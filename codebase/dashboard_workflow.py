@@ -2,10 +2,10 @@
 Entry point for the LEAP energy balance dashboard.
 
 This is a thin wrapper — the full workflow lives in:
-  codebase/leap_results_dashboard_v2_workflow.py
+  codebase/leap_results_dashboard_balance_estoaxis_workflow.py
 
 Run from repo root:
-  python codebase/leap_results_dashboard_v2_workflow.py
+  python codebase/leap_results_dashboard_balance_estoaxis_workflow.py
 
 DATA INPUTS (place in data/ — gitignored):
   data/leap results tables/          LEAP exported workbooks (.xlsx)
