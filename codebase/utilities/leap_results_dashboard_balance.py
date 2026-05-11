@@ -8207,7 +8207,7 @@ def _dashboard_template_esto_axis_records(
                     base[col] = False if col == "is_subtotal" else ""
             base = base[base["economy"].fillna("").astype(str).str.strip().eq(str(base_economy))].copy()
             base["value"] = pd.to_numeric(base[year_col], errors="coerce").fillna(0.0)
-            base["is_subtotal"] = base["is_subtotal"].fillna(False).astype(bool)
+            base["is_subtotal"] = base["is_subtotal"].fillna(False).infer_objects(copy=False).astype(bool)
             for row in base.itertuples(index=False):
                 flow = str(getattr(row, "flows", "")).strip()
                 product = str(getattr(row, "products", "")).strip()
@@ -8828,7 +8828,7 @@ def build_balance_comparison_esto_axis(
     for _col in ("esto_is_subtotal", "ninth_is_subtotal"):
         if _col not in groups.columns:
             groups[_col] = False
-        groups[_col] = groups[_col].fillna(False).astype(bool)
+        groups[_col] = groups[_col].fillna(False).infer_objects(copy=False).astype(bool)
     groups = _backfill_dashboard_hierarchy(groups, sheet_catalog=hierarchy_sheet_catalog)
     groups = _add_dashboard_context_aliases(_add_esto_flow_context_columns(groups))
 
