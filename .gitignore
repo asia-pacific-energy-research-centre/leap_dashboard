@@ -13,6 +13,9 @@ data/inputs/
 data/leap balances exports/
 outputs/
 
+# Auto-generated config archive (created at runtime by archive_config_dir_once_per_day)
+config/.archive/
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
