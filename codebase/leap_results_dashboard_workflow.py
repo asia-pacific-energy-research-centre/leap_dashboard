@@ -29,9 +29,9 @@ Why ESTO axis:
 - LEAP-backed rows get priority when many ESTO products share the same 9th
   sector/fuel pair. Workbook-only template rows fill gaps, but should not steal
   shared 9th values from rows that have direct LEAP balance evidence.
-- Transformation charts split signed balance rows at render time: negative
-  values are inputs and displayed as positive magnitudes; positive values are
-  outputs.
+- Transformation and transfer charts split signed balance rows at render time:
+  negative values are inputs and displayed as positive magnitudes; positive
+  values are outputs.
 - Simple audit outputs are written for the key ESTO-axis inputs:
   LEAP-to-ESTO rows, 9th-to-ESTO rows, and the combined comparison table.
 - See docs/esto_axis_balance_dashboard_system.md for the full system guide,
@@ -117,16 +117,22 @@ ECONOMY_TOKEN = "USA"          # short label used for docs/ subfolder and output
 BALANCE_EXPORT_ECONOMY = "20_USA"
 REF_BALANCE_EXPORT_DATE_ID: str | None = None
 TGT_BALANCE_EXPORT_DATE_ID: str | None = None
-REF_WORKBOOK_PATH = resolve_balance_export_workbook(
-    economy=BALANCE_EXPORT_ECONOMY,
-    scenario="REF",
-    date_id=REF_BALANCE_EXPORT_DATE_ID,
-)
-TGT_WORKBOOK_PATH = resolve_balance_export_workbook(
-    economy=BALANCE_EXPORT_ECONOMY,
-    scenario="TGT",
-    date_id=TGT_BALANCE_EXPORT_DATE_ID,
-)
+try:
+    REF_WORKBOOK_PATH = resolve_balance_export_workbook(
+        economy=BALANCE_EXPORT_ECONOMY,
+        scenario="REF",
+        date_id=REF_BALANCE_EXPORT_DATE_ID,
+    )
+except (FileNotFoundError, ValueError):
+    REF_WORKBOOK_PATH = None
+try:
+    TGT_WORKBOOK_PATH = resolve_balance_export_workbook(
+        economy=BALANCE_EXPORT_ECONOMY,
+        scenario="TGT",
+        date_id=TGT_BALANCE_EXPORT_DATE_ID,
+    )
+except (FileNotFoundError, ValueError):
+    TGT_WORKBOOK_PATH = None
 
 KNOWN_ISSUES_CONFIG_PATH = _resolve("config/leap_results_balance_known_issues.json")
 CHART_NAVIGATION_GUIDE_PATH = _resolve("config/leap_comparison_dashboard_template_v2.json")
@@ -335,6 +341,23 @@ def _filter_ignored_unmapped_issues(
     suppress_mask = pd.Series(False, index=work.index)
     suppress_mask.loc[unmapped_mask] = source_keys.map(lambda key: key in ignored_keys).to_numpy()
     return work.loc[~suppress_mask].copy()
+
+
+def _split_directional_balance_rows_for_charts(
+    comparison_long: pd.DataFrame,
+    resolved_structure: dict,
+) -> pd.DataFrame:
+    """
+    Split signed transformation and transfer rows before charting.
+
+    The shared helper keys off dashboard structure. `08 Transfers` is routed
+    under Other transformation, so it is split into input/output magnitudes
+    before chart ledgers and rendered charts are built.
+    """
+    return _split_transformation_input_output_measures(
+        comparison_long,
+        resolved_structure.get("sheet_catalog", {}),
+    )
 
 
 def _load_cached_ingestion(
@@ -757,10 +780,7 @@ def run_workflow() -> dict[str, object]:
     all_chart_groups_df = pd.DataFrame()
 
     if STAGE_RENDER_DASHBOARDS:
-        split_comparison_long = _split_transformation_input_output_measures(
-            comparison_long,
-            resolved_structure.get("sheet_catalog", {}),
-        )
+        split_comparison_long = _split_directional_balance_rows_for_charts(comparison_long, resolved_structure)
         chart_input = _prepare_render_long(split_comparison_long)
         chart_line_mapping_ledger = build_chart_line_mapping_ledger(chart_input, mapping_status)
         chart_total_component_ledger = build_total_component_ledger(chart_input, mapping_status)

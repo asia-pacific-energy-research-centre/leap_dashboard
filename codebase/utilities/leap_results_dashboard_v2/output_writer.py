@@ -4,9 +4,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from codebase import leap_results_dashboard_workflow as v1_workflow
-
-
 def write_core_outputs(
     *,
     out_dir: Path,
@@ -20,6 +17,8 @@ def write_core_outputs(
     atomic_mapping_edges: pd.DataFrame | None = None,
     atomic_validation_report: pd.DataFrame | None = None,
 ) -> dict[str, str]:
+    from codebase import leap_results_dashboard_workflow as v1_workflow  # deferred to break circular import
+
     out_dir.mkdir(parents=True, exist_ok=True)
     comparison_long_path = out_dir / "comparison_long.csv"
     comparison_wide_path = out_dir / "comparison_wide.csv"

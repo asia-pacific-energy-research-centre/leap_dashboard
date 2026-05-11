@@ -194,18 +194,16 @@ else:
     elif re.match(wsl_pc_pattern.lower(), cwd_lower):
         REPO_ROOT = Path("/mnt/c/Users/Work/github/leap_utilities")
     else:
-        raise ValueError("Unrecognized PC - please set REPO_ROOT manually.")
-#add paths to sys.path so we can import config files. This is complicated by the way other files from different repos import this and run it, so we have to add paths to sys.path instead of changing cwd.
+        REPO_ROOT = None
 
-#Path(__file__).resolve().parents[1]
-# CURRENT_DIR = Path.cwd()
-# if CURRENT_DIR != REPO_ROOT:
-#     os.chdir(REPO_ROOT)
-# if str(CURRENT_DIR) not in sys.path:
-sys.path.insert(0, str(REPO_ROOT))
-#add config to path --- END ---
-CONFIG_DIR = REPO_ROOT / "config"
-sys.path.insert(0, str(CONFIG_DIR))
-from LEAP_API_helpers import LEAP_UNITS_BY_ID
+if REPO_ROOT is not None:
+    sys.path.insert(0, str(REPO_ROOT))
+    CONFIG_DIR = REPO_ROOT / "config"
+    sys.path.insert(0, str(CONFIG_DIR))
+
+try:
+    from LEAP_API_helpers import LEAP_UNITS_BY_ID
+except ImportError:
+    LEAP_UNITS_BY_ID = {}
 
 # %%
