@@ -43,16 +43,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BALANCE_EXPORT_ECONOMY = "20_USA"
 DEFAULT_REF_BALANCE_EXPORT_DATE_ID: str | None = None
 DEFAULT_TGT_BALANCE_EXPORT_DATE_ID: str | None = None
-DEFAULT_REF_WORKBOOK_PATH = resolve_balance_export_workbook(
-    economy=DEFAULT_BALANCE_EXPORT_ECONOMY,
-    scenario="REF",
-    date_id=DEFAULT_REF_BALANCE_EXPORT_DATE_ID,
-)
-DEFAULT_TGT_WORKBOOK_PATH = resolve_balance_export_workbook(
-    economy=DEFAULT_BALANCE_EXPORT_ECONOMY,
-    scenario="TGT",
-    date_id=DEFAULT_TGT_BALANCE_EXPORT_DATE_ID,
-)
+try:
+    DEFAULT_REF_WORKBOOK_PATH = resolve_balance_export_workbook(
+        economy=DEFAULT_BALANCE_EXPORT_ECONOMY,
+        scenario="REF",
+        date_id=DEFAULT_REF_BALANCE_EXPORT_DATE_ID,
+    )
+except (FileNotFoundError, ValueError):
+    DEFAULT_REF_WORKBOOK_PATH = None
+try:
+    DEFAULT_TGT_WORKBOOK_PATH = resolve_balance_export_workbook(
+        economy=DEFAULT_BALANCE_EXPORT_ECONOMY,
+        scenario="TGT",
+        date_id=DEFAULT_TGT_BALANCE_EXPORT_DATE_ID,
+    )
+except (FileNotFoundError, ValueError):
+    DEFAULT_TGT_WORKBOOK_PATH = None
 DEFAULT_MAPPING_PAIRS_PATH = (REPO_ROOT / "config/master_config.xlsx", "ninth_pairs_to_esto_pairs")
 DEFAULT_CODEBOOK_PATH = REPO_ROOT / "config/sector_fuel_codes_to_names.xlsx"
 
