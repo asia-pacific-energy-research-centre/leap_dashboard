@@ -9,8 +9,7 @@ dist/
 build/
 
 # Data inputs — too large / sensitive for version control
-data/inputs/
-data/leap balances exports/
+data/
 outputs/
 
 # Auto-generated config archive (created at runtime by archive_config_dir_once_per_day)
