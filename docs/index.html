@@ -2,14 +2,294 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0; url=dashboards/about.html">
-  <title>LEAP Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LEAP Energy Balance Dashboard</title>
   <style>
-    body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f5f5f5; }
-    a { color: #0066cc; font-size: 1.1rem; }
+    :root {
+      --page-padding-x: clamp(16px, 3vw, 48px);
+      --page-padding-y: clamp(14px, 2vw, 28px);
+      --body-font-size: clamp(14px, 0.2vw + 13px, 16px);
+    }
+    * { box-sizing: border-box; }
+    html { background: #f4f6f8; }
+    body {
+      font-family: Segoe UI, Arial, sans-serif;
+      margin: 0;
+      background: #f4f6f8;
+      color: #111;
+      font-size: var(--body-font-size);
+      line-height: 1.5;
+      min-width: 320px;
+    }
+    a { color: #0b3d5c; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── header ───────────────────────────── */
+    .page-header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(244,246,248,0.96);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #d8dee4;
+      padding: var(--page-padding-y) var(--page-padding-x) 12px;
+    }
+    .header-inner { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .header-title { font-size: clamp(18px, 1.2vw + 14px, 26px); font-weight: 700; color: #0b3d5c; margin:0; }
+    .header-subtitle { font-size: 13px; color: #556; margin:0; }
+
+    /* ── main ─────────────────────────────── */
+    .page-shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px var(--page-padding-x) 64px;
+    }
+    .section-title {
+      font-size: clamp(15px, 0.6vw + 13px, 20px);
+      font-weight: 600;
+      color: #23384d;
+      margin: 0 0 20px 0;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #d0d7de;
+    }
+
+    /* ── economy grid ─────────────────────── */
+    .economy-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 14px;
+      margin-bottom: 48px;
+    }
+    .economy-card {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 10px;
+      padding: 18px 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      cursor: pointer;
+    }
+    .economy-card:hover {
+      border-color: #1f6feb;
+      box-shadow: 0 0 0 3px rgba(31,111,235,0.12);
+    }
+    .economy-card.unavailable {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .economy-card a {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+    }
+    .economy-flag { font-size: 28px; line-height: 1; }
+    .economy-code { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #888; text-transform: uppercase; }
+    .economy-name { font-size: 15px; font-weight: 600; color: #0b3d5c; }
+    .economy-badge {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #e6f4ea;
+      color: #1a7f37;
+      border: 1px solid #b2d8bc;
+      width: fit-content;
+    }
+    .economy-badge.pending {
+      background: #f0f0f0;
+      color: #888;
+      border-color: #ccc;
+    }
+
+    /* ── footer ───────────────────────────── */
+    .page-footer {
+      border-top: 1px solid #d8dee4;
+      padding: 20px var(--page-padding-x);
+      font-size: 12px;
+      color: #888;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
-  <p>Redirecting to dashboard&hellip; <a href="dashboards/about.html">Click here if not redirected.</a></p>
+
+<header class="page-header">
+  <div class="header-inner">
+    <div>
+      <p class="header-title">LEAP Energy Balance Dashboard</p>
+      <p class="header-subtitle">APEC economies &mdash; LEAP vs ESTO / 9th projection comparison</p>
+    </div>
+  </div>
+</header>
+
+<main class="page-shell">
+
+  <h2 class="section-title">Select an economy</h2>
+
+  <div class="economy-grid" id="economy-grid">
+
+    <!-- ── Available ───────────────────────────── -->
+
+    <div class="economy-card">
+      <a href="USA/dashboards/about.html">
+        <div class="economy-flag">🇺🇸</div>
+        <div class="economy-code">20USA</div>
+        <div class="economy-name">United States</div>
+        <span class="economy-badge">Available</span>
+      </a>
+    </div>
+
+    <!-- ── Pending (add as dashboards are generated) ── -->
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇦🇺</div>
+      <div class="economy-code">01AUS</div>
+      <div class="economy-name">Australia</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇧🇳</div>
+      <div class="economy-code">02BRN</div>
+      <div class="economy-name">Brunei Darussalam</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇨🇦</div>
+      <div class="economy-code">03CAN</div>
+      <div class="economy-name">Canada</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇨🇱</div>
+      <div class="economy-code">04CHL</div>
+      <div class="economy-name">Chile</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇨🇳</div>
+      <div class="economy-code">05PRC</div>
+      <div class="economy-name">China</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇭🇰</div>
+      <div class="economy-code">06HKG</div>
+      <div class="economy-name">Hong Kong, China</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇮🇩</div>
+      <div class="economy-code">07INA</div>
+      <div class="economy-name">Indonesia</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇯🇵</div>
+      <div class="economy-code">08JPN</div>
+      <div class="economy-name">Japan</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇰🇷</div>
+      <div class="economy-code">09ROK</div>
+      <div class="economy-name">Korea</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇲🇾</div>
+      <div class="economy-code">10MAS</div>
+      <div class="economy-name">Malaysia</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇲🇽</div>
+      <div class="economy-code">11MEX</div>
+      <div class="economy-name">Mexico</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇳🇿</div>
+      <div class="economy-code">12NZL</div>
+      <div class="economy-name">New Zealand</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇵🇬</div>
+      <div class="economy-code">13PNG</div>
+      <div class="economy-name">Papua New Guinea</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇵🇪</div>
+      <div class="economy-code">14PER</div>
+      <div class="economy-name">Peru</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇵🇭</div>
+      <div class="economy-code">15PHL</div>
+      <div class="economy-name">Philippines</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇷🇺</div>
+      <div class="economy-code">16RUS</div>
+      <div class="economy-name">Russia</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇸🇬</div>
+      <div class="economy-code">17SGP</div>
+      <div class="economy-name">Singapore</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇹🇼</div>
+      <div class="economy-code">18TAP</div>
+      <div class="economy-name">Chinese Taipei</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇹🇭</div>
+      <div class="economy-code">19THA</div>
+      <div class="economy-name">Thailand</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+    <div class="economy-card unavailable">
+      <div class="economy-flag">🇻🇳</div>
+      <div class="economy-code">21VIE</div>
+      <div class="economy-name">Viet Nam</div>
+      <span class="economy-badge pending">Pending</span>
+    </div>
+
+  </div>
+
+</main>
+
+<footer class="page-footer">
+  APEC Energy Working Group &mdash; LEAP model review dashboards
+</footer>
+
 </body>
 </html>
