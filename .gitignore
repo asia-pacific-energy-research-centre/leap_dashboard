@@ -10,6 +10,7 @@ build/
 
 # Data inputs — too large / sensitive for version control
 data/inputs/
+data/leap balances exports/
 outputs/
 
 # Jupyter
