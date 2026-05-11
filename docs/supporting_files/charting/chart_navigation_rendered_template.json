@@ -1,0 +1,84 @@
+{
+  "defaults": {
+    "measure": "Energy balance (PJ)"
+  },
+  "Buildings": {
+    "aggregate": {
+      "fuel": "Total",
+      "source_esto_flows": [
+        "16.01 Commercial and public services",
+        "16.02 Residential"
+      ]
+    }
+  },
+  "Bunkers": {
+    "aggregate": {
+      "fuel": "Total",
+      "source_esto_flows": [
+        "04 International marine bunkers",
+        "05 International aviation bunkers"
+      ]
+    }
+  },
+  "Industry": {
+    "aggregate": {
+      "fuel": "Total",
+      "source_esto_flows": [
+        "14.03 Manufacturing"
+      ]
+    },
+    "Manufacturing": {
+      "aggregate": {
+        "fuel": "Total",
+        "source_esto_flows": [
+          "14.03 Manufacturing"
+        ]
+      }
+    }
+  },
+  "Transport": {
+    "aggregate": {
+      "fuel": "Total",
+      "source_esto_flows": [
+        "15 Transport sector",
+        "15.02 Road",
+        "15.03 Rail",
+        "15.05 Pipeline transport"
+      ]
+    }
+  },
+  "Power": {
+    "aggregate": {
+      "fuel": "Total",
+      "source_esto_flows": [
+        "09.01.02 CHP plants"
+      ],
+      "measures": [
+        "Outputs (PJ)"
+      ]
+    }
+  },
+  "Other transformation and transfers": {
+    "Supply": {
+      "aggregate": {
+        "fuel": "Total",
+        "source_esto_flows": [
+          "01 Production",
+          "02 Imports",
+          "03 Exports",
+          "07 Total primary energy supply"
+        ]
+      }
+    },
+    "Demand": {
+      "Total final energy consumption": {
+        "aggregate": {
+          "fuel": "Total",
+          "source_esto_flows": [
+            "13 Total final energy consumption"
+          ]
+        }
+      }
+    }
+  }
+}

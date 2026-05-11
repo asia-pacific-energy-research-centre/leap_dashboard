@@ -1,0 +1,122 @@
+sheet,ninth_fuel_code,label_count,fuel_labels
+template__Power__CHP_plants,07_x_other_petroleum_products,8,Crude oil | Kerosene | LPG | Naphtha | Other products | Petroleum coke | Refinery feedstocks | Refinery gas (not liquefied)
+esto__08__Transfers,07_x_other_petroleum_products,6,Additives/ oxygenates | Bitumen | Lubricants | Other products | Paraffin waxes | White spirit SBP
+esto__01__Production,01_x_thermal_coal,5,Anthracite | Coal nonspecified | Lignite | Other bituminous coal | Sub-bituminous coal
+esto__02__Imports,07_x_other_petroleum_products,5,Additives/ oxygenates | Bitumen | Lubricants | Other products | Paraffin waxes
+esto__03__Exports,07_x_other_petroleum_products,5,Additives/ oxygenates | Bitumen | Lubricants | Other products | Paraffin waxes
+esto__07__Total_primary_energy_supply,07_x_other_petroleum_products,5,Additives/ oxygenates | Bitumen | Lubricants | Other products | Paraffin waxes
+esto__09_07__Oil_refineries,07_x_other_petroleum_products,5,Bitumen | Lubricants | Other products | Paraffin  waxes | White spirit SBP
+esto__13__Total_final_energy_consumption,07_x_other_petroleum_products,4,Bitumen | Lubricants | Other products | Paraffin waxes
+esto__14_03_02__Chemical__incl__petrochemical,07_x_other_petroleum_products,4,Bitumen | Lubricants | Other products | Paraffin waxes
+esto__14_03_03__Non_ferrous_metals,07_x_other_petroleum_products,4,Bitumen | Lubricants | Other products | Paraffin waxes
+esto__14_03_04__Non-metallic_mineral_products,07_x_other_petroleum_products,4,Bitumen | Lubricants | Other products | Paraffin waxes
+esto__14_03_06__Machinery,07_x_other_petroleum_products,4,Bitumen | Lubricants | Other products | Paraffin waxes
+esto__14_03_08__Pulp__paper_and_printing,07_x_other_petroleum_products,4,Bitumen | Lubricants | Other products | Paraffin waxes
+esto__14_03_11__Non-specified_industry,07_x_other_petroleum_products,4,Bitumen | Lubricants | Other products | Paraffin waxes
+esto__14_03__Manufacturing,07_x_other_petroleum_products,4,Bitumen | Lubricants | Other products | Paraffin waxes
+esto__14__Industry_sector,07_x_other_petroleum_products,4,Bitumen | Lubricants | Other products | Paraffin waxes
+esto__02__Imports,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__03__Exports,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__07__Total_primary_energy_supply,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__09_07__Oil_refineries,06_x_other_hydrocarbons,3,Additives/  oxygenates | Other hydrocarbons | Refinery feedstocks
+esto__13__Total_final_energy_consumption,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__14_03_01__Iron_and_steel,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__14_03_02__Chemical__incl__petrochemical,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__14_03_04__Non-metallic_mineral_products,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__14_03_06__Machinery,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__14_03_07__Food__beverages_and_tobacco,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__14_03_08__Pulp__paper_and_printing,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__14_03_10__Textiles_and_leather,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__14_03_11__Non-specified_industry,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__14_03__Manufacturing,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__14__Industry_sector,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__16_01__Commercial_and_public_services,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+template__Power__CHP_plants,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+template__Power__Electricity_plants,01_x_thermal_coal,3,Anthracite | Other bituminous coal | Sub-bituminous coal
+esto__02__Imports,06_x_other_hydrocarbons,2,Other hydrocarbons | Refinery feedstocks
+esto__02__Imports,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__03__Exports,06_x_other_hydrocarbons,2,Other hydrocarbons | Refinery feedstocks
+esto__03__Exports,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__07__Total_primary_energy_supply,06_x_other_hydrocarbons,2,Other hydrocarbons | Refinery feedstocks
+esto__07__Total_primary_energy_supply,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__08__Transfers,06_x_other_hydrocarbons,2,Other hydrocarbons | Refinery feedstocks
+esto__09_01_01__Electricity_plants,01_x_thermal_coal,2,Other bituminous coal | Sub-bituminous coal
+esto__09_02_01__Electricity_plants,01_x_thermal_coal,2,Other bituminous coal | Sub-bituminous coal
+esto__09__Total_transformation_sector,01_x_thermal_coal,2,Other bituminous coal | Sub-bituminous coal
+esto__09__Total_transformation_sector,06_x_other_hydrocarbons,2,Other hydrocarbons | Refinery feedstocks
+esto__09__Total_transformation_sector,07_x_other_petroleum_products,2,Bitumen | Other products
+esto__10_01_11__Oil_refineries,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__13__Total_final_energy_consumption,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__14_03_02__Chemical__incl__petrochemical,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__14_03_03__Non_ferrous_metals,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__14_03_04__Non-metallic_mineral_products,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__14_03_06__Machinery,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__14_03_08__Pulp__paper_and_printing,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__14_03_11__Non-specified_industry,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__14_03__Manufacturing,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+esto__14__Industry_sector,07_x_jet_fuel,2,Gasoline type jet fuel | Kerosene type jet fuel
+template__Other_transformation__Coal__oil_and_gas_extraction_own_use,01_x_thermal_coal,2,Other bituminous coal | Sub-bituminous coal
+template__Power__Electricity_plants,07_x_other_petroleum_products,2,Bitumen | Other products
+esto__01__Production,01_05_lignite|01_x_thermal_coal,1,Lignite
+esto__01__Production,07_x_jet_fuel,1,Gasoline type jet fuel
+esto__01__Production,07_x_other_petroleum_products,1,Paraffin waxes
+esto__01__Production,12_x_other_solar,1,Solar nonspecified
+esto__02__Imports,12_x_other_solar,1,Solar nonspecified
+esto__02__Imports,16_x_ammonia,1,Ammonia
+esto__02__Imports,16_x_hydrogen,1,Hydrogen
+esto__02__Imports,17_x_green_electricity,1,Electricity
+esto__04__International_marine_bunkers,16_x_ammonia,1,Ammonia
+esto__05__International_aviation_bunkers,07_x_jet_fuel,1,Kerosene type jet fuel
+esto__05__International_aviation_bunkers,16_x_hydrogen,1,Hydrogen
+esto__07__Total_primary_energy_supply,12_x_other_solar,1,Solar nonspecified
+esto__07__Total_primary_energy_supply,16_x_ammonia,1,Ammonia
+esto__07__Total_primary_energy_supply,16_x_hydrogen,1,Hydrogen
+esto__07__Total_primary_energy_supply,17_x_green_electricity,1,Electricity
+esto__08__Transfers,07_x_jet_fuel,1,Kerosene type jet fuel
+esto__09_01_01__Electricity_plants,07_x_other_petroleum_products,1,Other products
+esto__09_01_01__Electricity_plants,12_x_other_solar,1,Solar nonspecified
+esto__09_01_01__Electricity_plants,16_x_hydrogen,1,Hydrogen
+esto__09_01_02__CHP_plants,01_x_thermal_coal,1,Sub-bituminous coal
+esto__09_02_01__Electricity_plants,07_x_other_petroleum_products,1,Other products
+esto__09_02_01__Electricity_plants,12_x_other_solar,1,Solar nonspecified
+esto__09_02_01__Electricity_plants,16_x_hydrogen,1,Hydrogen
+esto__09_02_02__CHP_plants,01_x_thermal_coal,1,Sub-bituminous coal
+esto__09_07__Oil_refineries,07_x_jet_fuel,1,Kerosene type jet fuel
+esto__09_08__Coal_transformation,01_x_thermal_coal,1,Other bituminous coal
+esto__09_12__Non-specified_transformation,06_x_other_hydrocarbons,1,Other hydrocarbons
+esto__09_12__Non-specified_transformation,07_x_other_petroleum_products,1,Other products
+esto__09_13_01__Electrolysers,16_x_ammonia,1,Ammonia
+esto__09_13_01__Electrolysers,16_x_efuel,1,E-fuel
+esto__09_13_01__Electrolysers,16_x_hydrogen,1,Hydrogen
+esto__09_13_01__Electrolysers,17_x_green_electricity,1,Electricity
+esto__09_13_03__SMR_w_CCS,16_x_ammonia,1,Ammonia
+esto__09_13_03__SMR_w_CCS,16_x_efuel,1,E-fuel
+esto__09_13_03__SMR_w_CCS,16_x_hydrogen,1,Hydrogen
+esto__09_13__Hydrogen_transformation,16_x_ammonia,1,Ammonia
+esto__09_13__Hydrogen_transformation,16_x_efuel,1,E-fuel
+esto__09_13__Hydrogen_transformation,16_x_hydrogen,1,Hydrogen
+esto__09__Total_transformation_sector,07_x_jet_fuel,1,Kerosene type jet fuel
+esto__09__Total_transformation_sector,12_x_other_solar,1,Solar nonspecified
+esto__09__Total_transformation_sector,16_x_ammonia,1,Ammonia
+esto__09__Total_transformation_sector,16_x_efuel,1,E-fuel
+esto__09__Total_transformation_sector,16_x_hydrogen,1,Hydrogen
+esto__09__Total_transformation_sector,17_x_green_electricity,1,Electricity
+esto__10_01_11__Oil_refineries,07_x_other_petroleum_products,1,PetProd nonspecified
+esto__13__Total_final_energy_consumption,12_x_other_solar,1,Solar nonspecified
+esto__13__Total_final_energy_consumption,16_x_ammonia,1,Ammonia
+esto__13__Total_final_energy_consumption,16_x_efuel,1,E-fuel
+esto__13__Total_final_energy_consumption,16_x_hydrogen,1,Hydrogen
+esto__14_03_01__Iron_and_steel,16_x_hydrogen,1,Hydrogen
+esto__15_01__Domestic_air_transport,07_x_jet_fuel,1,Kerosene type jet fuel
+esto__15_01__Domestic_air_transport,16_x_efuel,1,E-fuel
+esto__15_01__Domestic_air_transport,16_x_hydrogen,1,Hydrogen
+esto__15_02__Road,16_x_hydrogen,1,Hydrogen
+esto__15_04__Domestic_navigation,16_x_ammonia,1,Ammonia
+esto__15__Transport_sector,07_x_jet_fuel,1,Kerosene type jet fuel
+esto__15__Transport_sector,16_x_ammonia,1,Ammonia
+esto__15__Transport_sector,16_x_efuel,1,E-fuel
+esto__15__Transport_sector,16_x_hydrogen,1,Hydrogen
+esto__16_01__Commercial_and_public_services,12_x_other_solar,1,Solar nonspecified
+esto__16_02__Residential,12_x_other_solar,1,Solar nonspecified
+template__Power__Electricity_plants,12_x_other_solar,1,Solar nonspecified
+template__Power__Electricity_plants,16_x_hydrogen,1,Hydrogen

@@ -1,0 +1,7 @@
+esto_flow,sheet,path
+14 Industry sector,esto__14__Industry_sector,Industry sector
+14.03 Manufacturing,esto__14_03__Manufacturing,Industry sector > Manufacturing
+15 Transport sector,esto__15__Transport_sector,Transport sector
+09.06 Gas processing plants,esto__09_06__Gas_processing_plants,Other transformation > Gas processing plants
+09.13 Hydrogen transformation,esto__09_13__Hydrogen_transformation,Other transformation > Hydrogen transformation
+09 Total transformation sector,esto__09__Total_transformation_sector,Other transformation > Total transformation sector

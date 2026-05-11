@@ -1,0 +1,11 @@
+workflow,stage_order,stage,status,started_at,ended_at,duration_seconds,duration_formatted
+leap_results_dashboard_balance_estoaxis,1,setup,success,2026-05-04T23:26:27,2026-05-04T23:26:27,0.052,0h 0m 0.1s
+leap_results_dashboard_balance_estoaxis,2,extract and map LEAP balance workbooks,success,2026-05-04T23:26:27,2026-05-04T23:30:13,226.687,0h 3m 46.7s
+leap_results_dashboard_balance_estoaxis,3,build ESTO-axis comparison,success,2026-05-04T23:30:13,2026-05-04T23:42:59,765.143,0h 12m 45.1s
+leap_results_dashboard_balance_estoaxis,4,write core and simple ESTO-axis outputs,success,2026-05-04T23:42:59,2026-05-04T23:45:14,135.458,0h 2m 15.5s
+leap_results_dashboard_balance_estoaxis,5,write diagnostics,success,2026-05-04T23:45:14,2026-05-04T23:45:16,2.168,0h 0m 2.2s
+leap_results_dashboard_balance_estoaxis,6,render dashboards,success,2026-05-04T23:45:16,2026-05-04T23:47:19,122.968,0h 2m 3.0s
+leap_results_dashboard_balance_estoaxis,7,write chart ledgers,success,2026-05-04T23:47:19,2026-05-04T23:47:32,12.468,0h 0m 12.5s
+leap_results_dashboard_balance_estoaxis,8,"write runtime, mapping, and coverage checks",success,2026-05-04T23:47:32,2026-05-04T23:48:08,36.253,0h 0m 36.3s
+leap_results_dashboard_balance_estoaxis,9,write manifest,success,2026-05-04T23:48:08,2026-05-04T23:48:09,1.273,0h 0m 1.3s
+leap_results_dashboard_balance_estoaxis,10,total,success,2026-05-04T23:26:27,2026-05-04T23:48:09,1302.476,0h 21m 42.5s

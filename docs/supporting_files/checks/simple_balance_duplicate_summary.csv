@@ -1,0 +1,7 @@
+dataset,check,severity,group_count,row_count,note
+leap,exact_duplicate_descriptor_rows,error,0,0,Same descriptor columns appear more than once.
+leap,source_maps_to_multiple_esto_pairs,warning,1845,3690,One source key maps to multiple ESTO flow/product pairs.
+leap,esto_pair_has_multiple_source_keys,info,0,0,Multiple source keys contribute to one ESTO pair.
+9th,exact_duplicate_descriptor_rows,error,0,0,Same descriptor columns appear more than once.
+9th,source_maps_to_multiple_esto_pairs,warning,3534,12540,One source key maps to multiple ESTO flow/product pairs.
+9th,esto_pair_has_multiple_source_keys,info,0,0,Multiple source keys contribute to one ESTO pair.

@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Production</title>
+  <style>
+:root {
+  color-scheme: light;
+  --page-padding-x: clamp(12px, 1.8vw, 24px);
+  --page-padding-y: clamp(14px, 1.8vw, 24px);
+  --body-font-size: clamp(15px, 0.22vw + 14px, 18px);
+  --title-font-size: clamp(24px, 0.75vw + 18px, 34px);
+  --section-title-size: clamp(18px, 0.45vw + 14px, 24px);
+}
+html { background: #f4f6f8; }
+body {
+  font-family: Segoe UI, Arial, sans-serif;
+  margin: 0;
+  background: #f4f6f8;
+  color: #111;
+  font-size: var(--body-font-size);
+  line-height: 1.45;
+  min-width: 320px;
+}
+a { color: #0b3d5c; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.page-shell { width: 100%; max-width: none; margin: 0 auto; padding: 0 var(--page-padding-x) 32px; box-sizing: border-box; }
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin: 0 0 14px 0;
+  padding: var(--page-padding-y) 0 10px 0;
+  background: rgba(244, 246, 248, 0.96);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #d8dee4;
+}
+.header-main-row { display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 16px; }
+.header-side-controls {
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;
+  gap:8px 10px;flex:1 1 460px;
+}
+.header-inline-controls {
+  display:flex;align-items:center;gap:8px;justify-content:flex-end;
+  flex:0 0 auto;flex-wrap:nowrap;margin-left:auto;
+}
+.header-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.header-chip {
+  padding: 6px 10px;
+  border: 1px solid #c5ccd3;
+  border-radius: 6px;
+  background: #fff;
+  color: #0b3d5c;
+  font-size: 13px;
+  text-decoration: none;
+}
+.header-chip[data-current="true"] {
+  border-color:#1f6feb;
+  box-shadow:0 0 0 2px rgba(31, 111, 235, 0.16);
+  font-weight:700;
+}
+.header-nav-separator {
+  color:#6b7280;
+  font-weight:700;
+  line-height:1.25;
+  padding:6px 2px;
+}
+.header-toggle {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #c5ccd3;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b3d5c;
+  cursor: pointer;
+}
+.header-toggle-row {
+  display:flex;
+  justify-content:flex-end;
+  margin-top:8px;
+}
+.page-header.is-collapsed .header-collapsible { display: none; }
+.page-header.is-collapsed {
+  padding-bottom:0;
+  background:transparent;
+  backdrop-filter:none;
+  border-bottom-color:transparent;
+}
+.page-header.is-collapsed .header-toggle-row { margin-top:0; }
+.jump-nav {
+  margin-top:8px;
+  padding-top:8px;
+  border-top:1px solid #d8dee4;
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px 10px;
+  align-items:flex-start;
+}
+.jump-nav-label {
+  font-weight:600;
+  color:#4b5563;
+  font-size:12px;
+  white-space:nowrap;
+  padding-top:4px;
+}
+.jump-nav-groups {
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  min-width:0;
+  flex:1 1 640px;
+}
+.jump-nav-row {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 8px;
+  align-items:center;
+  min-width:0;
+}
+.jump-nav-row[data-level="2"] { padding-left:18px; }
+.jump-nav-row[data-level="3"] { padding-left:36px; }
+.jump-nav-row[data-level="4"] { padding-left:54px; }
+.jump-chip {
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:4px 9px;
+  border:1px solid #c5ccd3;
+  border-radius:999px;
+  background:#fff;
+  color:#0b3d5c;
+  text-decoration:none;
+  font-size:12px;
+  line-height:1.25;
+  box-shadow:0 1px 1px rgba(15, 23, 42, 0.04);
+}
+.jump-chip::before {
+  content:"";
+  display:block;
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  flex:0 0 auto;
+  background:#94a3b8;
+}
+.jump-chip[data-level="1"] {
+  background:#fff4e6;
+  border-color:#f2a65a;
+  color:#7a3b00;
+}
+.jump-chip[data-level="1"]::before { background:#f97316; }
+.jump-chip[data-level="2"] {
+  background:#f5edff;
+  border-color:#c69af0;
+  color:#4c1d70;
+}
+.jump-chip[data-level="2"]::before { background:#9333ea; }
+.jump-chip[data-level="3"], .jump-chip[data-level="4"] {
+  background:#f8fafc;
+  border-color:#cbd5e1;
+  color:#334155;
+}
+.jump-chip[data-level="3"]::before, .jump-chip[data-level="4"]::before { background:#94a3b8; }
+.jump-chip[data-current="true"] {
+  border-color:#1f6feb;
+  box-shadow:0 0 0 2px rgba(31, 111, 235, 0.16);
+  font-weight:700;
+}
+.jump-nav-separator {
+  color:#6b7280;
+  font-weight:700;
+  line-height:1.25;
+  padding:4px 2px;
+}
+.section-link-list {
+  margin:0 0 14px 0;
+  padding:0;
+  list-style:none;
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+.section-link-list li {
+  line-height:1.35;
+}
+.section-link-list li[data-level="2"] { padding-left:18px; }
+.section-link-list li[data-level="3"] { padding-left:36px; }
+.section-link-list li[data-level="4"] { padding-left:54px; }
+.section-link-list a {
+  color:#0b3d5c;
+  text-decoration:none;
+  font-weight:600;
+}
+.section-card {
+  margin: 10px 0 14px 0;
+  padding: 10px;
+  border: 1px solid #d6dde5;
+  border-radius: 8px;
+  background: #fff;
+}
+.section-note {
+  margin: 10px 0 14px 0;
+  padding: 12px;
+  border: 1px dashed #c5ccd3;
+  border-radius: 8px;
+  background: #fff;
+  color: #4b5563;
+}
+.meta-line { margin-bottom: 8px; font-weight: 600; color: #1f2d3d; }
+.meta-subline { margin-top: -4px; margin-bottom: 8px; color: #4b5563; font-size: 12px; }
+.dashboard-grid {
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:12px;
+  align-items:start;
+}
+.dashboard-grid.expand-1 { grid-template-columns:minmax(0, 1fr); }
+.dashboard-grid.expand-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.dashboard-grid.expand-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.chart-card {
+  margin:0;
+  padding:10px;
+  border:1px solid #d0d7de;
+  border-radius:8px;
+  background:#fff;
+  box-shadow:0 1px 2px rgba(0,0,0,0.05);
+}
+.chart-caption {
+  font-weight:600;
+  margin-bottom:4px;
+}
+.lazy-chart-frame {
+  width: 100%;
+  height: clamp(380px, 62vh, 1100px);
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  display: block;
+  box-sizing: border-box;
+}
+.lazy-chart-frame.is-unloaded {
+  background:#f8fafc;
+}
+.chart-load-state {
+  min-height:22px;
+  margin:4px 0 6px 0;
+  color:#64748b;
+  font-size:12px;
+}
+.chart-load-state[data-loaded="true"] { display:none; }
+@media (max-width: 720px) {
+  .dashboard-grid { grid-template-columns:minmax(0, 1fr); }
+  .lazy-chart-frame { height: 420px; }
+}
+</style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="page-header" id="page-header">
+      <div class="header-collapsible">
+      <div class="header-main-row">
+        <div style="min-width:220px;flex:1 1 320px;">
+          <h1 style="margin:0;font-size:24px;line-height:1.15;"><a href="node__Supply__Production.html" style="color:inherit;text-decoration:none;">Production</a></h1>
+          
+        </div>
+        <div class="header-side-controls">
+          <div class="header-inline-controls">
+            <a href="about.html" class="header-chip" data-current="false">About</a><a href="node__Buildings.html" class="header-chip" data-current="false">Buildings</a><a href="node__Bunkers.html" class="header-chip" data-current="false">Bunkers</a><a href="node__Industry_sector.html" class="header-chip" data-current="false">Industry</a><a href="node__Transport_sector.html" class="header-chip" data-current="false">Transport</a><a href="node__Other_sector.html" class="header-chip" data-current="false">Others</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="node__Power.html" class="header-chip" data-current="false">Power</a><a href="node__Refining.html" class="header-chip" data-current="false">Refining</a><a href="node__Other_transformation.html" class="header-chip" data-current="false">Other transformation</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="node__Supply.html" class="header-chip" data-current="false">Supply</a>
+          </div>
+        </div>
+      </div>
+      <div class="jump-nav"><span class="jump-nav-label">Sections:</span><div class="jump-nav-groups"><div class="jump-nav-row" data-level="1"><a href="#sec-Supply__Exports" class="jump-chip" data-level="1" data-current="false">Exports</a><a href="#sec-Supply__Imports" class="jump-chip" data-level="1" data-current="false">Imports</a><a href="#sec-Supply__Production" class="jump-chip" data-level="1" data-current="false">Production</a><a href="#sec-Supply__Total_primary_energy_supply" class="jump-chip" data-level="1" data-current="false">Total primary energy supply</a></div></div></div>
+      </div>
+      <div class="header-toggle-row">
+        <button id="header-toggle" class="header-toggle" type="button" aria-expanded="true" aria-label="Collapse header">▴</button>
+      </div>
+    </header>
+    <main class="page-body">
+      
+      
+      <section><section id="sec-Supply__Production" style="scroll-margin-top:150px;"><h2 style="margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d;">Production</h2><section class="measure-group" style="margin:6px 0 14px 0;"><div class="dashboard-grid"><figure class="chart-card"><figcaption class="chart-caption">Total</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/aggregate__Supply__Production__Energy_balance__PJ__Total.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Total"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Anthracite</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Anthracite.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Anthracite"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Bagasse</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Bagasse.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Bagasse"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Bio jet kerosene</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Bio_jet_kerosene.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Bio jet kerosene"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Biodiesel</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Biodiesel.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Biodiesel"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Biogas</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Biogas.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Biogas"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Biogasoline</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Biogasoline.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Biogasoline"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Black liqour</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Black_liqour.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Black liqour"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Blast furnace gas</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Blast_furnace_gas.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Blast furnace gas"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Coal nonspecified</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Coal_nonspecified.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Coal nonspecified"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Coking coal</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Coking_coal.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Coking coal"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Crude oil</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Crude_oil.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Crude oil"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Fuelwood & woodwaste</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Fuelwood___woodwaste.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Fuelwood & woodwaste"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Geothermal</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Geothermal.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Geothermal"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Hydro</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Hydro.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Hydro"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Industrial waste</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Industrial_waste.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Industrial waste"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Lignite</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Lignite.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Lignite"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Municipal solid waste (non-renewable)</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Municipal_solid_waste__non-renewable.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Municipal solid waste (non-renewable)"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Municipal solid waste (renewable)</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Municipal_solid_waste__renewable.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Municipal solid waste (renewable)"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Natural gas</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Natural_gas.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Natural gas"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Natural gas liquids</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Natural_gas_liquids.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Natural gas liquids"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Nuclear</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Nuclear.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Nuclear"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">of which: Photovoltaics</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__of_which__Photovoltaics.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="of which: Photovoltaics"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Other biomass</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Other_biomass.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Other biomass"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Other bituminous coal</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Other_bituminous_coal.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Other bituminous coal"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Other liquid biofuels</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Other_liquid_biofuels.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Other liquid biofuels"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Other sources</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Other_sources.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Other sources"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Solar nonspecified</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Solar_nonspecified.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Solar nonspecified"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Sub-bituminous coal</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Sub-bituminous_coal.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Sub-bituminous coal"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Wind</figcaption><div class="meta-subline">Supply > Production</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__01__Production__Energy_balance__PJ__Wind.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Wind"></iframe></figure></div></section></section></section>
+    </main>
+  </div>
+  <script>
+(function() {
+  const pageHeader = document.getElementById('page-header');
+  const toggle = document.getElementById('header-toggle');
+  if (!pageHeader || !toggle) return;
+  const key = 'balance-dashboard-header-collapsed';
+  const apply = (collapsed) => {
+    pageHeader.classList.toggle('is-collapsed', collapsed);
+    toggle.textContent = collapsed ? '▾' : '▴';
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggle.setAttribute('aria-label', collapsed ? 'Expand header' : 'Collapse header');
+  };
+  let collapsed = false;
+  try { collapsed = window.localStorage.getItem(key) === 'true'; } catch (err) {}
+  apply(collapsed);
+  toggle.addEventListener('click', () => {
+    collapsed = !pageHeader.classList.contains('is-collapsed');
+    apply(collapsed);
+    try { window.localStorage.setItem(key, collapsed ? 'true' : 'false'); } catch (err) {}
+  });
+})();
+</script>
+  <script>
+(function() {
+  const frames = Array.from(document.querySelectorAll('iframe.lazy-chart-frame[data-src]'));
+  if (!frames.length) return;
+
+  const LOAD_WINDOW = 50;
+  const UNLOAD_DISTANCE = 100;
+  let ticking = false;
+
+  const setLoaded = (frame, loaded) => {
+    const state = frame.previousElementSibling;
+    if (loaded) {
+      if (!frame.getAttribute('src')) {
+        frame.setAttribute('src', frame.dataset.src);
+      }
+      frame.classList.remove('is-unloaded');
+      if (state && state.classList.contains('chart-load-state')) {
+        state.dataset.loaded = 'true';
+        state.textContent = '';
+      }
+      return;
+    }
+    if (frame.getAttribute('src')) {
+      frame.removeAttribute('src');
+    }
+    frame.classList.add('is-unloaded');
+    if (state && state.classList.contains('chart-load-state')) {
+      state.dataset.loaded = 'false';
+      state.textContent = 'Chart unloaded until nearby';
+    }
+  };
+
+  const nearestFrameIndex = () => {
+    const viewportMid = window.scrollY + window.innerHeight / 2;
+    let bestIndex = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    frames.forEach((frame, index) => {
+      const rect = frame.getBoundingClientRect();
+      const frameMid = window.scrollY + rect.top + rect.height / 2;
+      const distance = Math.abs(frameMid - viewportMid);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = index;
+      }
+    });
+    return bestIndex;
+  };
+
+  const updateFrames = () => {
+    ticking = false;
+    const current = nearestFrameIndex();
+    const half = Math.floor(LOAD_WINDOW / 2);
+    let start = Math.max(0, current - half);
+    let end = Math.min(frames.length - 1, start + LOAD_WINDOW - 1);
+    start = Math.max(0, end - LOAD_WINDOW + 1);
+
+    frames.forEach((frame, index) => {
+      if (index >= start && index <= end) {
+        setLoaded(frame, true);
+      } else if (Math.abs(index - current) > UNLOAD_DISTANCE) {
+        setLoaded(frame, false);
+      }
+    });
+  };
+
+  const scheduleUpdate = () => {
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(updateFrames);
+  };
+
+  frames.forEach((frame) => {
+    frame.classList.add('is-unloaded');
+    const state = frame.previousElementSibling;
+    if (state && state.classList.contains('chart-load-state')) {
+      state.dataset.loaded = 'false';
+      state.textContent = 'Chart queued';
+    }
+  });
+
+  window.addEventListener('scroll', scheduleUpdate, { passive: true });
+  window.addEventListener('resize', scheduleUpdate);
+  window.addEventListener('hashchange', () => window.setTimeout(scheduleUpdate, 80));
+  window.setTimeout(updateFrames, 0);
+})();
+</script>
+</body>
+</html>

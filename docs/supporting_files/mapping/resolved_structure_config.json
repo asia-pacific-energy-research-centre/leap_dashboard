@@ -1,0 +1,1381 @@
+{
+  "page_tree": [
+    {
+      "id": "Buildings",
+      "label": "Buildings",
+      "children": [
+        {
+          "id": "Buildings__Commercial_and_public_services",
+          "label": "Commercial and public services",
+          "children": []
+        },
+        {
+          "id": "Buildings__Datacentres",
+          "label": "Datacentres",
+          "children": []
+        },
+        {
+          "id": "Buildings__Residential",
+          "label": "Residential",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "Bunkers",
+      "label": "Bunkers",
+      "children": [
+        {
+          "id": "Bunkers__International_aviation_bunkers",
+          "label": "International aviation bunkers",
+          "children": []
+        },
+        {
+          "id": "Bunkers__International_marine_bunkers",
+          "label": "International marine bunkers",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "Industry_sector",
+      "label": "Industry sector",
+      "children": [
+        {
+          "id": "Industry_sector__Construction",
+          "label": "Construction",
+          "children": []
+        },
+        {
+          "id": "Industry_sector__Manufacturing",
+          "label": "Manufacturing",
+          "children": [
+            {
+              "id": "Industry_sector__Manufacturing__Chemical__incl__petrochemical",
+              "label": "Chemical (incl. petrochemical)",
+              "children": []
+            },
+            {
+              "id": "Industry_sector__Manufacturing__Food__beverages_and_tobacco",
+              "label": "Food, beverages and tobacco",
+              "children": []
+            },
+            {
+              "id": "Industry_sector__Manufacturing__Iron_and_steel",
+              "label": "Iron and steel",
+              "children": []
+            },
+            {
+              "id": "Industry_sector__Manufacturing__Machinery",
+              "label": "Machinery",
+              "children": []
+            },
+            {
+              "id": "Industry_sector__Manufacturing__Non_ferrous_metals",
+              "label": "Non ferrous metals",
+              "children": []
+            },
+            {
+              "id": "Industry_sector__Manufacturing__Non-metallic_mineral_products",
+              "label": "Non-metallic mineral products",
+              "children": []
+            },
+            {
+              "id": "Industry_sector__Manufacturing__Non-specified_industry",
+              "label": "Non-specified industry",
+              "children": []
+            },
+            {
+              "id": "Industry_sector__Manufacturing__Pulp__paper_and_printing",
+              "label": "Pulp, paper and printing",
+              "children": []
+            },
+            {
+              "id": "Industry_sector__Manufacturing__Textiles_and_leather",
+              "label": "Textiles and leather",
+              "children": []
+            },
+            {
+              "id": "Industry_sector__Manufacturing__Transportation_equipment",
+              "label": "Transportation equipment",
+              "children": []
+            },
+            {
+              "id": "Industry_sector__Manufacturing__Wood_and_wood_products",
+              "label": "Wood and wood products",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "Industry_sector__Mining_and_quarrying",
+          "label": "Mining and quarrying",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "Transport_sector",
+      "label": "Transport sector",
+      "children": [
+        {
+          "id": "Transport_sector__Domestic_air_transport",
+          "label": "Domestic air transport",
+          "children": []
+        },
+        {
+          "id": "Transport_sector__Domestic_navigation",
+          "label": "Domestic navigation",
+          "children": []
+        },
+        {
+          "id": "Transport_sector__Pipeline_transport",
+          "label": "Pipeline transport",
+          "children": []
+        },
+        {
+          "id": "Transport_sector__Rail",
+          "label": "Rail",
+          "children": []
+        },
+        {
+          "id": "Transport_sector__Road",
+          "label": "Road",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "Other_sector",
+      "label": "Other sector",
+      "children": [
+        {
+          "id": "Other_sector__Agriculture_and_fishing",
+          "label": "Agriculture and fishing",
+          "children": []
+        },
+        {
+          "id": "Other_sector__Non-specified_others",
+          "label": "Non-specified others",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "Power",
+      "label": "Power",
+      "children": [
+        {
+          "id": "Power__CHP_plants",
+          "label": "CHP plants",
+          "children": []
+        },
+        {
+          "id": "Power__Electricity_own_use",
+          "label": "Electricity own use",
+          "children": []
+        },
+        {
+          "id": "Power__Electricity_plants",
+          "label": "Electricity plants",
+          "children": []
+        },
+        {
+          "id": "Power__Heat_plants",
+          "label": "Heat plants",
+          "children": []
+        },
+        {
+          "id": "Power__Transmission_and_distribution_losses",
+          "label": "Transmission and distribution losses",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "Refining",
+      "label": "Refining",
+      "children": [
+        {
+          "id": "Refining__Oil_refineries",
+          "label": "Oil refineries",
+          "children": []
+        },
+        {
+          "id": "Refining__Refinery_own_use",
+          "label": "Refinery own use",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "Other_transformation",
+      "label": "Other transformation",
+      "children": [
+        {
+          "id": "Other_transformation__Charcoal_processing",
+          "label": "Charcoal processing",
+          "children": []
+        },
+        {
+          "id": "Other_transformation__Chemical_heat_for_electricity_production",
+          "label": "Chemical heat for electricity production",
+          "children": []
+        },
+        {
+          "id": "Other_transformation__Coal_transformation",
+          "label": "Coal transformation",
+          "children": [
+            {
+              "id": "Other_transformation__Coal_transformation__Coal_transformation_own_use",
+              "label": "Coal transformation own use",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "Other_transformation__Coal__oil_and_gas_extraction_own_use",
+          "label": "Coal, oil and gas extraction own use",
+          "children": []
+        },
+        {
+          "id": "Other_transformation__Electric_boilers",
+          "label": "Electric boilers",
+          "children": []
+        },
+        {
+          "id": "Other_transformation__Gas_processing_plants",
+          "label": "Gas processing plants",
+          "children": [
+            {
+              "id": "Other_transformation__Gas_processing_plants__Gas_processing_own_use",
+              "label": "Gas processing own use",
+              "children": []
+            },
+            {
+              "id": "Other_transformation__Gas_processing_plants__Gas_works_plants",
+              "label": "Gas works plants",
+              "children": []
+            },
+            {
+              "id": "Other_transformation__Gas_processing_plants__Gas-to-liquids_plants",
+              "label": "Gas-to-liquids plants",
+              "children": []
+            },
+            {
+              "id": "Other_transformation__Gas_processing_plants__Liquefaction_regasification_plants",
+              "label": "Liquefaction/regasification plants",
+              "children": []
+            },
+            {
+              "id": "Other_transformation__Gas_processing_plants__Natural_gas_blending_plants",
+              "label": "Natural gas blending plants",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "Other_transformation__Hydrogen_transformation",
+          "label": "Hydrogen transformation",
+          "children": [
+            {
+              "id": "Other_transformation__Hydrogen_transformation__Electrolysers",
+              "label": "Electrolysers",
+              "children": []
+            },
+            {
+              "id": "Other_transformation__Hydrogen_transformation__Hydrogen_transformation_losses_and_own_use",
+              "label": "Hydrogen transformation losses and own use",
+              "children": []
+            },
+            {
+              "id": "Other_transformation__Hydrogen_transformation__SMR_w_CCS",
+              "label": "SMR w CCS",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "Other_transformation__Non-specified_own_uses",
+          "label": "Non-specified own uses",
+          "children": []
+        },
+        {
+          "id": "Other_transformation__Non-specified_transformation",
+          "label": "Non-specified transformation",
+          "children": []
+        },
+        {
+          "id": "Other_transformation__Petrochemical_industry",
+          "label": "Petrochemical industry",
+          "children": []
+        },
+        {
+          "id": "Other_transformation__Total_transformation_sector",
+          "label": "Total transformation sector",
+          "children": []
+        },
+        {
+          "id": "Other_transformation__Transfers",
+          "label": "Transfers",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "Supply",
+      "label": "Supply",
+      "children": [
+        {
+          "id": "Supply__Exports",
+          "label": "Exports",
+          "children": []
+        },
+        {
+          "id": "Supply__Imports",
+          "label": "Imports",
+          "children": []
+        },
+        {
+          "id": "Supply__Production",
+          "label": "Production",
+          "children": []
+        },
+        {
+          "id": "Supply__Total_primary_energy_supply",
+          "label": "Total primary energy supply",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "Demand",
+      "label": "Demand",
+      "children": [
+        {
+          "id": "Demand__Total_final_energy_consumption",
+          "label": "Total final energy consumption",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "sheet_catalog": {
+    "esto__16_01__Commercial_and_public_services": {
+      "display_label": "Commercial and public services",
+      "path": [
+        "Buildings",
+        "Commercial and public services"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 3,
+      "page_key": "buildings",
+      "page_label": "Buildings",
+      "chart_group_key": "chart_group__buildings__buildings__commercial_and_public_services__direct",
+      "chart_group_label": "Commercial and public services"
+    },
+    "esto__16_01_01__Datacentres": {
+      "display_label": "Datacentres",
+      "path": [
+        "Buildings",
+        "Datacentres"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 3,
+      "page_key": "buildings",
+      "page_label": "Buildings",
+      "chart_group_key": "chart_group__buildings__buildings__datacentres__direct",
+      "chart_group_label": "Datacentres"
+    },
+    "esto__16_02__Residential": {
+      "display_label": "Residential",
+      "path": [
+        "Buildings",
+        "Residential"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 3,
+      "page_key": "buildings",
+      "page_label": "Buildings",
+      "chart_group_key": "chart_group__buildings__buildings__residential__direct",
+      "chart_group_label": "Residential"
+    },
+    "esto__04__International_marine_bunkers": {
+      "display_label": "International marine bunkers",
+      "path": [
+        "Bunkers",
+        "International marine bunkers"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 5,
+      "page_key": "bunkers",
+      "page_label": "Bunkers",
+      "chart_group_key": "chart_group__bunkers__bunkers__international_marine_bunkers__direct",
+      "chart_group_label": "International marine bunkers"
+    },
+    "esto__05__International_aviation_bunkers": {
+      "display_label": "International aviation bunkers",
+      "path": [
+        "Bunkers",
+        "International aviation bunkers"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 5,
+      "page_key": "bunkers",
+      "page_label": "Bunkers",
+      "chart_group_key": "chart_group__bunkers__bunkers__international_aviation_bunkers__direct",
+      "chart_group_label": "International aviation bunkers"
+    },
+    "esto__14_01__Mining_and_quarrying": {
+      "display_label": "Mining and quarrying",
+      "path": [
+        "Industry sector",
+        "Mining and quarrying"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__mining_and_quarrying__direct",
+      "chart_group_label": "Mining and quarrying"
+    },
+    "esto__14_02__Construction": {
+      "display_label": "Construction",
+      "path": [
+        "Industry sector",
+        "Construction"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__construction__direct",
+      "chart_group_label": "Construction"
+    },
+    "esto__14_03_01__Iron_and_steel": {
+      "display_label": "Iron and steel",
+      "path": [
+        "Industry sector",
+        "Manufacturing",
+        "Iron and steel"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__manufacturing__iron_and_steel__direct",
+      "chart_group_label": "Iron and steel"
+    },
+    "esto__14_03_02__Chemical__incl__petrochemical": {
+      "display_label": "Chemical (incl. petrochemical)",
+      "path": [
+        "Industry sector",
+        "Manufacturing",
+        "Chemical (incl. petrochemical)"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__manufacturing__chemical__incl__petrochemical__direct",
+      "chart_group_label": "Chemical (incl. petrochemical)"
+    },
+    "esto__14_03_03__Non_ferrous_metals": {
+      "display_label": "Non ferrous metals",
+      "path": [
+        "Industry sector",
+        "Manufacturing",
+        "Non ferrous metals"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__manufacturing__non_ferrous_metals__direct",
+      "chart_group_label": "Non ferrous metals"
+    },
+    "esto__14_03_04__Non-metallic_mineral_products": {
+      "display_label": "Non-metallic mineral products",
+      "path": [
+        "Industry sector",
+        "Manufacturing",
+        "Non-metallic mineral products"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__manufacturing__non-metallic_mineral_products__direct",
+      "chart_group_label": "Non-metallic mineral products"
+    },
+    "esto__14_03_05__Transportation_equipment": {
+      "display_label": "Transportation equipment",
+      "path": [
+        "Industry sector",
+        "Manufacturing",
+        "Transportation equipment"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__manufacturing__transportation_equipment__direct",
+      "chart_group_label": "Transportation equipment"
+    },
+    "esto__14_03_06__Machinery": {
+      "display_label": "Machinery",
+      "path": [
+        "Industry sector",
+        "Manufacturing",
+        "Machinery"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__manufacturing__machinery__direct",
+      "chart_group_label": "Machinery"
+    },
+    "esto__14_03_07__Food__beverages_and_tobacco": {
+      "display_label": "Food, beverages and tobacco",
+      "path": [
+        "Industry sector",
+        "Manufacturing",
+        "Food, beverages and tobacco"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__manufacturing__food__beverages_and_tobacco__direct",
+      "chart_group_label": "Food, beverages and tobacco"
+    },
+    "esto__14_03_08__Pulp__paper_and_printing": {
+      "display_label": "Pulp, paper and printing",
+      "path": [
+        "Industry sector",
+        "Manufacturing",
+        "Pulp, paper and printing"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__manufacturing__pulp__paper_and_printing__direct",
+      "chart_group_label": "Pulp, paper and printing"
+    },
+    "esto__14_03_09__Wood_and_wood_products": {
+      "display_label": "Wood and wood products",
+      "path": [
+        "Industry sector",
+        "Manufacturing",
+        "Wood and wood products"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__manufacturing__wood_and_wood_products__direct",
+      "chart_group_label": "Wood and wood products"
+    },
+    "esto__14_03_10__Textiles_and_leather": {
+      "display_label": "Textiles and leather",
+      "path": [
+        "Industry sector",
+        "Manufacturing",
+        "Textiles and leather"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__manufacturing__textiles_and_leather__direct",
+      "chart_group_label": "Textiles and leather"
+    },
+    "esto__14_03_11__Non-specified_industry": {
+      "display_label": "Non-specified industry",
+      "path": [
+        "Industry sector",
+        "Manufacturing",
+        "Non-specified industry"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 18,
+      "page_key": "industry",
+      "page_label": "Industry",
+      "chart_group_key": "chart_group__industry__industry_sector__manufacturing__non-specified_industry__direct",
+      "chart_group_label": "Non-specified industry"
+    },
+    "esto__15_01__Domestic_air_transport": {
+      "display_label": "Domestic air transport",
+      "path": [
+        "Transport sector",
+        "Domestic air transport"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 23,
+      "page_key": "transport",
+      "page_label": "Transport",
+      "chart_group_key": "chart_group__transport__transport_sector__domestic_air_transport__direct",
+      "chart_group_label": "Domestic air transport"
+    },
+    "esto__15_02__Road": {
+      "display_label": "Road",
+      "path": [
+        "Transport sector",
+        "Road"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 23,
+      "page_key": "transport",
+      "page_label": "Transport",
+      "chart_group_key": "chart_group__transport__transport_sector__road__direct",
+      "chart_group_label": "Road"
+    },
+    "esto__15_03__Rail": {
+      "display_label": "Rail",
+      "path": [
+        "Transport sector",
+        "Rail"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 23,
+      "page_key": "transport",
+      "page_label": "Transport",
+      "chart_group_key": "chart_group__transport__transport_sector__rail__direct",
+      "chart_group_label": "Rail"
+    },
+    "esto__15_04__Domestic_navigation": {
+      "display_label": "Domestic navigation",
+      "path": [
+        "Transport sector",
+        "Domestic navigation"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 23,
+      "page_key": "transport",
+      "page_label": "Transport",
+      "chart_group_key": "chart_group__transport__transport_sector__domestic_navigation__direct",
+      "chart_group_label": "Domestic navigation"
+    },
+    "esto__15_05__Pipeline_transport": {
+      "display_label": "Pipeline transport",
+      "path": [
+        "Transport sector",
+        "Pipeline transport"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 23,
+      "page_key": "transport",
+      "page_label": "Transport",
+      "chart_group_key": "chart_group__transport__transport_sector__pipeline_transport__direct",
+      "chart_group_label": "Pipeline transport"
+    },
+    "esto__16_03__Agriculture": {
+      "display_label": "Agriculture and fishing",
+      "path": [
+        "Other sector",
+        "Agriculture and fishing"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 25,
+      "page_key": "others",
+      "page_label": "Others",
+      "chart_group_key": "chart_group__others__other_sector__agriculture_and_fishing__direct",
+      "chart_group_label": "Agriculture and fishing"
+    },
+    "esto__16_05__Non-specified_others": {
+      "display_label": "Non-specified others",
+      "path": [
+        "Other sector",
+        "Non-specified others"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 25,
+      "page_key": "others",
+      "page_label": "Others",
+      "chart_group_key": "chart_group__others__other_sector__non-specified_others__direct",
+      "chart_group_label": "Non-specified others"
+    },
+    "esto__09_01_01__Electricity_plants": {
+      "display_label": "Electricity plants",
+      "path": [
+        "Power",
+        "Electricity plants"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 31,
+      "page_key": "power",
+      "page_label": "Power",
+      "chart_group_key": "chart_group__power__power__electricity_plants__direct",
+      "chart_group_label": "Electricity plants"
+    },
+    "esto__09_01_03__Heat_plants": {
+      "display_label": "Heat plants",
+      "path": [
+        "Power",
+        "Heat plants"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 31,
+      "page_key": "power",
+      "page_label": "Power",
+      "chart_group_key": "chart_group__power__power__heat_plants__direct",
+      "chart_group_label": "Heat plants"
+    },
+    "esto__09_02_03__Heat_plants": {
+      "display_label": "Heat plants",
+      "path": [
+        "Power",
+        "Heat plants"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 31,
+      "page_key": "power",
+      "page_label": "Power",
+      "chart_group_key": "chart_group__power__power__heat_plants__direct",
+      "chart_group_label": "Heat plants"
+    },
+    "esto__09_02_01__Electricity_plants": {
+      "display_label": "Electricity plants",
+      "path": [
+        "Power",
+        "Electricity plants"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 31,
+      "page_key": "power",
+      "page_label": "Power",
+      "chart_group_key": "chart_group__power__power__electricity_plants__direct",
+      "chart_group_label": "Electricity plants"
+    },
+    "esto__09_02_02__CHP_plants": {
+      "display_label": "CHP plants",
+      "path": [
+        "Power",
+        "CHP plants"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 31,
+      "page_key": "power",
+      "page_label": "Power",
+      "chart_group_key": "chart_group__power__power__chp_plants__direct",
+      "chart_group_label": "CHP plants"
+    },
+    "esto__09_01_02__CHP_plants": {
+      "display_label": "CHP plants",
+      "path": [
+        "Power",
+        "CHP plants"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 31,
+      "page_key": "power",
+      "page_label": "Power",
+      "chart_group_key": "chart_group__power__power__chp_plants__direct",
+      "chart_group_label": "CHP plants"
+    },
+    "esto__10_01_01__Electricity__CHP_and_heat_plants": {
+      "display_label": "Electricity own use",
+      "path": [
+        "Power",
+        "Electricity own use"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 31,
+      "page_key": "power",
+      "page_label": "Power",
+      "chart_group_key": "chart_group__power__power__electricity_own_use__direct",
+      "chart_group_label": "Electricity own use"
+    },
+    "esto__10_01_13__Pump_storage_plants": {
+      "display_label": "Electricity own use",
+      "path": [
+        "Power",
+        "Electricity own use"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 32,
+      "page_key": "power",
+      "page_label": "Power",
+      "chart_group_key": "chart_group__power__power__electricity_own_use__direct",
+      "chart_group_label": "Electricity own use"
+    },
+    "esto__10_02__Transmission_and_distribution_losses": {
+      "display_label": "Transmission and distribution losses",
+      "path": [
+        "Power",
+        "Transmission and distribution losses"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 33,
+      "page_key": "power",
+      "page_label": "Power",
+      "chart_group_key": "chart_group__power__power__transmission_and_distribution_losses__direct",
+      "chart_group_label": "Transmission and distribution losses"
+    },
+    "esto__09_07__Oil_refineries": {
+      "display_label": "Oil refineries",
+      "path": [
+        "Refining",
+        "Oil refineries"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 35,
+      "page_key": "refining",
+      "page_label": "Refining",
+      "chart_group_key": "chart_group__refining__refining__oil_refineries__direct",
+      "chart_group_label": "Oil refineries"
+    },
+    "esto__10_01_11__Oil_refineries": {
+      "display_label": "Refinery own use",
+      "path": [
+        "Refining",
+        "Refinery own use"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 35,
+      "page_key": "refining",
+      "page_label": "Refining",
+      "chart_group_key": "chart_group__refining__refining__refinery_own_use__direct",
+      "chart_group_label": "Refinery own use"
+    },
+    "esto__08__Transfers": {
+      "display_label": "Transfers",
+      "path": [
+        "Other transformation",
+        "Transfers"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 60,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__transfers__direct",
+      "chart_group_label": "Transfers"
+    },
+    "esto__09_06_01__Gas_works_plants": {
+      "display_label": "Gas works plants",
+      "path": [
+        "Other transformation",
+        "Gas processing plants",
+        "Gas works plants"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 55,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__gas_processing_plants__gas_works_plants__direct",
+      "chart_group_label": "Gas works plants"
+    },
+    "esto__09_06_02__Liquefaction_regasification_plants": {
+      "display_label": "Liquefaction/regasification plants",
+      "path": [
+        "Other transformation",
+        "Gas processing plants",
+        "Liquefaction/regasification plants"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 55,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__gas_processing_plants__liquefaction_regasification_plants__direct",
+      "chart_group_label": "Liquefaction/regasification plants"
+    },
+    "esto__09_06_03__Natural_gas_blending_plants": {
+      "display_label": "Natural gas blending plants",
+      "path": [
+        "Other transformation",
+        "Gas processing plants",
+        "Natural gas blending plants"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 55,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__gas_processing_plants__natural_gas_blending_plants__direct",
+      "chart_group_label": "Natural gas blending plants"
+    },
+    "esto__09_06_04__Gas-to-liquids_plants": {
+      "display_label": "Gas-to-liquids plants",
+      "path": [
+        "Other transformation",
+        "Gas processing plants",
+        "Gas-to-liquids plants"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 55,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__gas_processing_plants__gas-to-liquids_plants__direct",
+      "chart_group_label": "Gas-to-liquids plants"
+    },
+    "esto__09_08_01__Coke_ovens": {
+      "display_label": "Other transformation",
+      "path": [
+        "Other transformation"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 41,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__direct",
+      "chart_group_label": "Other transformation"
+    },
+    "esto__09_08_02__Blast_furnaces": {
+      "display_label": "Other transformation",
+      "path": [
+        "Other transformation"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 42,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__direct",
+      "chart_group_label": "Other transformation"
+    },
+    "esto__09_08_03__Patent_fuel_plants": {
+      "display_label": "Other transformation",
+      "path": [
+        "Other transformation"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 43,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__direct",
+      "chart_group_label": "Other transformation"
+    },
+    "esto__09_08_04__BKB_PB_plants": {
+      "display_label": "Other transformation",
+      "path": [
+        "Other transformation"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 44,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__direct",
+      "chart_group_label": "Other transformation"
+    },
+    "esto__09_08_05__Liquefaction__coal_to_oil": {
+      "display_label": "Other transformation",
+      "path": [
+        "Other transformation"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 45,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__direct",
+      "chart_group_label": "Other transformation"
+    },
+    "esto__09_12__Non-specified_transformation": {
+      "display_label": "Non-specified transformation",
+      "path": [
+        "Other transformation",
+        "Non-specified transformation"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 59,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__non-specified_transformation__direct",
+      "chart_group_label": "Non-specified transformation"
+    },
+    "esto__09_11__Charcoal_processing": {
+      "display_label": "Charcoal processing",
+      "path": [
+        "Other transformation",
+        "Charcoal processing"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 58,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__charcoal_processing__direct",
+      "chart_group_label": "Charcoal processing"
+    },
+    "esto__09_09__Petrochemical_industry": {
+      "display_label": "Petrochemical industry",
+      "path": [
+        "Other transformation",
+        "Petrochemical industry"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 58,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__petrochemical_industry__direct",
+      "chart_group_label": "Petrochemical industry"
+    },
+    "esto__09_05__Chemical_heat_for_electricity_production": {
+      "display_label": "Chemical heat for electricity production",
+      "path": [
+        "Other transformation",
+        "Chemical heat for electricity production"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 58,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__chemical_heat_for_electricity_production__direct",
+      "chart_group_label": "Chemical heat for electricity production"
+    },
+    "esto__09_13_01__Electrolysers": {
+      "display_label": "Electrolysers",
+      "path": [
+        "Other transformation",
+        "Hydrogen transformation",
+        "Electrolysers"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 58,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__hydrogen_transformation__electrolysers__direct",
+      "chart_group_label": "Electrolysers"
+    },
+    "esto__09_13_03__SMR_w_CCS": {
+      "display_label": "SMR w CCS",
+      "path": [
+        "Other transformation",
+        "Hydrogen transformation",
+        "SMR w CCS"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 58,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__hydrogen_transformation__smr_w_ccs__direct",
+      "chart_group_label": "SMR w CCS"
+    },
+    "esto__09_08__Coal_transformation": {
+      "display_label": "Coal transformation",
+      "path": [
+        "Other transformation",
+        "Coal transformation"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 52,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__coal_transformation__direct",
+      "chart_group_label": "Coal transformation"
+    },
+    "esto__10_01_05__Coke_ovens": {
+      "display_label": "Coal transformation own use",
+      "path": [
+        "Other transformation",
+        "Coal transformation",
+        "Coal transformation own use"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 53,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__coal_transformation__coal_transformation_own_use__direct",
+      "chart_group_label": "Coal transformation own use"
+    },
+    "esto__10_01_07__Blast_furnaces": {
+      "display_label": "Coal transformation own use",
+      "path": [
+        "Other transformation",
+        "Coal transformation",
+        "Coal transformation own use"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 54,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__coal_transformation__coal_transformation_own_use__direct",
+      "chart_group_label": "Coal transformation own use"
+    },
+    "esto__10_01_02__Gas_works_plants": {
+      "display_label": "Gas processing own use",
+      "path": [
+        "Other transformation",
+        "Gas processing plants",
+        "Gas processing own use"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 55,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__gas_processing_plants__gas_processing_own_use__direct",
+      "chart_group_label": "Gas processing own use"
+    },
+    "esto__10_01_03__Liquefaction_regasification_plants": {
+      "display_label": "Gas processing own use",
+      "path": [
+        "Other transformation",
+        "Gas processing plants",
+        "Gas processing own use"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 56,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__gas_processing_plants__gas_processing_own_use__direct",
+      "chart_group_label": "Gas processing own use"
+    },
+    "esto__10_01_19__Hydrogen_transformation_own_use": {
+      "display_label": "Hydrogen transformation losses and own use",
+      "path": [
+        "Other transformation",
+        "Hydrogen transformation",
+        "Hydrogen transformation losses and own use"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 57,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__hydrogen_transformation__hydrogen_transformation_losses_and_own_use__direct",
+      "chart_group_label": "Hydrogen transformation losses and own use"
+    },
+    "esto__09_04__Electric_boilers": {
+      "display_label": "Electric boilers",
+      "path": [
+        "Other transformation",
+        "Electric boilers"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 58,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__electric_boilers__direct",
+      "chart_group_label": "Electric boilers"
+    },
+    "esto__10_01_17__Non-specified_own_uses": {
+      "display_label": "Non-specified own uses",
+      "path": [
+        "Other transformation",
+        "Non-specified own uses"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 59,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__non-specified_own_uses__direct",
+      "chart_group_label": "Non-specified own uses"
+    },
+    "esto__10_01_06__Coal_mines": {
+      "display_label": "Coal, oil and gas extraction own use",
+      "path": [
+        "Other transformation",
+        "Coal, oil and gas extraction own use"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 60,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__coal__oil_and_gas_extraction_own_use__direct",
+      "chart_group_label": "Coal, oil and gas extraction own use"
+    },
+    "esto__10_01_12__Oil_and_gas_extraction": {
+      "display_label": "Coal, oil and gas extraction own use",
+      "path": [
+        "Other transformation",
+        "Coal, oil and gas extraction own use"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 61,
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "chart_group_key": "chart_group__other_transformation__other_transformation__coal__oil_and_gas_extraction_own_use__direct",
+      "chart_group_label": "Coal, oil and gas extraction own use"
+    },
+    "esto__01__Production": {
+      "display_label": "Production",
+      "path": [
+        "Supply",
+        "Production"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 66,
+      "page_key": "supply",
+      "page_label": "Supply",
+      "chart_group_key": "chart_group__supply__supply__production__direct",
+      "chart_group_label": "Production"
+    },
+    "esto__02__Imports": {
+      "display_label": "Imports",
+      "path": [
+        "Supply",
+        "Imports"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 66,
+      "page_key": "supply",
+      "page_label": "Supply",
+      "chart_group_key": "chart_group__supply__supply__imports__direct",
+      "chart_group_label": "Imports"
+    },
+    "esto__03__Exports": {
+      "display_label": "Exports",
+      "path": [
+        "Supply",
+        "Exports"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 66,
+      "page_key": "supply",
+      "page_label": "Supply",
+      "chart_group_key": "chart_group__supply__supply__exports__direct",
+      "chart_group_label": "Exports"
+    },
+    "esto__07__Total_primary_energy_supply": {
+      "display_label": "Total primary energy supply",
+      "path": [
+        "Supply",
+        "Total primary energy supply"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 66,
+      "page_key": "supply",
+      "page_label": "Supply",
+      "chart_group_key": "chart_group__supply__supply__total_primary_energy_supply__direct",
+      "chart_group_label": "Total primary energy supply"
+    },
+    "esto__13__Total_final_energy_consumption": {
+      "display_label": "Total final energy consumption",
+      "path": [
+        "Demand",
+        "Total final energy consumption"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 66,
+      "page_key": "demand",
+      "page_label": "Demand",
+      "chart_group_key": "chart_group__demand__demand__total_final_energy_consumption__direct",
+      "chart_group_label": "Total final energy consumption"
+    },
+    "esto__14__Industry_sector": {
+      "display_label": "Industry sector",
+      "path": [
+        "Industry sector"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 67
+    },
+    "esto__14_03__Manufacturing": {
+      "display_label": "Manufacturing",
+      "path": [
+        "Industry sector",
+        "Manufacturing"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 68
+    },
+    "esto__15__Transport_sector": {
+      "display_label": "Transport sector",
+      "path": [
+        "Transport sector"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 69
+    },
+    "esto__09_06__Gas_processing_plants": {
+      "display_label": "Gas processing plants",
+      "path": [
+        "Other transformation",
+        "Gas processing plants"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 70
+    },
+    "esto__09_13__Hydrogen_transformation": {
+      "display_label": "Hydrogen transformation",
+      "path": [
+        "Other transformation",
+        "Hydrogen transformation"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 71
+    },
+    "esto__09__Total_transformation_sector": {
+      "display_label": "Total transformation sector",
+      "path": [
+        "Other transformation",
+        "Total transformation sector"
+      ],
+      "measure": "Energy balance (PJ)",
+      "sort_order": 72
+    }
+  },
+  "esto_flow_to_sheet": {
+    "16.01 Commercial and public services": "esto__16_01__Commercial_and_public_services",
+    "16.01.01 Datacentres": "esto__16_01_01__Datacentres",
+    "16.02 Residential": "esto__16_02__Residential",
+    "04 International marine bunkers": "esto__04__International_marine_bunkers",
+    "05 International aviation bunkers": "esto__05__International_aviation_bunkers",
+    "14.01 Mining and quarrying": "esto__14_01__Mining_and_quarrying",
+    "14.02 Construction": "esto__14_02__Construction",
+    "14.03.01 Iron and steel": "esto__14_03_01__Iron_and_steel",
+    "14.03.02 Chemical (incl. petrochemical)": "esto__14_03_02__Chemical__incl__petrochemical",
+    "14.03.03 Non ferrous metals": "esto__14_03_03__Non_ferrous_metals",
+    "14.03.04 Non-metallic mineral products": "esto__14_03_04__Non-metallic_mineral_products",
+    "14.03.05 Transportation equipment": "esto__14_03_05__Transportation_equipment",
+    "14.03.06 Machinery": "esto__14_03_06__Machinery",
+    "14.03.07 Food, beverages and tobacco": "esto__14_03_07__Food__beverages_and_tobacco",
+    "14.03.08 Pulp, paper and printing": "esto__14_03_08__Pulp__paper_and_printing",
+    "14.03.09 Wood and wood products": "esto__14_03_09__Wood_and_wood_products",
+    "14.03.10 Textiles and leather": "esto__14_03_10__Textiles_and_leather",
+    "14.03.11 Non-specified industry": "esto__14_03_11__Non-specified_industry",
+    "15.01 Domestic air transport": "esto__15_01__Domestic_air_transport",
+    "15.02 Road": "esto__15_02__Road",
+    "15.03 Rail": "esto__15_03__Rail",
+    "15.04 Domestic navigation": "esto__15_04__Domestic_navigation",
+    "15.05 Pipeline transport": "esto__15_05__Pipeline_transport",
+    "16.03 Agriculture": "esto__16_03__Agriculture",
+    "16.05 Non-specified others": "esto__16_05__Non-specified_others",
+    "09.01.01 Electricity plants": "esto__09_01_01__Electricity_plants",
+    "09.01.03 Heat plants": "esto__09_01_03__Heat_plants",
+    "09.02.03 Heat plants": "esto__09_02_03__Heat_plants",
+    "09.02.01 Electricity plants": "esto__09_02_01__Electricity_plants",
+    "09.02.02 CHP plants": "esto__09_02_02__CHP_plants",
+    "09.01.02 CHP plants": "esto__09_01_02__CHP_plants",
+    "10.01.01 Electricity, CHP and heat plants": "esto__10_01_01__Electricity__CHP_and_heat_plants",
+    "10.01.13 Pump storage plants": "esto__10_01_13__Pump_storage_plants",
+    "10.02 Transmission and distribution losses": "esto__10_02__Transmission_and_distribution_losses",
+    "09.07 Oil refineries": "esto__09_07__Oil_refineries",
+    "10.01.11 Oil refineries": "esto__10_01_11__Oil_refineries",
+    "08 Transfers": "esto__08__Transfers",
+    "09.06.01 Gas works plants": "esto__09_06_01__Gas_works_plants",
+    "09.06.02 Liquefaction/regasification plants": "esto__09_06_02__Liquefaction_regasification_plants",
+    "09.06.03 Natural gas blending plants": "esto__09_06_03__Natural_gas_blending_plants",
+    "09.06.04 Gas-to-liquids plants": "esto__09_06_04__Gas-to-liquids_plants",
+    "09.08.01 Coke ovens": "esto__09_08_01__Coke_ovens",
+    "09.08.02 Blast furnaces": "esto__09_08_02__Blast_furnaces",
+    "09.08.03 Patent fuel plants": "esto__09_08_03__Patent_fuel_plants",
+    "09.08.04 BKB/PB plants": "esto__09_08_04__BKB_PB_plants",
+    "09.08.05 Liquefaction (coal to oil)": "esto__09_08_05__Liquefaction__coal_to_oil",
+    "09.12 Non-specified transformation": "esto__09_12__Non-specified_transformation",
+    "09.11 Charcoal processing": "esto__09_11__Charcoal_processing",
+    "09.09 Petrochemical industry": "esto__09_09__Petrochemical_industry",
+    "09.05 Chemical heat for electricity production": "esto__09_05__Chemical_heat_for_electricity_production",
+    "09.13.01 Electrolysers": "esto__09_13_01__Electrolysers",
+    "09.13.03 SMR w CCS": "esto__09_13_03__SMR_w_CCS",
+    "09.08 Coal transformation": "esto__09_08__Coal_transformation",
+    "10.01.05 Coke ovens": "esto__10_01_05__Coke_ovens",
+    "10.01.07 Blast furnaces": "esto__10_01_07__Blast_furnaces",
+    "10.01.02 Gas works plants": "esto__10_01_02__Gas_works_plants",
+    "10.01.03 Liquefaction/regasification plants": "esto__10_01_03__Liquefaction_regasification_plants",
+    "10.01.19 Hydrogen transformation own use": "esto__10_01_19__Hydrogen_transformation_own_use",
+    "09.04 Electric boilers": "esto__09_04__Electric_boilers",
+    "10.01.17 Non-specified own uses": "esto__10_01_17__Non-specified_own_uses",
+    "10.01.06 Coal mines": "esto__10_01_06__Coal_mines",
+    "10.01.12 Oil and gas extraction": "esto__10_01_12__Oil_and_gas_extraction",
+    "01 Production": "esto__01__Production",
+    "02 Imports": "esto__02__Imports",
+    "03 Exports": "esto__03__Exports",
+    "07 Total primary energy supply": "esto__07__Total_primary_energy_supply",
+    "13 Total final energy consumption": "esto__13__Total_final_energy_consumption",
+    "14 Industry sector": "esto__14__Industry_sector",
+    "14.03 Manufacturing": "esto__14_03__Manufacturing",
+    "15 Transport sector": "esto__15__Transport_sector",
+    "09.06 Gas processing plants": "esto__09_06__Gas_processing_plants",
+    "09.13 Hydrogen transformation": "esto__09_13__Hydrogen_transformation",
+    "09 Total transformation sector": "esto__09__Total_transformation_sector"
+  },
+  "empty_page_notice": "No mapped balance-table data is available for this page in the current run. The page is kept to preserve the configured dashboard structure."
+}

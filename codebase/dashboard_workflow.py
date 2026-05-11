@@ -1,37 +1,31 @@
 """
-Main entry point: build the LEAP results dashboard and write output to docs/.
+Entry point for the LEAP energy balance dashboard.
 
-Inputs (from data/inputs/ and config/):
-  - LEAP balance exports (CSV/Excel)
-  - config/leap_mappings.xlsx
-  - config/leap_comparison_dashboard_template_v2.json
+This is a thin wrapper — the full workflow lives in:
+  codebase/leap_results_dashboard_v2_workflow.py
 
-Outputs written to docs/:
-  - docs/dashboards/   navigation HTML pages
-  - docs/charts/       per-node energy balance chart HTML files
-  - docs/supporting_files/  audit CSVs and diagnostics
+Run from repo root:
+  python codebase/leap_results_dashboard_v2_workflow.py
 
-Transfer the dashboard engine modules from leap_utilities:
-  codebase/utilities/leap_results_dashboard_v2/
+DATA INPUTS (place in data/ — gitignored):
+  data/leap results tables/          LEAP exported workbooks (.xlsx)
+  data/00APEC_2025_low_with_subtotals.csv   ESTO base-year table
+  data/merged_file_energy_ALL_20251106.csv  9th projection table
+
+CONFIG (committed, edit as needed):
+  config/master_config.xlsx          Sector/fuel mappings
+  config/leap_comparison_dashboard_template_v2.json  Chart template
+
+OUTPUT (written to docs/ — committed for GitHub Pages):
+  docs/dashboards/    navigation HTML pages
+  docs/charts/        per-node chart HTML files
+  docs/supporting_files/  audit CSVs and diagnostics
+
+KEY CONSTANTS TO UPDATE IN leap_results_dashboard_v2_workflow.py:
+  LEAP_RESULTS_DIR      path to LEAP exported tables
+  BASE_TABLE_PATH       path to ESTO base-year CSV
+  PROJECTION_TABLE_PATH path to 9th projection CSV
+  OUTPUT_DIR            set to REPO_ROOT / "docs"  to write to GitHub Pages
+  ECONOMY_TOKEN         economy code (currently "USA")
+  SCENARIOS             tuple of scenario names
 """
-
-from __future__ import annotations
-
-from pathlib import Path
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DOCS_ROOT = REPO_ROOT / "docs"
-DATA_INPUTS = REPO_ROOT / "data" / "inputs"
-CONFIG_DIR = REPO_ROOT / "config"
-OUTPUTS_DIR = REPO_ROOT / "outputs"
-
-
-def main() -> None:
-    raise NotImplementedError(
-        "Transfer dashboard engine modules from leap_utilities and wire up here. "
-        "See leap_utilities/codebase/leap_results_dashboard_v2_workflow.py for reference."
-    )
-
-
-if __name__ == "__main__":
-    main()
