@@ -1,0 +1,13 @@
+name: leap_dashboard
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pandas
+  - openpyxl
+  - plotly
+  - jinja2
+  - pip
+  - pip:
+      - pyproject.toml
