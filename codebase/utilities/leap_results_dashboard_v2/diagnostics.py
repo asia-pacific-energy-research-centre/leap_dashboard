@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from codebase import leap_results_dashboard_workflow as v1_workflow
 from codebase.utilities.leap_results_dashboard_utils import basic_checks
 from codebase.utilities.workflow_outputs import build_workflow_output_layout
 
@@ -18,6 +17,8 @@ def write_diagnostics(
     diagnostic_probe_year: int,
     top_diagnostic_rows: int,
 ) -> dict[str, str | None]:
+    from codebase import leap_results_dashboard_workflow as v1_workflow  # deferred to break circular import
+
     artifacts: dict[str, str | None] = {
         "gap_diagnostics": None,
         "mapping_rundown_by_sheet": None,
