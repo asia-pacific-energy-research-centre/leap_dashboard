@@ -21,7 +21,7 @@ import json
 from collections import Counter, defaultdict
 from html import escape
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 import pandas as pd
 
@@ -4912,7 +4912,7 @@ def make_chart(
     backend: str = "plotly",
     display_sheet: str | None = None,
     file_sheet: str | None = None,
-) -> Path | None:
+) -> Path | Any | None:
     """Generate a simple comparison chart for one sheet/fuel."""
     output_dir.mkdir(parents=True, exist_ok=True)
     display_name = display_sheet or sheet
@@ -5264,7 +5264,7 @@ def make_chart(
             return None
 
     try:
-        if backend == "plotly":
+        if backend in {"plotly", "plotly_figure"}:
             import plotly.graph_objects as go
             import plotly.io as pio
 
@@ -5465,6 +5465,8 @@ def make_chart(
                     x=0,
                 ),
             )
+            if backend == "plotly_figure":
+                return fig
             plot_html = pio.to_html(
                 fig,
                 include_plotlyjs="cdn",

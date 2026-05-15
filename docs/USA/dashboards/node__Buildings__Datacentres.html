@@ -240,7 +240,16 @@ a:hover { text-decoration: underline; }
   display: block;
   box-sizing: border-box;
 }
-.lazy-chart-frame.is-unloaded {
+.lazy-chart-plot {
+  width: 100%;
+  height: clamp(380px, 62vh, 1100px);
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  display: block;
+  box-sizing: border-box;
+}
+.lazy-chart-frame.is-unloaded, .lazy-chart-plot.is-unloaded {
   background:#f8fafc;
 }
 .chart-load-state {
@@ -252,7 +261,7 @@ a:hover { text-decoration: underline; }
 .chart-load-state[data-loaded="true"] { display:none; }
 @media (max-width: 720px) {
   .dashboard-grid { grid-template-columns:minmax(0, 1fr); }
-  .lazy-chart-frame { height: 420px; }
+  .lazy-chart-frame, .lazy-chart-plot { height: 420px; }
 }
 </style>
 </head>
@@ -280,7 +289,7 @@ a:hover { text-decoration: underline; }
     <main class="page-body">
       
       
-      <section><section id="sec-Buildings__Datacentres" style="scroll-margin-top:150px;"><h2 style="margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d;">Datacentres</h2><section class="measure-group" style="margin:6px 0 14px 0;"><div class="dashboard-grid expand-2"><figure class="chart-card"><figcaption class="chart-caption">Total</figcaption><div class="meta-subline">Buildings > Datacentres</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/aggregate__Buildings__Datacentres__Energy_balance__PJ__Total.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Total"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Electricity</figcaption><div class="meta-subline">Buildings > Datacentres</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__16_01_01__Datacentres__Energy_balance__PJ__Electricity.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Electricity"></iframe></figure></div></section></section></section>
+      <section><section id="sec-Buildings__Datacentres" style="scroll-margin-top:150px;"><h2 style="margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d;">Datacentres</h2><section class="measure-group" style="margin:6px 0 14px 0;"><div class="dashboard-grid expand-2"><figure class="chart-card"><figcaption class="chart-caption">Total</figcaption><div class="meta-subline">Buildings > Datacentres</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="aggregate__Buildings__Datacentres__Energy_balance__PJ__Total" class="lazy-chart-plot is-unloaded" role="img" aria-label="Total"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Electricity</figcaption><div class="meta-subline">Buildings > Datacentres</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__16_01_01__Datacentres__Energy_balance__PJ__Electricity" class="lazy-chart-plot is-unloaded" role="img" aria-label="Electricity"></div></figure></div></section></section></section>
     </main>
   </div>
   <script>
@@ -305,90 +314,91 @@ a:hover { text-decoration: underline; }
   });
 })();
 </script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="../chart_bundles/node__Buildings__Datacentres__charts.js"></script>
   <script>
 (function() {
-  const frames = Array.from(document.querySelectorAll('iframe.lazy-chart-frame[data-src]'));
-  if (!frames.length) return;
+  const plots = Array.from(document.querySelectorAll('.lazy-chart-plot[data-chart-key]'));
+  const bundleUrl = window.BALANCE_CHART_BUNDLE_URL;
+  const inlineBundle = window.BALANCE_CHART_BUNDLE_DATA;
+  if (!plots.length || !window.Plotly) return;
 
-  const LOAD_WINDOW = 50;
-  const UNLOAD_DISTANCE = 100;
-  let ticking = false;
+  let bundlePromise = null;
+  const loadBundle = () => {
+    if (inlineBundle) {
+      return Promise.resolve(inlineBundle);
+    }
+    if (!bundlePromise) {
+      bundlePromise = fetch(bundleUrl).then((response) => {
+        if (!response.ok) {
+          throw new Error(`Chart bundle request failed: ${response.status}`);
+        }
+        return response.json();
+      });
+    }
+    return bundlePromise;
+  };
 
-  const setLoaded = (frame, loaded) => {
-    const state = frame.previousElementSibling;
-    if (loaded) {
-      if (!frame.getAttribute('src')) {
-        frame.setAttribute('src', frame.dataset.src);
-      }
-      frame.classList.remove('is-unloaded');
-      if (state && state.classList.contains('chart-load-state')) {
-        state.dataset.loaded = 'true';
-        state.textContent = '';
-      }
-      return;
-    }
-    if (frame.getAttribute('src')) {
-      frame.removeAttribute('src');
-    }
-    frame.classList.add('is-unloaded');
+  const setState = (plot, text, loaded) => {
+    const state = plot.previousElementSibling;
     if (state && state.classList.contains('chart-load-state')) {
-      state.dataset.loaded = 'false';
-      state.textContent = 'Chart unloaded until nearby';
+      state.dataset.loaded = loaded ? 'true' : 'false';
+      state.textContent = text || '';
     }
   };
 
-  const nearestFrameIndex = () => {
-    const viewportMid = window.scrollY + window.innerHeight / 2;
-    let bestIndex = 0;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    frames.forEach((frame, index) => {
-      const rect = frame.getBoundingClientRect();
-      const frameMid = window.scrollY + rect.top + rect.height / 2;
-      const distance = Math.abs(frameMid - viewportMid);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestIndex = index;
+  const renderPlot = async (plot) => {
+    if (plot.dataset.rendered === 'true' || plot.dataset.rendering === 'true') return;
+    plot.dataset.rendering = 'true';
+    setState(plot, 'Loading chart', false);
+    try {
+      const bundle = await loadBundle();
+      const chart = bundle.charts && bundle.charts[plot.dataset.chartKey];
+      if (!chart) {
+        throw new Error(`Missing chart spec: ${plot.dataset.chartKey}`);
+      }
+      await window.Plotly.newPlot(
+        plot,
+        chart.data || [],
+        chart.layout || {},
+        Object.assign({responsive: true}, chart.config || {}),
+      );
+      plot.dataset.rendered = 'true';
+      plot.classList.remove('is-unloaded');
+      setState(plot, '', true);
+      window.Plotly.Plots.resize(plot);
+    } catch (err) {
+      plot.classList.add('is-unloaded');
+      setState(plot, `Chart failed to load: ${err.message || err}`, false);
+    } finally {
+      plot.dataset.rendering = 'false';
+    }
+  };
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            renderPlot(entry.target);
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      {rootMargin: '900px 0px'},
+    );
+    plots.forEach((plot) => observer.observe(plot));
+  } else {
+    plots.forEach((plot) => renderPlot(plot));
+  }
+
+  window.addEventListener('resize', () => {
+    plots.forEach((plot) => {
+      if (plot.dataset.rendered === 'true') {
+        window.Plotly.Plots.resize(plot);
       }
     });
-    return bestIndex;
-  };
-
-  const updateFrames = () => {
-    ticking = false;
-    const current = nearestFrameIndex();
-    const half = Math.floor(LOAD_WINDOW / 2);
-    let start = Math.max(0, current - half);
-    let end = Math.min(frames.length - 1, start + LOAD_WINDOW - 1);
-    start = Math.max(0, end - LOAD_WINDOW + 1);
-
-    frames.forEach((frame, index) => {
-      if (index >= start && index <= end) {
-        setLoaded(frame, true);
-      } else if (Math.abs(index - current) > UNLOAD_DISTANCE) {
-        setLoaded(frame, false);
-      }
-    });
-  };
-
-  const scheduleUpdate = () => {
-    if (ticking) return;
-    ticking = true;
-    window.requestAnimationFrame(updateFrames);
-  };
-
-  frames.forEach((frame) => {
-    frame.classList.add('is-unloaded');
-    const state = frame.previousElementSibling;
-    if (state && state.classList.contains('chart-load-state')) {
-      state.dataset.loaded = 'false';
-      state.textContent = 'Chart queued';
-    }
   });
-
-  window.addEventListener('scroll', scheduleUpdate, { passive: true });
-  window.addEventListener('resize', scheduleUpdate);
-  window.addEventListener('hashchange', () => window.setTimeout(scheduleUpdate, 80));
-  window.setTimeout(updateFrames, 0);
 })();
 </script>
 </body>

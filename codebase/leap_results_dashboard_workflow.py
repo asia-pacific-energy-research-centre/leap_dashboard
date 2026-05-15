@@ -1,4 +1,4 @@
-#%%
+﻿#%%
 """
 Load LEAP balance exports into dataframes for ESTO-axis balance comparisons.
 
@@ -41,6 +41,7 @@ Why ESTO axis:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -48,9 +49,6 @@ import shutil
 import sys
 from pathlib import Path
 from typing import Sequence
-
-import openpyxl
-from openpyxl import load_workbook
 
 import pandas as pd
 
@@ -112,9 +110,25 @@ def _resolve(path: Path | str) -> Path:
     return candidate if candidate.is_absolute() else (REPO_ROOT / candidate)
 
 
+def _shared_repo_root() -> Path:
+    """Return the sibling leap_utilities repo used for shared inputs."""
+    return _resolve(os.environ.get("LEAP_UTILITIES_ROOT", "../leap_utilities"))
+
+
+def _require_shared_file(path: Path, *, description: str) -> Path:
+    if path.exists():
+        return path
+    raise FileNotFoundError(
+        f"Missing shared {description}: {path}\n"
+        "Install or clone the leap_utilities repo next to leap_dashboard, or set "
+        "LEAP_UTILITIES_ROOT to its location. Expected layout example: "
+        "C:/Users/Work/github/leap_utilities."
+    )
+
+
 #%%
-ECONOMY_TOKEN = "USA"          # short label used for docs/ subfolder and output paths
-BALANCE_EXPORT_ECONOMY = "20_USA"
+ECONOMY_TOKEN = "NZ"          # short label used for docs/ subfolder and output paths
+BALANCE_EXPORT_ECONOMY = "12_NZ"
 REF_BALANCE_EXPORT_DATE_ID: str | None = None
 TGT_BALANCE_EXPORT_DATE_ID: str | None = None
 try:
@@ -137,21 +151,41 @@ except (FileNotFoundError, ValueError):
 KNOWN_ISSUES_CONFIG_PATH = _resolve("config/leap_results_balance_known_issues.json")
 CHART_NAVIGATION_GUIDE_PATH = _resolve("config/leap_comparison_dashboard_template_v2.json")
 LEAP_ROWS_TO_REMOVE_AND_ADD_SHEET = "leap_rows_to_remove_and_add"
+LEAP_UTILITIES_ROOT = _shared_repo_root()
+SHARED_CONFIG_DIR = LEAP_UTILITIES_ROOT / "config"
+SHARED_DATA_DIR = LEAP_UTILITIES_ROOT / "data"
+SHARED_LEAP_MAPPINGS_PATH = _require_shared_file(
+    SHARED_CONFIG_DIR / "leap_mappings.xlsx",
+    description="LEAP mapping workbook",
+)
+SHARED_MASTER_CONFIG_PATH = _require_shared_file(
+    SHARED_CONFIG_DIR / "master_config.xlsx",
+    description="master config workbook",
+)
+SHARED_BASE_TABLE_PATH = _require_shared_file(
+    SHARED_DATA_DIR / "00APEC_2025_low_with_subtotals.csv",
+    description="ESTO base table",
+)
+SHARED_PROJECTION_TABLE_PATH = _require_shared_file(
+    SHARED_DATA_DIR / "merged_file_energy_ALL_20251106.csv",
+    description="9th projection table",
+)
 
-OUTPUT_DIR = _resolve(f"docs/{ECONOMY_TOKEN}")  # writes to GitHub Pages root, economy-scoped
+PUBLISH_DIR = _resolve(f"docs/{ECONOMY_TOKEN}")  # GitHub Pages assets: HTML, JS, JSON
+OUTPUT_DIR = _resolve(f"outputs/{ECONOMY_TOKEN}")  # local/generated CSV, XLSX, and audit outputs
 BALANCE_TO_ESTO_LONG_OUTPUT_DIR = BALANCE_TABLES_ROOT / "leap_balance_to_esto_long" / "USA"
 
-LEAP_TO_ESTO_MAPPING = (_resolve("config/leap_mappings.xlsx"), "leap_combined_esto")
-NINTH_TO_ESTO_MAPPING = (_resolve("config/master_config.xlsx"), "ninth_pairs_to_esto_pairs")
-CODEBOOK_PATH = _resolve("config/sector_fuel_codes_to_names.xlsx")
+LEAP_TO_ESTO_MAPPING = (SHARED_LEAP_MAPPINGS_PATH, "leap_combined_esto")
+NINTH_TO_ESTO_MAPPING = (SHARED_MASTER_CONFIG_PATH, "ninth_pairs_to_esto_pairs")
+CODEBOOK_PATH = SHARED_MASTER_CONFIG_PATH
 SHEET_MAP_PATH = _resolve("config/leap_results_sheet_map.csv")
 BACKUP_MAPPINGS_PATH = _resolve("config/backup_leap_mappings.xlsx")
 EXPLICIT_MAPPINGS_PATH = _resolve("config/leap_results_explicit_mappings.csv")
 EXPLICIT_REASSIGNMENTS_PATH = _resolve("config/leap_results_explicit_reassignments.csv")
 SYNTHETIC_REFERENCE_ROWS_PATH = _resolve("config/synthetic_reference_rows.csv")
 
-BASE_TABLE_PATH = _resolve("data/00APEC_2025_low_with_subtotals.csv")
-PROJECTION_TABLE_PATH = _resolve("data/merged_file_energy_ALL_20251106.csv")
+BASE_TABLE_PATH = SHARED_BASE_TABLE_PATH
+PROJECTION_TABLE_PATH = SHARED_PROJECTION_TABLE_PATH
 
 BASE_YEAR = 2022
 MAX_OUTPUT_YEAR = 2060
@@ -161,13 +195,15 @@ BASE_ECONOMY = "20USA"
 PROJECTION_ECONOMY = "20_USA"
 
 CHART_BACKEND = "plotly"
+CHART_OUTPUT_MODE = "page_bundles"#page_bundles"#per_chart_html
 HIDE_LEAP_ONLY_CHARTS = False
+APPLY_EXPLICIT_REFERENCE_REASSIGNMENTS = False
 ENABLE_WORKFLOW_TIMING = True
 WRITE_WORKFLOW_TIMING_CSV = True
 WORKFLOW_TIMING_FILENAME = "workflow_stage_timings.csv"
 
 # ---------------------------------------------------------------------------
-# Stage control — set False to skip a stage and reload cached outputs instead.
+# Stage control - set False to skip a stage and reload cached outputs instead.
 # Run the full workflow at least once before skipping any stage.
 #   STAGE_EXTRACT           reads LEAP Excel workbooks (typically the slowest step)
 #   STAGE_COMPARE           builds the ESTO-axis comparison (reads large projection CSVs)
@@ -249,43 +285,16 @@ def _load_ignored_unmapped_issue_keys(mapping_workbook_path: Path) -> set[tuple[
 def _write_dashboard_about_supplements(
     *,
     dashboards_dir: Path,
-    mapping_workbook_path: Path,
-    master_config_path: Path,
     template_json_path: Path,
 ) -> None:
-    """Copy mapping sheets and JSON template into dashboards_dir, then patch about.html."""
-    xlsx_filename = "dashboard_mappings.xlsx"
+    """Copy the dashboard JSON template into dashboards_dir, then patch about.html."""
     json_filename = "dashboard_template.json"
-
-    # Build mappings xlsx with the three mapping sheets
-    sheets_to_copy = [
-        (mapping_workbook_path, "leap_combined_esto"),
-        (mapping_workbook_path, "leap_combined_ninth"),
-        (master_config_path, "ninth_pairs_to_esto_pairs"),
-    ]
-    out_wb = openpyxl.Workbook()
-    out_wb.remove(out_wb.active)
-    for src_path, sheet_name in sheets_to_copy:
-        if not src_path.exists():
-            continue
-        try:
-            src_wb = load_workbook(src_path, data_only=True, read_only=True)
-            if sheet_name not in src_wb.sheetnames:
-                src_wb.close()
-                continue
-            dst_ws = out_wb.create_sheet(title=sheet_name)
-            for row in src_wb[sheet_name].iter_rows(values_only=True):
-                dst_ws.append(list(row))
-            src_wb.close()
-        except Exception:
-            pass
-    out_wb.save(dashboards_dir / xlsx_filename)
 
     # Copy JSON template
     if template_json_path.exists():
         shutil.copy2(template_json_path, dashboards_dir / json_filename)
 
-    # Patch about.html — inject reference files section and losses note
+    # Patch about.html - inject reference files section and losses note
     about_path = dashboards_dir / "about.html"
     if not about_path.exists():
         return
@@ -293,11 +302,8 @@ def _write_dashboard_about_supplements(
     extra = (
         '<section class="about-section"><h2>Reference files</h2>'
         "<ul>"
-        f'<li><a href="{xlsx_filename}">dashboard_mappings.xlsx</a>'
-        " — mapping sheets used to build this dashboard:"
-        " leap_combined_esto, leap_combined_ninth, and ninth_pairs_to_esto_pairs (ESTO-to-9th canonical mapping).</li>"
         f'<li><a href="{json_filename}">dashboard_template.json</a>'
-        " — the chart navigation template that defines the ESTO-axis structure and dashboard sections.</li>"
+        " - the chart navigation template that defines the ESTO-axis structure and dashboard sections.</li>"
         "</ul>"
         "</section>"
         '<section class="about-section"><h2>Note on LEAP values and losses</h2>'
@@ -305,7 +311,7 @@ def _write_dashboard_about_supplements(
         " Instead, losses are deducted directly from the value shown for the affected fuel,"
         " so the fuel figure already has losses subtracted from it."
         " This means transformation output values can be lower than the equivalent ESTO figure"
-        " — and in some cases can switch from positive to negative —"
+        " - and in some cases can switch from positive to negative -"
         " simply because the losses have been taken out of the fuel value rather than reported separately.</p>"
         "</section>"
     )
@@ -545,6 +551,69 @@ def _raise_if_unmapped_balance_rows(runtime_issues: pd.DataFrame, runtime_issues
     )
 
 
+def _chart_series_snapshot(chart_line_ledger: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate chart_line_mapping_ledger to one value row per series/year."""
+    columns = ["dashboard_section_label", "esto_flow_group_label", "fuel_label", "source", "year", "value"]
+    if chart_line_ledger.empty:
+        return pd.DataFrame(columns=columns)
+    work = chart_line_ledger.copy()
+    for col in columns[:-1]:
+        if col not in work.columns:
+            work[col] = ""
+    work["value"] = pd.to_numeric(work.get("value", pd.Series(dtype=float)), errors="coerce")
+    return (
+        work.groupby(columns[:-1], dropna=False)["value"]
+        .sum()
+        .reset_index()
+        .sort_values(columns[:-1])
+        .reset_index(drop=True)
+    )
+
+
+def _mapping_file_hash(mapping_path: Path) -> str:
+    h = hashlib.sha256()
+    with open(mapping_path, "rb") as file_obj:
+        for chunk in iter(lambda: file_obj.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _write_chart_series_snapshot_and_maybe_delta(
+    chart_line_ledger: pd.DataFrame,
+    snapshot_path: Path,
+    delta_path: Path,
+    mapping_path: Path,
+    hash_path: Path,
+) -> bool:
+    """Write a chart-series snapshot and a delta CSV when the mapping workbook changed."""
+    current_snapshot = _chart_series_snapshot(chart_line_ledger)
+    if "year" in current_snapshot.columns:
+        current_snapshot["year"] = current_snapshot["year"].astype(str)
+    current_hash = _mapping_file_hash(mapping_path) if mapping_path.exists() else ""
+
+    stored_hash = hash_path.read_text(encoding="utf-8").strip() if hash_path.exists() else ""
+    mapping_changed = current_hash != stored_hash
+
+    delta_written = False
+    if mapping_changed and snapshot_path.exists():
+        previous_snapshot = pd.read_csv(snapshot_path, dtype={"year": str})
+        previous_snapshot["value"] = pd.to_numeric(previous_snapshot["value"], errors="coerce")
+        merge_cols = ["dashboard_section_label", "esto_flow_group_label", "fuel_label", "source", "year"]
+        merged = current_snapshot.merge(previous_snapshot, on=merge_cols, how="outer", suffixes=("_after", "_before"))
+        merged["value_after"] = merged["value_after"].fillna(0.0)
+        merged["value_before"] = merged["value_before"].fillna(0.0)
+        merged["delta"] = merged["value_after"] - merged["value_before"]
+        delta = merged[merged["delta"].abs() > 1e-9].copy()
+        if not delta.empty:
+            delta[merge_cols + ["value_before", "value_after", "delta"]].to_csv(delta_path, index=False)
+            delta_written = True
+
+    current_snapshot.to_csv(snapshot_path, index=False)
+    if current_hash:
+        hash_path.write_text(current_hash, encoding="utf-8")
+    return delta_written
+
+
 def _write_shared_balance_to_esto_outputs(
     *,
     conversion: dict[str, object],
@@ -602,8 +671,9 @@ def _write_shared_balance_to_esto_outputs(
 def run_workflow() -> dict[str, object]:
     timer = WorkflowTimer("leap_results_dashboard_balance_estoaxis", enabled=ENABLE_WORKFLOW_TIMING)
     archive_config_dir_once_per_day()
-    out_dir = _resolve(OUTPUT_DIR)
-    layout = build_workflow_output_layout(out_dir)
+    publish_dir = _resolve(PUBLISH_DIR)
+    output_dir = _resolve(OUTPUT_DIR)
+    layout = build_workflow_output_layout(output_dir)
     timing_path = layout.runtime / WORKFLOW_TIMING_FILENAME
 
     structure_config = build_esto_axis_structure_from_dashboard_template(CHART_NAVIGATION_GUIDE_PATH)
@@ -629,7 +699,7 @@ def run_workflow() -> dict[str, object]:
         ingestion = conversion["ingestion"]
         resolved_structure = ingestion.get("resolved_structure", structure_config)
     else:
-        print("[SKIP] Stage: extract and map LEAP balance workbooks — loading cached outputs")
+        print("[SKIP] Stage: extract and map LEAP balance workbooks - loading cached outputs")
         conversion, ingestion, resolved_structure = _load_cached_ingestion(
             structure_config=structure_config,
             balance_to_esto_long_output_dir=BALANCE_TO_ESTO_LONG_OUTPUT_DIR,
@@ -654,6 +724,7 @@ def run_workflow() -> dict[str, object]:
             canonical_pairs_path=NINTH_TO_ESTO_MAPPING,
             explicit_mappings_path=EXPLICIT_MAPPINGS_PATH,
             explicit_reassignments_path=EXPLICIT_REASSIGNMENTS_PATH,
+            apply_reference_reassignments=APPLY_EXPLICIT_REFERENCE_REASSIGNMENTS,
             synthetic_reference_rows_path=SYNTHETIC_REFERENCE_ROWS_PATH,
             esto_table_path=BASE_TABLE_PATH,
             projection_table_path=PROJECTION_TABLE_PATH,
@@ -672,7 +743,7 @@ def run_workflow() -> dict[str, object]:
         comparison_wide = _comparison_wide_from_long(comparison_long)
         leap_long = leap_long[pd.to_numeric(leap_long["year"], errors="coerce").le(MAX_OUTPUT_YEAR)].copy()
     else:
-        print("[SKIP] Stage: build ESTO-axis comparison — loading cached outputs")
+        print("[SKIP] Stage: build ESTO-axis comparison - loading cached outputs")
         comparison_long, mapping_status, leap_long, comparison = _load_cached_comparison(layout)
         comparison_long_for_audit = comparison_long.copy()
         comparison_wide = _comparison_wide_from_long(comparison_long)
@@ -691,6 +762,9 @@ def run_workflow() -> dict[str, object]:
     mapping_lineage_audit_path = layout.mapping / "mapping_lineage_audit.csv"
     chart_line_mapping_path = layout.ledgers / "chart_line_mapping_ledger.csv"
     chart_total_component_path = layout.ledgers / "chart_total_component_ledger.csv"
+    chart_series_snapshot_path = layout.coverage / "chart_series_value_snapshot.csv"
+    chart_series_delta_path = layout.coverage / "chart_series_value_delta.csv"
+    mapping_hash_path = layout.coverage / ".mapping_hash"
     runtime_issues_path = layout.runtime / "balance_runtime_issues.csv"
     runtime_missing_pair_summary_path = layout.runtime / "balance_runtime_missing_pair_summary.xlsx"
     override_report_path = layout.runtime / "balance_override_application_report.csv"
@@ -788,15 +862,15 @@ def run_workflow() -> dict[str, object]:
             comparison_long=comparison_long,
             mapping_status=mapping_status,
             structure_config=resolved_structure,
-            output_dir=layout.root,
+            output_dir=publish_dir,
+            support_output_dir=layout.charting,
             chart_backend=CHART_BACKEND,
+            chart_output_mode=CHART_OUTPUT_MODE,
             hide_leap_only_charts=HIDE_LEAP_ONLY_CHARTS,
             chart_navigation_guide_path=CHART_NAVIGATION_GUIDE_PATH,
         )
         _write_dashboard_about_supplements(
             dashboards_dir=Path(str(dashboard_paths["dashboards_dir"])),
-            mapping_workbook_path=_mapping_workbook(LEAP_TO_ESTO_MAPPING),
-            master_config_path=NINTH_TO_ESTO_MAPPING[0],
             template_json_path=CHART_NAVIGATION_GUIDE_PATH,
         )
         timer.lap("render dashboards")
@@ -831,6 +905,15 @@ def run_workflow() -> dict[str, object]:
             dashboard_paths.get("all_chart_groups"),
         )
         simplify_mapping_lineage_audit_output(mapping_lineage_audit).to_csv(mapping_lineage_audit_path, index=False)
+        delta_written = _write_chart_series_snapshot_and_maybe_delta(
+            chart_line_ledger=chart_line_mapping_ledger,
+            snapshot_path=chart_series_snapshot_path,
+            delta_path=chart_series_delta_path,
+            mapping_path=_mapping_workbook(LEAP_TO_ESTO_MAPPING),
+            hash_path=mapping_hash_path,
+        )
+        if delta_written:
+            print(f"[INFO] leap_mappings.xlsx changed since the last run. Chart value delta written to: {chart_series_delta_path}")
         timer.lap("write chart ledgers")
     else:
         print("[SKIP] Stage: render dashboards")
@@ -910,8 +993,9 @@ def run_workflow() -> dict[str, object]:
             "simple_ninth_balance_mapped": str(simple_ninth_balance_path),
             "merged_leap_ninth_esto_balance": str(merged_esto_axis_balance_path),
             "dashboard_index": dashboard_paths.get("dashboard_index"),
-            "charts_dir": str(layout.charts),
-            "dashboards_dir": str(layout.dashboards),
+            "charts_dir": str(publish_dir / "charts"),
+            "chart_bundles_dir": dashboard_paths.get("chart_bundles_dir"),
+            "dashboards_dir": str(publish_dir / "dashboards"),
         },
         supporting_outputs={
             "shared_leap_balance_esto_long": shared_conversion_paths.get("shared_leap_balance_esto_long"),
@@ -948,7 +1032,8 @@ def run_workflow() -> dict[str, object]:
             "simple_ninth_balance_mapped": "Compact 9th balance table on the ESTO-axis structure.",
             "merged_leap_ninth_esto_balance": "Merged LEAP and 9th compact balance table on the ESTO axis.",
             "dashboard_index": "Main HTML entrypoint for the rendered ESTO-axis dashboard.",
-            "charts_dir": "Chart files used by the ESTO-axis dashboards.",
+            "charts_dir": "Legacy per-chart HTML/PNG output directory, used when CHART_OUTPUT_MODE is not page_bundles.",
+            "chart_bundles_dir": "Page-level Plotly JSON bundles used by the ESTO-axis dashboards.",
             "dashboards_dir": "Rendered ESTO-axis dashboard HTML pages.",
         },
         supporting_output_descriptions={
@@ -978,8 +1063,9 @@ def run_workflow() -> dict[str, object]:
             "workflow_stage_timings_csv": "Runtime duration by broad workflow stage.",
         },
         notes=[
-            "Primary ESTO-axis balance outputs are written at the workflow root.",
-            "Supporting diagnostics and mapping evidence are grouped under supporting_files/.",
+            "Public dashboard HTML, JS, and JSON assets are written under docs/<economy>/.",
+            "CSV, XLSX, and audit outputs are written under outputs/<economy>/.",
+            "Supporting diagnostics and mapping evidence are grouped under outputs/<economy>/supporting_files/.",
         ],
     )
     timer.lap("write manifest")
@@ -1005,6 +1091,8 @@ def run_workflow() -> dict[str, object]:
         "chart_total_component_ledger": str(chart_total_component_path),
         "dashboard_index": dashboard_paths.get("dashboard_index"),
         "charts_written": dashboard_paths.get("charts_written"),
+        "chart_output_mode": CHART_OUTPUT_MODE,
+        "chart_bundles_dir": dashboard_paths.get("chart_bundles_dir"),
         "empty_pages_csv": dashboard_paths.get("empty_pages_csv"),
         "chart_navigation_hierarchy": dashboard_paths.get("chart_navigation_hierarchy"),
         "chart_navigation_hierarchy_flat": dashboard_paths.get("chart_navigation_hierarchy_flat"),

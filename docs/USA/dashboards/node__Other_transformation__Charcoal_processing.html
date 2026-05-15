@@ -240,7 +240,16 @@ a:hover { text-decoration: underline; }
   display: block;
   box-sizing: border-box;
 }
-.lazy-chart-frame.is-unloaded {
+.lazy-chart-plot {
+  width: 100%;
+  height: clamp(380px, 62vh, 1100px);
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  display: block;
+  box-sizing: border-box;
+}
+.lazy-chart-frame.is-unloaded, .lazy-chart-plot.is-unloaded {
   background:#f8fafc;
 }
 .chart-load-state {
@@ -252,7 +261,7 @@ a:hover { text-decoration: underline; }
 .chart-load-state[data-loaded="true"] { display:none; }
 @media (max-width: 720px) {
   .dashboard-grid { grid-template-columns:minmax(0, 1fr); }
-  .lazy-chart-frame { height: 420px; }
+  .lazy-chart-frame, .lazy-chart-plot { height: 420px; }
 }
 </style>
 </head>

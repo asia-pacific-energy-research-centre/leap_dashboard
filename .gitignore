@@ -30,5 +30,39 @@ Thumbs.db
 # pytest
 .pytest_cache/
 
+
+#manually added gitignore files:
+# input_data/*
+# intermediate_data/*
+# output/*
+# config/computer_generated/*
+**/archive
+**/exploration
+#######################################
+# original_preparation_code/*
+*.png
+*.7z
+*.zip
+*.xlsx
+*.csv
+!config/analysis_input_field_mappings.xlsx
+!config/leap_transport_branch_to_ninth_sector_map.csv
+!config/leap_transport_fuel_aliases.csv
+*.html
+*.json
+!config/*.json
+*.pkl
+*.dll
+*.code-workspace
+!.gitkeep
+!docs/images/*.png
+env_leap/*
+#######################################
 # docs output is committed (GitHub Pages)
 # docs/ is intentionally NOT ignored
+docs/*/supporting_files/
+docs/**/*.csv
+docs/**/*.xls
+docs/**/*.xlsx
+docs/**/*.xlsm
+docs/*/output_manifest.json

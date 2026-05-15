@@ -289,7 +289,7 @@ class TemplateBalanceExtractor:
             "total final energy demand": "total final energy consumption",
             "total transformation": "total transformation sector",
             "transmission and distribution": "transmission and distribution losses",
-            "non specified transformation": "transformation nonspecified",
+            "non specified transformation": "Transfers nonspecified",
             "ng liquefaction": "liquefaction regasification plants",
             "lng regasification": "liquefaction regasification plants",
             "oil refining": "oil refineries",
@@ -1378,31 +1378,17 @@ class TemplateBalanceExtractor:
         if not target_pairs:
             target_pairs = [("", "")]
 
-        weights: list[float] = []
-        for esto_flow, esto_product in target_pairs:
-            matching_esto = next(
-                (
-                    record
-                    for record in full_path_esto
-                    if str(record.get("esto_flow", "")).strip() == esto_flow
-                    and str(record.get("esto_product", "")).strip() == esto_product
-                ),
-                {},
-            )
-            weight = pd.to_numeric(matching_esto.get("esto_pair_abs_sum", pd.NA), errors="coerce")
-            weights.append(float(weight) if pd.notna(weight) and float(weight) > 0 else 0.0)
-
         allocation_method = "direct"
         allocation_shares = [1.0] * len(target_pairs)
         if len(target_pairs) > 1:
-            weight_total = float(sum(weights))
-            if weight_total > 0:
-                allocation_shares = [float(weight) / weight_total for weight in weights]
-                allocation_method = "proportional_esto_pair_abs_sum"
-            else:
-                share = 1.0 / float(len(target_pairs))
-                allocation_shares = [share for _ in target_pairs]
-                allocation_method = "equal_split"
+            # Proportional ESTO weighting was removed because it did not account
+            # for subtotal targets or sign changes. Multi-target mappings are
+            # only safe when the targets aggregate to one displayed series, so
+            # equal split preserves the aggregate value without introducing
+            # misleading historical weights.
+            share = 1.0 / float(len(target_pairs))
+            allocation_shares = [share for _ in target_pairs]
+            allocation_method = "equal_split"
 
         match_resolution = "module_only" if use_descendant_records or self._balance_detail_mode == "less_detail" else "detailed"
 

@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MASTER_CONFIG_PATH = REPO_ROOT / "config" / "master_config.xlsx"
+_DEFAULT_LEAP_UTILITIES_ROOT = REPO_ROOT.parent / "leap_utilities"
+_LEAP_UTILITIES_ROOT = Path(os.environ.get("LEAP_UTILITIES_ROOT", _DEFAULT_LEAP_UTILITIES_ROOT)).expanduser()
+_SHARED_MASTER_CONFIG_PATH = _LEAP_UTILITIES_ROOT / "config" / "master_config.xlsx"
+MASTER_CONFIG_PATH = (
+    _SHARED_MASTER_CONFIG_PATH
+    if _SHARED_MASTER_CONFIG_PATH.exists()
+    else REPO_ROOT / "config" / "master_config.xlsx"
+)
 
 LEGACY_FILE_DEFAULT_SHEETS = {
     "ESTO_subtotal_mapping.xlsx": "ESTO_subtotal_mapping",
@@ -91,6 +99,24 @@ def read_config_table(
     Any path not represented in master_config.xlsx is read normally.
     """
     path = Path(path)
+    if path.name == MASTER_CONFIG_PATH.name and path.exists():
+        if sheet_name is not None:
+            sheet_name = MASTER_SHEET_ALIASES.get(str(sheet_name), str(sheet_name))
+            kwargs["sheet_name"] = sheet_name
+        return pd.read_excel(path, **kwargs)
+
+    try:
+        explicit_external_path = path.is_absolute() and path.exists() and not path.resolve().is_relative_to(REPO_ROOT.resolve())
+    except OSError:
+        explicit_external_path = False
+    if explicit_external_path:
+        if path.suffix.lower() in {".xlsx", ".xlsm", ".xls"}:
+            if sheet_name is not None:
+                kwargs["sheet_name"] = sheet_name
+            return pd.read_excel(path, **kwargs)
+        kwargs.pop("sheet_name", None)
+        return pd.read_csv(path, **kwargs)
+
     master_sheet = resolve_master_config_sheet(path, sheet_name)
     if _master_sheet_exists(master_sheet):
         return read_master_config_sheet(master_sheet, **kwargs)

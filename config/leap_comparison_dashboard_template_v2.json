@@ -909,7 +909,12 @@
       "aggregate_graphs": {
         "fuels": "Total",
         "esto_flows": [
-          "08 Transfers"
+            "08.01 Recycled products",
+            "08.02 Interproduct transfers",
+            "08.03 Products transferred",
+            "08.04 Gas separation",
+            "08.99 Transfers nonspecified"
+
         ],
         "measures": [
           "Inputs (PJ)",
@@ -918,7 +923,11 @@
       },
       "by_fuel_graphs": {
         "esto_flows": [
-          "08 Transfers"
+            "08.01 Recycled products",
+            "08.02 Interproduct transfers",
+            "08.03 Products transferred",
+            "08.04 Gas separation",
+            "08.99 Transfers nonspecified"
         ],
         "products": "All"
       }

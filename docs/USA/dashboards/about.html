@@ -240,7 +240,16 @@ a:hover { text-decoration: underline; }
   display: block;
   box-sizing: border-box;
 }
-.lazy-chart-frame.is-unloaded {
+.lazy-chart-plot {
+  width: 100%;
+  height: clamp(380px, 62vh, 1100px);
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  display: block;
+  box-sizing: border-box;
+}
+.lazy-chart-frame.is-unloaded, .lazy-chart-plot.is-unloaded {
   background:#f8fafc;
 }
 .chart-load-state {
@@ -252,7 +261,7 @@ a:hover { text-decoration: underline; }
 .chart-load-state[data-loaded="true"] { display:none; }
 @media (max-width: 720px) {
   .dashboard-grid { grid-template-columns:minmax(0, 1fr); }
-  .lazy-chart-frame { height: 420px; }
+  .lazy-chart-frame, .lazy-chart-plot { height: 420px; }
 }
 
 .about-content {
@@ -291,7 +300,7 @@ a:hover { text-decoration: underline; }
       <article class="about-content">
         <p>This dashboard compares LEAP balance exports, ESTO base-year balance data, and 9th edition projection data on a common ESTO balance-axis structure. It is designed for mapping audit as much as for chart review: every charted value should be traceable back to the mapping rows and comparator pairs that created it.</p>
         <section class="about-section"><h2>What this dashboard is for</h2><p>Use this dashboard to inspect where LEAP balance exports agree or disagree with ESTO base-year data and 9th edition projection data after all three are placed on a common ESTO balance-axis structure.</p></section><section class="about-section"><h2>What the lines mean</h2><ul><li>LEAP lines come from the mapped LEAP balance export after LEAP sector and fuel names are converted to ESTO flow/product rows.</li><li>ESTO lines are base-year values read directly from the ESTO balance table for the same ESTO flow/product pair.</li><li>9th lines are projection values read from the 9th edition sector/fuel table using mapped 9th sector/fuel targets for the same ESTO flow/product pair.</li></ul></section><section class="about-section"><h2>How rows are matched</h2><p>The main mapping path is LEAP-derived: active leap_combined_esto rows connect LEAP sector/fuel paths to ESTO flow/product pairs, and active leap_combined_ninth rows connect the same LEAP paths to 9th sector/fuel pairs.</p><p>Direct ESTO-to-9th canonical mappings are only a fallback for template sections that explicitly opt in. They are not the default mapping source.</p></section><section class="about-section"><h2>Transformation charts</h2><ul><li>Transformation rows are split into Inputs and Outputs for display.</li><li>Negative transformation values are inputs and are displayed as positive magnitudes in input charts.</li><li>Positive transformation values are outputs and should appear in output charts.</li></ul></section><section class="about-section"><h2>Where to audit details</h2><ul><li>Use mapping_lineage_audit.csv for row-level mapping lineage at audit years.</li><li>Use chart_line_mapping_ledger.csv to inspect the values actually exposed to rendered charts.</li><li>Use mapping_status.xlsx and dashboard_comparator_pair_coverage.xlsx to inspect missing, duplicated, and fallback mappings.</li><li>Use docs/esto_axis_balance_dashboard_system.md for the detailed systems guide.</li></ul></section>
-      </article>
+      <section class="about-section"><h2>Reference files</h2><ul><li><a href="dashboard_template.json">dashboard_template.json</a> - the chart navigation template that defines the ESTO-axis structure and dashboard sections.</li></ul></section><section class="about-section"><h2>Note on LEAP values and losses</h2><p>LEAP does not extract losses as a separate line item. Instead, losses are deducted directly from the value shown for the affected fuel, so the fuel figure already has losses subtracted from it. This means transformation output values can be lower than the equivalent ESTO figure - and in some cases can switch from positive to negative - simply because the losses have been taken out of the fuel value rather than reported separately.</p></section></article>
     </main>
   </div>
   <script>

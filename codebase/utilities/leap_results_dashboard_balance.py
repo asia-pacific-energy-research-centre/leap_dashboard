@@ -14,6 +14,7 @@ import json
 import os
 import re
 from collections import defaultdict
+from html import escape
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -4241,6 +4242,7 @@ def build_balance_comparison(
     canonical_pairs_path: ConfigTableRef = DEFAULT_MAPPING_PAIRS_PATH,
     explicit_mappings_path: Path | str = DEFAULT_EXPLICIT_MAPPINGS_PATH,
     explicit_reassignments_path: Path | str = DEFAULT_EXPLICIT_REASSIGNMENTS_PATH,
+    apply_reference_reassignments: bool = True,
     synthetic_reference_rows_path: Path | str = DEFAULT_SYNTHETIC_REFERENCE_ROWS_PATH,
     esto_table_path: Path | str = DEFAULT_BASE_TABLE_PATH,
     projection_table_path: Path | str = DEFAULT_PROJECTION_TABLE_PATH,
@@ -4268,10 +4270,15 @@ def build_balance_comparison(
             explicit_mappings_path=_resolve(explicit_mappings_path),
             explicit_reassignments_path=_resolve(explicit_reassignments_path),
         )
+        reference_reassignments = (
+            mapping_inputs["explicit_reassignments"]
+            if apply_reference_reassignments
+            else pd.DataFrame()
+        )
         base_df, ninth_df, reassignment_status, synthetic_reference_status = load_reference_tables(
             esto_table_path=_resolve(esto_table_path),
             projection_table_path=_resolve(projection_table_path),
-            explicit_reassignments=mapping_inputs["explicit_reassignments"],
+            explicit_reassignments=reference_reassignments,
             explicit_mappings=mapping_inputs["explicit_mappings"],
             canonical_pairs=mapping_inputs["canonical_pairs"],
             synthetic_reference_rows_path=_resolve(synthetic_reference_rows_path),
@@ -4493,11 +4500,24 @@ def build_balance_comparison(
     comparison_long = _backfill_dashboard_hierarchy(comparison_long, sheet_catalog=hierarchy_sheet_catalog)
     comparison_long = _add_dashboard_context_aliases(_add_esto_flow_context_columns(comparison_long))
     comparison_long = _collapse_template_multi_flow_comparison_rows(comparison_long, template_groups)
+    comparison_long = _add_leap_parent_transfer_rows_to_template(comparison_long)
+    comparison_long = _fill_template_transfer_base_values(
+        comparison_long,
+        base_df=base_df,
+        base_year=base_year,
+        base_economy=base_economy,
+    )
     comparison_long = (
         comparison_long.groupby(group_cols, as_index=False)["value"]
         .sum(min_count=1)
         .sort_values(group_cols, kind="mergesort")
         .reset_index(drop=True)
+    )
+    comparison_long = _fill_template_transfer_base_values(
+        comparison_long,
+        base_df=base_df,
+        base_year=base_year,
+        base_economy=base_economy,
     )
     comparison_long = comparison_long.merge(
         flag_meta,
@@ -5538,7 +5558,16 @@ a:hover { text-decoration: underline; }
   display: block;
   box-sizing: border-box;
 }
-.lazy-chart-frame.is-unloaded {
+.lazy-chart-plot {
+  width: 100%;
+  height: clamp(380px, 62vh, 1100px);
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  display: block;
+  box-sizing: border-box;
+}
+.lazy-chart-frame.is-unloaded, .lazy-chart-plot.is-unloaded {
   background:#f8fafc;
 }
 .chart-load-state {
@@ -5550,7 +5579,7 @@ a:hover { text-decoration: underline; }
 .chart-load-state[data-loaded="true"] { display:none; }
 @media (max-width: 720px) {
   .dashboard-grid { grid-template-columns:minmax(0, 1fr); }
-  .lazy-chart-frame { height: 420px; }
+  .lazy-chart-frame, .lazy-chart-plot { height: 420px; }
 }
 """
 
@@ -5667,6 +5696,93 @@ _CHART_VIRTUALIZATION_SCRIPT = """
 """
 
 
+_BUNDLED_CHART_RENDER_SCRIPT = """
+(function() {
+  const plots = Array.from(document.querySelectorAll('.lazy-chart-plot[data-chart-key]'));
+  const bundleUrl = window.BALANCE_CHART_BUNDLE_URL;
+  const inlineBundle = window.BALANCE_CHART_BUNDLE_DATA;
+  if (!plots.length || !window.Plotly) return;
+
+  let bundlePromise = null;
+  const loadBundle = () => {
+    if (inlineBundle) {
+      return Promise.resolve(inlineBundle);
+    }
+    if (!bundlePromise) {
+      bundlePromise = fetch(bundleUrl).then((response) => {
+        if (!response.ok) {
+          throw new Error(`Chart bundle request failed: ${response.status}`);
+        }
+        return response.json();
+      });
+    }
+    return bundlePromise;
+  };
+
+  const setState = (plot, text, loaded) => {
+    const state = plot.previousElementSibling;
+    if (state && state.classList.contains('chart-load-state')) {
+      state.dataset.loaded = loaded ? 'true' : 'false';
+      state.textContent = text || '';
+    }
+  };
+
+  const renderPlot = async (plot) => {
+    if (plot.dataset.rendered === 'true' || plot.dataset.rendering === 'true') return;
+    plot.dataset.rendering = 'true';
+    setState(plot, 'Loading chart', false);
+    try {
+      const bundle = await loadBundle();
+      const chart = bundle.charts && bundle.charts[plot.dataset.chartKey];
+      if (!chart) {
+        throw new Error(`Missing chart spec: ${plot.dataset.chartKey}`);
+      }
+      await window.Plotly.newPlot(
+        plot,
+        chart.data || [],
+        chart.layout || {},
+        Object.assign({responsive: true}, chart.config || {}),
+      );
+      plot.dataset.rendered = 'true';
+      plot.classList.remove('is-unloaded');
+      setState(plot, '', true);
+      window.Plotly.Plots.resize(plot);
+    } catch (err) {
+      plot.classList.add('is-unloaded');
+      setState(plot, `Chart failed to load: ${err.message || err}`, false);
+    } finally {
+      plot.dataset.rendering = 'false';
+    }
+  };
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            renderPlot(entry.target);
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      {rootMargin: '900px 0px'},
+    );
+    plots.forEach((plot) => observer.observe(plot));
+  } else {
+    plots.forEach((plot) => renderPlot(plot));
+  }
+
+  window.addEventListener('resize', () => {
+    plots.forEach((plot) => {
+      if (plot.dataset.rendered === 'true') {
+        window.Plotly.Plots.resize(plot);
+      }
+    });
+  });
+})();
+"""
+
+
 def _as_sort_int(value: object, default: int = 9999) -> int:
     try:
         return int(str(value).strip())
@@ -5685,6 +5801,7 @@ def _build_page_html(
     chart_entries: list[dict[str, str]],
     empty_notice: str,
     fallback_note: str = "",
+    chart_bundle_file: str = "",
 ) -> str:
     title_href = current_file or "#page-header"
     separator_after = {"Others", "Other transformation"}
@@ -5808,6 +5925,19 @@ def _build_page_html(
                 return f'{entry.get("display_sheet", entry.get("sheet", ""))}: {fuel}'
             return fuel
 
+        def _chart_embed_html(entry: dict[str, str], title: str) -> str:
+            if chart_bundle_file and str(entry.get("bundle_key", "")).strip():
+                return (
+                    f'<div data-chart-key="{escape(str(entry.get("bundle_key", "")))}" '
+                    f'class="lazy-chart-plot is-unloaded" role="img" '
+                    f'aria-label="{escape(title)}"></div>'
+                )
+            return (
+                f'<iframe data-src="../charts/{entry["file"]}" '
+                f'class="lazy-chart-frame is-unloaded" loading="lazy" '
+                f'title="{escape(title)}"></iframe>'
+            )
+
         for section_id, entries in grouped_chart_entries.items():
             measure_sections: list[str] = []
             if entries and all(str(entry.get("entry_kind", "")).strip() == "aggregate" for entry in entries):
@@ -5819,7 +5949,7 @@ def _build_page_html(
                             f'<figcaption class="chart-caption">{entry.get("measure", "") or _entry_caption(entry, measure_entries)}</figcaption>'
                             f'<div class="meta-subline">{entry.get("path_label", "")}</div>'
                             f'<div class="chart-load-state" data-loaded="false">Chart queued</div>'
-                            f'<iframe data-src="../charts/{entry["file"]}" class="lazy-chart-frame is-unloaded" loading="lazy" title="{entry.get("measure", "") or _entry_caption(entry, measure_entries)}"></iframe>'
+                            f'{_chart_embed_html(entry, entry.get("measure", "") or _entry_caption(entry, measure_entries))}'
                             "</figure>"
                         )
                         for entry in measure_entries
@@ -5850,7 +5980,7 @@ def _build_page_html(
                                 f'<figcaption class="chart-caption">{_entry_caption(entry, measure_entries)}</figcaption>'
                                 f'<div class="meta-subline">{entry.get("path_label", "")}</div>'
                                 f'<div class="chart-load-state" data-loaded="false">Chart queued</div>'
-                                f'<iframe data-src="../charts/{entry["file"]}" class="lazy-chart-frame is-unloaded" loading="lazy" title="{_entry_caption(entry, measure_entries)}"></iframe>'
+                                f'{_chart_embed_html(entry, _entry_caption(entry, measure_entries))}'
                                 "</figure>"
                             )
                             for entry in measure_entries
@@ -5878,6 +6008,17 @@ def _build_page_html(
         chart_html = ""
     else:
         chart_html = f'<section class="section-note">{empty_notice}</section>'
+
+    if chart_entries and chart_bundle_file:
+        chart_script_parts = ['<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>']
+        if chart_bundle_file.endswith(".js"):
+            chart_script_parts.append(f'<script src="{escape(chart_bundle_file)}"></script>')
+        else:
+            chart_script_parts.append(f'<script>window.BALANCE_CHART_BUNDLE_URL = "{escape(chart_bundle_file)}";</script>')
+        chart_script_parts.append(f'<script>{_BUNDLED_CHART_RENDER_SCRIPT}</script>')
+        chart_script_html = "\n  ".join(chart_script_parts)
+    else:
+        chart_script_html = f'<script>{_CHART_VIRTUALIZATION_SCRIPT}</script>'
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -5915,7 +6056,7 @@ def _build_page_html(
     </main>
   </div>
   <script>{_HEADER_TOGGLE_SCRIPT}</script>
-  <script>{_CHART_VIRTUALIZATION_SCRIPT}</script>
+  {chart_script_html}
 </body>
 </html>
 """
@@ -6037,7 +6178,9 @@ def render_balance_dashboards(
     mapping_status: pd.DataFrame,
     structure_config: dict[str, Any],
     output_dir: Path | str,
+    support_output_dir: Path | str | None = None,
     chart_backend: str = "plotly",
+    chart_output_mode: str = "page_bundles",
     hide_leap_only_charts: bool = False,
     chart_navigation_guide_path: Path | str | None = None,
 ) -> dict[str, Any]:
@@ -6045,14 +6188,23 @@ def render_balance_dashboards(
     Render charts with existing utilities and dashboards from structure.json.
     """
     out_dir = _resolve(output_dir)
+    support_dir = _resolve(support_output_dir) if support_output_dir is not None else out_dir
     charts_dir = out_dir / "charts"
+    chart_bundles_dir = out_dir / "chart_bundles"
     dashboards_dir = out_dir / "dashboards"
+    support_dir.mkdir(parents=True, exist_ok=True)
     charts_dir.mkdir(parents=True, exist_ok=True)
+    chart_bundles_dir.mkdir(parents=True, exist_ok=True)
     dashboards_dir.mkdir(parents=True, exist_ok=True)
     for stale_chart in charts_dir.glob("*.html"):
         stale_chart.unlink()
     for stale_chart in charts_dir.glob("*.png"):
         stale_chart.unlink()
+    for stale_bundle in chart_bundles_dir.glob("*.json"):
+        stale_bundle.unlink()
+    for stale_bundle in chart_bundles_dir.glob("*.js"):
+        stale_bundle.unlink()
+    use_chart_bundles = chart_backend == "plotly" and str(chart_output_mode).strip().lower() == "page_bundles"
 
     template_allowlist = _load_dashboard_template_allowlist(chart_navigation_guide_path)
     page_tree = list(structure_config.get("page_tree", []) or [])
@@ -6144,12 +6296,14 @@ def render_balance_dashboards(
     chart_comparison_long = _backfill_dashboard_hierarchy(chart_comparison_long, sheet_catalog=sheet_catalog)
     mapping_status = _backfill_dashboard_hierarchy(mapping_status, sheet_catalog=sheet_catalog)
 
-    written_charts = build_charts(
-        chart_comparison_long,
-        charts_dir=charts_dir,
-        backend=chart_backend,
-        hide_leap_only_charts=hide_leap_only_charts,
-    )
+    written_charts = []
+    if not use_chart_bundles:
+        written_charts = build_charts(
+            chart_comparison_long,
+            charts_dir=charts_dir,
+            backend=chart_backend,
+            hide_leap_only_charts=hide_leap_only_charts,
+        )
 
     flat_nodes = _flatten_page_tree(page_tree)
     node_paths: list[tuple[str, ...]] = []
@@ -6214,6 +6368,9 @@ def render_balance_dashboards(
             str(entry.get("entry_kind", "")).strip() == "aggregate"
             or str(entry.get("file", "")).startswith("aggregate__")
         )
+
+    aggregate_chart_figures: dict[str, Any] = {}
+    bundled_chart_count = 0
 
     def _as_sort_int(value: object, default: int = 9999) -> int:
         try:
@@ -6613,23 +6770,30 @@ def render_balance_dashboards(
                 )
                 if total_rows.empty or not _has_required_aggregate_dataset_families(total_rows) or not _has_nonzero_values(total_rows):
                     continue
-                chart_path = make_chart(
+                file_sheet = f"aggregate__{path_slug}__{measure_text}"
+                chart_result = make_chart(
                     title,
                     "Total",
                     total_rows,
                     charts_dir,
-                    backend=chart_backend,
+                    backend="plotly_figure" if use_chart_bundles else chart_backend,
                     display_sheet=f"{title} - {measure_text}",
-                    file_sheet=f"aggregate__{path_slug}__{measure_text}",
+                    file_sheet=file_sheet,
                 )
-                if chart_path is None:
+                if chart_result is None:
                     continue
+                if use_chart_bundles:
+                    chart_file_sheet = file_sheet.replace("\\", "_")
+                    chart_file_name = f"{_safe_token(chart_file_sheet)}__{_safe_token('Total')}.html"
+                    aggregate_chart_figures[chart_file_name] = chart_result
+                else:
+                    chart_file_name = chart_result.name
                 entries.append(
                     {
                         "sheet": title,
                         "measure": measure_text,
                         "fuel": "Total",
-                        "file": chart_path.name,
+                        "file": chart_file_name,
                         "path_label": _path_label(path),
                         "entry_kind": "aggregate",
                         "template_order": str(_template_order_for_entry(path, {"entry_kind": "aggregate"})),
@@ -6909,6 +7073,90 @@ def render_balance_dashboards(
                 entries.append(tagged)
         return entries
 
+    def _write_chart_bundle_for_page(
+        path: tuple[str, ...],
+        chart_entries: list[dict[str, str]],
+    ) -> str:
+        nonlocal bundled_chart_count
+        if not use_chart_bundles or not chart_entries:
+            return ""
+
+        try:
+            from plotly.utils import PlotlyJSONEncoder
+        except Exception as exc:  # noqa: BLE001
+            print(f"[WARN] Plotly bundle encoder unavailable; falling back to iframe charts for {path}: {exc}")
+            return ""
+
+        charts: dict[str, Any] = {}
+        seen_files: set[str] = set()
+        for entry in chart_entries:
+            file_name = str(entry.get("file", "")).strip()
+            if not file_name or file_name in seen_files:
+                if file_name:
+                    entry["bundle_key"] = _safe_token(file_name.removesuffix(".html"))
+                continue
+            seen_files.add(file_name)
+
+            figure = aggregate_chart_figures.get(file_name)
+            if figure is None:
+                subset = render_long[
+                    render_long["sheet"].eq(str(entry.get("sheet", "")))
+                    & render_long["measure"].eq(str(entry.get("measure", "")))
+                    & render_long["fuel_label"].eq(str(entry.get("fuel", "")))
+                ].copy()
+                if subset.empty:
+                    continue
+                display_sheet = str(entry.get("display_sheet", "")).strip() or str(entry.get("sheet", "")).strip()
+                measure_text = str(entry.get("measure", "")).strip()
+                chart_title = display_sheet
+                if measure_text and measure_text.lower() not in display_sheet.lower():
+                    chart_title = f"{display_sheet} [{measure_text}]"
+                file_sheet = str(entry.get("sheet", "")).strip()
+                if measure_text:
+                    file_sheet = f"{file_sheet}__{measure_text}"
+                figure = make_chart(
+                    str(entry.get("sheet", "")).strip(),
+                    str(entry.get("fuel", "")).strip(),
+                    subset,
+                    charts_dir,
+                    backend="plotly_figure",
+                    display_sheet=chart_title,
+                    file_sheet=file_sheet,
+                )
+                if figure is None:
+                    continue
+
+            bundle_key = _safe_token(file_name.removesuffix(".html"))
+            entry["bundle_key"] = bundle_key
+            figure_json = figure.to_plotly_json()
+            charts[bundle_key] = {
+                "data": figure_json.get("data", []),
+                "layout": figure_json.get("layout", {}),
+                "config": {"responsive": True},
+            }
+
+        if not charts:
+            return ""
+
+        bundle_name = f"{_page_filename_from_path(path).removesuffix('.html')}__charts.json"
+        bundle_path = chart_bundles_dir / bundle_name
+        payload = {
+            "dashboard_path": " > ".join(_display_path(path)),
+            "charts": charts,
+        }
+        payload_json = json.dumps(payload, cls=PlotlyJSONEncoder, ensure_ascii=True, separators=(",", ":"))
+        bundle_path.write_text(payload_json, encoding="utf-8")
+        bundle_js_name = f"{_page_filename_from_path(path).removesuffix('.html')}__charts.js"
+        bundle_js_path = chart_bundles_dir / bundle_js_name
+        bundle_js_path.write_text(
+            "window.BALANCE_CHART_BUNDLE_DATA="
+            + payload_json.replace("</", "<\\/")
+            + ";\n",
+            encoding="utf-8",
+        )
+        bundled_chart_count += len(charts)
+        return f"../chart_bundles/{bundle_js_name}"
+
     def _write_chart_navigation_hierarchy() -> tuple[Path, Path, Path]:
         hierarchy: dict[str, Any] = {}
         rows: list[dict[str, str]] = []
@@ -6964,7 +7212,7 @@ def render_balance_dashboards(
                     )
 
         json_path = out_dir / "chart_navigation_hierarchy.json"
-        csv_path = out_dir / "chart_navigation_hierarchy.csv"
+        csv_path = support_dir / "chart_navigation_hierarchy.csv"
         json_path.write_text(json.dumps(hierarchy, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
         pd.DataFrame(
             rows,
@@ -7267,7 +7515,7 @@ def render_balance_dashboards(
             row["exposed_in_dashboard"] = str(row.get("chart_group_id", "")).strip() in exposed_ids
             deduped_all_rows.append(row)
 
-        chart_group_path = out_dir / "chart_group_exposure.csv"
+        chart_group_path = support_dir / "chart_group_exposure.csv"
         exposed_df = pd.DataFrame(
             exposed_rows,
             columns=[
@@ -7295,7 +7543,7 @@ def render_balance_dashboards(
             ).drop(columns=["_template_order_sort"])
         exposed_df.to_csv(chart_group_path, index=False)
 
-        all_chart_groups_path = out_dir / "all_chart_groups.csv"
+        all_chart_groups_path = support_dir / "all_chart_groups.csv"
         all_chart_groups_df = pd.DataFrame(
             deduped_all_rows,
             columns=[
@@ -7345,6 +7593,7 @@ def render_balance_dashboards(
         child_links = _section_links_for_top_path(path)
 
         chart_entries = _chart_entries_for_path(path)
+        chart_bundle_file = _write_chart_bundle_for_page(path, chart_entries)
         fallback_note = ""
         if not chart_entries and not child_links:
             empty_pages.append({"path": " > ".join(path), "level": len(path)})
@@ -7359,6 +7608,7 @@ def render_balance_dashboards(
             chart_entries=chart_entries,
             empty_notice=empty_notice,
             fallback_note=fallback_note,
+            chart_bundle_file=chart_bundle_file,
         )
         (dashboards_dir / filename).write_text(html, encoding="utf-8")
 
@@ -7371,7 +7621,7 @@ def render_balance_dashboards(
         )
         (dashboards_dir / "about.html").write_text(about_html, encoding="utf-8")
 
-    empty_pages_path = dashboards_dir / "empty_pages.csv"
+    empty_pages_path = support_dir / "empty_pages.csv"
     empty_pages_df = pd.DataFrame(empty_pages, columns=["path", "level"])
     if not empty_pages_df.empty:
         empty_pages_df = empty_pages_df.sort_values(["path", "level"], kind="mergesort").reset_index(drop=True)
@@ -7383,14 +7633,15 @@ def render_balance_dashboards(
         graph_fuel_coverage_csv = write_dashboard_graph_fuel_coverage(
             template=template_allowlist,
             mapping_status=mapping_status,
-            output_path=out_dir / "dashboard_graph_fuel_coverage.csv",
+            output_path=support_dir / "dashboard_graph_fuel_coverage.csv",
             chart_comparison_long=chart_comparison_long,
         )
 
     return {
-        "charts_written": len(written_charts) + aggregate_charts_written,
+        "charts_written": bundled_chart_count if use_chart_bundles else len(written_charts) + aggregate_charts_written,
         "dashboard_index": dashboard_index,
         "charts_dir": str(charts_dir),
+        "chart_bundles_dir": str(chart_bundles_dir),
         "dashboards_dir": str(dashboards_dir),
         "empty_pages_csv": str(empty_pages_path),
         "chart_navigation_hierarchy": str(chart_hierarchy_json_path),
@@ -7481,8 +7732,46 @@ def _esto_parent_codes(code: str) -> list[str]:
     return [".".join(parts[:idx]) for idx in range(1, len(parts))]
 
 
-def _esto_flow_label_lookup(flows: Iterable[object]) -> dict[str, str]:
+_ESTO_FLOW_CODEBOOK_LABEL_CACHE: dict[Path, dict[str, str]] = {}
+
+
+def _load_esto_flow_codebook_labels(codebook_path: Path | str = DEFAULT_CODEBOOK_PATH) -> dict[str, str]:
+    """Load ESTO flow labels from the active codebook/master config."""
+    path = _resolve(codebook_path)
+    cached = _ESTO_FLOW_CODEBOOK_LABEL_CACHE.get(path)
+    if cached is not None:
+        return dict(cached)
+
+    lookup: dict[str, str] = {}
+    try:
+        if not config_table_exists(path, sheet_name="code_to_name"):
+            _ESTO_FLOW_CODEBOOK_LABEL_CACHE[path] = lookup
+            return {}
+        codebook = read_config_table(path, sheet_name="code_to_name", dtype=str).fillna("")
+    except (FileNotFoundError, ValueError, OSError):
+        _ESTO_FLOW_CODEBOOK_LABEL_CACHE[path] = lookup
+        return {}
+
+    for _, row in codebook.iterrows():
+        esto_column = _normalize_text(row.get("esto_column", ""))
+        if esto_column != "flows":
+            continue
+        esto_label = _clean_token(row.get("esto_label", ""))
+        code = _esto_flow_code(esto_label)
+        label = _clean_token(row.get("name", "")) or _strip_esto_code_prefix(esto_label)
+        if code and label:
+            lookup[code] = label
+
+    _ESTO_FLOW_CODEBOOK_LABEL_CACHE[path] = lookup
+    return dict(lookup)
+
+
+def _esto_flow_label_lookup(
+    flows: Iterable[object],
+    codebook_path: Path | str = DEFAULT_CODEBOOK_PATH,
+) -> dict[str, str]:
     lookup = dict(ESTO_FLOW_LABEL_FALLBACKS)
+    lookup.update(_load_esto_flow_codebook_labels(codebook_path))
     for flow in flows:
         code = _esto_flow_code(flow)
         label = _strip_esto_code_prefix(flow)
@@ -7774,6 +8063,148 @@ def _collapse_template_multi_flow_comparison_rows(
     return out
 
 
+def _add_leap_parent_transfer_rows_to_template(comparison_long: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add LEAP parent 08 transfer rows to the template transfer chart only.
+
+    ESTO and 9th treat parent 08 Transfers as a subtotal, so template transfer
+    charts are authored against active 08.xx rows. LEAP exports can carry real
+    values on the parent 08 row, and this bridges those values into the template
+    chart without changing the underlying ESTO-axis rows.
+    """
+    if comparison_long.empty:
+        return comparison_long.copy()
+
+    required_cols = {"sheet", "source", "measure", "fuel_label", "scenario", "year", "value"}
+    if not required_cols.issubset(comparison_long.columns):
+        return comparison_long.copy()
+
+    frame = comparison_long.copy()
+    parent_mask = frame["sheet"].fillna("").astype(str).str.strip().eq("esto__08__Transfers")
+    parent_mask &= frame["source"].fillna("").astype(str).str.strip().eq("leap")
+    parent_rows = frame.loc[parent_mask].copy()
+    if parent_rows.empty:
+        return frame
+
+    template_mask = frame["sheet"].fillna("").astype(str).str.strip().eq("template__Other_transformation__Transfers")
+    template_rows = frame.loc[template_mask].copy()
+    if template_rows.empty:
+        return frame
+
+    meta_cols = [
+        "scenario",
+        "measure",
+        "fuel_label",
+        "sheet",
+        "page_key",
+        "page_label",
+        "chart_group_key",
+        "chart_group_label",
+        "dashboard_page_key",
+        "dashboard_page_label",
+        "dashboard_section_key",
+        "dashboard_section_label",
+        "chart_kind",
+        "esto_flow_key",
+        "esto_flow_group_key",
+        "esto_flow_group_label",
+        "ninth_pairs_label",
+    ]
+    for col in meta_cols:
+        if col not in template_rows.columns:
+            template_rows[col] = ""
+        if col not in parent_rows.columns:
+            parent_rows[col] = ""
+
+    template_meta = (
+        template_rows[meta_cols]
+        .drop_duplicates(subset=["scenario", "measure", "fuel_label"])
+        .reset_index(drop=True)
+    )
+    if template_meta.empty:
+        return frame
+
+    value_cols = ["economy", "scenario", "measure", "fuel_label", "source", "year", "value"]
+    parent_for_template = parent_rows[value_cols].merge(
+        template_meta,
+        on=["scenario", "measure", "fuel_label"],
+        how="inner",
+        suffixes=("", "_template"),
+    )
+    if parent_for_template.empty:
+        return frame
+
+    parent_for_template = parent_for_template.reindex(columns=frame.columns, fill_value="")
+    return pd.concat([frame, parent_for_template], ignore_index=True, sort=False)
+
+
+def _fill_template_transfer_base_values(
+    comparison_long: pd.DataFrame,
+    *,
+    base_df: pd.DataFrame,
+    base_year: int,
+    base_economy: str,
+) -> pd.DataFrame:
+    """Fill template transfer ESTO base rows from their explicit 08.xx pairs."""
+    if comparison_long.empty or base_df is None or base_df.empty:
+        return comparison_long.copy()
+    required_cols = {"sheet", "source", "fuel_label", "value"}
+    if not required_cols.issubset(comparison_long.columns):
+        return comparison_long.copy()
+
+    out = comparison_long.copy()
+    out["value"] = pd.to_numeric(out["value"], errors="coerce")
+    transfer_template = out["sheet"].fillna("").astype(str).str.strip().eq("template__Other_transformation__Transfers")
+    base_source = out["source"].fillna("").astype(str).str.strip().eq("base")
+    target = transfer_template & base_source
+    if not target.any():
+        return out
+
+    transfer_child_flows = [
+        "08.01 Recycled products",
+        "08.02 Interproduct transfers",
+        "08.03 Products transferred",
+        "08.04 Gas separation",
+        "08.99 Transfers nonspecified",
+    ]
+    product_lookup: dict[str, str] = {}
+    if {"flows", "products"}.issubset(base_df.columns):
+        base_products = base_df[
+            base_df["flows"].fillna("").astype(str).str.strip().isin(transfer_child_flows)
+        ].copy()
+        if "is_subtotal" in base_products.columns:
+            base_products = base_products[~base_products["is_subtotal"].map(_to_bool)].copy()
+        for product in base_products["products"].dropna().astype(str).str.strip().unique():
+            if product and not _product_is_total(product):
+                product_lookup.setdefault((_strip_esto_code_prefix(product) or product).strip(), product)
+
+    cache: dict[tuple[str, str], float] = {}
+    for idx, row in out.loc[target].iterrows():
+        flow = _clean_token(row.get("esto_flow", "")) if "esto_flow" in out.columns else ""
+        product = _clean_token(row.get("esto_product", "")) if "esto_product" in out.columns else ""
+        if flow.startswith("08.") and product:
+            flow_product_pairs = [(flow, product)]
+        else:
+            fuel_label = _clean_token(row.get("fuel_label", ""))
+            product = product_lookup.get(fuel_label, "")
+            flow_product_pairs = [(flow_item, product) for flow_item in transfer_child_flows if product]
+        values: list[float] = []
+        for flow_item, product_item in flow_product_pairs:
+            key = (flow_item, product_item)
+            if key not in cache:
+                cache[key] = pull_base_year_value(
+                    base_df,
+                    base_year=base_year,
+                    economy_code=base_economy,
+                    esto_flow=flow_item,
+                    esto_product=product_item,
+                    value_sign_role="",
+                )
+            values.append(cache[key])
+        out.at[idx, "value"] = sum(value for value in values if pd.notna(value)) if values else float("nan")
+    return out
+
+
 def _build_page_tree_from_paths(paths: list[list[str]]) -> list[dict[str, Any]]:
     root: dict[str, Any] = {"children": {}}
     for path in paths:
@@ -7804,6 +8235,7 @@ def _resolve_esto_structure(
     *,
     grouped: pd.DataFrame,
     structure_config: dict[str, Any],
+    codebook_path: Path | str = DEFAULT_CODEBOOK_PATH,
 ) -> tuple[pd.DataFrame, dict[str, Any], pd.DataFrame]:
     structure = dict(structure_config or {})
     sheet_catalog = dict(structure.get("sheet_catalog", {}) or {})
@@ -7826,7 +8258,10 @@ def _resolve_esto_structure(
             .drop_duplicates()
             .tolist()
         )
-        label_lookup = _esto_flow_label_lookup([*out["esto_flow"].dropna().astype(str).tolist(), *missing_flows])
+        label_lookup = _esto_flow_label_lookup(
+            [*out["esto_flow"].dropna().astype(str).tolist(), *missing_flows],
+            codebook_path=codebook_path,
+        )
         for flow in sorted(missing_flows, key=lambda value: _esto_dashboard_path_sort_key(_esto_flow_path(value, label_lookup), value)):
             sheet_key = _sheet_key_from_esto_flow(flow)
             esto_flow_to_sheet[flow] = sheet_key
@@ -7977,6 +8412,7 @@ def load_balance_leap_long_esto_axis(
     grouped, resolved_structure, auto_sheet_rows = _resolve_esto_structure(
         grouped=grouped,
         structure_config=structure,
+        codebook_path=codebook,
     )
 
     grouped["economy"] = projection_economy
@@ -8309,6 +8745,7 @@ def build_balance_comparison_esto_axis(
     canonical_pairs_path: ConfigTableRef = DEFAULT_MAPPING_PAIRS_PATH,
     explicit_mappings_path: Path | str = DEFAULT_EXPLICIT_MAPPINGS_PATH,
     explicit_reassignments_path: Path | str = DEFAULT_EXPLICIT_REASSIGNMENTS_PATH,
+    apply_reference_reassignments: bool = True,
     synthetic_reference_rows_path: Path | str = DEFAULT_SYNTHETIC_REFERENCE_ROWS_PATH,
     esto_table_path: Path | str = DEFAULT_BASE_TABLE_PATH,
     projection_table_path: Path | str = DEFAULT_PROJECTION_TABLE_PATH,
@@ -8333,10 +8770,15 @@ def build_balance_comparison_esto_axis(
             explicit_mappings_path=_resolve(explicit_mappings_path),
             explicit_reassignments_path=_resolve(explicit_reassignments_path),
         )
+        reference_reassignments = (
+            mapping_inputs["explicit_reassignments"]
+            if apply_reference_reassignments
+            else pd.DataFrame()
+        )
         base_df, ninth_df, reassignment_status, synthetic_reference_status = load_reference_tables(
             esto_table_path=_resolve(esto_table_path),
             projection_table_path=_resolve(projection_table_path),
-            explicit_reassignments=mapping_inputs["explicit_reassignments"],
+            explicit_reassignments=reference_reassignments,
             explicit_mappings=mapping_inputs["explicit_mappings"],
             canonical_pairs=mapping_inputs["canonical_pairs"],
             synthetic_reference_rows_path=_resolve(synthetic_reference_rows_path),
@@ -9069,11 +9511,24 @@ def build_balance_comparison_esto_axis(
     comparison_long = _backfill_dashboard_hierarchy(comparison_long, sheet_catalog=hierarchy_sheet_catalog)
     comparison_long = _add_dashboard_context_aliases(_add_esto_flow_context_columns(comparison_long))
     comparison_long = _collapse_template_multi_flow_comparison_rows(comparison_long, template_groups)
+    comparison_long = _add_leap_parent_transfer_rows_to_template(comparison_long)
+    comparison_long = _fill_template_transfer_base_values(
+        comparison_long,
+        base_df=base_df,
+        base_year=base_year,
+        base_economy=base_economy,
+    )
     comparison_long = (
         comparison_long.groupby(group_cols, as_index=False)["value"]
         .sum(min_count=1)
         .sort_values(group_cols, kind="mergesort")
         .reset_index(drop=True)
+    )
+    comparison_long = _fill_template_transfer_base_values(
+        comparison_long,
+        base_df=base_df,
+        base_year=base_year,
+        base_economy=base_economy,
     )
     # Attach compact 9th-pairs annotation for chart rendering (only when cardinality is not one-to-one)
     if ninth_pairs_label_map:

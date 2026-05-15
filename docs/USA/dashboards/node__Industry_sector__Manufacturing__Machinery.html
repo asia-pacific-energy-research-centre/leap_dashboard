@@ -240,7 +240,16 @@ a:hover { text-decoration: underline; }
   display: block;
   box-sizing: border-box;
 }
-.lazy-chart-frame.is-unloaded {
+.lazy-chart-plot {
+  width: 100%;
+  height: clamp(380px, 62vh, 1100px);
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  display: block;
+  box-sizing: border-box;
+}
+.lazy-chart-frame.is-unloaded, .lazy-chart-plot.is-unloaded {
   background:#f8fafc;
 }
 .chart-load-state {
@@ -252,7 +261,7 @@ a:hover { text-decoration: underline; }
 .chart-load-state[data-loaded="true"] { display:none; }
 @media (max-width: 720px) {
   .dashboard-grid { grid-template-columns:minmax(0, 1fr); }
-  .lazy-chart-frame { height: 420px; }
+  .lazy-chart-frame, .lazy-chart-plot { height: 420px; }
 }
 </style>
 </head>
@@ -280,7 +289,7 @@ a:hover { text-decoration: underline; }
     <main class="page-body">
       
       
-      <section><section id="sec-Industry_sector__Manufacturing__Machinery" style="scroll-margin-top:150px;"><h2 style="margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d;">Machinery</h2><section class="measure-group" style="margin:6px 0 14px 0;"><div class="dashboard-grid"><figure class="chart-card"><figcaption class="chart-caption">Total</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/aggregate__Industry_sector__Manufacturing__Machinery__Energy_balance__PJ__Total.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Total"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Anthracite</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Anthracite.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Anthracite"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Aviation gasoline</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Aviation_gasoline.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Aviation gasoline"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Bagasse</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Bagasse.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Bagasse"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Bio jet kerosene</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Bio_jet_kerosene.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Bio jet kerosene"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Biodiesel</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Biodiesel.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Biodiesel"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Biogas</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Biogas.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Biogas"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Biogasoline</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Biogasoline.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Biogasoline"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Bitumen</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Bitumen.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Bitumen"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Black liqour</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Black_liqour.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Black liqour"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Charcoal</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Charcoal.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Charcoal"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Coal nonspecified</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Coal_nonspecified.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Coal nonspecified"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Electricity</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Electricity.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Electricity"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Ethane</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Ethane.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Ethane"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Fuelwood & woodwaste</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Fuelwood___woodwaste.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Fuelwood & woodwaste"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Gas/diesel oil</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Gas_diesel_oil.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Gas/diesel oil"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Gasoline type jet fuel</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Gasoline_type_jet_fuel.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Gasoline type jet fuel"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Heat</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Heat.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Heat"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Industrial waste</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Industrial_waste.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Industrial waste"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Kerosene</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Kerosene.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Kerosene"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Kerosene type jet fuel</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Kerosene_type_jet_fuel.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Kerosene type jet fuel"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">LPG</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__LPG.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="LPG"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Lubricants</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Lubricants.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Lubricants"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Municipal solid waste (non-renewable)</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Municipal_solid_waste__non-renewable.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Municipal solid waste (non-renewable)"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Municipal solid waste (renewable)</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Municipal_solid_waste__renewable.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Municipal solid waste (renewable)"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Naphtha</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Naphtha.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Naphtha"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Natural gas</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Natural_gas.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Natural gas"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Other biomass</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Other_biomass.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Other biomass"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Other bituminous coal</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Other_bituminous_coal.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Other bituminous coal"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Other liquid biofuels</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Other_liquid_biofuels.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Other liquid biofuels"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Other products</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Other_products.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Other products"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Other sources</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Other_sources.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Other sources"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Paraffin waxes</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Paraffin_waxes.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Paraffin waxes"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">PetProd nonspecified</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__PetProd_nonspecified.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="PetProd nonspecified"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Petroleum coke</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Petroleum_coke.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Petroleum coke"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Refinery gas (not liquefied)</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Refinery_gas__not_liquefied.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Refinery gas (not liquefied)"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">Sub-bituminous coal</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__Sub-bituminous_coal.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="Sub-bituminous coal"></iframe></figure><figure class="chart-card"><figcaption class="chart-caption">White spirit SBP</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><iframe data-src="../charts/esto__14_03_06__Machinery__Energy_balance__PJ__White_spirit_SBP.html" class="lazy-chart-frame is-unloaded" loading="lazy" title="White spirit SBP"></iframe></figure></div></section></section></section>
+      <section><section id="sec-Industry_sector__Manufacturing__Machinery" style="scroll-margin-top:150px;"><h2 style="margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d;">Machinery</h2><section class="measure-group" style="margin:6px 0 14px 0;"><div class="dashboard-grid"><figure class="chart-card"><figcaption class="chart-caption">Total</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="aggregate__Industry_sector__Manufacturing__Machinery__Energy_balance__PJ__Total" class="lazy-chart-plot is-unloaded" role="img" aria-label="Total"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Anthracite</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Anthracite" class="lazy-chart-plot is-unloaded" role="img" aria-label="Anthracite"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Aviation gasoline</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Aviation_gasoline" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aviation gasoline"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Bagasse</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Bagasse" class="lazy-chart-plot is-unloaded" role="img" aria-label="Bagasse"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Bio jet kerosene</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Bio_jet_kerosene" class="lazy-chart-plot is-unloaded" role="img" aria-label="Bio jet kerosene"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Biodiesel</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Biodiesel" class="lazy-chart-plot is-unloaded" role="img" aria-label="Biodiesel"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Biogas</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Biogas" class="lazy-chart-plot is-unloaded" role="img" aria-label="Biogas"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Biogasoline</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Biogasoline" class="lazy-chart-plot is-unloaded" role="img" aria-label="Biogasoline"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Bitumen</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Bitumen" class="lazy-chart-plot is-unloaded" role="img" aria-label="Bitumen"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Black liqour</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Black_liqour" class="lazy-chart-plot is-unloaded" role="img" aria-label="Black liqour"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Charcoal</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Charcoal" class="lazy-chart-plot is-unloaded" role="img" aria-label="Charcoal"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Coal nonspecified</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Coal_nonspecified" class="lazy-chart-plot is-unloaded" role="img" aria-label="Coal nonspecified"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Electricity</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Electricity" class="lazy-chart-plot is-unloaded" role="img" aria-label="Electricity"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Ethane</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Ethane" class="lazy-chart-plot is-unloaded" role="img" aria-label="Ethane"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Fuelwood & woodwaste</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Fuelwood___woodwaste" class="lazy-chart-plot is-unloaded" role="img" aria-label="Fuelwood &amp; woodwaste"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Gas/diesel oil</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Gas_diesel_oil" class="lazy-chart-plot is-unloaded" role="img" aria-label="Gas/diesel oil"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Gasoline type jet fuel</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Gasoline_type_jet_fuel" class="lazy-chart-plot is-unloaded" role="img" aria-label="Gasoline type jet fuel"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Heat</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Heat" class="lazy-chart-plot is-unloaded" role="img" aria-label="Heat"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Industrial waste</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Industrial_waste" class="lazy-chart-plot is-unloaded" role="img" aria-label="Industrial waste"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Kerosene</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Kerosene" class="lazy-chart-plot is-unloaded" role="img" aria-label="Kerosene"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Kerosene type jet fuel</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Kerosene_type_jet_fuel" class="lazy-chart-plot is-unloaded" role="img" aria-label="Kerosene type jet fuel"></div></figure><figure class="chart-card"><figcaption class="chart-caption">LPG</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__LPG" class="lazy-chart-plot is-unloaded" role="img" aria-label="LPG"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Lubricants</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Lubricants" class="lazy-chart-plot is-unloaded" role="img" aria-label="Lubricants"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Municipal solid waste (non-renewable)</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Municipal_solid_waste__non-renewable" class="lazy-chart-plot is-unloaded" role="img" aria-label="Municipal solid waste (non-renewable)"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Municipal solid waste (renewable)</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Municipal_solid_waste__renewable" class="lazy-chart-plot is-unloaded" role="img" aria-label="Municipal solid waste (renewable)"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Naphtha</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Naphtha" class="lazy-chart-plot is-unloaded" role="img" aria-label="Naphtha"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Natural gas</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Natural_gas" class="lazy-chart-plot is-unloaded" role="img" aria-label="Natural gas"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Other biomass</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Other_biomass" class="lazy-chart-plot is-unloaded" role="img" aria-label="Other biomass"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Other bituminous coal</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Other_bituminous_coal" class="lazy-chart-plot is-unloaded" role="img" aria-label="Other bituminous coal"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Other liquid biofuels</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Other_liquid_biofuels" class="lazy-chart-plot is-unloaded" role="img" aria-label="Other liquid biofuels"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Other products</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Other_products" class="lazy-chart-plot is-unloaded" role="img" aria-label="Other products"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Other sources</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Other_sources" class="lazy-chart-plot is-unloaded" role="img" aria-label="Other sources"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Paraffin waxes</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Paraffin_waxes" class="lazy-chart-plot is-unloaded" role="img" aria-label="Paraffin waxes"></div></figure><figure class="chart-card"><figcaption class="chart-caption">PetProd nonspecified</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__PetProd_nonspecified" class="lazy-chart-plot is-unloaded" role="img" aria-label="PetProd nonspecified"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Petroleum coke</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Petroleum_coke" class="lazy-chart-plot is-unloaded" role="img" aria-label="Petroleum coke"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Refinery gas (not liquefied)</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Refinery_gas__not_liquefied" class="lazy-chart-plot is-unloaded" role="img" aria-label="Refinery gas (not liquefied)"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Sub-bituminous coal</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__Sub-bituminous_coal" class="lazy-chart-plot is-unloaded" role="img" aria-label="Sub-bituminous coal"></div></figure><figure class="chart-card"><figcaption class="chart-caption">White spirit SBP</figcaption><div class="meta-subline">Industry > Manufacturing > Machinery</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="esto__14_03_06__Machinery__Energy_balance__PJ__White_spirit_SBP" class="lazy-chart-plot is-unloaded" role="img" aria-label="White spirit SBP"></div></figure></div></section></section></section>
     </main>
   </div>
   <script>
@@ -305,90 +314,91 @@ a:hover { text-decoration: underline; }
   });
 })();
 </script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="../chart_bundles/node__Industry_sector__Manufacturing__Machinery__charts.js"></script>
   <script>
 (function() {
-  const frames = Array.from(document.querySelectorAll('iframe.lazy-chart-frame[data-src]'));
-  if (!frames.length) return;
+  const plots = Array.from(document.querySelectorAll('.lazy-chart-plot[data-chart-key]'));
+  const bundleUrl = window.BALANCE_CHART_BUNDLE_URL;
+  const inlineBundle = window.BALANCE_CHART_BUNDLE_DATA;
+  if (!plots.length || !window.Plotly) return;
 
-  const LOAD_WINDOW = 50;
-  const UNLOAD_DISTANCE = 100;
-  let ticking = false;
+  let bundlePromise = null;
+  const loadBundle = () => {
+    if (inlineBundle) {
+      return Promise.resolve(inlineBundle);
+    }
+    if (!bundlePromise) {
+      bundlePromise = fetch(bundleUrl).then((response) => {
+        if (!response.ok) {
+          throw new Error(`Chart bundle request failed: ${response.status}`);
+        }
+        return response.json();
+      });
+    }
+    return bundlePromise;
+  };
 
-  const setLoaded = (frame, loaded) => {
-    const state = frame.previousElementSibling;
-    if (loaded) {
-      if (!frame.getAttribute('src')) {
-        frame.setAttribute('src', frame.dataset.src);
-      }
-      frame.classList.remove('is-unloaded');
-      if (state && state.classList.contains('chart-load-state')) {
-        state.dataset.loaded = 'true';
-        state.textContent = '';
-      }
-      return;
-    }
-    if (frame.getAttribute('src')) {
-      frame.removeAttribute('src');
-    }
-    frame.classList.add('is-unloaded');
+  const setState = (plot, text, loaded) => {
+    const state = plot.previousElementSibling;
     if (state && state.classList.contains('chart-load-state')) {
-      state.dataset.loaded = 'false';
-      state.textContent = 'Chart unloaded until nearby';
+      state.dataset.loaded = loaded ? 'true' : 'false';
+      state.textContent = text || '';
     }
   };
 
-  const nearestFrameIndex = () => {
-    const viewportMid = window.scrollY + window.innerHeight / 2;
-    let bestIndex = 0;
-    let bestDistance = Number.POSITIVE_INFINITY;
-    frames.forEach((frame, index) => {
-      const rect = frame.getBoundingClientRect();
-      const frameMid = window.scrollY + rect.top + rect.height / 2;
-      const distance = Math.abs(frameMid - viewportMid);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestIndex = index;
+  const renderPlot = async (plot) => {
+    if (plot.dataset.rendered === 'true' || plot.dataset.rendering === 'true') return;
+    plot.dataset.rendering = 'true';
+    setState(plot, 'Loading chart', false);
+    try {
+      const bundle = await loadBundle();
+      const chart = bundle.charts && bundle.charts[plot.dataset.chartKey];
+      if (!chart) {
+        throw new Error(`Missing chart spec: ${plot.dataset.chartKey}`);
+      }
+      await window.Plotly.newPlot(
+        plot,
+        chart.data || [],
+        chart.layout || {},
+        Object.assign({responsive: true}, chart.config || {}),
+      );
+      plot.dataset.rendered = 'true';
+      plot.classList.remove('is-unloaded');
+      setState(plot, '', true);
+      window.Plotly.Plots.resize(plot);
+    } catch (err) {
+      plot.classList.add('is-unloaded');
+      setState(plot, `Chart failed to load: ${err.message || err}`, false);
+    } finally {
+      plot.dataset.rendering = 'false';
+    }
+  };
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            renderPlot(entry.target);
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      {rootMargin: '900px 0px'},
+    );
+    plots.forEach((plot) => observer.observe(plot));
+  } else {
+    plots.forEach((plot) => renderPlot(plot));
+  }
+
+  window.addEventListener('resize', () => {
+    plots.forEach((plot) => {
+      if (plot.dataset.rendered === 'true') {
+        window.Plotly.Plots.resize(plot);
       }
     });
-    return bestIndex;
-  };
-
-  const updateFrames = () => {
-    ticking = false;
-    const current = nearestFrameIndex();
-    const half = Math.floor(LOAD_WINDOW / 2);
-    let start = Math.max(0, current - half);
-    let end = Math.min(frames.length - 1, start + LOAD_WINDOW - 1);
-    start = Math.max(0, end - LOAD_WINDOW + 1);
-
-    frames.forEach((frame, index) => {
-      if (index >= start && index <= end) {
-        setLoaded(frame, true);
-      } else if (Math.abs(index - current) > UNLOAD_DISTANCE) {
-        setLoaded(frame, false);
-      }
-    });
-  };
-
-  const scheduleUpdate = () => {
-    if (ticking) return;
-    ticking = true;
-    window.requestAnimationFrame(updateFrames);
-  };
-
-  frames.forEach((frame) => {
-    frame.classList.add('is-unloaded');
-    const state = frame.previousElementSibling;
-    if (state && state.classList.contains('chart-load-state')) {
-      state.dataset.loaded = 'false';
-      state.textContent = 'Chart queued';
-    }
   });
-
-  window.addEventListener('scroll', scheduleUpdate, { passive: true });
-  window.addEventListener('resize', scheduleUpdate);
-  window.addEventListener('hashchange', () => window.setTimeout(scheduleUpdate, 80));
-  window.setTimeout(updateFrames, 0);
 })();
 </script>
 </body>
