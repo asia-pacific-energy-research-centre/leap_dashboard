@@ -284,7 +284,7 @@ def _write_dashboard_about_supplements(
     if template_json_path.exists():
         shutil.copy2(template_json_path, dashboards_dir / json_filename)
 
-    # Patch about.html - inject reference files section and losses note
+    # Patch about.html - inject reference files section and loss/own-use note
     about_path = dashboards_dir / "about.html"
     if not about_path.exists():
         return
@@ -296,13 +296,15 @@ def _write_dashboard_about_supplements(
         " - the chart navigation template that defines the ESTO-axis structure and dashboard sections.</li>"
         "</ul>"
         "</section>"
-        '<section class="about-section"><h2>Note on LEAP values and losses</h2>'
-        "<p>LEAP does not extract losses as a separate line item."
-        " Instead, losses are deducted directly from the value shown for the affected fuel,"
-        " so the fuel figure already has losses subtracted from it."
-        " This means transformation output values can be lower than the equivalent ESTO figure"
-        " - and in some cases can switch from positive to negative -"
-        " simply because the losses have been taken out of the fuel value rather than reported separately.</p>"
+        '<section class="about-section"><h2>Note on losses and own use</h2>'
+        "<p>Losses and own use are still a work in progress in the LEAP model."
+        " In the transformation sector, LEAP currently models only electricity transmission and distribution losses directly."
+        " Other losses and own-use lines are handled in the demand sector under Other loss and own use.</p>"
+        "<p>The demand-sector approach is iterative."
+        " First-pass values are estimated from the 9th edition loss and own-use series."
+        " After the relevant proxy sector has been projected, that projected activity is used as the activity proxy."
+        " Loss and own-use intensities are then calculated from historical ESTO ratios and applied to the proxy activity."
+        " These rows should therefore be read as proxy-based estimates rather than fully final transformation-sector results.</p>"
         "</section>"
     )
     if "</article>" in html:

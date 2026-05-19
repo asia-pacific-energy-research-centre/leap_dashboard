@@ -5594,6 +5594,234 @@ def make_chart(
         return None
 
 
+def make_stacked_area_chart(
+    sheet: str,
+    fuel: str,
+    subset: pd.DataFrame,
+    output_dir: Path,
+    backend: str = "plotly",
+    display_sheet: str | None = None,
+    file_sheet: str | None = None,
+    comparison_lines: Sequence[str] | None = None,
+    color_legend: dict[str, str] | None = None,
+    others_note: list[str] | None = None,
+) -> Path | Any | None:
+    """Generate a LEAP stacked-area chart by product, with optional comparator total lines."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    display_name = display_sheet or sheet
+    sheet_slug = _safe_token((file_sheet or sheet).replace("\\", "_"))
+    fuel_slug = _safe_token(fuel)
+    out_html = output_dir / f"{sheet_slug}__{fuel_slug}.html"
+    y_axis_label = "Energy (PJ)"
+
+    if subset.empty:
+        return None
+
+    working = subset.copy()
+    for col in ["source", "scenario", "fuel_label", "year", "value"]:
+        if col not in working.columns:
+            working[col] = ""
+    working["source"] = working["source"].fillna("").astype(str).str.strip()
+    working["scenario"] = working["scenario"].fillna("").astype(str).str.strip()
+    working["fuel_label"] = working["fuel_label"].fillna("").astype(str).str.strip()
+    working["year"] = pd.to_numeric(working["year"], errors="coerce")
+    working["value"] = pd.to_numeric(working["value"], errors="coerce")
+    working = working[working["year"].notna() & working["value"].notna()].copy()
+    if working.empty:
+        return None
+    working["year"] = working["year"].astype(int)
+
+    area_rows = working[
+        working["source"].eq("leap")
+        & working["fuel_label"].ne("")
+        & working["fuel_label"].ne("Total")
+    ].copy()
+    if area_rows.empty:
+        area_rows = working[
+            working["source"].eq("leap")
+            & working["fuel_label"].ne("")
+        ].copy()
+    if area_rows.empty:
+        return None
+
+    def _format_scenario_label(value: object) -> str:
+        raw = str(value or "").strip()
+        if not raw:
+            return "Scenario"
+        lowered = raw.lower()
+        if lowered == "reference":
+            return "Reference"
+        if lowered == "target":
+            return "Target"
+        return raw
+
+    def _scenario_sort_key(value: object) -> tuple[int, str]:
+        lowered = str(value or "").strip().lower()
+        if lowered == "target":
+            return (0, lowered)
+        if lowered == "reference":
+            return (1, lowered)
+        return (2, lowered)
+
+    scenario_values = sorted(area_rows["scenario"].dropna().astype(str).unique(), key=_scenario_sort_key)
+    if not scenario_values:
+        return None
+    visible_scenario = scenario_values[0]
+
+    product_order = (
+        area_rows.groupby("fuel_label", dropna=False)["value"]
+        .apply(lambda values: pd.to_numeric(values, errors="coerce").abs().sum())
+        .sort_values(ascending=False)
+        .index.astype(str)
+        .tolist()
+    )
+    palette = [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf",
+        "#4c78a8",
+        "#f58518",
+        "#54a24b",
+        "#e45756",
+        "#72b7b2",
+    ]
+    color_lookup = dict(color_legend or {})
+
+    def _color_for_product(product: object, idx: int) -> str:
+        label = str(product or "").strip()
+        norm = " ".join(label.lower().split())
+        return color_lookup.get(label) or color_lookup.get(norm) or palette[idx % len(palette)]
+
+    comparison_tokens = {
+        str(value or "").strip().lower()
+        for value in list(comparison_lines or [])
+        if str(value or "").strip()
+    }
+    source_groups = {
+        "esto": (["base", "base_mixed", "base_estimated"], "ESTO"),
+        "base": (["base", "base_mixed", "base_estimated"], "ESTO"),
+        "9th": (["projection", "projection_mixed", "projection_estimated"], "9th"),
+        "ninth": (["projection", "projection_mixed", "projection_estimated"], "9th"),
+        "projection": (["projection", "projection_mixed", "projection_estimated"], "9th"),
+    }
+
+    try:
+        import plotly.graph_objects as go
+        import plotly.io as pio
+
+        fig = go.Figure()
+        for scenario in scenario_values:
+            scenario_rows = area_rows[area_rows["scenario"].eq(scenario)].copy()
+            scenario_label = _format_scenario_label(scenario)
+            scenario_visible = True if scenario == visible_scenario else "legendonly"
+            stackgroup = f"leap_{_safe_token(scenario_label)}"
+            for idx, product in enumerate(product_order):
+                product_rows = scenario_rows[scenario_rows["fuel_label"].eq(product)].copy()
+                if product_rows.empty:
+                    continue
+                series = product_rows.groupby("year", as_index=True)["value"].sum(min_count=1).sort_index()
+                if series.empty or not series.abs().gt(1e-12).any():
+                    continue
+                name = str(product)
+                if len(scenario_values) > 1:
+                    name = f"{product} - {scenario_label}"
+                fig.add_trace(
+                    go.Scatter(
+                        x=series.index.tolist(),
+                        y=[None if pd.isna(v) else float(v) for v in series.tolist()],
+                        mode="lines",
+                        line=dict(width=0.7, color=_color_for_product(product, idx)),
+                        fillcolor=_color_for_product(product, idx),
+                        stackgroup=stackgroup,
+                        name=name,
+                        visible=scenario_visible,
+                        hovertemplate="%{x}<br>%{y:.3g} PJ<extra>" + name + "</extra>",
+                    )
+                )
+
+        added_comparison_keys: set[str] = set()
+        for token in comparison_tokens:
+            if token not in source_groups:
+                continue
+            source_names, label = source_groups[token]
+            key = ",".join(source_names)
+            if key in added_comparison_keys:
+                continue
+            added_comparison_keys.add(key)
+            line_rows = working[working["source"].isin(source_names)].copy()
+            if line_rows.empty:
+                continue
+            for scenario, scenario_rows in sorted(line_rows.groupby("scenario", dropna=False), key=lambda item: _scenario_sort_key(item[0])):
+                series = scenario_rows.groupby("year", as_index=True)["value"].sum(min_count=1).sort_index()
+                if series.empty or not series.abs().gt(1e-12).any():
+                    continue
+                scenario_label = _format_scenario_label(scenario)
+                name = label if len(scenario_values) <= 1 else f"{label} - {scenario_label}"
+                is_esto = label == "ESTO"
+                fig.add_trace(
+                    go.Scatter(
+                        x=series.index.tolist(),
+                        y=[None if pd.isna(v) else float(v) for v in series.tolist()],
+                        mode="lines+markers",
+                        line=dict(
+                            width=2.3,
+                            dash="dash" if label == "9th" else "dot",
+                            color="#111111" if label == "9th" else "#DAA520",
+                        ),
+                        marker=dict(
+                            size=12 if is_esto else 5,
+                            symbol="diamond" if is_esto else "circle",
+                            color="#FFD700" if is_esto else None,
+                            line=dict(width=1.5, color="#B8860B") if is_esto else dict(width=0),
+                        ),
+                        name=name,
+                    )
+                )
+
+        bottom_margin = 100
+        annotations = []
+        if others_note:
+            others_text = "Others includes: " + ", ".join(others_note)
+            annotations.append(
+                dict(
+                    text=others_text,
+                    xref="paper",
+                    yref="paper",
+                    x=0,
+                    y=-0.38,
+                    xanchor="left",
+                    yanchor="top",
+                    showarrow=False,
+                    font=dict(size=10, color="#888888"),
+                )
+            )
+            bottom_margin = 130
+        fig.update_layout(
+            title=f"{display_name} - {fuel}",
+            xaxis_title="Year",
+            yaxis_title=y_axis_label,
+            template="plotly_white",
+            hovermode="x unified",
+            legend=dict(orientation="h", yanchor="bottom", y=-0.28, xanchor="left", x=0),
+            margin=dict(l=60, r=25, t=60, b=bottom_margin),
+            annotations=annotations if annotations else [],
+        )
+        if backend == "plotly_figure":
+            return fig
+        pio.write_html(fig, file=out_html, include_plotlyjs="cdn", full_html=True)
+        return out_html
+    except Exception as exc:  # noqa: BLE001
+        print(f"[WARN] Failed to render stacked area chart for {display_name}/{fuel}: {exc}")
+        return None
+
+
 def _prepare_render_long(comparison_long: pd.DataFrame) -> pd.DataFrame:
     """
     Use precomputed chart totals when available; otherwise derive them lazily.

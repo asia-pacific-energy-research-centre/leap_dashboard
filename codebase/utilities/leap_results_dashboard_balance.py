@@ -31,6 +31,7 @@ from codebase.utilities.leap_results_dashboard_utils import (
     _safe_token,
     build_charts,
     make_chart,
+    make_stacked_area_chart,
     pull_base_year_value,
     pull_projection_series,
 )
@@ -2165,8 +2166,9 @@ def write_dashboard_comparator_pair_coverage(
     if template:
         template_aggregate_groups: list[dict[str, object]] = []
         template_measure_default = str((template.get("defaults") or {}).get("measure", "")).strip()
+        _template_fuel_mapping_sets_local = _template_fuel_mapping_sets(template)
         def _walk_template(node: dict[str, Any]) -> None:
-            for aggregate in _dashboard_template_aggregate_specs(node, default_measure=template_measure_default):
+            for aggregate in _dashboard_template_aggregate_specs(node, default_measure=template_measure_default, fuel_mapping_sets=_template_fuel_mapping_sets_local):
                 source_flows = [clean(flow) for flow in list(aggregate.get("source_flows", []) or []) if clean(flow)]
                 if source_flows:
                     template_aggregate_groups.append(aggregate)
@@ -4747,6 +4749,9 @@ TEMPLATE_RESERVED_KEYS = {
     "aggregate_graphs",
     "graphs",
     "by_fuel_graphs",
+    "fuel_aggregate_mappings",
+    "specified_fuel_mappings",
+    "product_color_legend",
     "esto_flow",
     "_comments",
     "comments",
@@ -4773,6 +4778,59 @@ def _as_clean_list(value: object) -> list[str]:
     return [text] if text else []
 
 
+def _norm_template_token(value: object) -> str:
+    """Normalize template labels for case/spacing-insensitive matching."""
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _template_fuel_mapping_sets(template: dict[str, Any] | None) -> dict[str, list[str]]:
+    """Read top-level named product-set aliases from specified_fuel_mappings_sets."""
+    if not isinstance(template, dict):
+        return {}
+    raw = template.get("specified_fuel_mappings_sets", {})
+    if not isinstance(raw, dict):
+        return {}
+    sets: dict[str, list[str]] = {}
+    for set_name, products in raw.items():
+        key = str(set_name or "").strip()
+        values = _as_clean_list(products)
+        if key and values:
+            sets[key] = values
+    return sets
+
+
+def _template_fuel_aggregate_mappings(template: dict[str, Any] | None) -> dict[str, list[str]]:
+    """Read top-level product aggregate groups such as {"Coal": ["01 Coal", ...]}."""
+    if not isinstance(template, dict):
+        raw = {}
+    else:
+        raw = template.get("specified_fuel_mappings", template.get("fuel_aggregate_mappings", {}))
+    if not isinstance(raw, dict):
+        return {}
+    mappings: dict[str, list[str]] = {}
+    for group_name, products in raw.items():
+        key = str(group_name or "").strip()
+        values = _as_clean_list(products)
+        if key and values:
+            mappings[key] = values
+            mappings.setdefault(_norm_template_token(key), values)
+    return mappings
+
+
+def _template_product_color_legend(template: dict[str, Any] | None) -> dict[str, str]:
+    raw = (template or {}).get("product_color_legend", {}) if isinstance(template, dict) else {}
+    if not isinstance(raw, dict):
+        return {}
+    colors: dict[str, str] = {}
+    for label, color in raw.items():
+        label_text = str(label or "").strip()
+        color_text = str(color or "").strip()
+        if label_text and color_text:
+            colors[label_text] = color_text
+            colors.setdefault(_norm_template_token(label_text), color_text)
+    return colors
+
+
 def _template_measure_list(
     raw_spec: dict[str, Any],
     default_measure: str = "",
@@ -4790,6 +4848,7 @@ def _dashboard_template_aggregate_specs(
     node: dict[str, Any],
     *,
     default_measure: str = "",
+    fuel_mapping_sets: dict[str, list[str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Normalize V2 aggregate_graphs and legacy aggregate declarations."""
     if not isinstance(node, dict):
@@ -4810,20 +4869,68 @@ def _dashboard_template_aggregate_specs(
     normalized: list[dict[str, Any]] = []
     for idx, raw_spec in enumerate(raw_specs, start=1):
         flows = _as_clean_list(raw_spec.get("esto_flows", raw_spec.get("source_esto_flows", [])))
-        fuel = str(raw_spec.get("fuels", raw_spec.get("fuel", "Total")) or "Total").strip() or "Total"
+        products_raw = raw_spec.get("products", raw_spec.get("fuels", raw_spec.get("fuel", "Total")))
+        specified_products: list[str] = []
+        if isinstance(products_raw, dict):
+            product_mode = str(products_raw.get("how", "total") or "total").strip().lower()
+            if product_mode not in {"all", "specified", "total"}:
+                raise ValueError(f"aggregate_graphs products.how must be 'total', 'all', or 'specified'; got {product_mode!r}")
+            sp_raw = products_raw.get("specified_products", [])
+            if isinstance(sp_raw, str):
+                set_key = sp_raw.strip()
+                resolved = (fuel_mapping_sets or {}).get(set_key)
+                if resolved is None:
+                    raise ValueError(
+                        f"aggregate_graphs products.specified_products references set {set_key!r} "
+                        "which is not in specified_fuel_mappings_sets"
+                    )
+                specified_products = list(resolved)
+            else:
+                specified_products = _as_clean_list(sp_raw)
+            products = specified_products
+        else:
+            product_text = str(products_raw or "").strip() if not isinstance(products_raw, (list, tuple)) else ""
+            if isinstance(products_raw, (list, tuple)):
+                products = [str(value).strip() for value in products_raw if str(value).strip()]
+                product_mode = "specified"
+            elif product_text.lower() == "all":
+                products = []
+                product_mode = "all"
+            elif product_text.lower() == "total" or not product_text:
+                products = []
+                product_mode = "total"
+            else:
+                products = [product_text]
+                product_mode = "specified"
+            specified_products = products
+        include_all_products = product_mode == "all"
+        product_is_total = product_mode == "total"
+        fuel = str(raw_spec.get("fuel", raw_spec.get("fuels", "Total")) or "Total").strip() or "Total"
+        chart_type = str(raw_spec.get("chart_type", "line") or "line").strip().lower()
+        if chart_type == "stacked_area":
+            fuel = "Products" if include_all_products or products else "Total"
         measures = _template_measure_list(raw_spec, default_measure)
         if not flows:
             continue
+        products_norm = {norm_text for norm_text in [_norm_template_token(product) for product in products] if norm_text}
         normalized.append(
             {
                 "aggregate_id": f"aggregate_{idx}",
                 "fuel": fuel,
                 "fuels": fuel,
+                "products": products,
+                "product_mode": product_mode,
+                "specified_products": specified_products,
+                "products_norm": products_norm,
+                "include_all_products": include_all_products,
+                "product_is_total": product_is_total,
                 "source_flows": flows,
                 "esto_flows": flows,
-                "source_flows_norm": {" ".join(flow.lower().split()) for flow in flows if flow},
-                "fuel_norm": " ".join(fuel.lower().split()),
+                "source_flows_norm": {_norm_template_token(flow) for flow in flows if flow},
+                "fuel_norm": _norm_template_token(fuel),
                 "measures": measures,
+                "chart_type": chart_type,
+                "comparison_lines": _as_clean_list(raw_spec.get("comparison_lines", [])),
                 "use_esto_to_ninth_mapping": _to_bool(
                     raw_spec.get("use_esto_to_ninth_mapping", False),
                     default=False,
@@ -4949,6 +5056,7 @@ def build_esto_axis_structure_from_dashboard_template(
 
     top_label_inverse = {v: k for k, v in BALANCE_DASHBOARD_TOP_LABELS.items()}
     measure_default = str((template.get("defaults") or {}).get("measure", "")).strip() or "Energy balance (PJ)"
+    _build_fuel_mapping_sets = _template_fuel_mapping_sets(template)
     page_paths: list[list[str]] = []
     sheet_catalog: dict[str, dict[str, Any]] = {}
     esto_flow_to_sheet: dict[str, str] = {}
@@ -4991,7 +5099,7 @@ def build_esto_axis_structure_from_dashboard_template(
     def _walk(node: dict[str, Any], display_path: tuple[str, ...] = ()) -> None:
         if display_path:
             _remember_path(display_path)
-        for aggregate in _dashboard_template_aggregate_specs(node, default_measure=measure_default):
+        for aggregate in _dashboard_template_aggregate_specs(node, default_measure=measure_default, fuel_mapping_sets=_build_fuel_mapping_sets):
             for flow in list(aggregate.get("source_flows", []) or []):
                 _remember_flow(flow, display_path)
         for spec in _dashboard_template_graph_specs(node, default_measure=measure_default):
@@ -6150,6 +6258,40 @@ def _build_page_html(
 """
 
 
+def _collect_template_referenced_products(
+    template: dict[str, Any],
+    fuel_mapping_sets: dict[str, list[str]] | None = None,
+) -> list[str]:
+    """Walk the template and collect all product names referenced in specified_products fields."""
+    seen: set[str] = set()
+    result: list[str] = []
+
+    def _walk(node: object) -> None:
+        if not isinstance(node, dict):
+            return
+        agg = node.get("aggregate_graphs")
+        if isinstance(agg, dict):
+            products_spec = agg.get("products")
+            if isinstance(products_spec, dict):
+                sp = products_spec.get("specified_products", [])
+                if isinstance(sp, str):
+                    resolved = (fuel_mapping_sets or {}).get(sp.strip(), [])
+                    names = list(resolved)
+                else:
+                    names = _as_clean_list(sp)
+                for name in names:
+                    if name and name not in seen:
+                        seen.add(name)
+                        result.append(name)
+        for key, child in node.items():
+            if _dashboard_template_is_reserved_key(key) or not isinstance(child, dict):
+                continue
+            _walk(child)
+
+    _walk(template)
+    return result
+
+
 def _build_about_page_html(
     *,
     title: str,
@@ -6159,6 +6301,7 @@ def _build_about_page_html(
     top_links: list[tuple[str, str]],
     current_file: str,
     about_config: dict[str, Any],
+    fuel_mappings_html: str = "",
 ) -> str:
     heading = _clean_token(about_config.get("title", "")) or "About This Dashboard"
     intro = _clean_token(about_config.get("intro", ""))
@@ -6241,6 +6384,9 @@ def _build_about_page_html(
 .about-content li {{ margin: 5px 0; }}
 .about-section {{ margin-top: 18px; }}
 .about-section h2 {{ margin: 0 0 8px 0; font-size: var(--section-title-size); color: #23384d; }}
+.fuel-mappings-grid {{ display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; margin-top: 8px; font-size: 13px; }}
+.fuel-mapping-label {{ font-weight: 600; padding: 4px 0; color: #23384d; align-self: start; }}
+.fuel-mapping-values {{ padding: 4px 0; color: #444; line-height: 1.5; }}
   </style>
 </head>
 <body>
@@ -6266,6 +6412,7 @@ def _build_about_page_html(
       <article class="about-content">
         {_paragraph_html(intro)}
         {"".join(section_html)}
+        {fuel_mappings_html}
       </article>
     </main>
   </div>
@@ -6432,6 +6579,7 @@ def render_balance_dashboards(
         top_label_inverse = {v: k for k, v in BALANCE_DASHBOARD_TOP_LABELS.items()}
         flow_paths: dict[str, tuple[str, ...]] = {}
         measure_default = str((template_allowlist.get("defaults") or {}).get("measure", "")).strip()
+        local_fuel_mapping_sets = _template_fuel_mapping_sets(template_allowlist)
 
         def _raw_path(display_path: tuple[str, ...]) -> tuple[str, ...]:
             if not display_path:
@@ -6450,7 +6598,7 @@ def render_balance_dashboards(
                     flow_paths[flow_text] = candidate_path
 
         def _walk(node: dict[str, Any], display_path: tuple[str, ...]) -> None:
-            for aggregate in _dashboard_template_aggregate_specs(node, default_measure=measure_default):
+            for aggregate in _dashboard_template_aggregate_specs(node, default_measure=measure_default, fuel_mapping_sets=local_fuel_mapping_sets):
                 for flow in list(aggregate.get("source_flows", []) or []):
                     _remember_flow(flow, display_path)
             for spec in _dashboard_template_graph_specs(node, default_measure=measure_default):
@@ -6636,6 +6784,9 @@ def render_balance_dashboards(
     allowed_template_graph_specs: dict[tuple[str, ...], list[dict[str, Any]]] = {}
     template_entry_order: dict[tuple[tuple[str, ...], str], int] = {}
     template_measure_default = str((template_allowlist.get("defaults") or {}).get("measure", "")).strip() or "Energy balance (PJ)"
+    fuel_aggregate_mappings = _template_fuel_aggregate_mappings(template_allowlist)
+    fuel_mapping_sets = _template_fuel_mapping_sets(template_allowlist)
+    product_color_legend = _template_product_color_legend(template_allowlist)
 
     def _collect_template_allowlist(node: dict[str, Any], path: tuple[str, ...] = ()) -> None:
         if path:
@@ -6678,7 +6829,7 @@ def render_balance_dashboards(
             return False
         node = allowed_template_nodes.get(_display_path_tuple(path), {})
         return isinstance(node, dict) and bool(
-            _dashboard_template_aggregate_specs(node, default_measure=template_measure_default)
+            _dashboard_template_aggregate_specs(node, default_measure=template_measure_default, fuel_mapping_sets=fuel_mapping_sets)
         )
 
     def _template_order_for_entry(path: tuple[str, ...], entry: dict[str, str]) -> int:
@@ -6694,7 +6845,7 @@ def render_balance_dashboards(
         node = allowed_template_nodes.get(_display_path_tuple(path), {})
         if not isinstance(node, dict):
             return []
-        return _dashboard_template_aggregate_specs(node, default_measure=template_measure_default)
+        return _dashboard_template_aggregate_specs(node, default_measure=template_measure_default, fuel_mapping_sets=fuel_mapping_sets)
 
     def _component_sheets_for_aggregate_path(path: tuple[str, ...]) -> list[str]:
         aggregate_specs = _template_aggregate_specs_for_path(path)
@@ -6727,7 +6878,7 @@ def render_balance_dashboards(
         measure = str(entry.get("measure", "")).strip()
         fuel = str(entry.get("fuel", "")).strip()
         if _is_aggregate_entry(entry):
-            aggregate_specs = _dashboard_template_aggregate_specs(node, default_measure=template_measure_default)
+            aggregate_specs = _dashboard_template_aggregate_specs(node, default_measure=template_measure_default, fuel_mapping_sets=fuel_mapping_sets)
             if not aggregate_specs:
                 return False
             for aggregate in aggregate_specs:
@@ -6951,6 +7102,155 @@ def render_balance_dashboards(
         values = pd.to_numeric(frame["value"], errors="coerce").dropna()
         return bool(not values.empty and values.abs().gt(1e-12).any())
 
+    def _aggregate_product_groups(spec: dict[str, Any]) -> list[dict[str, Any]]:
+        """Resolve aggregate products to chart components."""
+        mode = str(spec.get("product_mode", "") or "").strip().lower()
+        if bool(spec.get("include_all_products", False)):
+            if not list(spec.get("specified_products", []) or []):
+                return [{"label": "All", "mode": "all", "products_norm": set()}]
+        if bool(spec.get("product_is_total", False)):
+            return [{"label": "Total", "mode": "total", "products_norm": set()}]
+
+        groups: list[dict[str, Any]] = []
+        product_owner: dict[str, str] = {}
+        for product in list(spec.get("specified_products", spec.get("products", [])) or []):
+            product_text = str(product).strip()
+            if not product_text:
+                continue
+            mapped = fuel_aggregate_mappings.get(product_text)
+            if mapped is None:
+                mapped = fuel_aggregate_mappings.get(_norm_template_token(product_text))
+            if mapped is None:
+                raise ValueError(
+                    "aggregate_graphs products.specified_products references "
+                    f"{product_text!r}, but it is missing from top-level specified_fuel_mappings"
+                )
+            mapped_norms = {_norm_template_token(value) for value in mapped if _norm_template_token(value)}
+            conflicts = sorted(
+                f"{norm} already in {product_owner[norm]!r}"
+                for norm in mapped_norms
+                if norm in product_owner
+            )
+            if conflicts:
+                conflict_preview = "; ".join(conflicts[:6])
+                raise ValueError(
+                    "aggregate_graphs specified_products has overlapping fuel mappings: "
+                    f"{product_text!r} conflicts with {conflict_preview}"
+                )
+            for norm in mapped_norms:
+                product_owner[norm] = product_text
+            if mapped:
+                groups.append(
+                    {
+                        "label": product_text,
+                        "mode": "group",
+                        "products_norm": mapped_norms,
+                    }
+                )
+        if mode == "all" and groups:
+            groups.append({"label": "Others", "mode": "others", "products_norm": set()})
+        return groups or [{"label": "Total", "mode": "total", "products_norm": set()}]
+
+    def _row_matches_aggregate_products(row: pd.Series, product_norms: set[str]) -> bool:
+        if not product_norms:
+            return False
+        sheet = str(row.get("sheet", ""))
+        measure = str(row.get("measure", ""))
+        fuel = str(row.get("fuel_label", ""))
+        mapping_info = mapping_lookup.get((sheet, measure, fuel)) or mapping_lookup.get((sheet, "Energy balance (PJ)", fuel)) or {}
+        mapped_products = {
+            _norm_template_token(product)
+            for product in list(mapping_info.get("esto_products", []) or [])
+            if _norm_template_token(product)
+        }
+        if mapped_products and mapped_products & product_norms:
+            return True
+        return _norm_template_token(fuel) in product_norms
+
+    def _row_aggregate_product_group_label(row: pd.Series, product_groups: list[dict[str, Any]]) -> str:
+        matches: list[str] = []
+        for group in product_groups:
+            mode = str(group.get("mode", ""))
+            if mode not in {"group", "others"}:
+                continue
+            norms = set(group.get("products_norm", set()))
+            if norms and _row_matches_aggregate_products(row, norms):
+                matches.append(str(group.get("label", "")).strip() or "Product group")
+        if len(matches) > 1:
+            raise ValueError(
+                "A chart row matched multiple specified fuel mappings in the same aggregate graph: "
+                + ", ".join(matches)
+            )
+        if matches:
+            return matches[0]
+        if any(str(group.get("mode", "")) == "others" for group in product_groups):
+            return "Others"
+        return ""
+
+    def _aggregate_rows_for_products(
+        subset: pd.DataFrame,
+        *,
+        product_groups: list[dict[str, Any]],
+        title: str,
+        measure_text: str,
+    ) -> tuple[pd.DataFrame, list[str]]:
+        """Returns (chart_rows, others_labels) where others_labels are fuel names that fell into Others."""
+        if not product_groups:
+            return pd.DataFrame(), []
+        if len(product_groups) == 1 and str(product_groups[0].get("mode", "")) == "all":
+            return subset.copy(), []
+        if len(product_groups) == 1 and str(product_groups[0].get("mode", "")) == "total":
+            return _aggregate_display_rows_to_total(
+                subset,
+                title=title,
+                measure_value=measure_text,
+                collapse_base_family=True,
+                collapse_projection_family=True,
+            ), []
+
+        parts: list[pd.DataFrame] = []
+        if any(str(group.get("mode", "")) == "others" for group in product_groups):
+            matched = subset.copy()
+            matched["_aggregate_product_label"] = matched.apply(
+                lambda row: _row_aggregate_product_group_label(row, product_groups),
+                axis=1,
+            )
+            matched = matched[matched["_aggregate_product_label"].ne("")].copy()
+            if matched.empty:
+                return pd.DataFrame(), []
+            others_labels = sorted(
+                matched.loc[matched["_aggregate_product_label"].eq("Others"), "fuel_label"]
+                .dropna().astype(str).unique().tolist()
+            )
+            matched["fuel_label"] = matched["_aggregate_product_label"]
+            grouped = (
+                matched.groupby(["scenario", "sheet", "measure", "fuel_label", "source", "year"], as_index=False)["value"]
+                .sum(min_count=1)
+            )
+            grouped["sheet"] = title
+            grouped["measure"] = measure_text
+            return grouped, others_labels
+
+        for group in product_groups:
+            norms = set(group.get("products_norm", set()))
+            if not norms:
+                continue
+            matched = subset[subset.apply(lambda row: _row_matches_aggregate_products(row, norms), axis=1)].copy()
+            if matched.empty:
+                continue
+            matched["fuel_label"] = str(group.get("label", "")).strip() or "Product group"
+            grouped = (
+                matched.groupby(["scenario", "sheet", "measure", "fuel_label", "source", "year"], as_index=False)["value"]
+                .sum(min_count=1)
+            )
+            parts.append(grouped)
+        if not parts:
+            return pd.DataFrame(), []
+        combined = pd.concat(parts, ignore_index=True, sort=False)
+        combined["sheet"] = title
+        combined["measure"] = measure_text
+        return combined, []
+
     def _add_parent_aggregate_chart_entries() -> int:
         added = 0
         for path in sorted(node_paths, key=lambda item: (len(item), tuple(part.lower() for part in item))):
@@ -6970,52 +7270,96 @@ def render_balance_dashboards(
             title = _path_title(path)
             path_slug = "__".join(_safe_token(part.replace("\\", "_")) for part in path)
             entries: list[dict[str, str]] = []
-            for measure, measure_subset in subset.groupby("measure", dropna=False):
-                measure_text = str(measure or "").strip() or "Energy balance (PJ)"
-                total_rows = _aggregate_display_rows_to_total(
-                    measure_subset,
-                    title=title,
-                    measure_value=measure_text,
-                    collapse_base_family=True,
-                    collapse_projection_family=True,
-                )
-                if total_rows.empty or not _has_required_aggregate_dataset_families(total_rows) or not _has_nonzero_values(total_rows):
-                    continue
-                file_sheet = f"aggregate__{path_slug}__{measure_text}"
-                chart_result = make_chart(
-                    title,
-                    "Total",
-                    total_rows,
-                    charts_dir,
-                    backend="plotly_figure" if use_chart_bundles else chart_backend,
-                    display_sheet=f"{title} - {measure_text}",
-                    file_sheet=file_sheet,
-                )
-                if chart_result is None:
-                    continue
-                if use_chart_bundles:
-                    chart_file_sheet = file_sheet.replace("\\", "_")
-                    chart_file_name = f"{_safe_token(chart_file_sheet)}__{_safe_token('Total')}.html"
-                    aggregate_chart_figures[chart_file_name] = chart_result
-                else:
-                    chart_file_name = chart_result.name
-                entries.append(
-                    {
-                        "sheet": title,
-                        "measure": measure_text,
-                        "fuel": "Total",
-                        "file": chart_file_name,
-                        "path_label": _path_label(path),
-                        "entry_kind": "aggregate",
-                        "template_order": str(_template_order_for_entry(path, {"entry_kind": "aggregate"})),
-                        **_dashboard_hierarchy_from_path(
-                            path,
-                            entry_kind="aggregate",
-                            measure=measure_text,
-                            fallback_label=title,
-                        ),
-                    }
-                )
+            aggregate_specs = _template_aggregate_specs_for_path(path) or [
+                {
+                    "aggregate_id": "aggregate_1",
+                    "fuel": "Total",
+                    "chart_type": "line",
+                    "product_is_total": True,
+                    "product_mode": "total",
+                    "include_all_products": False,
+                    "products": [],
+                    "specified_products": [],
+                    "measures": [],
+                    "comparison_lines": [],
+                }
+            ]
+            for aggregate_spec in aggregate_specs:
+                configured_measures = {
+                    str(value).strip()
+                    for value in list(aggregate_spec.get("measures", []) or [])
+                    if str(value).strip()
+                }
+                chart_type = str(aggregate_spec.get("chart_type", "line") or "line").strip().lower()
+                product_groups = _aggregate_product_groups(aggregate_spec)
+                aggregate_fuel = str(aggregate_spec.get("fuel", "Total") or "Total").strip() or "Total"
+                for measure, measure_subset in subset.groupby("measure", dropna=False):
+                    measure_text = str(measure or "").strip() or "Energy balance (PJ)"
+                    if configured_measures and measure_text not in configured_measures:
+                        continue
+                    chart_rows, others_labels = _aggregate_rows_for_products(
+                        measure_subset,
+                        product_groups=product_groups,
+                        title=title,
+                        measure_text=measure_text,
+                    )
+                    if chart_rows.empty or not _has_nonzero_values(chart_rows):
+                        continue
+                    if chart_type != "stacked_area" and (
+                        not _has_required_aggregate_dataset_families(chart_rows)
+                    ):
+                        continue
+                    aggregate_id = str(aggregate_spec.get("aggregate_id", "aggregate")).strip() or "aggregate"
+                    file_sheet = f"aggregate__{path_slug}__{aggregate_id}__{measure_text}"
+                    display_sheet = f"{title} - {measure_text}"
+                    if chart_type == "stacked_area":
+                        chart_result = make_stacked_area_chart(
+                            title,
+                            aggregate_fuel,
+                            chart_rows,
+                            charts_dir,
+                            backend="plotly_figure" if use_chart_bundles else chart_backend,
+                            display_sheet=display_sheet,
+                            file_sheet=file_sheet,
+                            comparison_lines=list(aggregate_spec.get("comparison_lines", []) or []),
+                            color_legend=product_color_legend,
+                            others_note=others_labels or None,
+                        )
+                    else:
+                        chart_result = make_chart(
+                            title,
+                            aggregate_fuel,
+                            chart_rows,
+                            charts_dir,
+                            backend="plotly_figure" if use_chart_bundles else chart_backend,
+                            display_sheet=display_sheet,
+                            file_sheet=file_sheet,
+                        )
+                    if chart_result is None:
+                        continue
+                    if use_chart_bundles:
+                        chart_file_sheet = file_sheet.replace("\\", "_")
+                        chart_file_name = f"{_safe_token(chart_file_sheet)}__{_safe_token(aggregate_fuel)}.html"
+                        aggregate_chart_figures[chart_file_name] = chart_result
+                    else:
+                        chart_file_name = chart_result.name
+                    entries.append(
+                        {
+                            "sheet": title,
+                            "measure": measure_text,
+                            "fuel": aggregate_fuel,
+                            "file": chart_file_name,
+                            "path_label": _path_label(path),
+                            "entry_kind": "aggregate",
+                            "template_order": str(_template_order_for_entry(path, {"entry_kind": "aggregate"})),
+                            **_dashboard_hierarchy_from_path(
+                                path,
+                                entry_kind="aggregate",
+                                measure=measure_text,
+                                fallback_label=title,
+                            ),
+                        }
+                    )
             if entries:
                 node_entries[path] = [*entries, *node_entries.get(path, [])]
                 added += len(entries)
@@ -7838,6 +8182,28 @@ def render_balance_dashboards(
         (dashboards_dir / filename).write_text(html, encoding="utf-8")
 
     if about_page_config:
+        referenced_products = _collect_template_referenced_products(template_allowlist, fuel_mapping_sets)
+        fuel_mappings_html = ""
+        if referenced_products and fuel_aggregate_mappings:
+            rows_html: list[str] = []
+            for product in referenced_products:
+                mapping = fuel_aggregate_mappings.get(product)
+                if not mapping:
+                    continue
+                label = escape(product)
+                values = escape(", ".join(mapping))
+                rows_html.append(
+                    f'<div class="fuel-mapping-label">{label}</div>'
+                    f'<div class="fuel-mapping-values">{values}</div>'
+                )
+            if rows_html:
+                fuel_mappings_html = (
+                    '<section class="about-section">'
+                    "<h2>Fuel mappings used in this dashboard</h2>"
+                    "<p>The following fuel categories and their constituent ESTO product codes are used in stacked-area aggregate charts across this dashboard.</p>"
+                    f'<div class="fuel-mappings-grid">{"".join(rows_html)}</div>'
+                    "</section>"
+                )
         about_html = _build_about_page_html(
             title=_clean_token(about_page_config.get("title", "")) or "About This Dashboard",
             economy_label=economy_label,
@@ -7846,6 +8212,7 @@ def render_balance_dashboards(
             top_links=top_links,
             current_file="about.html",
             about_config=about_page_config,
+            fuel_mappings_html=fuel_mappings_html,
         )
         (dashboards_dir / "about.html").write_text(about_html, encoding="utf-8")
     home_index_path = _write_dashboard_home_index(
@@ -9113,6 +9480,7 @@ def build_balance_comparison_esto_axis(
         template = _load_dashboard_template_allowlist(chart_navigation_guide_path)
         if not template:
             return canonical_pairs_frame.iloc[0:0].copy()
+        _enabled_fuel_mapping_sets = _template_fuel_mapping_sets(template)
 
         enabled_all_product_flows: set[str] = set()
         enabled_pairs: set[tuple[str, str]] = set()
@@ -9121,7 +9489,7 @@ def build_balance_comparison_esto_axis(
             return " ".join(str(value or "").strip().lower().split())
 
         def _walk_enabled_specs(node: dict[str, Any]) -> None:
-            for aggregate in _dashboard_template_aggregate_specs(node):
+            for aggregate in _dashboard_template_aggregate_specs(node, fuel_mapping_sets=_enabled_fuel_mapping_sets):
                 if not bool(aggregate.get("use_esto_to_ninth_mapping", False)):
                     continue
                 for flow in list(aggregate.get("esto_flows", aggregate.get("source_flows", [])) or []):
