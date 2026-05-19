@@ -5363,6 +5363,33 @@ a:hover { text-decoration: underline; }
   display:flex;align-items:center;gap:8px;justify-content:flex-end;
   flex:0 0 auto;flex-wrap:nowrap;margin-left:auto;
 }
+.dashboard-context {
+  margin-top:6px;
+  color:#4b5563;
+  font-size:13px;
+  line-height:1.35;
+}
+.economy-switch {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
+}
+.economy-switch label {
+  color:#4b5563;
+  font-size:12px;
+  font-weight:600;
+  white-space:nowrap;
+}
+.economy-switch select {
+  max-width:240px;
+  padding:6px 30px 6px 8px;
+  border:1px solid #c5ccd3;
+  border-radius:6px;
+  background:#fff;
+  color:#0b3d5c;
+  font-size:13px;
+}
 .header-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .header-chip {
   padding: 6px 10px;
@@ -5783,6 +5810,52 @@ _BUNDLED_CHART_RENDER_SCRIPT = """
 """
 
 
+_ECONOMY_NAME_OVERRIDES = {
+    "NZ": "New Zealand",
+    "12_NZ": "New Zealand",
+    "12NZ": "New Zealand",
+    "USA": "United States",
+    "20_USA": "United States",
+    "20USA": "United States",
+}
+
+
+def _economy_display_name(token: object) -> str:
+    text = _clean_token(token)
+    if not text:
+        return "Economy"
+    if text in _ECONOMY_NAME_OVERRIDES:
+        return _ECONOMY_NAME_OVERRIDES[text]
+    return text.replace("_", " ").title()
+
+
+def _economy_switch_html(
+    *,
+    economy_links: list[dict[str, object]],
+    home_href: str,
+) -> str:
+    options = [("Home", home_href, False)]
+    for item in economy_links:
+        label = _clean_token(item.get("label", ""))
+        href = _clean_token(item.get("dashboard_href", ""))
+        current = bool(item.get("current", False))
+        if label and href:
+            options.append((label, href, current))
+    if len(options) <= 1:
+        return ""
+    option_html = "".join(
+        f'<option value="{escape(href)}"{" selected" if current else ""}>{escape(label)}</option>'
+        for label, href, current in options
+    )
+    return (
+        '<div class="economy-switch">'
+        '<label for="economy-switch">Dashboard</label>'
+        f'<select id="economy-switch" aria-label="Switch economy dashboard" '
+        f'onchange="if (this.value) window.location.href = this.value;">{option_html}</select>'
+        '</div>'
+    )
+
+
 def _as_sort_int(value: object, default: int = 9999) -> int:
     try:
         return int(str(value).strip())
@@ -5793,6 +5866,9 @@ def _as_sort_int(value: object, default: int = 9999) -> int:
 def _build_page_html(
     *,
     title: str,
+    economy_label: str,
+    economy_links: list[dict[str, object]],
+    home_href: str,
     top_links: list[tuple[str, str]],
     header_nav_links: list[dict[str, object]],
     child_links: list[dict[str, object]],
@@ -5846,6 +5922,16 @@ def _build_page_html(
             f'<div class="jump-nav-groups">{group_html}</div>'
             + '</div>'
         )
+
+    economy_context = (
+        f'<div class="dashboard-context">Economy: <strong>{escape(economy_label)}</strong></div>'
+        if economy_label
+        else ""
+    )
+    economy_switch = _economy_switch_html(
+        economy_links=economy_links,
+        home_href=home_href,
+    )
 
     children_html = "".join(
         [
@@ -6035,9 +6121,11 @@ def _build_page_html(
       <div class="header-main-row">
         <div style="min-width:220px;flex:1 1 320px;">
           <h1 style="margin:0;font-size:24px;line-height:1.15;"><a href="{title_href}" style="color:inherit;text-decoration:none;">{title}</a></h1>
+          {economy_context}
           {page_measure_html}
         </div>
         <div class="header-side-controls">
+          {economy_switch}
           <div class="header-inline-controls">
             {_header_page_links_html()}
           </div>
@@ -6065,6 +6153,9 @@ def _build_page_html(
 def _build_about_page_html(
     *,
     title: str,
+    economy_label: str,
+    economy_links: list[dict[str, object]],
+    home_href: str,
     top_links: list[tuple[str, str]],
     current_file: str,
     about_config: dict[str, Any],
@@ -6084,6 +6175,16 @@ def _build_about_page_html(
             if label in separator_after:
                 chips.append('<span class="header-nav-separator" aria-hidden="true">|</span>')
         return "".join(chips)
+
+    economy_context = (
+        f'<div class="dashboard-context">Economy: <strong>{escape(economy_label)}</strong></div>'
+        if economy_label
+        else ""
+    )
+    economy_switch = _economy_switch_html(
+        economy_links=economy_links,
+        home_href=home_href,
+    )
 
     def _paragraph_html(text: object) -> str:
         content = _clean_token(text)
@@ -6149,8 +6250,10 @@ def _build_about_page_html(
         <div class="header-main-row">
           <div style="min-width:220px;flex:1 1 320px;">
             <h1 style="margin:0;font-size:24px;line-height:1.15;"><a href="{current_file}" style="color:inherit;text-decoration:none;">{heading}</a></h1>
+            {economy_context}
           </div>
           <div class="header-side-controls">
+            {economy_switch}
             <div class="header-inline-controls">{_header_page_links_html()}</div>
           </div>
         </div>
@@ -6170,6 +6273,114 @@ def _build_about_page_html(
 </body>
 </html>
 """
+
+
+def _dashboard_index_file_for_economy(economy_dir: Path, preferred_filename: str = "") -> str:
+    dashboards_dir = economy_dir / "dashboards"
+    preferred = _clean_token(preferred_filename)
+    if preferred and (dashboards_dir / preferred).exists():
+        return preferred
+    buildings = dashboards_dir / "node__Buildings.html"
+    if buildings.exists():
+        return buildings.name
+    candidates = sorted(
+        [path.name for path in dashboards_dir.glob("node__*.html")],
+        key=lambda value: value.lower(),
+    )
+    if candidates:
+        return candidates[0]
+    about = dashboards_dir / "about.html"
+    if about.exists():
+        return about.name
+    return ""
+
+
+def _economy_dashboard_links(
+    *,
+    out_dir: Path,
+    current_dashboard_filename: str,
+) -> list[dict[str, object]]:
+    docs_root = out_dir.parent
+    if not docs_root.exists():
+        return []
+    current_token = out_dir.name
+    links: list[dict[str, object]] = []
+    for economy_dir in sorted([path for path in docs_root.iterdir() if path.is_dir()], key=lambda path: path.name.lower()):
+        dashboard_file = _dashboard_index_file_for_economy(
+            economy_dir,
+            preferred_filename=current_dashboard_filename if economy_dir.name == current_token else "",
+        )
+        if not dashboard_file:
+            continue
+        token = economy_dir.name
+        links.append(
+            {
+                "token": token,
+                "label": _economy_display_name(token),
+                "current": token == current_token,
+                "dashboard_href": f"../../{token}/dashboards/{dashboard_file}",
+                "home_href": f"{token}/dashboards/{dashboard_file}",
+            }
+        )
+    if not any(bool(link.get("current", False)) for link in links):
+        links.append(
+            {
+                "token": current_token,
+                "label": _economy_display_name(current_token),
+                "current": True,
+                "dashboard_href": f"../../{current_token}/dashboards/{current_dashboard_filename}",
+                "home_href": f"{current_token}/dashboards/{current_dashboard_filename}",
+            }
+        )
+    return links
+
+
+def _write_dashboard_home_index(*, docs_root: Path, economy_links: list[dict[str, object]]) -> Path:
+    docs_root.mkdir(parents=True, exist_ok=True)
+    rows = "".join(
+        (
+            '<a class="home-card" href="{href}">'
+            '<span class="home-card-title">{label}</span>'
+            '<span class="home-card-subtitle">{token}</span>'
+            '</a>'
+        ).format(
+            href=escape(_clean_token(link.get("home_href", ""))),
+            label=escape(_clean_token(link.get("label", ""))),
+            token=escape(_clean_token(link.get("token", ""))),
+        )
+        for link in economy_links
+        if _clean_token(link.get("home_href", "")) and _clean_token(link.get("label", ""))
+    )
+    if not rows:
+        rows = '<p class="home-empty">No economy dashboards have been rendered yet.</p>'
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LEAP Balance Dashboards</title>
+  <style>{_V2_STYLE_CSS}
+.home-layout {{ max-width: 960px; padding-top: 28px; }}
+.home-grid {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-top:18px; }}
+.home-card {{ display:block; padding:16px; border:1px solid #d0d7de; border-radius:8px; background:#fff; color:#0b3d5c; text-decoration:none; }}
+.home-card:hover {{ border-color:#1f6feb; box-shadow:0 2px 8px rgba(15, 23, 42, 0.08); text-decoration:none; }}
+.home-card-title {{ display:block; font-size:18px; font-weight:700; color:#111827; }}
+.home-card-subtitle {{ display:block; margin-top:4px; font-size:13px; color:#64748b; }}
+.home-empty {{ color:#64748b; }}
+  </style>
+</head>
+<body>
+  <div class="page-shell home-layout">
+    <h1 style="margin:0;font-size:28px;line-height:1.15;">LEAP Balance Dashboards</h1>
+    <p style="margin:8px 0 0 0;color:#4b5563;">Choose an economy dashboard.</p>
+    <div class="home-grid">{rows}</div>
+  </div>
+</body>
+</html>
+"""
+    path = docs_root / "index.html"
+    path.write_text(html, encoding="utf-8")
+    return path
 
 
 def render_balance_dashboards(
@@ -6870,6 +7081,17 @@ def render_balance_dashboards(
         top_links = [("About", "about.html"), *top_links]
 
     path_to_filename = {path: _page_filename_from_path(path) for path in node_paths if path}
+    current_dashboard_filename = (
+        path_to_filename.get(top_page_paths[0], "about.html" if about_page_config else "")
+        if top_page_paths
+        else ("about.html" if about_page_config else "")
+    )
+    economy_label = _economy_display_name(out_dir.name)
+    economy_links = _economy_dashboard_links(
+        out_dir=out_dir,
+        current_dashboard_filename=current_dashboard_filename,
+    )
+    home_href = "../../index.html"
 
     def _chart_count_for_path(target_path: tuple[str, ...]) -> int:
         return sum(
@@ -7600,6 +7822,9 @@ def render_balance_dashboards(
 
         html = _build_page_html(
             title=title,
+            economy_label=economy_label,
+            economy_links=economy_links,
+            home_href=home_href,
             top_links=top_links,
             header_nav_links=_header_nav_links_for_path(path),
             child_links=child_links,
@@ -7615,11 +7840,18 @@ def render_balance_dashboards(
     if about_page_config:
         about_html = _build_about_page_html(
             title=_clean_token(about_page_config.get("title", "")) or "About This Dashboard",
+            economy_label=economy_label,
+            economy_links=economy_links,
+            home_href=home_href,
             top_links=top_links,
             current_file="about.html",
             about_config=about_page_config,
         )
         (dashboards_dir / "about.html").write_text(about_html, encoding="utf-8")
+    home_index_path = _write_dashboard_home_index(
+        docs_root=out_dir.parent,
+        economy_links=economy_links,
+    )
 
     empty_pages_path = support_dir / "empty_pages.csv"
     empty_pages_df = pd.DataFrame(empty_pages, columns=["path", "level"])
@@ -7640,6 +7872,7 @@ def render_balance_dashboards(
     return {
         "charts_written": bundled_chart_count if use_chart_bundles else len(written_charts) + aggregate_charts_written,
         "dashboard_index": dashboard_index,
+        "dashboard_home_index": str(home_index_path),
         "charts_dir": str(charts_dir),
         "chart_bundles_dir": str(chart_bundles_dir),
         "dashboards_dir": str(dashboards_dir),

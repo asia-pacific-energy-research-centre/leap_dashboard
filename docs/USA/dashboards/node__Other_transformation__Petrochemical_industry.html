@@ -45,6 +45,33 @@ a:hover { text-decoration: underline; }
   display:flex;align-items:center;gap:8px;justify-content:flex-end;
   flex:0 0 auto;flex-wrap:nowrap;margin-left:auto;
 }
+.dashboard-context {
+  margin-top:6px;
+  color:#4b5563;
+  font-size:13px;
+  line-height:1.35;
+}
+.economy-switch {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:nowrap;
+}
+.economy-switch label {
+  color:#4b5563;
+  font-size:12px;
+  font-weight:600;
+  white-space:nowrap;
+}
+.economy-switch select {
+  max-width:240px;
+  padding:6px 30px 6px 8px;
+  border:1px solid #c5ccd3;
+  border-radius:6px;
+  background:#fff;
+  color:#0b3d5c;
+  font-size:13px;
+}
 .header-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .header-chip {
   padding: 6px 10px;
@@ -272,9 +299,11 @@ a:hover { text-decoration: underline; }
       <div class="header-main-row">
         <div style="min-width:220px;flex:1 1 320px;">
           <h1 style="margin:0;font-size:24px;line-height:1.15;"><a href="node__Other_transformation__Petrochemical_industry.html" style="color:inherit;text-decoration:none;">Petrochemical industry</a></h1>
+          <div class="dashboard-context">Economy: <strong>United States</strong></div>
           
         </div>
         <div class="header-side-controls">
+          <div class="economy-switch"><label for="economy-switch">Dashboard</label><select id="economy-switch" aria-label="Switch economy dashboard" onchange="if (this.value) window.location.href = this.value;"><option value="../../index.html">Home</option><option value="../../NZ/dashboards/node__Buildings.html">New Zealand</option><option value="../../USA/dashboards/node__Buildings.html" selected>United States</option></select></div>
           <div class="header-inline-controls">
             <a href="about.html" class="header-chip" data-current="false">About</a><a href="node__Buildings.html" class="header-chip" data-current="false">Buildings</a><a href="node__Bunkers.html" class="header-chip" data-current="false">Bunkers</a><a href="node__Industry_sector.html" class="header-chip" data-current="false">Industry</a><a href="node__Transport_sector.html" class="header-chip" data-current="false">Transport</a><a href="node__Other_sector.html" class="header-chip" data-current="false">Others</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="node__Power.html" class="header-chip" data-current="false">Power</a><a href="node__Refining.html" class="header-chip" data-current="false">Refining</a><a href="node__Other_transformation.html" class="header-chip" data-current="false">Other transformation</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="node__Supply.html" class="header-chip" data-current="false">Supply</a>
           </div>

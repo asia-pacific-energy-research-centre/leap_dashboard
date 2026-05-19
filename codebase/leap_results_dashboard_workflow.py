@@ -127,26 +127,17 @@ def _require_shared_file(path: Path, *, description: str) -> Path:
 
 
 #%%
-ECONOMY_TOKEN = "NZ"          # short label used for docs/ subfolder and output paths
-BALANCE_EXPORT_ECONOMY = "12_NZ"
+# ---------------------------------------------------------------------------
+# Economy selection - the only line most users need to edit.
+# List every economy code to process. Each run writes to docs/{token}/ and
+# outputs/{token}/.
+# Examples: "12_NZ", "20_USA"
+# ---------------------------------------------------------------------------
+ECONOMIES: list[str] = ["12_NZ", "20_USA"]
+
+# Optional per-run date overrides for locating workbook files (None = auto-detect latest).
 REF_BALANCE_EXPORT_DATE_ID: str | None = None
 TGT_BALANCE_EXPORT_DATE_ID: str | None = None
-try:
-    REF_WORKBOOK_PATH = resolve_balance_export_workbook(
-        economy=BALANCE_EXPORT_ECONOMY,
-        scenario="REF",
-        date_id=REF_BALANCE_EXPORT_DATE_ID,
-    )
-except (FileNotFoundError, ValueError):
-    REF_WORKBOOK_PATH = None
-try:
-    TGT_WORKBOOK_PATH = resolve_balance_export_workbook(
-        economy=BALANCE_EXPORT_ECONOMY,
-        scenario="TGT",
-        date_id=TGT_BALANCE_EXPORT_DATE_ID,
-    )
-except (FileNotFoundError, ValueError):
-    TGT_WORKBOOK_PATH = None
 
 KNOWN_ISSUES_CONFIG_PATH = _resolve("config/leap_results_balance_known_issues.json")
 CHART_NAVIGATION_GUIDE_PATH = _resolve("config/leap_comparison_dashboard_template_v2.json")
@@ -171,10 +162,6 @@ SHARED_PROJECTION_TABLE_PATH = _require_shared_file(
     description="9th projection table",
 )
 
-PUBLISH_DIR = _resolve(f"docs/{ECONOMY_TOKEN}")  # GitHub Pages assets: HTML, JS, JSON
-OUTPUT_DIR = _resolve(f"outputs/{ECONOMY_TOKEN}")  # local/generated CSV, XLSX, and audit outputs
-BALANCE_TO_ESTO_LONG_OUTPUT_DIR = BALANCE_TABLES_ROOT / "leap_balance_to_esto_long" / "USA"
-
 LEAP_TO_ESTO_MAPPING = (SHARED_LEAP_MAPPINGS_PATH, "leap_combined_esto")
 NINTH_TO_ESTO_MAPPING = (SHARED_MASTER_CONFIG_PATH, "ninth_pairs_to_esto_pairs")
 CODEBOOK_PATH = SHARED_MASTER_CONFIG_PATH
@@ -191,8 +178,6 @@ BASE_YEAR = 2022
 MAX_OUTPUT_YEAR = 2060
 PROJECTION_YEARS: Sequence[int] = tuple(range(BASE_YEAR + 1, MAX_OUTPUT_YEAR + 1))
 SCENARIO_MAP = {"Reference": "reference", "Target": "target"}
-BASE_ECONOMY = "20USA"
-PROJECTION_ECONOMY = "20_USA"
 
 CHART_BACKEND = "plotly"
 CHART_OUTPUT_MODE = "page_bundles"#page_bundles"#per_chart_html
@@ -249,6 +234,11 @@ def _load_json(path: Path) -> dict[str, object]:
     if not path.exists():
         raise FileNotFoundError(f"Required JSON config file not found: {path}")
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _economy_token(economy_code: str) -> str:
+    """Derive a short token from a LEAP economy code, e.g. '12_NZ' -> 'NZ'."""
+    return re.sub(r"^\d+_?", "", economy_code.strip())
 
 
 def _mapping_workbook(mapping_ref: tuple[Path, str]) -> Path:
@@ -668,11 +658,32 @@ def _write_shared_balance_to_esto_outputs(
     }
 
 
-def run_workflow() -> dict[str, object]:
+def run_workflow(economy_code: str) -> dict[str, object]:
+    economy_token = _economy_token(economy_code)
+    base_economy = economy_code.replace("_", "")
+    projection_economy = economy_code
+    publish_dir = _resolve(f"docs/{economy_token}")
+    output_dir = _resolve(f"outputs/{economy_token}")
+    balance_to_esto_long_output_dir = BALANCE_TABLES_ROOT / "leap_balance_to_esto_long" / economy_token
+    try:
+        ref_workbook_path: Path | None = resolve_balance_export_workbook(
+            economy=economy_code,
+            scenario="REF",
+            date_id=REF_BALANCE_EXPORT_DATE_ID,
+        )
+    except (FileNotFoundError, ValueError):
+        ref_workbook_path = None
+    try:
+        tgt_workbook_path: Path | None = resolve_balance_export_workbook(
+            economy=economy_code,
+            scenario="TGT",
+            date_id=TGT_BALANCE_EXPORT_DATE_ID,
+        )
+    except (FileNotFoundError, ValueError):
+        tgt_workbook_path = None
+
     timer = WorkflowTimer("leap_results_dashboard_balance_estoaxis", enabled=ENABLE_WORKFLOW_TIMING)
     archive_config_dir_once_per_day()
-    publish_dir = _resolve(PUBLISH_DIR)
-    output_dir = _resolve(OUTPUT_DIR)
     layout = build_workflow_output_layout(output_dir)
     timing_path = layout.runtime / WORKFLOW_TIMING_FILENAME
 
@@ -685,14 +696,14 @@ def run_workflow() -> dict[str, object]:
     # -------------------------------------------------------------------------
     if STAGE_EXTRACT:
         conversion = convert_leap_balances_to_esto_long_table(
-            ref_workbook_path=REF_WORKBOOK_PATH,
-            tgt_workbook_path=TGT_WORKBOOK_PATH,
+            ref_workbook_path=ref_workbook_path,
+            tgt_workbook_path=tgt_workbook_path,
             template_sheet="EBal|2060",
             mapping_pairs_path=_mapping_workbook(LEAP_TO_ESTO_MAPPING),
             codebook_path=CODEBOOK_PATH,
             structure_config=structure_config,
             known_issues=known_issues,
-            projection_economy=PROJECTION_ECONOMY,
+            projection_economy=projection_economy,
             max_output_year=MAX_OUTPUT_YEAR,
             explicit_pair_mappings_only=True,
         )
@@ -702,7 +713,7 @@ def run_workflow() -> dict[str, object]:
         print("[SKIP] Stage: extract and map LEAP balance workbooks - loading cached outputs")
         conversion, ingestion, resolved_structure = _load_cached_ingestion(
             structure_config=structure_config,
-            balance_to_esto_long_output_dir=BALANCE_TO_ESTO_LONG_OUTPUT_DIR,
+            balance_to_esto_long_output_dir=balance_to_esto_long_output_dir,
         )
     timer.lap("extract and map LEAP balance workbooks")
 
@@ -715,8 +726,8 @@ def run_workflow() -> dict[str, object]:
             mapping_status=ingestion["mapping_status"],
             base_year=BASE_YEAR,
             projection_years=tuple(PROJECTION_YEARS),
-            base_economy=BASE_ECONOMY,
-            projection_economy=PROJECTION_ECONOMY,
+            base_economy=base_economy,
+            projection_economy=projection_economy,
             scenario_map=SCENARIO_MAP,
             sheet_map_path=SHEET_MAP_PATH,
             backup_mappings_path=BACKUP_MAPPINGS_PATH,
@@ -805,7 +816,7 @@ def run_workflow() -> dict[str, object]:
             mapping_status=mapping_status,
             comparison_long=comparison_long,
             simple_ninth_balance=simple_ninth_balance,
-            output_dir=BALANCE_TO_ESTO_LONG_OUTPUT_DIR,
+            output_dir=balance_to_esto_long_output_dir,
         )
         mapped_ninth_to_esto = comparison.get("ninth_projection_components", pd.DataFrame())
         if mapped_ninth_to_esto.empty:
@@ -943,8 +954,8 @@ def run_workflow() -> dict[str, object]:
             base_df=comparison.get("base_df", pd.DataFrame()),
             ninth_df=comparison.get("ninth_df", pd.DataFrame()),
             output_path=layout.coverage / "dashboard_comparator_pair_coverage.xlsx",
-            base_economy=BASE_ECONOMY,
-            projection_economy=PROJECTION_ECONOMY,
+            base_economy=base_economy,
+            projection_economy=projection_economy,
             base_year=BASE_YEAR,
             projection_years=tuple(PROJECTION_YEARS),
             scenarios=tuple(SCENARIO_MAP.values()),
@@ -967,7 +978,7 @@ def run_workflow() -> dict[str, object]:
             ninth_df=comparison.get("ninth_df", pd.DataFrame()),
             ninth_mapping_pairs=leap_combined_ninth_mapping,
             output_path=layout.coverage / "ninth_mapping_data_coverage.xlsx",
-            projection_economy=PROJECTION_ECONOMY,
+            projection_economy=projection_economy,
             scenarios=tuple(SCENARIO_MAP.values()),
             years=tuple(PROJECTION_YEARS),
         )
@@ -1125,10 +1136,12 @@ def run_workflow() -> dict[str, object]:
 
 #%%
 RUN_WORKFLOW = True
-WORKFLOW_RESULT: dict[str, object] | None = None
+WORKFLOW_RESULTS: dict[str, dict[str, object]] = {}
 if RUN_WORKFLOW:
-    WORKFLOW_RESULT = run_workflow()
-    print("[OK] Balance dashboard ESTO-axis workflow complete.")
-    for key, value in WORKFLOW_RESULT.items():
-        print(f"- {key}: {value}")
+    for _economy in ECONOMIES:
+        print(f"\n[RUN] Economy: {_economy}")
+        WORKFLOW_RESULTS[_economy] = run_workflow(_economy)
+        print(f"[OK] {_economy}: Balance dashboard ESTO-axis workflow complete.")
+        for key, value in WORKFLOW_RESULTS[_economy].items():
+            print(f"- {key}: {value}")
 #%%
