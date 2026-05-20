@@ -5763,7 +5763,12 @@ def make_stacked_area_chart(
                 if series.empty or not series.abs().gt(1e-12).any():
                     continue
                 scenario_label = _format_scenario_label(scenario)
-                name = label if len(scenario_values) <= 1 else f"{label} - {scenario_label}"
+                if label == "9th":
+                    name = f"9th ({scenario_label})"
+                elif len(scenario_values) > 1:
+                    name = f"{label} - {scenario_label}"
+                else:
+                    name = label
                 is_esto = label == "ESTO"
                 fig.add_trace(
                     go.Scatter(
@@ -5785,24 +5790,6 @@ def make_stacked_area_chart(
                     )
                 )
 
-        bottom_margin = 100
-        annotations = []
-        if others_note:
-            others_text = "Others includes: " + ", ".join(others_note)
-            annotations.append(
-                dict(
-                    text=others_text,
-                    xref="paper",
-                    yref="paper",
-                    x=0,
-                    y=-0.38,
-                    xanchor="left",
-                    yanchor="top",
-                    showarrow=False,
-                    font=dict(size=10, color="#888888"),
-                )
-            )
-            bottom_margin = 130
         fig.update_layout(
             title=f"{display_name} - {fuel}",
             xaxis_title="Year",
@@ -5810,8 +5797,7 @@ def make_stacked_area_chart(
             template="plotly_white",
             hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=-0.28, xanchor="left", x=0),
-            margin=dict(l=60, r=25, t=60, b=bottom_margin),
-            annotations=annotations if annotations else [],
+            margin=dict(l=60, r=25, t=60, b=100),
         )
         if backend == "plotly_figure":
             return fig

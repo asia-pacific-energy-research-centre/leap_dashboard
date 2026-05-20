@@ -66,3 +66,6 @@ docs/**/*.xls
 docs/**/*.xlsx
 docs/**/*.xlsm
 docs/*/output_manifest.json
+!docs/**/*.json
+!docs/**/*.html
+!docs/**/*.js

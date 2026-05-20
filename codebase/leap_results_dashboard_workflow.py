@@ -140,7 +140,7 @@ REF_BALANCE_EXPORT_DATE_ID: str | None = None
 TGT_BALANCE_EXPORT_DATE_ID: str | None = None
 
 KNOWN_ISSUES_CONFIG_PATH = _resolve("config/leap_results_balance_known_issues.json")
-CHART_NAVIGATION_GUIDE_PATH = _resolve("config/leap_comparison_dashboard_template_v2.json")
+CHART_NAVIGATION_GUIDE_PATH = _resolve("config/leap_comparison_dashboard_template_v3.json")
 LEAP_ROWS_TO_REMOVE_AND_ADD_SHEET = "leap_rows_to_remove_and_add"
 LEAP_UTILITIES_ROOT = _shared_repo_root()
 SHARED_CONFIG_DIR = LEAP_UTILITIES_ROOT / "config"

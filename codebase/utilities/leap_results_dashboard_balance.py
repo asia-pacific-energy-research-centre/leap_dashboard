@@ -4761,7 +4761,20 @@ TEMPLATE_RESERVED_KEYS = {
 def _dashboard_template_is_reserved_key(key: object) -> bool:
     """Return True for template metadata keys that should not create pages."""
     text = str(key or "").strip()
-    return text in TEMPLATE_RESERVED_KEYS or text.lower().startswith("note")
+    lower = text.lower()
+    return text in TEMPLATE_RESERVED_KEYS or lower.startswith("note") or lower == "visible_note"
+
+
+def _node_visible_note(node: object) -> str:
+    """Read visible_note (case-insensitive) from a template node dict."""
+    if not isinstance(node, dict):
+        return ""
+    for key, value in node.items():
+        if str(key or "").strip().lower() == "visible_note":
+            text = str(value or "").strip()
+            if text:
+                return text
+    return ""
 
 
 def _dashboard_template_about_page(template: dict[str, Any]) -> dict[str, Any]:
@@ -4931,6 +4944,7 @@ def _dashboard_template_aggregate_specs(
                 "measures": measures,
                 "chart_type": chart_type,
                 "comparison_lines": _as_clean_list(raw_spec.get("comparison_lines", [])),
+                "visible_note": _node_visible_note(raw_spec),
                 "use_esto_to_ninth_mapping": _to_bool(
                     raw_spec.get("use_esto_to_ninth_mapping", False),
                     default=False,
@@ -5663,6 +5677,8 @@ a:hover { text-decoration: underline; }
 }
 .meta-line { margin-bottom: 8px; font-weight: 600; color: #1f2d3d; }
 .meta-subline { margin-top: -4px; margin-bottom: 8px; color: #4b5563; font-size: 12px; }
+.others-note { display: block; margin-top: 6px; font-size: 10px; color: #888; line-height: 1.4; }
+.visible-note { margin: 8px 0 10px 0; padding: 8px 12px; background: #fffbe6; border-left: 3px solid #f0a500; border-radius: 4px; font-size: 13px; color: #5a3e00; line-height: 1.5; }
 .dashboard-grid {
   display:grid;
   grid-template-columns:repeat(4, minmax(0, 1fr));
@@ -5986,6 +6002,7 @@ def _build_page_html(
     empty_notice: str,
     fallback_note: str = "",
     chart_bundle_file: str = "",
+    visible_note: str = "",
 ) -> str:
     title_href = current_file or "#page-header"
     separator_after = {"Others", "Other transformation"}
@@ -6070,6 +6087,10 @@ def _build_page_html(
     note_html = ""
     if fallback_note:
         note_html = f'<section class="section-note">{fallback_note}</section>'
+    visible_note_html = (
+        f'<div class="visible-note">{escape(visible_note)}</div>'
+        if visible_note else ""
+    )
 
     if chart_entries:
         grouped_chart_entries: dict[str, list[dict[str, str]]] = defaultdict(list)
@@ -6136,6 +6157,9 @@ def _build_page_html(
             measure_sections: list[str] = []
             if entries and all(str(entry.get("entry_kind", "")).strip() == "aggregate" for entry in entries):
                 measure_entries = sorted(entries, key=_entry_sort_key)
+                agg_section_note = next(
+                    (str(e.get("section_note", "")).strip() for e in measure_entries if e.get("section_note")), ""
+                )
                 cards = "".join(
                     [
                         (
@@ -6144,13 +6168,15 @@ def _build_page_html(
                             f'<div class="meta-subline">{entry.get("path_label", "")}</div>'
                             f'<div class="chart-load-state" data-loaded="false">Chart queued</div>'
                             f'{_chart_embed_html(entry, entry.get("measure", "") or _entry_caption(entry, measure_entries))}'
-                            "</figure>"
+                            + (f'<small class="others-note">Others includes: {escape(entry["others_note"])}</small>' if entry.get("others_note") else "")
+                            + "</figure>"
                         )
                         for entry in measure_entries
                     ]
                 )
                 measure_sections.append(
                     f'<section class="measure-group" style="margin:6px 0 14px 0;">'
+                    + (f'<div class="visible-note">{escape(agg_section_note)}</div>' if agg_section_note else "")
                     + f'<div class="dashboard-grid{_grid_expand_class(len(measure_entries))}">{cards}</div>'
                     + "</section>"
                 )
@@ -6246,6 +6272,7 @@ def _build_page_html(
       </div>
     </header>
     <main class="page-body">
+      {visible_note_html}
       {children_section}
       {note_html}
       <section>{chart_html}</section>
@@ -6783,6 +6810,7 @@ def render_balance_dashboards(
     allowed_template_nodes: dict[tuple[str, ...], dict[str, Any]] = {}
     allowed_template_graph_specs: dict[tuple[str, ...], list[dict[str, Any]]] = {}
     template_entry_order: dict[tuple[tuple[str, ...], str], int] = {}
+    template_visible_notes: dict[tuple[str, ...], str] = {}
     template_measure_default = str((template_allowlist.get("defaults") or {}).get("measure", "")).strip() or "Energy balance (PJ)"
     fuel_aggregate_mappings = _template_fuel_aggregate_mappings(template_allowlist)
     fuel_mapping_sets = _template_fuel_mapping_sets(template_allowlist)
@@ -6792,6 +6820,9 @@ def render_balance_dashboards(
         if path:
             allowed_template_paths.add(path)
             allowed_template_nodes[path] = node
+            note = _node_visible_note(node)
+            if note:
+                template_visible_notes[path] = note
         order_idx = 0
         for key, child in node.items():
             if key in {"aggregate_graphs", "aggregate"} and isinstance(child, dict):
@@ -7351,6 +7382,8 @@ def render_balance_dashboards(
                             "file": chart_file_name,
                             "path_label": _path_label(path),
                             "entry_kind": "aggregate",
+                            "others_note": ", ".join(others_labels) if others_labels else "",
+                            "section_note": str(aggregate_spec.get("visible_note", "") or ""),
                             "template_order": str(_template_order_for_entry(path, {"entry_kind": "aggregate"})),
                             **_dashboard_hierarchy_from_path(
                                 path,
@@ -8164,6 +8197,7 @@ def render_balance_dashboards(
         if not chart_entries and not child_links:
             empty_pages.append({"path": " > ".join(path), "level": len(path)})
 
+        page_visible_note = template_visible_notes.get(_display_path_tuple(path), "")
         html = _build_page_html(
             title=title,
             economy_label=economy_label,
@@ -8178,6 +8212,7 @@ def render_balance_dashboards(
             empty_notice=empty_notice,
             fallback_note=fallback_note,
             chart_bundle_file=chart_bundle_file,
+            visible_note=page_visible_note,
         )
         (dashboards_dir / filename).write_text(html, encoding="utf-8")
 

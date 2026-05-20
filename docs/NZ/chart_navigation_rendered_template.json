@@ -1,0 +1,688 @@
+{
+  "defaults": {
+    "measure": "Energy balance (PJ)"
+  },
+  "Buildings": {
+    "aggregate_graphs": {
+      "fuels": "Total",
+      "esto_flows": [
+        "16.01 Commercial and public services",
+        "16.01.01 Datacentres",
+        "16.02 Residential"
+      ]
+    },
+    "Commercial and public services": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "16.01 Commercial and public services"
+        ]
+      }
+    },
+    "Datacentres": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "16.01.01 Datacentres"
+        ]
+      }
+    },
+    "Residential": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "16.02 Residential"
+        ]
+      }
+    }
+  },
+  "Bunkers": {
+    "aggregate_graphs": {
+      "fuels": "Total",
+      "esto_flows": [
+        "04 International marine bunkers",
+        "05 International aviation bunkers"
+      ]
+    },
+    "International aviation bunkers": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "05 International aviation bunkers"
+        ]
+      }
+    },
+    "International marine bunkers": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "04 International marine bunkers"
+        ]
+      }
+    }
+  },
+  "Industry": {
+    "aggregate_graphs": {
+      "fuels": "Total",
+      "esto_flows": [
+        "14.01 Mining and quarrying",
+        "14.02 Construction",
+        "14.03.01 Iron and steel",
+        "14.03.02 Chemical (incl. petrochemical)",
+        "14.03.03 Non ferrous metals",
+        "14.03.04 Non-metallic mineral products",
+        "14.03.05 Transportation equipment",
+        "14.03.06 Machinery",
+        "14.03.07 Food, beverages and tobacco",
+        "14.03.08 Pulp, paper and printing",
+        "14.03.09 Wood and wood products",
+        "14.03.10 Textiles and leather",
+        "14.03.11 Non-specified industry"
+      ]
+    },
+    "Construction": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "14.02 Construction"
+        ]
+      }
+    },
+    "Manufacturing": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "14.03.01 Iron and steel",
+          "14.03.02 Chemical (incl. petrochemical)",
+          "14.03.03 Non ferrous metals",
+          "14.03.04 Non-metallic mineral products",
+          "14.03.05 Transportation equipment",
+          "14.03.06 Machinery",
+          "14.03.07 Food, beverages and tobacco",
+          "14.03.08 Pulp, paper and printing",
+          "14.03.09 Wood and wood products",
+          "14.03.10 Textiles and leather",
+          "14.03.11 Non-specified industry"
+        ]
+      },
+      "Chemical (incl. petrochemical)": {
+        "aggregate_graphs": {
+          "fuels": "Total",
+          "esto_flows": [
+            "14.03.02 Chemical (incl. petrochemical)"
+          ]
+        }
+      },
+      "Food, beverages and tobacco": {
+        "aggregate_graphs": {
+          "fuels": "Total",
+          "esto_flows": [
+            "14.03.07 Food, beverages and tobacco"
+          ]
+        }
+      },
+      "Iron and steel": {
+        "aggregate_graphs": {
+          "fuels": "Total",
+          "esto_flows": [
+            "14.03.01 Iron and steel"
+          ]
+        }
+      },
+      "Machinery": {
+        "aggregate_graphs": {
+          "fuels": "Total",
+          "esto_flows": [
+            "14.03.06 Machinery"
+          ]
+        }
+      },
+      "Non ferrous metals": {
+        "aggregate_graphs": {
+          "fuels": "Total",
+          "esto_flows": [
+            "14.03.03 Non ferrous metals"
+          ]
+        }
+      },
+      "Non-metallic mineral products": {
+        "aggregate_graphs": {
+          "fuels": "Total",
+          "esto_flows": [
+            "14.03.04 Non-metallic mineral products"
+          ]
+        }
+      },
+      "Non-specified industry": {
+        "aggregate_graphs": {
+          "fuels": "Total",
+          "esto_flows": [
+            "14.03.11 Non-specified industry"
+          ]
+        }
+      },
+      "Pulp, paper and printing": {
+        "aggregate_graphs": {
+          "fuels": "Total",
+          "esto_flows": [
+            "14.03.08 Pulp, paper and printing"
+          ]
+        }
+      },
+      "Textiles and leather": {
+        "aggregate_graphs": {
+          "fuels": "Total",
+          "esto_flows": [
+            "14.03.10 Textiles and leather"
+          ]
+        }
+      },
+      "Transportation equipment": {
+        "aggregate_graphs": {
+          "fuels": "Total",
+          "esto_flows": [
+            "14.03.05 Transportation equipment"
+          ]
+        }
+      },
+      "Wood and wood products": {
+        "aggregate_graphs": {
+          "fuels": "Total",
+          "esto_flows": [
+            "14.03.09 Wood and wood products"
+          ]
+        }
+      }
+    },
+    "Mining and quarrying": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "14.01 Mining and quarrying"
+        ]
+      }
+    }
+  },
+  "Transport": {
+    "aggregate_graphs": {
+      "fuels": "Total",
+      "esto_flows": [
+        "15.01 Domestic air transport",
+        "15.02 Road",
+        "15.03 Rail",
+        "15.04 Domestic navigation",
+        "15.05 Pipeline transport"
+      ]
+    },
+    "Domestic air transport": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "15.01 Domestic air transport"
+        ]
+      }
+    },
+    "Domestic navigation": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "15.04 Domestic navigation"
+        ]
+      }
+    },
+    "Pipeline transport": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "15.05 Pipeline transport"
+        ]
+      }
+    },
+    "Rail": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "15.03 Rail"
+        ]
+      }
+    },
+    "Road": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "15.02 Road"
+        ]
+      }
+    }
+  },
+  "Others": {
+    "aggregate_graphs": {
+      "fuels": "Total",
+      "esto_flows": [
+        "16.03 Agriculture",
+        "16.05 Non-specified others"
+      ]
+    },
+    "Agriculture and fishing": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "16.03 Agriculture"
+        ]
+      }
+    },
+    "Non-specified others": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "16.05 Non-specified others"
+        ]
+      }
+    }
+  },
+  "Power": {
+    "aggregate_graphs": {
+      "fuels": "Total",
+      "esto_flows": [
+        "09.01.02 CHP plants",
+        "09.01.03 Heat plants",
+        "09.02.01 Electricity plants",
+        "09.02.03 Heat plants"
+      ],
+      "measures": [
+        "Inputs (PJ)",
+        "Outputs (PJ)"
+      ]
+    },
+    "CHP plants": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "09.01.02 CHP plants"
+        ],
+        "measures": [
+          "Inputs (PJ)",
+          "Outputs (PJ)"
+        ]
+      }
+    },
+    "Electricity own use": {
+      "by_fuel_graphs": {
+        "products": [
+          "17 Electricity"
+        ],
+        "esto_flows": [
+          "10.01.01 Electricity, CHP and heat plants",
+          "10.01.13 Pump storage plants"
+        ],
+        "measures": [
+          "Inputs (PJ)"
+        ]
+      }
+    },
+    "Electricity plants": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "09.02.01 Electricity plants"
+        ],
+        "measures": [
+          "Inputs (PJ)",
+          "Outputs (PJ)"
+        ]
+      }
+    },
+    "Transmission and distribution losses": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "10.02 Transmission and distribution losses"
+        ],
+        "measures": [
+          "Inputs (PJ)"
+        ]
+      }
+    }
+  },
+  "Refining": {
+    "aggregate_graphs": {
+      "fuels": "Total",
+      "esto_flows": [
+        "09.07 Oil refineries"
+      ],
+      "measures": [
+        "Inputs (PJ)",
+        "Outputs (PJ)"
+      ]
+    },
+    "Oil refineries": {
+      "by_fuel_graphs": {
+        "products": [
+          "06.01 Crude oil",
+          "06.02 Natural gas liquids",
+          "06.03 Refinery feedstocks",
+          "06.05 Other hydrocarbons",
+          "07.01 Motor gasoline",
+          "07.02 Aviation gasoline",
+          "07.03 Naphtha",
+          "07.05 Kerosene type jet fuel",
+          "07.06 Kerosene",
+          "07.07 Gas/diesel oil",
+          "07.08 Fuel oil",
+          "07.09 LPG",
+          "07.10 Refinery gas (not liquefied)",
+          "07.14 Bitumen",
+          "07.17 Other products",
+          "07.99 PetProd nonspecified"
+        ],
+        "esto_flows": [
+          "09.07 Oil refineries"
+        ],
+        "measures": [
+          "Inputs (PJ)",
+          "Outputs (PJ)"
+        ]
+      }
+    },
+    "Refinery own use": {
+      "by_fuel_graphs": {
+        "products": [
+          "07.10 Refinery gas (not liquefied)",
+          "08.01 Natural gas",
+          "17 Electricity"
+        ],
+        "esto_flows": [
+          "10.01.11 Oil refineries"
+        ],
+        "measures": [
+          "Inputs (PJ)"
+        ]
+      }
+    }
+  },
+  "Other transformation": {
+    "aggregate_graphs": {
+      "fuels": "Total",
+      "esto_flows": [
+        "08 Transfers",
+        "09.05 Chemical heat for electricity production",
+        "09.06.01 Gas works plants",
+        "09.06.02 Liquefaction/regasification plants",
+        "09.06.03 Natural gas blending plants",
+        "09.06.04 Gas-to-liquids plants",
+        "09.08.01 Coke ovens",
+        "09.08.02 Blast furnaces",
+        "09.08.03 Patent fuel plants",
+        "09.08.04 BKB/PB plants",
+        "09.08.05 Liquefaction (coal to oil)",
+        "09.09 Petrochemical industry",
+        "09.11 Charcoal processing",
+        "09.12 Non-specified transformation",
+        "09.13.01 Electrolysers",
+        "09.13.03 SMR w CCS"
+      ],
+      "measures": [
+        "Inputs (PJ)",
+        "Outputs (PJ)"
+      ]
+    },
+    "Chemical heat for electricity production": {
+      "by_fuel_graphs": {
+        "products": [
+          "18 Heat"
+        ],
+        "esto_flows": [
+          "09.05 Chemical heat for electricity production"
+        ],
+        "measures": [
+          "Inputs (PJ)"
+        ]
+      }
+    },
+    "Coal transformation": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "09.08 Coal transformation"
+        ],
+        "measures": [
+          "Inputs (PJ)",
+          "Outputs (PJ)"
+        ]
+      },
+      "Coal transformation own use": {
+        "by_fuel_graphs": {
+          "products": [
+            "02 Coal products",
+            "02.03 Coke oven gas",
+            "02.04 Blast furnace gas",
+            "02.08 BKB/PB",
+            "08.01 Natural gas"
+          ],
+          "esto_flows": [
+            "10.01.05 Coke ovens",
+            "10.01.07 Blast furnaces"
+          ],
+          "measures": [
+            "Inputs (PJ)"
+          ]
+        }
+      }
+    },
+    "Coal, oil and gas extraction own use": {
+      "by_fuel_graphs": {
+        "products": [
+          "01.01 Coking coal",
+          "01.02 Other bituminous coal",
+          "01.03 Sub-bituminous coal",
+          "08.01 Natural gas",
+          "17 Electricity"
+        ],
+        "esto_flows": [
+          "10.01.06 Coal mines",
+          "10.01.12 Oil and gas extraction"
+        ],
+        "measures": [
+          "Inputs (PJ)"
+        ]
+      }
+    },
+    "Gas processing plants": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "09.06.01 Gas works plants",
+          "09.06.02 Liquefaction/regasification plants",
+          "09.06.03 Natural gas blending plants",
+          "09.06.04 Gas-to-liquids plants"
+        ],
+        "measures": [
+          "Inputs (PJ)",
+          "Outputs (PJ)"
+        ]
+      },
+      "Gas works plants": {
+        "by_fuel_graphs": {
+          "products": [
+            "01.05 Lignite",
+            "08.03 Gas works gas"
+          ],
+          "esto_flows": [
+            "09.06.01 Gas works plants"
+          ],
+          "measures": [
+            "Inputs (PJ)",
+            "Outputs (PJ)"
+          ]
+        }
+      },
+      "Liquefaction/regasification plants": {
+        "by_fuel_graphs": {
+          "products": [
+            "08.01 Natural gas",
+            "08.02 LNG"
+          ],
+          "esto_flows": [
+            "09.06.02 Liquefaction/regasification plants"
+          ],
+          "measures": [
+            "Inputs (PJ)",
+            "Outputs (PJ)"
+          ]
+        }
+      },
+      "Natural gas blending plants": {
+        "by_fuel_graphs": {
+          "products": [
+            "08.01 Natural gas",
+            "08.03 Gas works gas"
+          ],
+          "esto_flows": [
+            "09.06.03 Natural gas blending plants"
+          ],
+          "measures": [
+            "Inputs (PJ)",
+            "Outputs (PJ)"
+          ]
+        }
+      }
+    },
+    "Hydrogen transformation": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "09.13.01 Electrolysers",
+          "09.13.03 SMR w CCS"
+        ],
+        "measures": [
+          "Inputs (PJ)",
+          "Outputs (PJ)"
+        ]
+      },
+      "Electrolysers": {
+        "by_fuel_graphs": {
+          "products": [
+            "16.10 Ammonia",
+            "16.11 E-fuel",
+            "16.12 Hydrogen",
+            "17 Electricity"
+          ],
+          "esto_flows": [
+            "09.13.01 Electrolysers"
+          ],
+          "measures": [
+            "Inputs (PJ)",
+            "Outputs (PJ)"
+          ]
+        }
+      },
+      "SMR w CCS": {
+        "by_fuel_graphs": {
+          "products": [
+            "08.01 Natural gas",
+            "16.10 Ammonia",
+            "16.11 E-fuel",
+            "16.12 Hydrogen"
+          ],
+          "esto_flows": [
+            "09.13.03 SMR w CCS"
+          ],
+          "measures": [
+            "Inputs (PJ)",
+            "Outputs (PJ)"
+          ]
+        }
+      }
+    },
+    "Non-specified own uses": {
+      "by_fuel_graphs": {
+        "products": [
+          "17 Electricity"
+        ],
+        "esto_flows": [
+          "10.01.17 Non-specified own uses"
+        ],
+        "measures": [
+          "Inputs (PJ)"
+        ]
+      }
+    },
+    "Non-specified transformation": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "09.12 Non-specified transformation"
+        ],
+        "measures": [
+          "Inputs (PJ)",
+          "Outputs (PJ)"
+        ]
+      }
+    },
+    "Transfers": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "08.99 Transfers nonspecified"
+        ],
+        "measures": [
+          "Inputs (PJ)",
+          "Outputs (PJ)"
+        ]
+      }
+    }
+  },
+  "Supply": {
+    "aggregate_graphs": {
+      "fuels": "Total",
+      "esto_flows": [
+        "01 Production",
+        "02 Imports",
+        "03 Exports",
+        "07 Total primary energy supply"
+      ]
+    },
+    "Exports": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "03 Exports"
+        ]
+      }
+    },
+    "Imports": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "02 Imports"
+        ]
+      }
+    },
+    "Production": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "01 Production"
+        ]
+      }
+    },
+    "Total primary energy supply": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "07 Total primary energy supply"
+        ]
+      }
+    }
+  },
+  "Demand": {
+    "Total final energy consumption": {
+      "aggregate_graphs": {
+        "fuels": "Total",
+        "esto_flows": [
+          "13 Total final energy consumption"
+        ]
+      }
+    }
+  }
+}

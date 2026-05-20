@@ -1,0 +1,2170 @@
+{
+  "primary_outputs": {
+    "comparison_long": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\comparison_long.csv",
+      "description": "Main ESTO-axis comparison table across LEAP, ESTO, and 9th sources.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "economy",
+          "description": "Economy code for the series or mapping row."
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "sheet",
+          "description": "Dashboard sheet or comparison group name."
+        },
+        {
+          "name": "page_key",
+          "description": null
+        },
+        {
+          "name": "page_label",
+          "description": null
+        },
+        {
+          "name": "chart_group_key",
+          "description": null
+        },
+        {
+          "name": "chart_group_label",
+          "description": null
+        },
+        {
+          "name": "dashboard_page_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_page_label",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_label",
+          "description": null
+        },
+        {
+          "name": "chart_kind",
+          "description": null
+        },
+        {
+          "name": "esto_flow_key",
+          "description": null
+        },
+        {
+          "name": "esto_flow_group_key",
+          "description": null
+        },
+        {
+          "name": "esto_flow_group_label",
+          "description": null
+        },
+        {
+          "name": "measure",
+          "description": "Measure label used to distinguish related chart lines."
+        },
+        {
+          "name": "fuel_label",
+          "description": "Display fuel/category label used in outputs and charts."
+        },
+        {
+          "name": "source",
+          "description": "Series source, such as LEAP, base, or projection."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "value",
+          "description": "Numeric value for the row after workflow transformations."
+        },
+        {
+          "name": "ninth_pairs_label",
+          "description": null
+        }
+      ],
+      "alias": "comparison_long"
+    },
+    "comparison_wide": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\comparison_wide.csv",
+      "description": "Wide ESTO-axis comparison table with one column per source.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "economy",
+          "description": "Economy code for the series or mapping row."
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "sheet",
+          "description": "Dashboard sheet or comparison group name."
+        },
+        {
+          "name": "page_key",
+          "description": null
+        },
+        {
+          "name": "page_label",
+          "description": null
+        },
+        {
+          "name": "chart_group_key",
+          "description": null
+        },
+        {
+          "name": "chart_group_label",
+          "description": null
+        },
+        {
+          "name": "measure",
+          "description": "Measure label used to distinguish related chart lines."
+        },
+        {
+          "name": "fuel_label",
+          "description": "Display fuel/category label used in outputs and charts."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "base",
+          "description": null
+        },
+        {
+          "name": "leap",
+          "description": null
+        },
+        {
+          "name": "projection",
+          "description": null
+        }
+      ],
+      "alias": "comparison_wide"
+    },
+    "mapping_status": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\mapping_status.xlsx",
+      "description": "Mapping workbook for ESTO-axis comparison rows.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".xlsx",
+      "columns": [
+        {
+          "name": "sheet",
+          "description": "Dashboard sheet or comparison group name."
+        },
+        {
+          "name": "measure",
+          "description": "Measure label used to distinguish related chart lines."
+        },
+        {
+          "name": "fuel_label",
+          "description": "Display fuel/category label used in outputs and charts."
+        },
+        {
+          "name": "sector_code_9th",
+          "description": "9th sector code tied to the row."
+        },
+        {
+          "name": "ninth_fuel_code",
+          "description": "9th fuel code used for projection comparison."
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "mapped",
+          "description": "True when the row has the required mappings for comparison."
+        },
+        {
+          "name": "has_any_mapping",
+          "description": "True when any mapping fields were filled."
+        },
+        {
+          "name": "base_mapping_complete",
+          "description": null
+        },
+        {
+          "name": "projection_mapping_complete",
+          "description": null
+        },
+        {
+          "name": "partially_mapped",
+          "description": "True when only part of the mapping information was resolved."
+        },
+        {
+          "name": "missing_ninth_fuel",
+          "description": null
+        },
+        {
+          "name": "missing_esto_flow",
+          "description": null
+        },
+        {
+          "name": "missing_esto_product",
+          "description": null
+        },
+        {
+          "name": "has_mapping_note",
+          "description": null
+        },
+        {
+          "name": "mapping_source",
+          "description": "How the sector/fuel mapping was resolved."
+        },
+        {
+          "name": "flow_source",
+          "description": "How the ESTO flow mapping was resolved."
+        },
+        {
+          "name": "fuel_source",
+          "description": "How the 9th fuel mapping was resolved."
+        },
+        {
+          "name": "sector_match_method",
+          "description": null
+        },
+        {
+          "name": "mapping_note",
+          "description": null
+        },
+        {
+          "name": "projection_parent_fallback",
+          "description": null
+        },
+        {
+          "name": "projection_parent_sector_code",
+          "description": null
+        },
+        {
+          "name": "comparator_scope",
+          "description": null
+        },
+        {
+          "name": "page_key",
+          "description": null
+        },
+        {
+          "name": "page_label",
+          "description": null
+        },
+        {
+          "name": "chart_group_key",
+          "description": null
+        },
+        {
+          "name": "chart_group_label",
+          "description": null
+        },
+        {
+          "name": "esto_flow_key",
+          "description": null
+        },
+        {
+          "name": "esto_flow_group_key",
+          "description": null
+        },
+        {
+          "name": "esto_flow_group_label",
+          "description": null
+        },
+        {
+          "name": "dashboard_page_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_page_label",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_label",
+          "description": null
+        },
+        {
+          "name": "chart_kind",
+          "description": null
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "template_is_multi_flow",
+          "description": null
+        },
+        {
+          "name": "use_esto_to_ninth_mapping",
+          "description": null
+        },
+        {
+          "name": "has_leap",
+          "description": null
+        },
+        {
+          "name": "has_base",
+          "description": null
+        },
+        {
+          "name": "has_projection",
+          "description": null
+        },
+        {
+          "name": "projection_targets_count",
+          "description": null
+        }
+      ],
+      "alias": "mapping_status"
+    },
+    "leap_long": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\leap_long.csv",
+      "description": "Normalized LEAP balance rows before ESTO-axis aggregation.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "economy",
+          "description": "Economy code for the series or mapping row."
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "region",
+          "description": "Region label carried through from LEAP extraction."
+        },
+        {
+          "name": "sheet_name",
+          "description": "Original LEAP sheet name."
+        },
+        {
+          "name": "sector_code_9th",
+          "description": "9th sector code tied to the row."
+        },
+        {
+          "name": "sector_name",
+          "description": null
+        },
+        {
+          "name": "fuel_label",
+          "description": "Display fuel/category label used in outputs and charts."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "leap_value",
+          "description": "Raw or prepared LEAP numeric value."
+        },
+        {
+          "name": "leap_variable",
+          "description": null
+        },
+        {
+          "name": "leap_units",
+          "description": "Units reported by the LEAP source row."
+        },
+        {
+          "name": "measure",
+          "description": "Measure label used to distinguish related chart lines."
+        },
+        {
+          "name": "leap_scale_note",
+          "description": null
+        },
+        {
+          "name": "ninth_fuel_code",
+          "description": "9th fuel code used for projection comparison."
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "source_sheet",
+          "description": null
+        },
+        {
+          "name": "source_workbook",
+          "description": null
+        },
+        {
+          "name": "leap_sector",
+          "description": null
+        },
+        {
+          "name": "leap_fuel",
+          "description": null
+        },
+        {
+          "name": "leap_sector_name",
+          "description": null
+        },
+        {
+          "name": "leap_fuel_name",
+          "description": null
+        },
+        {
+          "name": "is_subtotal",
+          "description": null
+        },
+        {
+          "name": "esto_is_subtotal",
+          "description": null
+        },
+        {
+          "name": "ninth_is_subtotal",
+          "description": null
+        }
+      ],
+      "alias": "leap_long"
+    },
+    "simple_leap_balance_mapped": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\simple_leap_balance_mapped.csv",
+      "description": "Compact LEAP balance table on the ESTO-axis structure.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "leap_sector",
+          "description": null
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "leap_fuel",
+          "description": null
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "value_pj",
+          "description": "Summed value in petajoules."
+        }
+      ],
+      "alias": "simple_leap_balance_mapped"
+    },
+    "simple_ninth_balance_mapped": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\simple_ninth_balance_mapped.csv",
+      "description": "Compact 9th balance table on the ESTO-axis structure.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "ninth_sector",
+          "description": null
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "ninth_fuel",
+          "description": null
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "value_pj",
+          "description": "Summed value in petajoules."
+        }
+      ],
+      "alias": "simple_ninth_balance_mapped"
+    },
+    "merged_leap_ninth_esto_balance": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\merged_leap_ninth_esto_balance.csv",
+      "description": "Merged LEAP and 9th compact balance table on the ESTO axis.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "leap_sector",
+          "description": null
+        },
+        {
+          "name": "leap_fuel",
+          "description": null
+        },
+        {
+          "name": "ninth_sector",
+          "description": null
+        },
+        {
+          "name": "ninth_fuel",
+          "description": null
+        },
+        {
+          "name": "value_pj_leap",
+          "description": null
+        },
+        {
+          "name": "value_pj_9th",
+          "description": null
+        },
+        {
+          "name": "value_pj_esto",
+          "description": null
+        }
+      ],
+      "alias": "merged_leap_ninth_esto_balance"
+    },
+    "dashboard_index": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\dashboards\\node__Buildings.html",
+      "description": "Main HTML entrypoint for the rendered ESTO-axis dashboard.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".html",
+      "alias": "dashboard_index"
+    },
+    "charts_dir": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\charts",
+      "description": "Legacy per-chart HTML/PNG output directory, used when CHART_OUTPUT_MODE is not page_bundles.",
+      "exists": true,
+      "type": "directory",
+      "item_count": 1153,
+      "contains_preview": [
+        ".gitkeep",
+        "aggregate__Buildings__Commercial_and_public_services__Energy_balance__PJ__Total.html",
+        "aggregate__Buildings__Datacentres__Energy_balance__PJ__Total.html",
+        "aggregate__Buildings__Energy_balance__PJ__Total.html",
+        "aggregate__Buildings__Residential__Energy_balance__PJ__Total.html",
+        "aggregate__Bunkers__Energy_balance__PJ__Total.html",
+        "aggregate__Bunkers__International_aviation_bunkers__Energy_balance__PJ__Total.html",
+        "aggregate__Bunkers__International_marine_bunkers__Energy_balance__PJ__Total.html",
+        "aggregate__Demand__Total_final_energy_consumption__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Construction__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Chemical__incl__petrochemical__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Food__beverages_and_tobacco__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Iron_and_steel__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Machinery__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Non-metallic_mineral_products__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Non-specified_industry__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Non_ferrous_metals__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Pulp__paper_and_printing__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Textiles_and_leather__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Transportation_equipment__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Manufacturing__Wood_and_wood_products__Energy_balance__PJ__Total.html",
+        "aggregate__Industry_sector__Mining_and_quarrying__Energy_balance__PJ__Total.html",
+        "aggregate__Other_sector__Agriculture_and_fishing__Energy_balance__PJ__Total.html"
+      ],
+      "alias": "charts_dir"
+    },
+    "chart_bundles_dir": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\chart_bundles",
+      "description": "Page-level Plotly JSON bundles used by the ESTO-axis dashboards.",
+      "exists": true,
+      "type": "directory",
+      "item_count": 0,
+      "contains_preview": [],
+      "alias": "chart_bundles_dir"
+    },
+    "dashboards_dir": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\dashboards",
+      "description": "Rendered ESTO-axis dashboard HTML pages.",
+      "exists": true,
+      "type": "directory",
+      "item_count": 73,
+      "contains_preview": [
+        ".gitkeep",
+        "about.html",
+        "dashboard_mappings.xlsx",
+        "dashboard_template.json",
+        "empty_pages.csv",
+        "node__Buildings.html",
+        "node__Buildings__Commercial_and_public_services.html",
+        "node__Buildings__Datacentres.html",
+        "node__Buildings__Residential.html",
+        "node__Bunkers.html",
+        "node__Bunkers__International_aviation_bunkers.html",
+        "node__Bunkers__International_marine_bunkers.html",
+        "node__Demand.html",
+        "node__Demand__Total_final_energy_consumption.html",
+        "node__Industry_sector.html",
+        "node__Industry_sector__Construction.html",
+        "node__Industry_sector__Manufacturing.html",
+        "node__Industry_sector__Manufacturing__Chemical__incl__petrochemical.html",
+        "node__Industry_sector__Manufacturing__Food__beverages_and_tobacco.html",
+        "node__Industry_sector__Manufacturing__Iron_and_steel.html",
+        "node__Industry_sector__Manufacturing__Machinery.html",
+        "node__Industry_sector__Manufacturing__Non-metallic_mineral_products.html",
+        "node__Industry_sector__Manufacturing__Non-specified_industry.html",
+        "node__Industry_sector__Manufacturing__Non_ferrous_metals.html",
+        "node__Industry_sector__Manufacturing__Pulp__paper_and_printing.html"
+      ],
+      "alias": "dashboards_dir"
+    }
+  },
+  "supporting_outputs": {
+    "shared_leap_balance_esto_long": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\outputs\\balance_tables\\leap_balance_to_esto_long\\USA\\leap_balance_esto_long.csv",
+      "description": "Reusable LEAP balance long table mapped to ESTO rows.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "leap_sector",
+          "description": null
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "leap_fuel",
+          "description": null
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "value_pj",
+          "description": "Summed value in petajoules."
+        }
+      ],
+      "alias": "shared_leap_balance_esto_long"
+    },
+    "shared_ninth_balance_esto_long": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\outputs\\balance_tables\\leap_balance_to_esto_long\\USA\\ninth_balance_esto_long.csv",
+      "description": "Reusable 9th balance long table mapped to ESTO rows.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "leap_sector",
+          "description": null
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "leap_fuel",
+          "description": null
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "value_pj",
+          "description": "Summed value in petajoules."
+        }
+      ],
+      "alias": "shared_ninth_balance_esto_long"
+    },
+    "shared_supporting_files_dir": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\outputs\\balance_tables\\leap_balance_to_esto_long\\USA\\supporting_files",
+      "description": "Shared supporting folder for the reusable ESTO-long conversion outputs.",
+      "exists": true,
+      "type": "directory",
+      "item_count": 11,
+      "contains_preview": [
+        "auto_sheet_rows.csv",
+        "esto_axis_comparison_long.csv",
+        "leap_balance_coverage.csv",
+        "leap_balance_extraction_summary.json",
+        "leap_balance_mapped_detail_long.csv",
+        "leap_balance_mapping_status.csv",
+        "leap_balance_override_application_report.csv",
+        "leap_balance_runtime_issues.csv",
+        "leap_balance_unit_diagnostics.csv",
+        "ninth_balance_esto_long_semantic_columns.csv",
+        "resolved_structure_config.json"
+      ],
+      "alias": "shared_supporting_files_dir"
+    },
+    "mapping_lineage_audit_csv": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\mapping\\mapping_lineage_audit.csv",
+      "description": "Row-level mapping lineage for LEAP/9th/ESTO at audit years (see dataset column).",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "dashboard_path",
+          "description": "Rendered dashboard page path for the chart."
+        },
+        {
+          "name": "chart_file",
+          "description": "Relative chart file written by the workflow."
+        },
+        {
+          "name": "dashboard_page_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_page_label",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_label",
+          "description": null
+        },
+        {
+          "name": "chart_kind",
+          "description": null
+        },
+        {
+          "name": "esto_flow_group_key",
+          "description": null
+        },
+        {
+          "name": "esto_flow_group_label",
+          "description": null
+        },
+        {
+          "name": "esto_flow_key",
+          "description": null
+        },
+        {
+          "name": "dataset",
+          "description": null
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "source_sector",
+          "description": null
+        },
+        {
+          "name": "source_fuel",
+          "description": null
+        },
+        {
+          "name": "value_pj",
+          "description": "Summed value in petajoules."
+        },
+        {
+          "name": "is_subtotal",
+          "description": null
+        },
+        {
+          "name": "esto_pair_is_subtotal",
+          "description": null
+        },
+        {
+          "name": "ninth_pair_is_subtotal",
+          "description": null
+        }
+      ],
+      "alias": "mapping_lineage_audit_csv"
+    },
+    "gap_diagnostics": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\checks\\comparison_gap_diagnostics.csv",
+      "description": "Largest gaps between LEAP and ESTO-axis comparator sources.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "sheet",
+          "description": "Dashboard sheet or comparison group name."
+        },
+        {
+          "name": "fuel_label",
+          "description": "Display fuel/category label used in outputs and charts."
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "leap_2022",
+          "description": null
+        },
+        {
+          "name": "base_2022",
+          "description": null
+        },
+        {
+          "name": "gap_base",
+          "description": null
+        },
+        {
+          "name": "abs_gap_base",
+          "description": null
+        },
+        {
+          "name": "ratio_base_to_leap",
+          "description": null
+        },
+        {
+          "name": "leap_2030",
+          "description": null
+        },
+        {
+          "name": "projection_2030",
+          "description": null
+        },
+        {
+          "name": "gap_projection",
+          "description": null
+        },
+        {
+          "name": "abs_gap_projection",
+          "description": null
+        },
+        {
+          "name": "ratio_projection_to_leap",
+          "description": null
+        },
+        {
+          "name": "leap_year_points",
+          "description": null
+        },
+        {
+          "name": "projection_year_points",
+          "description": null
+        },
+        {
+          "name": "projection_missing_year_points",
+          "description": null
+        },
+        {
+          "name": "diagnostic_flag",
+          "description": null
+        }
+      ],
+      "alias": "gap_diagnostics"
+    },
+    "mapping_rundown_by_sheet": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\mapping\\mapping_rundown_by_sheet.csv",
+      "description": "Sheet-level summary of ESTO-axis mapping completeness.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "sheet",
+          "description": "Dashboard sheet or comparison group name."
+        },
+        {
+          "name": "rows",
+          "description": "Count of source rows contributing to the summary row."
+        },
+        {
+          "name": "fully_mapped",
+          "description": null
+        },
+        {
+          "name": "partially_mapped",
+          "description": "True when only part of the mapping information was resolved."
+        },
+        {
+          "name": "any_mapping",
+          "description": null
+        },
+        {
+          "name": "base_mapping_complete",
+          "description": null
+        },
+        {
+          "name": "projection_mapping_complete",
+          "description": null
+        },
+        {
+          "name": "missing_ninth_fuel",
+          "description": null
+        },
+        {
+          "name": "missing_esto_flow",
+          "description": null
+        },
+        {
+          "name": "missing_esto_product",
+          "description": null
+        },
+        {
+          "name": "with_mapping_notes",
+          "description": null
+        }
+      ],
+      "alias": "mapping_rundown_by_sheet"
+    },
+    "mapping_rundown_details": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\mapping\\mapping_rundown_details.xlsx",
+      "description": "Detailed mapping audit workbook for ESTO-axis rows.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".xlsx",
+      "columns": [
+        {
+          "name": "sheet",
+          "description": "Dashboard sheet or comparison group name."
+        },
+        {
+          "name": "measure",
+          "description": "Measure label used to distinguish related chart lines."
+        },
+        {
+          "name": "fuel_label",
+          "description": "Display fuel/category label used in outputs and charts."
+        },
+        {
+          "name": "sector_code_9th",
+          "description": "9th sector code tied to the row."
+        },
+        {
+          "name": "ninth_fuel_code",
+          "description": "9th fuel code used for projection comparison."
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "mapped",
+          "description": "True when the row has the required mappings for comparison."
+        },
+        {
+          "name": "has_any_mapping",
+          "description": "True when any mapping fields were filled."
+        },
+        {
+          "name": "base_mapping_complete",
+          "description": null
+        },
+        {
+          "name": "projection_mapping_complete",
+          "description": null
+        },
+        {
+          "name": "partially_mapped",
+          "description": "True when only part of the mapping information was resolved."
+        },
+        {
+          "name": "missing_ninth_fuel",
+          "description": null
+        },
+        {
+          "name": "missing_esto_flow",
+          "description": null
+        },
+        {
+          "name": "missing_esto_product",
+          "description": null
+        },
+        {
+          "name": "has_mapping_note",
+          "description": null
+        },
+        {
+          "name": "mapping_source",
+          "description": "How the sector/fuel mapping was resolved."
+        },
+        {
+          "name": "flow_source",
+          "description": "How the ESTO flow mapping was resolved."
+        },
+        {
+          "name": "fuel_source",
+          "description": "How the 9th fuel mapping was resolved."
+        },
+        {
+          "name": "sector_match_method",
+          "description": null
+        },
+        {
+          "name": "mapping_note",
+          "description": null
+        },
+        {
+          "name": "projection_parent_fallback",
+          "description": null
+        },
+        {
+          "name": "projection_parent_sector_code",
+          "description": null
+        },
+        {
+          "name": "comparator_scope",
+          "description": null
+        },
+        {
+          "name": "page_key",
+          "description": null
+        },
+        {
+          "name": "page_label",
+          "description": null
+        },
+        {
+          "name": "chart_group_key",
+          "description": null
+        },
+        {
+          "name": "chart_group_label",
+          "description": null
+        },
+        {
+          "name": "esto_flow_key",
+          "description": null
+        },
+        {
+          "name": "esto_flow_group_key",
+          "description": null
+        },
+        {
+          "name": "esto_flow_group_label",
+          "description": null
+        },
+        {
+          "name": "dashboard_page_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_page_label",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_label",
+          "description": null
+        },
+        {
+          "name": "chart_kind",
+          "description": null
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "template_is_multi_flow",
+          "description": null
+        },
+        {
+          "name": "use_esto_to_ninth_mapping",
+          "description": null
+        },
+        {
+          "name": "has_leap",
+          "description": null
+        },
+        {
+          "name": "has_base",
+          "description": null
+        },
+        {
+          "name": "has_projection",
+          "description": null
+        },
+        {
+          "name": "projection_targets_count",
+          "description": null
+        }
+      ],
+      "alias": "mapping_rundown_details"
+    },
+    "comparison_issue_summary": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\checks\\comparison_issue_summary.csv",
+      "description": "Prioritized ESTO-axis comparison issues with gap metrics and hints.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "sheet",
+          "description": "Dashboard sheet or comparison group name."
+        },
+        {
+          "name": "fuel_label",
+          "description": "Display fuel/category label used in outputs and charts."
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "base_abs_gap",
+          "description": null
+        },
+        {
+          "name": "base_gap_ratio",
+          "description": null
+        },
+        {
+          "name": "projection_abs_gap",
+          "description": null
+        },
+        {
+          "name": "projection_gap_ratio",
+          "description": null
+        },
+        {
+          "name": "ninth_fuel_code",
+          "description": "9th fuel code used for projection comparison."
+        },
+        {
+          "name": "mapping_source",
+          "description": "How the sector/fuel mapping was resolved."
+        },
+        {
+          "name": "flow_source",
+          "description": "How the ESTO flow mapping was resolved."
+        },
+        {
+          "name": "fuel_source",
+          "description": "How the 9th fuel mapping was resolved."
+        },
+        {
+          "name": "sector_match_method",
+          "description": null
+        },
+        {
+          "name": "mapping_note",
+          "description": null
+        },
+        {
+          "name": "comparator_scope",
+          "description": null
+        },
+        {
+          "name": "worst_gap_ratio",
+          "description": null
+        },
+        {
+          "name": "worst_abs_gap",
+          "description": null
+        },
+        {
+          "name": "issue_cause",
+          "description": "High-level classification for a comparison problem."
+        },
+        {
+          "name": "agent_debug_hint",
+          "description": "Short debugging hint for the issue row."
+        }
+      ],
+      "alias": "comparison_issue_summary"
+    },
+    "comparison_issue_cause_summary": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\checks\\comparison_issue_cause_summary.csv",
+      "description": "Frequency summary of ESTO-axis issue categories.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "issue_cause",
+          "description": "High-level classification for a comparison problem."
+        },
+        {
+          "name": "rows",
+          "description": "Count of source rows contributing to the summary row."
+        },
+        {
+          "name": "max_gap_ratio",
+          "description": null
+        },
+        {
+          "name": "max_abs_gap",
+          "description": null
+        }
+      ],
+      "alias": "comparison_issue_cause_summary"
+    },
+    "chart_line_mapping_ledger": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\charting\\chart_line_mapping_ledger.csv",
+      "description": "Per-chart-line ledger linking visible chart rows to mapping decisions.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "dashboard_path",
+          "description": "Rendered dashboard page path for the chart."
+        },
+        {
+          "name": "chart_file",
+          "description": "Relative chart file written by the workflow."
+        },
+        {
+          "name": "dashboard_page_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_page_label",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_label",
+          "description": null
+        },
+        {
+          "name": "chart_kind",
+          "description": null
+        },
+        {
+          "name": "esto_flow_group_key",
+          "description": null
+        },
+        {
+          "name": "esto_flow_group_label",
+          "description": null
+        },
+        {
+          "name": "esto_flow_key",
+          "description": null
+        },
+        {
+          "name": "economy",
+          "description": "Economy code for the series or mapping row."
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "measure",
+          "description": "Measure label used to distinguish related chart lines."
+        },
+        {
+          "name": "fuel_label",
+          "description": "Display fuel/category label used in outputs and charts."
+        },
+        {
+          "name": "source",
+          "description": "Series source, such as LEAP, base, or projection."
+        },
+        {
+          "name": "value",
+          "description": "Numeric value for the row after workflow transformations."
+        },
+        {
+          "name": "ninth_pairs_label",
+          "description": null
+        },
+        {
+          "name": "is_total_line",
+          "description": null
+        },
+        {
+          "name": "mapping_record_type",
+          "description": null
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "source_sector",
+          "description": null
+        },
+        {
+          "name": "source_fuel",
+          "description": null
+        },
+        {
+          "name": "exact_comparator_key",
+          "description": null
+        },
+        {
+          "name": "duplicate_exact_comparator_key_count",
+          "description": null
+        },
+        {
+          "name": "total_component_bucket_count",
+          "description": null
+        },
+        {
+          "name": "mapping_source",
+          "description": "How the sector/fuel mapping was resolved."
+        },
+        {
+          "name": "mapping_note",
+          "description": null
+        }
+      ],
+      "alias": "chart_line_mapping_ledger"
+    },
+    "chart_total_component_ledger": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\charting\\chart_total_component_ledger.csv",
+      "description": "Ledger showing how visible total lines were constructed.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "dashboard_page_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_page_label",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_key",
+          "description": null
+        },
+        {
+          "name": "dashboard_section_label",
+          "description": null
+        },
+        {
+          "name": "chart_kind",
+          "description": null
+        },
+        {
+          "name": "economy",
+          "description": "Economy code for the series or mapping row."
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "source",
+          "description": "Series source, such as LEAP, base, or projection."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "measure",
+          "description": "Measure label used to distinguish related chart lines."
+        },
+        {
+          "name": "sheet",
+          "description": "Dashboard sheet or comparison group name."
+        },
+        {
+          "name": "member_fuel_label",
+          "description": null
+        },
+        {
+          "name": "member_value",
+          "description": null
+        },
+        {
+          "name": "component_included_in_total",
+          "description": null
+        },
+        {
+          "name": "exact_comparator_key",
+          "description": null
+        },
+        {
+          "name": "duplicate_exact_comparator_key_count",
+          "description": null
+        },
+        {
+          "name": "source_sector",
+          "description": null
+        },
+        {
+          "name": "source_fuel",
+          "description": null
+        },
+        {
+          "name": "projection_parent_sector_code",
+          "description": null
+        },
+        {
+          "name": "sector_depth",
+          "description": null
+        },
+        {
+          "name": "fuel_depth",
+          "description": null
+        },
+        {
+          "name": "is_leaf_level",
+          "description": null
+        }
+      ],
+      "alias": "chart_total_component_ledger"
+    },
+    "runtime_issues_csv": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\runtime\\balance_runtime_issues.csv",
+      "description": "Runtime balance rows that could not be mapped cleanly.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "reason",
+          "description": "Issue or classification reason for the row."
+        },
+        {
+          "name": "details",
+          "description": "Extra detail about the issue or mapping decision."
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "source_sheet",
+          "description": null
+        },
+        {
+          "name": "leap_sector_name_full_path",
+          "description": null
+        },
+        {
+          "name": "leap_flow",
+          "description": "Mapped LEAP flow code from the balance workflow."
+        },
+        {
+          "name": "leap_flow_name",
+          "description": "Human-readable LEAP flow name."
+        },
+        {
+          "name": "leap_product",
+          "description": "Mapped LEAP product code from the balance workflow."
+        },
+        {
+          "name": "leap_product_name",
+          "description": "Human-readable LEAP product name."
+        },
+        {
+          "name": "mapping_failed",
+          "description": null
+        },
+        {
+          "name": "mapping_key_sector",
+          "description": null
+        },
+        {
+          "name": "mapping_key_fuel",
+          "description": null
+        },
+        {
+          "name": "mapping_candidate_rule",
+          "description": null
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "value_petajoule",
+          "description": null
+        }
+      ],
+      "alias": "runtime_issues_csv"
+    },
+    "runtime_missing_pair_summary_xlsx": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\runtime\\balance_runtime_missing_pair_summary.xlsx",
+      "description": "Grouped summary of missing ESTO-axis mapping pairs.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".xlsx",
+      "columns": [
+        {
+          "name": "leap_sector_name_full_path",
+          "description": null
+        },
+        {
+          "name": "raw_leap_fuel_name",
+          "description": null
+        },
+        {
+          "name": "value_petajoule",
+          "description": null
+        }
+      ],
+      "alias": "runtime_missing_pair_summary_xlsx"
+    },
+    "dashboard_comparator_pair_coverage_xlsx": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\checks\\dashboard_comparator_pair_coverage.xlsx",
+      "description": "Coverage audit for comparator pairs actually exposed in ESTO-axis dashboards.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".xlsx",
+      "columns": [
+        {
+          "name": "chart_group_id",
+          "description": null
+        },
+        {
+          "name": "dashboard_path",
+          "description": "Rendered dashboard page path for the chart."
+        },
+        {
+          "name": "sheet",
+          "description": "Dashboard sheet or comparison group name."
+        },
+        {
+          "name": "measure",
+          "description": "Measure label used to distinguish related chart lines."
+        },
+        {
+          "name": "fuel_label",
+          "description": "Display fuel/category label used in outputs and charts."
+        },
+        {
+          "name": "chart_file",
+          "description": "Relative chart file written by the workflow."
+        },
+        {
+          "name": "section_id",
+          "description": null
+        },
+        {
+          "name": "section_label",
+          "description": null
+        },
+        {
+          "name": "entry_kind",
+          "description": null
+        },
+        {
+          "name": "exposed_in_dashboard",
+          "description": null
+        }
+      ],
+      "alias": "dashboard_comparator_pair_coverage_xlsx"
+    },
+    "missing_mapping_candidates_xlsx": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\mapping\\balance_missing_mapping_candidates.xlsx",
+      "description": "Workbook of candidate mapping additions based on runtime misses.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".xlsx",
+      "columns": [
+        {
+          "name": "leap_sector_name_original",
+          "description": null
+        },
+        {
+          "name": "leap_sector_name_full_path",
+          "description": null
+        },
+        {
+          "name": "raw_leap_fuel_name",
+          "description": null
+        },
+        {
+          "name": "value",
+          "description": "Numeric value for the row after workflow transformations."
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "pair_mapping_cardinality",
+          "description": null
+        },
+        {
+          "name": "leap_is_subtotal",
+          "description": null
+        },
+        {
+          "name": "esto_pair_is_subtotal",
+          "description": null
+        },
+        {
+          "name": "subtotal_mismatch_is_ok",
+          "description": null
+        },
+        {
+          "name": "subtotal_alignment",
+          "description": null
+        },
+        {
+          "name": "esto_pair_abs_sum",
+          "description": null
+        },
+        {
+          "name": "many_to_many_is_ok",
+          "description": null
+        },
+        {
+          "name": "remove_row",
+          "description": null
+        },
+        {
+          "name": "remove_row_reason",
+          "description": null
+        }
+      ],
+      "alias": "missing_mapping_candidates_xlsx"
+    },
+    "ninth_mapping_data_coverage_xlsx": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\checks\\ninth_mapping_data_coverage.xlsx",
+      "description": "Coverage check for mapped 9th pairs against available 9th data.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".xlsx",
+      "columns": [
+        {
+          "name": "9th_sector",
+          "description": null
+        },
+        {
+          "name": "9th_fuel",
+          "description": null
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "sector_path",
+          "description": null
+        },
+        {
+          "name": "fuel_path",
+          "description": null
+        },
+        {
+          "name": "scenario_count",
+          "description": null
+        },
+        {
+          "name": "scenarios",
+          "description": null
+        },
+        {
+          "name": "year_min",
+          "description": null
+        },
+        {
+          "name": "year_max",
+          "description": null
+        },
+        {
+          "name": "value_abs_sum",
+          "description": null
+        },
+        {
+          "name": "value_sum",
+          "description": null
+        },
+        {
+          "name": "source_rows",
+          "description": null
+        },
+        {
+          "name": "exact_mapping_found",
+          "description": null
+        },
+        {
+          "name": "covered_by_parent_mapping",
+          "description": null
+        },
+        {
+          "name": "covering_mapping_pairs",
+          "description": null
+        }
+      ],
+      "alias": "ninth_mapping_data_coverage_xlsx"
+    },
+    "override_report_csv": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\runtime\\balance_override_application_report.csv",
+      "description": "Report of which manual overrides were applied.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "override_index",
+          "description": null
+        },
+        {
+          "name": "applied_rows",
+          "description": null
+        },
+        {
+          "name": "match",
+          "description": null
+        },
+        {
+          "name": "set",
+          "description": null
+        }
+      ],
+      "alias": "override_report_csv"
+    },
+    "auto_sheet_rows_csv": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\mapping\\auto_sheet_rows.csv",
+      "description": "Rows automatically assigned to dashboard sheets during preparation.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "sheet",
+          "description": "Dashboard sheet or comparison group name."
+        },
+        {
+          "name": "path",
+          "description": null
+        }
+      ],
+      "alias": "auto_sheet_rows_csv"
+    },
+    "resolved_structure_json": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\mapping\\resolved_structure_config.json",
+      "description": "Resolved dashboard structure config used for rendering.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".json",
+      "alias": "resolved_structure_json"
+    },
+    "balance_coverage_csv": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\checks\\balance_coverage.csv",
+      "description": "Coverage summary from LEAP balance extraction.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "source_sheet",
+          "description": null
+        },
+        {
+          "name": "template_flow_count",
+          "description": null
+        },
+        {
+          "name": "template_fuel_count",
+          "description": null
+        },
+        {
+          "name": "matched_flow_count",
+          "description": null
+        },
+        {
+          "name": "matched_fuel_count",
+          "description": null
+        },
+        {
+          "name": "missing_flow_names",
+          "description": null
+        },
+        {
+          "name": "missing_fuel_names",
+          "description": null
+        }
+      ],
+      "alias": "balance_coverage_csv"
+    },
+    "balance_unit_diagnostics_csv": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\checks\\balance_unit_diagnostics.csv",
+      "description": "Unit normalization checks from LEAP balance extraction.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "source_sheet",
+          "description": null
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "units_original",
+          "description": null
+        },
+        {
+          "name": "unit_to_petajoule_factor",
+          "description": null
+        },
+        {
+          "name": "unit_parse_status",
+          "description": null
+        },
+        {
+          "name": "unit_prefix",
+          "description": null
+        },
+        {
+          "name": "unit_base",
+          "description": null
+        }
+      ],
+      "alias": "balance_unit_diagnostics_csv"
+    },
+    "balance_matching_diagnostics_csv": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\checks\\balance_matching_diagnostics.csv",
+      "description": "Row-level detail-mode and allocation diagnostics from LEAP balance extraction.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "source_workbook",
+          "description": null
+        },
+        {
+          "name": "source_sheet",
+          "description": null
+        },
+        {
+          "name": "scenario",
+          "description": "Scenario label used for the row."
+        },
+        {
+          "name": "year",
+          "description": "Year for the observation."
+        },
+        {
+          "name": "leap_sector_name_original",
+          "description": null
+        },
+        {
+          "name": "leap_sector_name_full_path",
+          "description": null
+        },
+        {
+          "name": "leap_fuel_name_raw",
+          "description": null
+        },
+        {
+          "name": "leap_sector_name",
+          "description": null
+        },
+        {
+          "name": "leap_fuel_name",
+          "description": null
+        },
+        {
+          "name": "esto_flow",
+          "description": "ESTO flow code or label used for comparison."
+        },
+        {
+          "name": "esto_product",
+          "description": "ESTO product code or label used for comparison."
+        },
+        {
+          "name": "source_value_petajoule",
+          "description": null
+        },
+        {
+          "name": "allocation_share",
+          "description": null
+        },
+        {
+          "name": "allocated_value_petajoule",
+          "description": null
+        },
+        {
+          "name": "match_resolution",
+          "description": null
+        },
+        {
+          "name": "allocation_method",
+          "description": null
+        },
+        {
+          "name": "mapping_status",
+          "description": null
+        },
+        {
+          "name": "mapping_method",
+          "description": null
+        },
+        {
+          "name": "source_sheet_detail_mode",
+          "description": null
+        },
+        {
+          "name": "detail_mode",
+          "description": null
+        }
+      ],
+      "alias": "balance_matching_diagnostics_csv"
+    },
+    "balance_extraction_summary_json": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\checks\\balance_extraction_summary.json",
+      "description": "Summary metadata from the balance extraction stage.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".json",
+      "alias": "balance_extraction_summary_json"
+    },
+    "workflow_stage_timings_csv": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\runtime\\workflow_stage_timings.csv",
+      "description": "Runtime duration by broad workflow stage.",
+      "exists": true,
+      "type": "file",
+      "suffix": ".csv",
+      "columns": [
+        {
+          "name": "workflow",
+          "description": null
+        },
+        {
+          "name": "stage_order",
+          "description": null
+        },
+        {
+          "name": "stage",
+          "description": null
+        },
+        {
+          "name": "status",
+          "description": null
+        },
+        {
+          "name": "started_at",
+          "description": null
+        },
+        {
+          "name": "ended_at",
+          "description": null
+        },
+        {
+          "name": "duration_seconds",
+          "description": null
+        },
+        {
+          "name": "duration_formatted",
+          "description": null
+        }
+      ],
+      "alias": "workflow_stage_timings_csv"
+    }
+  },
+  "supporting_folders": {
+    "mapping": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\mapping",
+      "description": "How rows were matched, mapped, reassigned, or grouped.",
+      "exists": true,
+      "type": "directory",
+      "item_count": 11,
+      "contains_preview": [
+        "auto_sheet_rows.csv",
+        "balance_missing_mapping_candidates.xlsx",
+        "mapped_leap_to_esto_balance_rows.csv",
+        "mapped_ninth_to_esto_balance_rows.csv",
+        "mapping_lineage_audit.csv",
+        "mapping_rundown_by_sheet.csv",
+        "mapping_rundown_details.xlsx",
+        "resolved_structure_config.json",
+        "shared_aggregate_fuel_mapping_audit.csv",
+        "transport_mapping_diagnostics.csv",
+        "transport_mapping_diagnostics_summary.csv"
+      ],
+      "alias": "mapping"
+    },
+    "checks": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\checks",
+      "description": "Coverage checks, duplicates, gaps, and other QA outputs.",
+      "exists": true,
+      "type": "directory",
+      "item_count": 15,
+      "contains_preview": [
+        ".mapping_hash",
+        "balance_coverage.csv",
+        "balance_extraction_summary.json",
+        "balance_matching_diagnostics.csv",
+        "balance_missing_mapping_candidates.xlsx",
+        "balance_unit_diagnostics.csv",
+        "chart_series_value_snapshot.csv",
+        "comparison_gap_diagnostics.csv",
+        "comparison_issue_cause_summary.csv",
+        "comparison_issue_summary.csv",
+        "dashboard_comparator_pair_coverage.xlsx",
+        "dashboard_graph_fuel_coverage.csv",
+        "ninth_mapping_data_coverage.xlsx",
+        "simple_balance_duplicate_details.csv",
+        "simple_balance_duplicate_summary.csv"
+      ],
+      "alias": "checks"
+    },
+    "runtime": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\runtime",
+      "description": "Problems or exception-style outputs produced during the run.",
+      "exists": true,
+      "type": "directory",
+      "item_count": 4,
+      "contains_preview": [
+        "balance_override_application_report.csv",
+        "balance_runtime_issues.csv",
+        "balance_runtime_missing_pair_summary.xlsx",
+        "workflow_stage_timings.csv"
+      ],
+      "alias": "runtime"
+    },
+    "charting": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\charting",
+      "description": "Chart ledgers, hierarchy files, and chart-support artifacts.",
+      "exists": true,
+      "type": "directory",
+      "item_count": 7,
+      "contains_preview": [
+        "all_chart_groups.csv",
+        "chart_group_exposure.csv",
+        "chart_line_mapping_ledger.csv",
+        "chart_navigation_hierarchy.csv",
+        "chart_navigation_hierarchy.json",
+        "chart_navigation_rendered_template.json",
+        "chart_total_component_ledger.csv"
+      ],
+      "alias": "charting"
+    },
+    "analysis": {
+      "path": "C:\\Users\\Work\\github\\leap_dashboard\\docs\\USA\\supporting_files\\analysis",
+      "description": "Deeper method-comparison, derived, atomic, or shadow-analysis outputs.",
+      "exists": true,
+      "type": "directory",
+      "item_count": 0,
+      "contains_preview": [],
+      "alias": "analysis"
+    }
+  },
+  "notes": [
+    "Primary ESTO-axis balance outputs are written at the workflow root.",
+    "Supporting diagnostics and mapping evidence are grouped under supporting_files/."
+  ]
+}

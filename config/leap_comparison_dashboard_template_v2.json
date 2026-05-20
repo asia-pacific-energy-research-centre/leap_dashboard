@@ -15,7 +15,8 @@
       "Wind",
       "Biofuels",
       "Electricity",
-      "Heat"
+      "Heat",
+      "Hydrogen-based fuels"
     ]
   },
   "specified_fuel_mappings": {
@@ -81,15 +82,14 @@
     "Petroleum products": [
       "07 Petroleum products",
       "07.01 Motor gasoline",
-      "07.01 Aviation gasoline",
-      "07.02 Naphtha",
-      "07.03 Gasoline type jet fuel",
-      "07.04 Kerosene type jet fuel",
-      "07.05 Kerosene",
-      "07.06 Gas/diesel oil",
-      "07.07 Fuel oil",
-      "07.08 LPG",
-      "07.09 Refinery gas (not liquefied)",
+      "07.02 Aviation gasoline",
+      "07.03 Naphtha",
+      "07.04 Gasoline type jet fuel",
+      "07.05 Kerosene type jet fuel",
+      "07.06 Kerosene",
+      "07.07 Gas/diesel oil",
+      "07.08 Fuel oil",
+      "07.09 LPG",
       "07.10 Refinery gas (not liquefied)",
       "07.11 Ethane",
       "07.12 White spirit SBP",
@@ -98,21 +98,19 @@
       "07.15 Paraffin  waxes",
       "07.16 Petroleum coke",
       "07.17 Other products",
-      "07.99 Petroleum products nonspecified",
-      "07.99 Non-specified Petroleum Products"
+      "07.99 PetProd nonspecified"
     ],
     "Oil products": [
       "07 Petroleum products",
       "07.01 Motor gasoline",
-      "07.01 Aviation gasoline",
-      "07.02 Naphtha",
-      "07.03 Gasoline type jet fuel",
-      "07.04 Kerosene type jet fuel",
-      "07.05 Kerosene",
-      "07.06 Gas/diesel oil",
-      "07.07 Fuel oil",
-      "07.08 LPG",
-      "07.09 Refinery gas (not liquefied)",
+      "07.02 Aviation gasoline",
+      "07.03 Naphtha",
+      "07.04 Gasoline type jet fuel",
+      "07.05 Kerosene type jet fuel",
+      "07.06 Kerosene",
+      "07.07 Gas/diesel oil",
+      "07.08 Fuel oil",
+      "07.09 LPG",
       "07.10 Refinery gas (not liquefied)",
       "07.11 Ethane",
       "07.12 White spirit SBP",
@@ -121,8 +119,7 @@
       "07.15 Paraffin  waxes",
       "07.16 Petroleum coke",
       "07.17 Other products",
-      "07.99 Petroleum products nonspecified",
-      "07.99 Non-specified Petroleum Products"
+      "07.99 PetProd nonspecified"
     ],
     "Oil": [
       "05 Oil shale and oil sands",
@@ -134,15 +131,14 @@
       "06.05 Other hydrocarbons",
       "07 Petroleum products",
       "07.01 Motor gasoline",
-      "07.01 Aviation gasoline",
-      "07.02 Naphtha",
-      "07.03 Gasoline type jet fuel",
-      "07.04 Kerosene type jet fuel",
-      "07.05 Kerosene",
-      "07.06 Gas/diesel oil",
-      "07.07 Fuel oil",
-      "07.08 LPG",
-      "07.09 Refinery gas (not liquefied)",
+      "07.02 Aviation gasoline",
+      "07.03 Naphtha",
+      "07.04 Gasoline type jet fuel",
+      "07.05 Kerosene type jet fuel",
+      "07.06 Kerosene",
+      "07.07 Gas/diesel oil",
+      "07.08 Fuel oil",
+      "07.09 LPG",
       "07.10 Refinery gas (not liquefied)",
       "07.11 Ethane",
       "07.12 White spirit SBP",
@@ -151,16 +147,14 @@
       "07.15 Paraffin  waxes",
       "07.16 Petroleum coke",
       "07.17 Other products",
-      "07.99 Petroleum products nonspecified",
-      "07.99 Non-specified Petroleum Products"
+      "07.99 PetProd nonspecified"
     ],
     "Gas": [
       "08 Gas",
       "08.01 Natural gas",
       "08.02 LNG",
       "08.03 Gas works gas",
-      "08.99 Gas nonspecified",
-      "08.99 Non-specified Gas"
+      "08.99 Gas nonspecified"
     ],
     "Natural gas": [
       "08.01 Natural gas"
@@ -180,8 +174,7 @@
     "Solar": [
       "12 Solar",
       "12.01 of which: Photovoltaics",
-      "12.02 Solar nonspecified",
-      "12.02 Non-specified Solar"
+      "12.99 Solar nonspecified"
     ],
     "Ocean": [
       "13 Tide, wave, ocean"
@@ -263,6 +256,9 @@
     ],
     "Hydrogen": [
       "16 Others"
+    ],
+    "Hydrogen-based fuels": [
+      "16 Others"
     ]
   },
   "Notes": {
@@ -313,6 +309,7 @@
     ]
   },
   "Buildings": {
+    "visible_note": "The Buildings model is currently being rebuilt. ETA June 2026.",
     "aggregate_graphs": {
       "products": {
         "how": "all",
@@ -418,6 +415,16 @@
     }
   },
   "Industry": {
+    "visible_note": "The Industry model is currently being rebuilt. ETA June 2026.",
+    "_comments": [
+      "visible_note can be added at any level to show an amber notice banner on the dashboard.",
+      "Page-level example (shows at top of the Industry page):",
+      "  \"visible_note\": \"Industry mappings are still being revised\"",
+      "Aggregate-level example (shows above the stacked-area chart grid only):",
+      "  Inside aggregate_graphs: \"visible_note\": \"These charts may not include all fuels yet\"",
+      "Sub-section example (shows at top of e.g. the Construction page):",
+      "  Inside Construction: \"visible_note\": \"Construction data is sparse — treat with caution\""
+    ],
     "aggregate_graphs": {
       "products": {
         "how": "all",
@@ -646,6 +653,7 @@
     }
   },
   "Transport": {
+    "visible_note": "The Transport model is undergoing redevelopment. ETA September 2026.",
     "aggregate_graphs": {
       "products": {
         "how": "all",
@@ -1397,6 +1405,7 @@
     "Total renewables": "#6BA43A",
     "Other fuels non biofuels": "#A20042",
     "Hydrogen": "#F67AA3",
+    "Hydrogen-based fuels": "#D46FA0",
     "Others": "#8A8A8A"
   }
 }
