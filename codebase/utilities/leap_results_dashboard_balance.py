@@ -6589,6 +6589,8 @@ def render_balance_dashboards(
         stale_bundle.unlink()
     for stale_bundle in chart_bundles_dir.glob("*.js"):
         stale_bundle.unlink()
+    for stale_page in dashboards_dir.glob("*.html"):
+        stale_page.unlink()
     use_chart_bundles = chart_backend == "plotly" and str(chart_output_mode).strip().lower() == "page_bundles"
 
     template_allowlist = _load_dashboard_template_allowlist(chart_navigation_guide_path)

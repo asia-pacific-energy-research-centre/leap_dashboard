@@ -445,7 +445,7 @@
     }
   },
   "Industry": {
-    "visible_note": "The Industry model is currently being rebuilt. ETA June 2026.",
+    "visible_note": "The Industry model is currently being rebuilt. ETA June 2026. Non-energy is expected around the same time, but is not included in this dashboard yet.",
     "_comments": [
       "visible_note can be added at any level to show an amber notice banner on the dashboard.",
       "Page-level example (shows at top of the Industry page):",

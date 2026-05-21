@@ -11,16 +11,6 @@ from typing import Callable, Iterable, Sequence
 
 import pandas as pd
 
-from codebase.functions.leap_core import (
-    connect_to_leap,
-    create_branches_from_export_file,
-    fill_branches_from_export_file,
-)
-from codebase.functions.analysis_input_write_dispatcher import (
-    dispatch_analysis_input_write,
-)
-from codebase.utilities import fuel_catalog_preflight
-
 AGGREGATE_ECONOMY_LABELS = {"00_APEC", "ALL_ECONOMIES", "ALL"}
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -505,90 +495,3 @@ def find_latest_export_workbook(
     return matches[-1]
 
 
-def import_workbook_to_leap(
-    export_path: Path,
-    sheet_name: str,
-    scenario: str | None,
-    region: str | None,
-    create_branches: bool = True,
-    fill_branches: bool = True,
-    include_current_accounts: bool = True,
-    default_branch_type: tuple | None = None,
-    branch_type_mapping: dict | None = None,
-    branch_root: str | None = None,
-    branch_path_col: str | None = None,
-    raise_on_missing_branch: bool = False,
-) -> Path:
-    """Connect to LEAP, validate the workbook, and fill branches."""
-    available = list_export_scenarios(export_path, sheet_name)
-    scenario_choice = scenario or (available[0] if available else None)
-    available_lower = {str(name).strip().lower() for name in available}
-    current_accounts_available = any(
-        label in available_lower for label in {"current accounts", "current account"}
-    )
-    if scenario_choice and scenario_choice not in available:
-        raise ValueError(
-            f"Scenario '{scenario_choice}' not found in {export_path.name}; options {available}"
-        )
-    if region:
-        validate_export_region(export_path, sheet_name, region)
-    if include_current_accounts and not current_accounts_available:
-        print(
-            "[INFO] Skipping Current Accounts import for "
-            f"{export_path.name}: workbook scenarios are {available}."
-        )
-        include_current_accounts = False
-
-    def _run_api_write() -> Path:
-        leap_conn = connect_to_leap()
-        if leap_conn is None:
-            raise RuntimeError("Unable to connect to LEAP.")
-
-        fuel_catalog_preflight.run_fuel_catalog_preflight(
-            export_path=export_path,
-            sheet_name=sheet_name,
-            scenario=scenario_choice,
-            context="workflow_common.import_workbook_to_leap",
-            leap_app=leap_conn,
-        )
-        if create_branches:
-            create_kwargs = {
-                "sheet_name": sheet_name,
-                "branch_root": branch_root,
-                "branch_type_mapping": branch_type_mapping,
-                "default_branch_type": default_branch_type,
-                "RAISE_ERROR_ON_FAILED_BRANCH_CREATION": raise_on_missing_branch,
-            }
-            if branch_path_col is not None:
-                create_kwargs["branch_path_col"] = branch_path_col
-            create_branches_from_export_file(
-                leap_conn,
-                export_path,
-                **create_kwargs,
-            )
-        if fill_branches:
-            fill_branches_from_export_file(
-                leap_conn,
-                export_path,
-                sheet_name=sheet_name,
-                scenario=scenario_choice,
-                region=region,
-                RAISE_ERROR_ON_FAILED_SET=raise_on_missing_branch,
-                HANDLE_CURRENT_ACCOUNTS_TOO=include_current_accounts,
-                RUN_FUEL_CATALOG_PREFLIGHT=False,
-            )
-        return export_path
-
-    dispatch_result = dispatch_analysis_input_write(
-        export_path=export_path,
-        sheet_name=sheet_name,
-        scenario=scenario_choice,
-        region=region,
-        context_label="workflow_common.import_workbook_to_leap",
-        run_api_write=_run_api_write,
-    )
-    if dispatch_result.get("mode") == "api":
-        result_path = dispatch_result.get("api_result")
-        if isinstance(result_path, Path):
-            return result_path
-    return export_path
