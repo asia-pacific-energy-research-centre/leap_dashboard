@@ -306,21 +306,6 @@
         ]
       }
     },
-    "Electricity own use": {
-      "by_fuel_graphs": {
-        "products": [
-          "17 Electricity",
-          "18 Heat"
-        ],
-        "esto_flows": [
-          "10.01.01 Electricity, CHP and heat plants",
-          "10.01.13 Pump storage plants"
-        ],
-        "measures": [
-          "Inputs (PJ)"
-        ]
-      }
-    },
     "Electricity plants": {
       "aggregate_graphs": {
         "fuels": "Total",
@@ -361,24 +346,14 @@
         "products": [
           "06.01 Crude oil",
           "06.02 Natural gas liquids",
-          "06.03 Refinery feedstocks",
           "06.05 Other hydrocarbons",
           "07.01 Motor gasoline",
           "07.02 Aviation gasoline",
           "07.03 Naphtha",
-          "07.05 Kerosene type jet fuel",
           "07.06 Kerosene",
           "07.07 Gas/diesel oil",
           "07.08 Fuel oil",
           "07.09 LPG",
-          "07.10 Refinery gas (not liquefied)",
-          "07.11 Ethane",
-          "07.12 White spirit SBP",
-          "07.13 Lubricants",
-          "07.14 Bitumen",
-          "07.15 Paraffin  waxes",
-          "07.16 Petroleum coke",
-          "07.17 Other products",
           "07.99 PetProd nonspecified"
         ],
         "esto_flows": [
@@ -387,37 +362,6 @@
         "measures": [
           "Inputs (PJ)",
           "Outputs (PJ)"
-        ]
-      }
-    },
-    "Refinery own use": {
-      "by_fuel_graphs": {
-        "products": [
-          "07.01 Motor gasoline",
-          "07.02 Aviation gasoline",
-          "07.03 Naphtha",
-          "07.04 Gasoline type jet fuel",
-          "07.05 Kerosene type jet fuel",
-          "07.06 Kerosene",
-          "07.07 Gas/diesel oil",
-          "07.08 Fuel oil",
-          "07.09 LPG",
-          "07.10 Refinery gas (not liquefied)",
-          "07.11 Ethane",
-          "07.13 Lubricants",
-          "07.14 Bitumen",
-          "07.16 Petroleum coke",
-          "07.17 Other products",
-          "07.99 PetProd nonspecified",
-          "08.01 Natural gas",
-          "17 Electricity",
-          "18 Heat"
-        ],
-        "esto_flows": [
-          "10.01.11 Oil refineries"
-        ],
-        "measures": [
-          "Inputs (PJ)"
         ]
       }
     }
@@ -448,59 +392,6 @@
         "Outputs (PJ)"
       ]
     },
-    "Coal transformation": {
-      "aggregate_graphs": {
-        "fuels": "Total",
-        "esto_flows": [
-          "09.08 Coal transformation"
-        ],
-        "measures": [
-          "Inputs (PJ)",
-          "Outputs (PJ)"
-        ]
-      },
-      "Coal transformation own use": {
-        "by_fuel_graphs": {
-          "products": [
-            "02 Coal products",
-            "02.03 Coke oven gas",
-            "02.04 Blast furnace gas",
-            "02.08 BKB/PB",
-            "07.08 Fuel oil",
-            "08.01 Natural gas",
-            "17 Electricity"
-          ],
-          "esto_flows": [
-            "10.01.05 Coke ovens",
-            "10.01.07 Blast furnaces"
-          ],
-          "measures": [
-            "Inputs (PJ)"
-          ]
-        }
-      }
-    },
-    "Coal, oil and gas extraction own use": {
-      "by_fuel_graphs": {
-        "products": [
-          "01.02 Other bituminous coal",
-          "01.03 Sub-bituminous coal",
-          "07.01 Motor gasoline",
-          "07.07 Gas/diesel oil",
-          "07.08 Fuel oil",
-          "08.01 Natural gas",
-          "16.06 Biodiesel",
-          "17 Electricity"
-        ],
-        "esto_flows": [
-          "10.01.06 Coal mines",
-          "10.01.12 Oil and gas extraction"
-        ],
-        "measures": [
-          "Inputs (PJ)"
-        ]
-      }
-    },
     "Gas processing plants": {
       "aggregate_graphs": {
         "fuels": "Total",
@@ -515,25 +406,10 @@
           "Outputs (PJ)"
         ]
       },
-      "Gas processing own use": {
-        "by_fuel_graphs": {
-          "products": [
-            "08.01 Natural gas",
-            "17 Electricity"
-          ],
-          "esto_flows": [
-            "10.01.02 Gas works plants",
-            "10.01.03 Liquefaction/regasification plants"
-          ],
-          "measures": [
-            "Inputs (PJ)"
-          ]
-        }
-      },
       "Gas works plants": {
         "by_fuel_graphs": {
           "products": [
-            "01.05 Lignite",
+            "02.07 Coal tar",
             "08.03 Gas works gas"
           ],
           "esto_flows": [
@@ -564,8 +440,7 @@
         "by_fuel_graphs": {
           "products": [
             "08.01 Natural gas",
-            "08.03 Gas works gas",
-            "16.01 Biogas"
+            "08.03 Gas works gas"
           ],
           "esto_flows": [
             "09.06.03 Natural gas blending plants"
@@ -620,19 +495,6 @@
             "Outputs (PJ)"
           ]
         }
-      }
-    },
-    "Non-specified own uses": {
-      "by_fuel_graphs": {
-        "products": [
-          "17 Electricity"
-        ],
-        "esto_flows": [
-          "10.01.17 Non-specified own uses"
-        ],
-        "measures": [
-          "Inputs (PJ)"
-        ]
       }
     },
     "Non-specified transformation": {

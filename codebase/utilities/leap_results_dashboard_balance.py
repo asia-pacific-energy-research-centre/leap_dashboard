@@ -821,6 +821,7 @@ def convert_leap_balances_to_esto_long_table(
     projection_economy: str = "20_USA",
     max_output_year: int | None = None,
     explicit_pair_mappings_only: bool = False,
+    allow_descendant_mapping_expansion: bool = True,
 ) -> dict[str, Any]:
     """
     Convert REF/TGT LEAP balance exports into an ESTO-pair long balance table.
@@ -839,6 +840,7 @@ def convert_leap_balances_to_esto_long_table(
         known_issues=known_issues,
         projection_economy=projection_economy,
         explicit_pair_mappings_only=explicit_pair_mappings_only,
+        allow_descendant_mapping_expansion=allow_descendant_mapping_expansion,
     )
     leap_long = ingestion["leap_long"].copy()
     if max_output_year is not None and not leap_long.empty:
@@ -3816,6 +3818,7 @@ def _extract_balance_workbook(
     mapping_pairs_path: ConfigTableRef,
     codebook_path: Path,
     explicit_pair_mappings_only: bool = False,
+    allow_descendant_mapping_expansion: bool = True,
 ) -> dict[str, Any]:
     chosen_template = _pick_template_sheet(workbook_path, template_sheet)
     extractor = TemplateBalanceExtractor(
@@ -3824,6 +3827,7 @@ def _extract_balance_workbook(
         codebook_path=codebook_path,
         reinterpret_fuel_rows_as_parent_sector=False,
         explicit_pair_mappings_only=explicit_pair_mappings_only,
+        allow_descendant_mapping_expansion=allow_descendant_mapping_expansion,
     )
     extractor.load_mappings()
     selected_sheets = _list_balance_sheets(workbook_path)
@@ -3856,6 +3860,7 @@ def load_balance_leap_long(
     known_issues: dict[str, Any] | None = None,
     projection_economy: str = "20_USA",
     explicit_pair_mappings_only: bool = False,
+    allow_descendant_mapping_expansion: bool = True,
 ) -> dict[str, Any]:
     """
     Load LEAP balance exports (REF/TGT), map them, keep fully mapped rows only,
@@ -3884,6 +3889,7 @@ def load_balance_leap_long(
         mapping_pairs_path=mapping_pairs,
         codebook_path=codebook,
         explicit_pair_mappings_only=explicit_pair_mappings_only,
+        allow_descendant_mapping_expansion=allow_descendant_mapping_expansion,
     )
     extracted_tgt = _extract_balance_workbook(
         tgt_path,
@@ -3891,6 +3897,7 @@ def load_balance_leap_long(
         mapping_pairs_path=mapping_pairs,
         codebook_path=codebook,
         explicit_pair_mappings_only=explicit_pair_mappings_only,
+        allow_descendant_mapping_expansion=allow_descendant_mapping_expansion,
     )
 
     combined = pd.concat(
@@ -4631,7 +4638,12 @@ def _section_id_from_path(path: Sequence[str]) -> str:
     return f"sec-{token or 'section'}"
 
 
-def _chart_file_lookup(comparison_long: pd.DataFrame, *, hide_leap_only_charts: bool) -> dict[tuple[str, str, str], str]:
+def _chart_file_lookup(
+    comparison_long: pd.DataFrame,
+    *,
+    hide_leap_only_charts: bool,
+    hide_charts_without_leap_data: bool = False,
+) -> dict[tuple[str, str, str], str]:
     render_long = _prepare_render_long(comparison_long)
     chart_lookup: dict[tuple[str, str, str], str] = {}
 
@@ -4651,6 +4663,11 @@ def _chart_file_lookup(comparison_long: pd.DataFrame, *, hide_leap_only_charts: 
                 if str(src).strip() and str(src).strip() != "leap"
             }
             if not non_leap_sources and not force_show_chart:
+                continue
+        if hide_charts_without_leap_data:
+            leap_rows = sub[sub["source"].fillna("").astype(str).str.strip().eq("leap")]
+            leap_values = pd.to_numeric(leap_rows.get("value", pd.Series(dtype=float)), errors="coerce").fillna(0.0)
+            if leap_values.empty or not leap_values.ne(0).any():
                 continue
 
         sheet_text = str(sheet)
@@ -6100,6 +6117,12 @@ def _build_page_html(
             section_label = str(entry.get("section_label", "") or "Charts")
             section_labels.setdefault(section_id, section_label)
             grouped_chart_entries[section_id].append(entry)
+        section_notes: dict[str, str] = {}
+        for entry in chart_entries:
+            section_id = str(entry.get("section_id", "") or "sec-charts")
+            note = str(entry.get("section_visible_note", "") or entry.get("section_note", "") or "").strip()
+            if note and note != visible_note:
+                section_notes.setdefault(section_id, note)
         section_blocks: list[str] = []
 
         def _grid_expand_class(item_count: int) -> str:
@@ -6220,8 +6243,12 @@ def _build_page_html(
                 f'<h2 style="margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d;">'
                 f'{section_labels[section_id]}</h2>'
             )
+            section_note_html = (
+                f'<div class="visible-note">{escape(section_notes[section_id])}</div>'
+                if section_notes.get(section_id) else ""
+            )
             section_blocks.append(
-                f'<section id="{section_id}" style="scroll-margin-top:150px;">{heading}{"".join(measure_sections)}</section>'
+                f'<section id="{section_id}" style="scroll-margin-top:150px;">{heading}{section_note_html}{"".join(measure_sections)}</section>'
             )
         chart_html = "".join(section_blocks)
     elif child_links:
@@ -6567,6 +6594,7 @@ def render_balance_dashboards(
     chart_backend: str = "plotly",
     chart_output_mode: str = "page_bundles",
     hide_leap_only_charts: bool = False,
+    hide_charts_without_leap_data: bool = False,
     chart_navigation_guide_path: Path | str | None = None,
 ) -> dict[str, Any]:
     """
@@ -6709,7 +6737,11 @@ def render_balance_dashboards(
     for node in flat_nodes:
         _append_path_with_prefixes(node["path"])
 
-    chart_lookup = _chart_file_lookup(chart_comparison_long, hide_leap_only_charts=hide_leap_only_charts)
+    chart_lookup = _chart_file_lookup(
+        chart_comparison_long,
+        hide_leap_only_charts=hide_leap_only_charts,
+        hide_charts_without_leap_data=hide_charts_without_leap_data,
+    )
     node_entries, _ = _collect_node_chart_entries(
         comparison_long=chart_comparison_long,
         sheet_catalog=sheet_catalog,
@@ -7515,6 +7547,9 @@ def render_balance_dashboards(
                 for idx, part in enumerate(node_path)
             ]
             node = _node_for_display_path(display_path)
+            visible_note = template_visible_notes.get(tuple(display_path), "")
+            if visible_note:
+                node["visible_note"] = visible_note
             aggregate_entries = [entry for entry in entries if _is_aggregate_entry(entry)]
             if aggregate_entries:
                 source_sheets = _component_sheets_for_aggregate_path(node_path)
@@ -7671,6 +7706,7 @@ def render_balance_dashboards(
                 tagged = dict(entry)
                 tagged["section_label"] = section_label
                 tagged["section_id"] = section_id
+                tagged["section_visible_note"] = template_visible_notes.get(_display_path_tuple(section_path), "")
                 entries.append(tagged)
         return entries
 
@@ -8951,6 +8987,7 @@ def load_balance_leap_long_esto_axis(
     known_issues: dict[str, Any] | None = None,
     projection_economy: str = "20_USA",
     explicit_pair_mappings_only: bool = False,
+    allow_descendant_mapping_expansion: bool = True,
 ) -> dict[str, Any]:
     structure = structure_config or {}
     issues_cfg = known_issues or {}
@@ -8974,6 +9011,7 @@ def load_balance_leap_long_esto_axis(
         mapping_pairs_path=mapping_pairs,
         codebook_path=codebook,
         explicit_pair_mappings_only=explicit_pair_mappings_only,
+        allow_descendant_mapping_expansion=allow_descendant_mapping_expansion,
     )
     extracted_tgt = _extract_balance_workbook(
         tgt_path,
@@ -8981,6 +9019,7 @@ def load_balance_leap_long_esto_axis(
         mapping_pairs_path=mapping_pairs,
         codebook_path=codebook,
         explicit_pair_mappings_only=explicit_pair_mappings_only,
+        allow_descendant_mapping_expansion=allow_descendant_mapping_expansion,
     )
 
     combined = pd.concat([extracted_ref["mapped_long"], extracted_tgt["mapped_long"]], ignore_index=True, sort=False)

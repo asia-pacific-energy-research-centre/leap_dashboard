@@ -146,21 +146,35 @@ def _economy_token(economy_code: str) -> str:
     return re.sub(r"^\d+_?", "", economy_code.strip())
 
 
+def _env_flag(name: str, *, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return bool(default)
+    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 #%%
 # ---------------------------------------------------------------------------
 # Configuration — the only section most users need to edit.
 # ---------------------------------------------------------------------------
 
-# Economy codes to process. Each run writes to docs/{token}/ and outputs/{token}/.
-# Examples: "12_NZ", "20_USA"
-ECONOMIES: list[str] = ["12_NZ", "20_USA"]
+# Economy codes to process. Each run writes both dashboard site files and
+# supporting analytical outputs under outputs/{token}/.
+# Examples: "12_NZ", "20_USA""12_NZ",
+ECONOMIES: list[str] = [ "20_USA"]
 
 # Optional per-run date overrides for locating workbook files (None = auto-detect latest).
 REF_BALANCE_EXPORT_DATE_ID: str | None = None
 TGT_BALANCE_EXPORT_DATE_ID: str | None = None
 
 KNOWN_ISSUES_CONFIG_PATH = _resolve("config/leap_results_balance_known_issues.json")
-CHART_NAVIGATION_GUIDE_PATH = _resolve("config/leap_comparison_dashboard_template_v3.json")
+# Optional override to switch dashboard templates without code edits.
+# Useful when maintaining both high-detail and low-detail template variants.
+# Example:
+#   LEAP_DASHBOARD_TEMPLATE_PATH=config/leap_comparison_dashboard_template_v3.json
+CHART_NAVIGATION_GUIDE_PATH = _resolve(
+    os.getenv("LEAP_DASHBOARD_TEMPLATE_PATH", "config/leap_comparison_dashboard_template_v3.json")
+)
 LEAP_ROWS_TO_REMOVE_AND_ADD_SHEET = "leap_rows_to_remove_and_add"
 LEAP_UTILITIES_ROOT = _shared_repo_root()
 SHARED_CONFIG_DIR = LEAP_UTILITIES_ROOT / "config"
@@ -182,7 +196,14 @@ SHARED_PROJECTION_TABLE_PATH = _require_shared_file(
     description="9th projection table",
 )
 
-LEAP_TO_ESTO_MAPPING = (SHARED_LEAP_MAPPINGS_PATH, "leap_combined_esto")
+LEAP_MAPPING_WORKBOOK_OVERRIDE = os.getenv("LEAP_MAPPING_WORKBOOK_PATH", "").strip()
+ACTIVE_LEAP_MAPPINGS_PATH = (
+    _resolve(LEAP_MAPPING_WORKBOOK_OVERRIDE)
+    if LEAP_MAPPING_WORKBOOK_OVERRIDE
+    else SHARED_LEAP_MAPPINGS_PATH
+)
+
+LEAP_TO_ESTO_MAPPING = (ACTIVE_LEAP_MAPPINGS_PATH, "leap_combined_esto")
 NINTH_TO_ESTO_MAPPING = (SHARED_MASTER_CONFIG_PATH, "ninth_pairs_to_esto_pairs")
 CODEBOOK_PATH = SHARED_MASTER_CONFIG_PATH
 SHEET_MAP_PATH = _resolve("config/leap_results_sheet_map.csv")
@@ -194,6 +215,12 @@ SYNTHETIC_REFERENCE_ROWS_PATH = _resolve("config/synthetic_reference_rows.csv")
 BASE_TABLE_PATH = SHARED_BASE_TABLE_PATH
 PROJECTION_TABLE_PATH = SHARED_PROJECTION_TABLE_PATH
 
+# Mapping behavior for LEAP balance extraction. Keep these explicit because
+# low-detail LEAP exports can otherwise let parent rows inherit many child
+# mappings and create overly broad dashboard lineage groups.
+EXPLICIT_PAIR_MAPPINGS_ONLY = True
+ALLOW_DESCENDANT_MAPPING_EXPANSION = False
+
 BASE_YEAR = 2022
 MAX_OUTPUT_YEAR = 2060
 PROJECTION_YEARS: Sequence[int] = tuple(range(BASE_YEAR + 1, MAX_OUTPUT_YEAR + 1))
@@ -202,6 +229,10 @@ SCENARIO_MAP = {"Reference": "reference", "Target": "target"}
 CHART_BACKEND = "plotly"
 CHART_OUTPUT_MODE = "page_bundles"
 HIDE_LEAP_ONLY_CHARTS = False
+# When True, charts with no non-zero LEAP series are omitted from the dashboard.
+# Helpful for reduced-detail exports to avoid placeholder pages/charts driven only
+# by ESTO/9th values when LEAP has no data for that line.
+HIDE_CHARTS_WITHOUT_LEAP_DATA = _env_flag("HIDE_CHARTS_WITHOUT_LEAP_DATA", default=False)
 APPLY_EXPLICIT_REFERENCE_REASSIGNMENTS = False
 ENABLE_WORKFLOW_TIMING = True
 WRITE_WORKFLOW_TIMING_CSV = True
@@ -275,7 +306,8 @@ def _stage_extract(
             known_issues=known_issues,
             projection_economy=projection_economy,
             max_output_year=max_output_year,
-            explicit_pair_mappings_only=True,
+            explicit_pair_mappings_only=EXPLICIT_PAIR_MAPPINGS_ONLY,
+            allow_descendant_mapping_expansion=ALLOW_DESCENDANT_MAPPING_EXPANSION,
         )
         ingestion = conversion["ingestion"]
         resolved_structure = ingestion.get("resolved_structure", structure_config)
@@ -287,6 +319,80 @@ def _stage_extract(
         )
     timer.lap("extract and map LEAP balance workbooks")
     return conversion, ingestion, resolved_structure
+
+
+def _raise_if_visible_leap_scenarios_use_mixed_detail(
+    ingestion: dict,
+    visible_comparison_series: set[tuple[str, str]],
+) -> None:
+    visible_leap_scenarios = {
+        str(scenario).strip().lower()
+        for source, scenario in visible_comparison_series
+        if str(source).strip().lower() == "leap"
+    }
+    if not {"reference", "target"}.issubset(visible_leap_scenarios):
+        return
+
+    extraction_summary = ingestion.get("extraction_summary", {})
+    ref_detail_mode = str(extraction_summary.get("ref", {}).get("detail_mode", "")).strip()
+    tgt_detail_mode = str(extraction_summary.get("tgt", {}).get("detail_mode", "")).strip()
+    if not ref_detail_mode or not tgt_detail_mode or ref_detail_mode == tgt_detail_mode:
+        return
+
+    raise RuntimeError(
+        "REF and TGT LEAP balance workbooks use different detected detail modes "
+        "while both LEAP Reference and LEAP Target are configured as visible series. "
+        f"REF detail_mode={ref_detail_mode!r}; TGT detail_mode={tgt_detail_mode!r}. "
+        "Export both scenarios at the same LEAP detail level, or hide one LEAP scenario "
+        "from VISIBLE_COMPARISON_SERIES."
+    )
+
+
+def _raise_if_visible_leap_scenarios_are_not_detailed(
+    ingestion: dict,
+    visible_comparison_series: set[tuple[str, str]],
+) -> None:
+    visible_leap_scenarios = {
+        str(scenario).strip().lower()
+        for source, scenario in visible_comparison_series
+        if str(source).strip().lower() == "leap"
+    }
+    if not visible_leap_scenarios:
+        return
+
+    scenario_to_summary_key = {
+        "reference": "ref",
+        "target": "tgt",
+    }
+    extraction_summary = ingestion.get("extraction_summary", {})
+    low_detail: list[str] = []
+    for scenario in sorted(visible_leap_scenarios):
+        summary_key = scenario_to_summary_key.get(scenario)
+        if not summary_key:
+            continue
+        scenario_summary = extraction_summary.get(summary_key, {})
+        detail_mode = str(scenario_summary.get("detail_mode", "")).strip()
+        if detail_mode != "detailed":
+            selected_sheet_count = scenario_summary.get("selected_sheet_count", "")
+            detail_path_row_ratio = scenario_summary.get("detail_path_row_ratio", "")
+            low_detail.append(
+                f"{scenario.title()} detail_mode={detail_mode!r}, "
+                f"selected_sheet_count={selected_sheet_count}, "
+                f"detail_path_row_ratio={detail_path_row_ratio}"
+            )
+
+    if not low_detail:
+        return
+
+    details = "; ".join(low_detail)
+    raise RuntimeError(
+        "LEAP balance dashboard requires level-4/high-detail LEAP balance exports "
+        "for all visible LEAP scenarios. Reduced-detail exports do not contain the "
+        "sector paths expected by leap_mappings.xlsx and can produce misleading "
+        f"parent/child mappings. Offending scenario(s): {details}. Re-export the "
+        "LEAP balance workbook at level 4, or remove the affected LEAP scenario "
+        "from VISIBLE_COMPARISON_SERIES."
+    )
 
 
 def _stage_compare(
@@ -455,6 +561,7 @@ def _stage_render_dashboards(
     chart_backend: str,
     chart_output_mode: str,
     hide_leap_only_charts: bool,
+    hide_charts_without_leap_data: bool,
     chart_navigation_guide_path: Path,
     mapping_workbook_path: Path,
     base_year: int,
@@ -494,6 +601,7 @@ def _stage_render_dashboards(
         chart_backend=chart_backend,
         chart_output_mode=chart_output_mode,
         hide_leap_only_charts=hide_leap_only_charts,
+        hide_charts_without_leap_data=hide_charts_without_leap_data,
         chart_navigation_guide_path=chart_navigation_guide_path,
     )
     _write_dashboard_about_supplements(
@@ -643,22 +751,31 @@ def run_workflow(economy_code: str) -> dict[str, object]:
     economy_token = _economy_token(economy_code)
     base_economy = economy_code.replace("_", "")
     projection_economy = economy_code
-    publish_dir = _resolve(f"docs/{economy_token}")
     output_dir = _resolve(f"outputs/{economy_token}")
+    publish_dir = output_dir
     balance_to_esto_long_output_dir = BALANCE_TABLES_ROOT / "leap_balance_to_esto_long" / economy_token
 
-    try:
-        ref_workbook_path: Path | None = resolve_balance_export_workbook(
-            economy=economy_code, scenario="REF", date_id=REF_BALANCE_EXPORT_DATE_ID,
-        )
-    except (FileNotFoundError, ValueError):
-        ref_workbook_path = None
-    try:
-        tgt_workbook_path: Path | None = resolve_balance_export_workbook(
-            economy=economy_code, scenario="TGT", date_id=TGT_BALANCE_EXPORT_DATE_ID,
-        )
-    except (FileNotFoundError, ValueError):
-        tgt_workbook_path = None
+    ref_workbook_override = os.getenv("LEAP_REF_WORKBOOK_PATH", "").strip()
+    tgt_workbook_override = os.getenv("LEAP_TGT_WORKBOOK_PATH", "").strip()
+
+    if ref_workbook_override:
+        ref_workbook_path = _resolve(ref_workbook_override)
+    else:
+        try:
+            ref_workbook_path = resolve_balance_export_workbook(
+                economy=economy_code, scenario="REF", date_id=REF_BALANCE_EXPORT_DATE_ID,
+            )
+        except (FileNotFoundError, ValueError):
+            ref_workbook_path = None
+    if tgt_workbook_override:
+        tgt_workbook_path = _resolve(tgt_workbook_override)
+    else:
+        try:
+            tgt_workbook_path = resolve_balance_export_workbook(
+                economy=economy_code, scenario="TGT", date_id=TGT_BALANCE_EXPORT_DATE_ID,
+            )
+        except (FileNotFoundError, ValueError):
+            tgt_workbook_path = None
 
     timer = WorkflowTimer("leap_results_dashboard_balance_estoaxis", enabled=ENABLE_WORKFLOW_TIMING)
     archive_config_dir_once_per_day()
@@ -681,6 +798,14 @@ def run_workflow(economy_code: str) -> dict[str, object]:
         mapping_workbook_path=_mapping_workbook(LEAP_TO_ESTO_MAPPING),
         balance_to_esto_long_output_dir=balance_to_esto_long_output_dir,
         timer=timer,
+    )
+    _raise_if_visible_leap_scenarios_use_mixed_detail(
+        ingestion,
+        VISIBLE_COMPARISON_SERIES,
+    )
+    _raise_if_visible_leap_scenarios_are_not_detailed(
+        ingestion,
+        VISIBLE_COMPARISON_SERIES,
     )
 
     comparison_long, comparison_wide, leap_long, mapping_status, comparison = _stage_compare(
@@ -744,6 +869,7 @@ def run_workflow(economy_code: str) -> dict[str, object]:
         chart_backend=CHART_BACKEND,
         chart_output_mode=CHART_OUTPUT_MODE,
         hide_leap_only_charts=HIDE_LEAP_ONLY_CHARTS,
+        hide_charts_without_leap_data=HIDE_CHARTS_WITHOUT_LEAP_DATA,
         chart_navigation_guide_path=CHART_NAVIGATION_GUIDE_PATH,
         mapping_workbook_path=_mapping_workbook(LEAP_TO_ESTO_MAPPING),
         base_year=BASE_YEAR,
@@ -853,7 +979,7 @@ def run_workflow(economy_code: str) -> dict[str, object]:
             "workflow_stage_timings_csv": "Runtime duration by broad workflow stage.",
         },
         notes=[
-            "Public dashboard HTML, JS, and JSON assets are written under docs/<economy>/.",
+            "Public dashboard HTML, JS, and JSON assets are written under outputs/<economy>/.",
             "CSV, XLSX, and audit outputs are written under outputs/<economy>/.",
             "Supporting diagnostics and mapping evidence are grouped under outputs/<economy>/supporting_files/.",
         ],

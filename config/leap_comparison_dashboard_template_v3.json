@@ -17,6 +17,20 @@
       "Electricity",
       "Heat",
       "Hydrogen-based fuels"
+    ],
+    "td_loss_electricity_products": [
+      "Electricity"
+    ],
+    "td_loss_other_products": [
+      "Blast furnace gas",
+      "Coke oven coke",
+      "Coke oven gas",
+      "Crude oil",
+      "Heat",
+      "LNG",
+      "LPG",
+      "Natural gas",
+      "Other recovered gases"
     ]
   },
   "specified_fuel_mappings": {
@@ -47,6 +61,18 @@
       "02.06 Patent fuel",
       "02.07 Coal tar",
       "02.08 BKB/PB"
+    ],
+    "Blast furnace gas": [
+      "02.04 Blast furnace gas"
+    ],
+    "Coke oven coke": [
+      "02.01 Coke oven coke"
+    ],
+    "Coke oven gas": [
+      "02.03 Coke oven gas"
+    ],
+    "Other recovered gases": [
+      "02.05 Other recovered gases"
     ],
     "Metallurgical coal": [
       "01.01 Coking coal"
@@ -153,6 +179,9 @@
     ],
     "LNG": [
       "08.02 LNG"
+    ],
+    "LPG": [
+      "07.09 LPG"
     ],
     "Nuclear": [
       "09 Nuclear"
@@ -918,7 +947,9 @@
         "09.02.03 Heat plants",
         "09.02.01 Electricity plants",
         "09.02.02 CHP plants",
-        "09.01.02 CHP plants"
+        "09.01.02 CHP plants",
+        "10.01.01 Electricity, CHP and heat plants",
+        "10.01.13 Pump storage plants"        
       ],
       "measures": [
         "Inputs (PJ)",
@@ -1040,10 +1071,11 @@
       }
     },
     "Transmission and distribution losses": {
+      "visible_note": "Transmission and distribution losses for electricity are included here since they are closely related to the power sector, but because of mapping difficulties they are not in the first aggregate graph for power, above.",
       "aggregate_graphs": {
         "products": {
-          "how": "all",
-          "specified_products": "typical_products"
+          "how": "specified",
+          "specified_products": "td_loss_electricity_products"
         },
         "chart_type": "stacked_area",
         "comparison_lines": [
@@ -1062,7 +1094,9 @@
         "esto_flows": [
           "10.02 Transmission and distribution losses"
         ],
-        "products": "All"
+        "products": [
+          "17 Electricity"
+        ]
       }
     }
   },
@@ -1091,6 +1125,7 @@
       }
     },
     "Refinery own use": {
+      "visible_note": "Refinery own use is not included in the graphs for refining above.",
       "aggregate_graphs": {
         "products": "All",
         "chart_type": "stacked_area",
@@ -1128,26 +1163,61 @@
       ],
       "esto_flows": [
         "08 Transfers",
-        "09.06.01 Gas works plants",
-        "09.06.02 Liquefaction/regasification plants",
-        "09.06.03 Natural gas blending plants",
-        "09.06.04 Gas-to-liquids plants",
-        "09.08.01 Coke ovens",
-        "09.08.02 Blast furnaces",
-        "09.08.03 Patent fuel plants",
-        "09.08.04 BKB/PB plants",
-        "09.08.05 Liquefaction (coal to oil)",
+        "09.06 Gas processing plants",
+        "09.08 Coal transformation",
         "09.12 Non-specified transformation",
         "09.11 Charcoal processing",
         "09.09 Petrochemical industry",
         "09.05 Chemical heat for electricity production",
         "09.13.01 Electrolysers",
-        "09.13.03 SMR w CCS"
+        "09.13.03 SMR w CCS",
+        "10.01.02 Gas works plants",
+        "10.01.03 Liquefaction/regasification plants",
+        "10.01.05 Coke ovens",
+        "10.01.07 Blast furnaces",
+        "10.01.17 Non-specified own uses"
       ],
       "measures": [
         "Inputs (PJ)",
         "Outputs (PJ)"
       ]
+    },
+    "Transmission and distribution losses": {
+       "visible_note": "Transmission and distribution losses for all fuels except electricity are covered here. Because of mapping difficulties, they are not in the aggregate graph above.",
+      "aggregate_graphs": {
+        "products": {
+          "how": "specified",
+          "specified_products": "td_loss_other_products"
+        },
+        "chart_type": "stacked_area",
+        "comparison_lines": [
+          "9th",
+          "esto"
+        ],
+        "esto_flows": [
+          "10.02 Transmission and distribution losses"
+        ],
+        "measures": [
+          "Inputs (PJ)",
+          "Outputs (PJ)"
+        ]
+      },
+      "by_fuel_graphs": {
+        "esto_flows": [
+          "10.02 Transmission and distribution losses"
+        ],
+        "products": [
+          "02.04 Blast furnace gas",
+          "02.01 Coke oven coke",
+          "02.03 Coke oven gas",
+          "06.01 Crude oil",
+          "18 Heat",
+          "08.02 LNG",
+          "07.09 LPG",
+          "08.01 Natural gas",
+          "02.05 Other recovered gases"
+        ]
+      }
     },
     "Coal transformation": {
       "aggregate_graphs": {
@@ -1161,7 +1231,9 @@
           "esto"
         ],
         "esto_flows": [
-          "09.08 Coal transformation"
+          "09.08 Coal transformation",
+          "10.01.05 Coke ovens",
+          "10.01.07 Blast furnaces"
         ],
         "Note": [
           "Coal transformation cannot be split into its subsectors in the 9th data since even though those sectors exist they were not projected, instead 09_08_coal_transformation (the parent) was used.",
@@ -1172,16 +1244,6 @@
           "Inputs (PJ)",
           "Outputs (PJ)"
         ]
-      },
-      "Coal transformation own use": {
-        "by_fuel_graphs": {
-          "esto_flows": [
-            "10.01.05 Coke ovens",
-            "10.01.07 Blast furnaces"
-          ],
-          "products": "All",
-          "use_esto_to_ninth_mapping": true
-        }
       }
     },
     "Gas processing plants": {
@@ -1196,10 +1258,9 @@
           "esto"
         ],
         "esto_flows": [
-          "09.06.01 Gas works plants",
-          "09.06.02 Liquefaction/regasification plants",
-          "09.06.03 Natural gas blending plants",
-          "09.06.04 Gas-to-liquids plants"
+          "09.06 Gas processing plants",
+          "10.01.02 Gas works plants",
+          "10.01.03 Liquefaction/regasification plants"
         ],
         "Note": [
           "Gas processing doesnt exist for 09.06.03 Natural gas blending plants and 09.06.04 Gas-to-liquids plants subsectors in the 9th data. Even though those sectors exist in the 9th dataset they were not projected. Perhaps their total comes under another category but it is not specified. Nothing can really be done about it so we just have through the visualisations that those subsectors are missing from the 9th data and cannot be compared to ESTO or LEAP for now."
@@ -1212,7 +1273,8 @@
       "Gas works plants": {
         "by_fuel_graphs": {
           "esto_flows": [
-            "09.06.01 Gas works plants"
+            "09.06.01 Gas works plants",
+            "10.01.02 Gas works plants"
           ],
           "products": "All"
         }
@@ -1220,7 +1282,8 @@
       "Liquefaction/regasification plants": {
         "by_fuel_graphs": {
           "esto_flows": [
-            "09.06.02 Liquefaction/regasification plants"
+            "09.06.02 Liquefaction/regasification plants",
+            "10.01.03 Liquefaction/regasification plants"
           ],
           "products": "All"
         }
@@ -1239,16 +1302,6 @@
             "09.06.04 Gas-to-liquids plants"
           ],
           "products": "All"
-        }
-      },
-      "Gas processing own use": {
-        "by_fuel_graphs": {
-          "esto_flows": [
-            "10.01.02 Gas works plants",
-            "10.01.03 Liquefaction/regasification plants"
-          ],
-          "products": "All",
-          "use_esto_to_ninth_mapping": true
         }
       }
     },
@@ -1273,6 +1326,7 @@
         ]
       },
       "Hydrogen transformation losses and own use": {
+        "visible_note": "This hasnt been mapped to anything in LEAP yet because we havent worked out how we will model it.",
         "aggregate_graphs": {
           "fuels": "Total",
           "esto_flows": [
@@ -1424,7 +1478,8 @@
           "esto"
         ],
         "esto_flows": [
-          "09.12 Non-specified transformation"
+          "09.12 Non-specified transformation",
+          "10.01.17 Non-specified own uses"
         ],
         "measures": [
           "Inputs (PJ)",
@@ -1433,21 +1488,14 @@
       },
       "by_fuel_graphs": {
         "esto_flows": [
-          "09.12 Non-specified transformation"
+          "09.12 Non-specified transformation",
+          "10.01.17 Non-specified own uses"
         ],
         "products": "All"
       }
     },
-    "Non-specified own uses": {
-      "by_fuel_graphs": {
-        "esto_flows": [
-          "10.01.17 Non-specified own uses"
-        ],
-        "products": "All",
-        "use_esto_to_ninth_mapping": true
-      }
-    },
     "Transfers": {
+      "visible_note": "This is not specifically a transformation sector, but this is the best place to put them, for lack of a better category.",
       "aggregate_graphs": {
         "products": {
           "how": "all",
@@ -1482,6 +1530,7 @@
       }
     },
     "Coal, oil and gas extraction own use": {
+      "visible_note": "This is own use associated with supply, not transformation, but this is the best place to put them, for lack of a better category.",
       "aggregate_graphs": {
         "products": {
           "how": "all",

@@ -10,14 +10,22 @@ build/
 
 # Data inputs — too large / sensitive for version control
 data/
+
+# Analytical outputs — dashboard is published from docs/ (GitHub Pages)
 outputs/
 
 # Auto-generated config archive (created at runtime by archive_config_dir_once_per_day)
 config/.archive/
 
-# Jupyter
+# Old/archived config files
+config/archive/
+**/archive
+
+# Jupyter / Spyder
 .ipynb_checkpoints/
 *.ipynb
+temp/
+codebase/scrapbook/
 
 # IDE
 .vscode/
@@ -30,36 +38,19 @@ Thumbs.db
 # pytest
 .pytest_cache/
 
-
-#manually added gitignore files:
-# input_data/*
-# intermediate_data/*
-# output/*
-# config/computer_generated/*
-**/archive
-**/exploration
-#######################################
-# original_preparation_code/*
+# Binary / generated formats (not part of the dashboard site)
 *.png
 *.7z
 *.zip
 *.xlsx
 *.csv
-!config/analysis_input_field_mappings.xlsx
-!config/leap_transport_branch_to_ninth_sector_map.csv
-!config/leap_transport_fuel_aliases.csv
-*.html
-*.json
-!config/*.json
 *.pkl
 *.dll
 *.code-workspace
 !.gitkeep
-!docs/images/*.png
-env_leap/*
-#######################################
-# docs output is committed (GitHub Pages)
-# docs/ is intentionally NOT ignored
+
+# Committed dashboard site assets (docs/ = GitHub Pages source)
+# HTML, JS, JSON in docs/ are committed; heavy data files inside docs/ are not.
 docs/*/supporting_files/
 docs/**/*.csv
 docs/**/*.xls
@@ -69,3 +60,9 @@ docs/*/output_manifest.json
 !docs/**/*.json
 !docs/**/*.html
 !docs/**/*.js
+!docs/images/*.png
+
+# Config files committed to this repo
+!config/*.json
+!config/*.csv
+!config/*.xlsx

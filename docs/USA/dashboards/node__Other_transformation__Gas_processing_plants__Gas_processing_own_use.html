@@ -321,7 +321,7 @@ a:hover { text-decoration: underline; }
       
       
       
-      <section><section id="sec-Other_transformation__Gas_processing_plants__Gas_processing_own_use" style="scroll-margin-top:150px;"><h2 style="margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d;">Gas processing own use</h2><section class="measure-group" style="margin:6px 0 14px 0;"><h3 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:#5b6470;">Inputs (PJ)</h3><div class="dashboard-grid expand-2"><figure class="chart-card"><figcaption class="chart-caption">Electricity</figcaption><div class="meta-subline">Other transformation > Gas processing plants > Gas processing own use</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="template__Other_transformation__Gas_processing_plants__Gas_processing_own_use__Inputs__PJ__Electricity" class="lazy-chart-plot is-unloaded" role="img" aria-label="Electricity"></div></figure><figure class="chart-card"><figcaption class="chart-caption">Natural gas</figcaption><div class="meta-subline">Other transformation > Gas processing plants > Gas processing own use</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="template__Other_transformation__Gas_processing_plants__Gas_processing_own_use__Inputs__PJ__Natural_gas" class="lazy-chart-plot is-unloaded" role="img" aria-label="Natural gas"></div></figure></div></section></section></section>
+      <section><section class="section-note">No mapped balance-table data is available for this page in the current run. The page is kept to preserve the configured dashboard structure.</section></section>
     </main>
   </div>
   <script>
@@ -346,91 +346,90 @@ a:hover { text-decoration: underline; }
   });
 })();
 </script>
-  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-  <script src="../chart_bundles/node__Other_transformation__Gas_processing_plants__Gas_processing_own_use__charts.js"></script>
   <script>
 (function() {
-  const plots = Array.from(document.querySelectorAll('.lazy-chart-plot[data-chart-key]'));
-  const bundleUrl = window.BALANCE_CHART_BUNDLE_URL;
-  const inlineBundle = window.BALANCE_CHART_BUNDLE_DATA;
-  if (!plots.length || !window.Plotly) return;
+  const frames = Array.from(document.querySelectorAll('iframe.lazy-chart-frame[data-src]'));
+  if (!frames.length) return;
 
-  let bundlePromise = null;
-  const loadBundle = () => {
-    if (inlineBundle) {
-      return Promise.resolve(inlineBundle);
-    }
-    if (!bundlePromise) {
-      bundlePromise = fetch(bundleUrl).then((response) => {
-        if (!response.ok) {
-          throw new Error(`Chart bundle request failed: ${response.status}`);
-        }
-        return response.json();
-      });
-    }
-    return bundlePromise;
-  };
+  const LOAD_WINDOW = 50;
+  const UNLOAD_DISTANCE = 100;
+  let ticking = false;
 
-  const setState = (plot, text, loaded) => {
-    const state = plot.previousElementSibling;
-    if (state && state.classList.contains('chart-load-state')) {
-      state.dataset.loaded = loaded ? 'true' : 'false';
-      state.textContent = text || '';
-    }
-  };
-
-  const renderPlot = async (plot) => {
-    if (plot.dataset.rendered === 'true' || plot.dataset.rendering === 'true') return;
-    plot.dataset.rendering = 'true';
-    setState(plot, 'Loading chart', false);
-    try {
-      const bundle = await loadBundle();
-      const chart = bundle.charts && bundle.charts[plot.dataset.chartKey];
-      if (!chart) {
-        throw new Error(`Missing chart spec: ${plot.dataset.chartKey}`);
+  const setLoaded = (frame, loaded) => {
+    const state = frame.previousElementSibling;
+    if (loaded) {
+      if (!frame.getAttribute('src')) {
+        frame.setAttribute('src', frame.dataset.src);
       }
-      await window.Plotly.newPlot(
-        plot,
-        chart.data || [],
-        chart.layout || {},
-        Object.assign({responsive: true}, chart.config || {}),
-      );
-      plot.dataset.rendered = 'true';
-      plot.classList.remove('is-unloaded');
-      setState(plot, '', true);
-      window.Plotly.Plots.resize(plot);
-    } catch (err) {
-      plot.classList.add('is-unloaded');
-      setState(plot, `Chart failed to load: ${err.message || err}`, false);
-    } finally {
-      plot.dataset.rendering = 'false';
+      frame.classList.remove('is-unloaded');
+      if (state && state.classList.contains('chart-load-state')) {
+        state.dataset.loaded = 'true';
+        state.textContent = '';
+      }
+      return;
+    }
+    if (frame.getAttribute('src')) {
+      frame.removeAttribute('src');
+    }
+    frame.classList.add('is-unloaded');
+    if (state && state.classList.contains('chart-load-state')) {
+      state.dataset.loaded = 'false';
+      state.textContent = 'Chart unloaded until nearby';
     }
   };
 
-  if ('IntersectionObserver' in window) {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            renderPlot(entry.target);
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      {rootMargin: '900px 0px'},
-    );
-    plots.forEach((plot) => observer.observe(plot));
-  } else {
-    plots.forEach((plot) => renderPlot(plot));
-  }
-
-  window.addEventListener('resize', () => {
-    plots.forEach((plot) => {
-      if (plot.dataset.rendered === 'true') {
-        window.Plotly.Plots.resize(plot);
+  const nearestFrameIndex = () => {
+    const viewportMid = window.scrollY + window.innerHeight / 2;
+    let bestIndex = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    frames.forEach((frame, index) => {
+      const rect = frame.getBoundingClientRect();
+      const frameMid = window.scrollY + rect.top + rect.height / 2;
+      const distance = Math.abs(frameMid - viewportMid);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = index;
       }
     });
+    return bestIndex;
+  };
+
+  const updateFrames = () => {
+    ticking = false;
+    const current = nearestFrameIndex();
+    const half = Math.floor(LOAD_WINDOW / 2);
+    let start = Math.max(0, current - half);
+    let end = Math.min(frames.length - 1, start + LOAD_WINDOW - 1);
+    start = Math.max(0, end - LOAD_WINDOW + 1);
+
+    frames.forEach((frame, index) => {
+      if (index >= start && index <= end) {
+        setLoaded(frame, true);
+      } else if (Math.abs(index - current) > UNLOAD_DISTANCE) {
+        setLoaded(frame, false);
+      }
+    });
+  };
+
+  const scheduleUpdate = () => {
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(updateFrames);
+  };
+
+  frames.forEach((frame) => {
+    frame.classList.add('is-unloaded');
+    const state = frame.previousElementSibling;
+    if (state && state.classList.contains('chart-load-state')) {
+      state.dataset.loaded = 'false';
+      state.textContent = 'Chart queued';
+    }
   });
+
+  window.addEventListener('scroll', scheduleUpdate, { passive: true });
+  window.addEventListener('resize', scheduleUpdate);
+  window.addEventListener('hashchange', () => window.setTimeout(scheduleUpdate, 80));
+  window.setTimeout(updateFrames, 0);
 })();
 </script>
 </body>
