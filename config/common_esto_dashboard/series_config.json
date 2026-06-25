@@ -3,7 +3,27 @@
   "dashboard_switcher": {
     "enabled": true,
     "dashboards": [
-      {"dashboard_key": "20USA", "label": "United States"}
+      {"dashboard_key": "01AUS", "label": "Australia"},
+      {"dashboard_key": "02BD", "label": "Brunei Darussalam"},
+      {"dashboard_key": "03CDA", "label": "Canada"},
+      {"dashboard_key": "04CHL", "label": "Chile"},
+      {"dashboard_key": "05PRC", "label": "China"},
+      {"dashboard_key": "06HKC", "label": "Hong Kong, China"},
+      {"dashboard_key": "07INA", "label": "Indonesia"},
+      {"dashboard_key": "08JPN", "label": "Japan"},
+      {"dashboard_key": "09ROK", "label": "Korea"},
+      {"dashboard_key": "10MAS", "label": "Malaysia"},
+      {"dashboard_key": "11MEX", "label": "Mexico"},
+      {"dashboard_key": "12NZ", "label": "New Zealand"},
+      {"dashboard_key": "13PNG", "label": "Papua New Guinea"},
+      {"dashboard_key": "14PE", "label": "Peru"},
+      {"dashboard_key": "15PHL", "label": "Philippines"},
+      {"dashboard_key": "16RUS", "label": "Russia"},
+      {"dashboard_key": "17SGP", "label": "Singapore"},
+      {"dashboard_key": "18CT", "label": "Chinese Taipei"},
+      {"dashboard_key": "19THA", "label": "Thailand"},
+      {"dashboard_key": "20USA", "label": "United States"},
+      {"dashboard_key": "21VN", "label": "Viet Nam"}
     ]
   },
   "visible_series": [

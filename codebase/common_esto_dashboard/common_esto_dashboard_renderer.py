@@ -1034,6 +1034,18 @@ def _normalise_dashboard_switcher(series_config: dict, current_dashboard: str) -
     return unique_dashboards
 
 
+def _current_dashboard_label(
+    series_config: dict,
+    dashboard_switcher: list[dict[str, str]],
+    current_dashboard: str,
+) -> str:
+    """Return the display label for the dashboard currently being rendered."""
+    for item in dashboard_switcher:
+        if item["dashboard_key"] == current_dashboard:
+            return item["label"]
+    return str(series_config.get("economy_label") or current_dashboard)
+
+
 def _dashboard_switcher_html(dashboards: list[dict[str, str]], current_dashboard: str, current_file: str) -> str:
     """Build a static cross-dashboard switcher for matching page filenames."""
     if len(dashboards) <= 1:
@@ -1854,9 +1866,9 @@ def render_dashboard(
 ) -> pd.DataFrame:
     """Render page bundles, dashboard pages, and a chart manifest."""
     series_labels = series_config.get("series_labels", {})
-    economy_label = series_config.get("economy_label", "")
     current_dashboard = layout["root"].name
     dashboard_switcher = _normalise_dashboard_switcher(series_config, current_dashboard)
+    economy_label = _current_dashboard_label(series_config, dashboard_switcher, current_dashboard)
     page_rules = template.get("sector_pages")
     if not page_rules:
         raise ValueError("Template is missing required 'sector_pages' rules.")

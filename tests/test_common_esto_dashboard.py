@@ -108,6 +108,21 @@ def test_common_esto_dashboard_can_render_opt_in_scope_pages(tmp_path: Path) -> 
     assert "transport_leap_vs_ninth" in page_keys
 
 
+def test_common_esto_dashboard_switcher_uses_current_dashboard_label(tmp_path: Path) -> None:
+    template = _load_template()
+    series_config = _load_series_config()
+    df = apply_sign_semantics(_build_common_esto_rows(), template["sign_semantics"])
+    main_df = df[df["comparison_scope"] == "leap_vs_esto_vs_ninth"].copy()
+
+    layout = build_output_layout(tmp_path / "outputs", "01AUS", clear_existing=True)
+    render_dashboard(main_df, template, series_config, layout, scope_df=df)
+
+    html = (layout["dashboards"] / "transport.html").read_text(encoding="utf-8")
+    assert "<strong>Australia</strong>" in html
+    assert '<option value="transport.html" selected>Australia</option>' in html
+    assert '../../20USA/dashboards/transport.html' in html
+
+
 def test_weekly_common_esto_sample_fixture_is_present() -> None:
     fixture_dir = REPO_ROOT / "tests" / "fixtures" / "common_esto_dashboard"
     assert (fixture_dir / "common_esto_comparison_data_sample.csv").exists()
