@@ -126,6 +126,19 @@ Page status and diagnostic-page review notes are tracked in:
 docs/common_esto_dashboard_page_status.md
 ```
 
+Sankey routing remains disabled. The draft routing table and QA checker are:
+
+```text
+config/common_esto_dashboard/sankey_routing_table_draft.csv
+scripts/check_common_esto_sankey_routing.py
+```
+
+Run the QA checker before enabling any route:
+
+```powershell
+C:\Users\Work\miniconda3\python.exe scripts\check_common_esto_sankey_routing.py
+```
+
 ## Publish
 
 Generated outputs stay under `outputs/` by default and are ignored by git. To

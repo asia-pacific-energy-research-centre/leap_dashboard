@@ -242,8 +242,11 @@
     "enabled": false,
     "status": "design_scaffold_only",
     "_note": "Sankey generation is intentionally disabled until balance-routing rules define how signed common ESTO flows connect without double-counting.",
+    "routing_table_path": "config/common_esto_dashboard/sankey_routing_table_draft.csv",
     "required_routing_fields": [
       "route_id",
+      "enabled",
+      "diagram_key",
       "comparison_scope",
       "source_node",
       "target_node",

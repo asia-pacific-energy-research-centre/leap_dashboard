@@ -1,0 +1,5 @@
+route_id,enabled,diagram_key,comparison_scope,source_node,target_node,flow_code_prefixes,product_code_prefixes,value_sign,include_in_total,priority,note
+supply_production_to_supply,false,supply_domestic_availability,leap_vs_esto_vs_ninth,Production,Domestic availability,01,,positive,true,10,Draft example only; keep disabled until reviewed.
+supply_imports_to_supply,false,supply_domestic_availability,leap_vs_esto_vs_ninth,Imports,Domestic availability,02,,positive,true,20,Draft example only; keep disabled until reviewed.
+supply_exports_from_supply,false,supply_domestic_availability,leap_vs_esto_vs_ninth,Domestic availability,Exports,03,,negative,true,30,Draft example only; keep disabled until reviewed.
+supply_stock_changes_to_supply,false,supply_domestic_availability,leap_vs_esto_vs_ninth,Stock changes,Domestic availability,06,,both,true,40,Draft example only; keep disabled until reviewed.

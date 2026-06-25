@@ -13,20 +13,21 @@ demand can be double-counted or connected in misleading ways.
 Last reviewed: 2026-06-25.
 
 Sankey implementation is not ready to start. The repository has the disabled
-`sankey_diagrams` config scaffold, but no routing table, no route QA output, and
-no double-counting reconciliation checks. Keep `sankey_diagrams.enabled = false`
-until those inputs exist.
+`sankey_diagrams` config scaffold, a disabled draft routing table, and a QA
+checker, but no reviewed active routes and no double-counting reconciliation
+checks. Keep `sankey_diagrams.enabled = false` until those inputs exist.
 
 Current blockers:
 
-- No `routing_table_path` is configured.
-- No file defines `route_id`, `source_node`, `target_node`, and signed flow rules.
-- No QA output identifies included, excluded, or multiply-routed rows.
+- `routing_table_path` points to a draft table only:
+  `config/common_esto_dashboard/sankey_routing_table_draft.csv`.
+- The draft routes are disabled and must be reviewed before any route is active.
 - No reconciliation check proves Sankey totals match the source comparison data.
 - No page-specific diagram definitions exist for the candidate pages.
 
-The next safe step is to create a reviewed routing-table draft and QA checker,
-not to add Plotly Sankey rendering.
+The next safe step is to review candidate routes, add reconciliation checks, and
+use the QA checker before enabling any route. Do not add Plotly Sankey rendering
+until the route QA has no unexpected zero-route or multiple-route rows.
 
 ## Design Rule
 
@@ -39,6 +40,8 @@ relationship IDs, graph IDs, or the old ESTO-axis dashboard mapping pipeline.
 Each routing row should contain:
 
 - `route_id`: stable identifier for the routing rule.
+- `enabled`: boolean; draft rows must stay disabled until reviewed.
+- `diagram_key`: stable diagram identifier.
 - `comparison_scope`: scope the route applies to.
 - `source_node`: Sankey source node label or node key.
 - `target_node`: Sankey target node label or node key.
@@ -70,6 +73,7 @@ A Sankey page should not be enabled until:
 
 ## Config Hook
 
-The dashboard template contains a disabled `sankey_diagrams` section. Future work
-should extend that section with a `routing_table_path`, page-specific diagram
-definitions, and a `tolerance_pj` setting before enabling generation.
+The dashboard template contains a disabled `sankey_diagrams` section with a
+draft `routing_table_path`. Future work should extend that section with
+page-specific diagram definitions and a `tolerance_pj` setting before enabling
+generation.
