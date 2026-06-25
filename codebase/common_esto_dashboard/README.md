@@ -80,6 +80,19 @@ $env:COMMON_ESTO_RENDER_DASHBOARDS = "0"
 C:\Users\Work\miniconda3\python.exe scripts\render_common_esto_dashboard_all_economies.py
 ```
 
+To flag dense or noisy pages after rendering:
+
+```powershell
+C:\Users\Work\miniconda3\python.exe scripts\analyze_common_esto_dashboard_page_noise.py
+```
+
+This writes:
+
+```text
+outputs/common_esto_dashboard/page_noise_summary.csv
+outputs/common_esto_dashboard/page_noise_flags.csv
+```
+
 For production or ad hoc runs, override the input paths with environment
 variables:
 
