@@ -80,6 +80,12 @@ reviewed for production usefulness; enable `scope_specific_pages.enabled` only
 for focused review runs. `series_config.json` controls visible source/scenario
 series, labels, economy display text, and the static dashboard switcher.
 
+Page status and diagnostic-page review notes are tracked in:
+
+```text
+docs/common_esto_dashboard_page_status.md
+```
+
 ## Publish
 
 Generated outputs stay under `outputs/` by default and are ignored by git. To
