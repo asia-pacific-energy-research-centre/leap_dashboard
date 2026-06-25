@@ -8,6 +8,26 @@ a Sankey needs an additional routing layer that defines source and target nodes.
 Without that layer, transformation inputs, outputs, losses, transfers, and final
 demand can be double-counted or connected in misleading ways.
 
+## Readiness Review
+
+Last reviewed: 2026-06-25.
+
+Sankey implementation is not ready to start. The repository has the disabled
+`sankey_diagrams` config scaffold, but no routing table, no route QA output, and
+no double-counting reconciliation checks. Keep `sankey_diagrams.enabled = false`
+until those inputs exist.
+
+Current blockers:
+
+- No `routing_table_path` is configured.
+- No file defines `route_id`, `source_node`, `target_node`, and signed flow rules.
+- No QA output identifies included, excluded, or multiply-routed rows.
+- No reconciliation check proves Sankey totals match the source comparison data.
+- No page-specific diagram definitions exist for the candidate pages.
+
+The next safe step is to create a reviewed routing-table draft and QA checker,
+not to add Plotly Sankey rendering.
+
 ## Design Rule
 
 The Sankey builder should consume the common ESTO comparison data plus a separate
