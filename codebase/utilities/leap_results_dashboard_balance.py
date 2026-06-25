@@ -81,6 +81,10 @@ DEFAULT_EMPTY_PAGE_NOTICE = (
 TRANSFORMATION_INPUT_MEASURE = "Inputs (PJ)"
 TRANSFORMATION_OUTPUT_MEASURE = "Outputs (PJ)"
 TRANSFORMATION_DASHBOARD_TOP_GROUPS = {"Power", "Refining", "Other transformation"}
+ALLOWED_SPLIT_ESTO_DASHBOARD_EXPOSURE_FLOW_CODES = {
+    "12",  # Total final consumption
+    "13",  # Total final energy consumption
+}
 
 
 def _product_is_total(value: object) -> bool:
@@ -100,7 +104,6 @@ BALANCE_ESTO_MAPPING_COLUMNS = [
     "subtotal_mismatch_is_ok",
     "subtotal_alignment",
     "esto_pair_abs_sum",
-    "many_to_many_is_ok",
     "remove_row",
     "remove_row_reason",
 ]
@@ -118,7 +121,6 @@ BALANCE_NINTH_MAPPING_COLUMNS = [
     "subtotal_mismatch_is_ok",
     "subtotal_alignment",
     "ninth_pair_abs_sum",
-    "many_to_many_is_ok",
     "remove_row",
     "remove_row_reason",
 ]
@@ -181,6 +183,7 @@ ESTO_DASHBOARD_GROUP_ORDER = {
     "Losses & own use": 8,
     "Supply": 9,
     "Demand": 10,
+    "Total demand": 10,
 }
 
 BALANCE_DASHBOARD_MAJOR_SECTOR_PAGES = {
@@ -193,6 +196,7 @@ BALANCE_DASHBOARD_MAJOR_SECTOR_PAGES = {
     "Refining",
     "Other transformation",
     "Supply",
+    "Total demand",
 }
 
 BALANCE_DASHBOARD_TOP_LABELS = {
@@ -375,8 +379,6 @@ def _load_active_balance_mapping_crosswalk(
         "ninth_fuel",
         "esto_pair_mapping_cardinality",
         "ninth_pair_mapping_cardinality",
-        "esto_many_to_many_is_ok",
-        "ninth_many_to_many_is_ok",
         "leap_is_subtotal",
         "esto_pair_is_subtotal",
         "ninth_pair_is_subtotal",
@@ -398,7 +400,6 @@ def _load_active_balance_mapping_crosswalk(
             "remove_row",
             "duplicate_to_remove",
             "pair_mapping_cardinality",
-            "many_to_many_is_ok",
             "leap_is_subtotal",
             *target_cols,
         ]
@@ -448,8 +449,6 @@ def _load_active_balance_mapping_crosswalk(
             "ninth_fuel": joined["ninth_fuel"],
             "esto_pair_mapping_cardinality": joined["pair_mapping_cardinality_esto"],
             "ninth_pair_mapping_cardinality": joined["pair_mapping_cardinality_ninth"],
-            "esto_many_to_many_is_ok": joined["many_to_many_is_ok_esto"].map(_to_bool),
-            "ninth_many_to_many_is_ok": joined["many_to_many_is_ok_ninth"].map(_to_bool),
             "leap_is_subtotal": (
                 joined["leap_is_subtotal_esto"].map(_to_bool)
                 | joined["leap_is_subtotal_ninth"].map(_to_bool)
@@ -1906,7 +1905,7 @@ def write_balance_missing_mapping_candidates(
         out["leap_sector_name_full_path"] = grouped["leap_sector_name_full_path"]
         out["raw_leap_fuel_name"] = grouped["raw_leap_fuel_name"]
         out["value"] = grouped["value"]
-        for bool_col in ["leap_is_subtotal", "subtotal_mismatch_is_ok", "many_to_many_is_ok", "remove_row"]:
+        for bool_col in ["leap_is_subtotal", "subtotal_mismatch_is_ok", "remove_row"]:
             out[bool_col] = False
         if target == "esto":
             out["esto_flow"] = ""
@@ -2772,6 +2771,7 @@ def write_dashboard_comparator_pair_coverage(
             "dashboard_row",
             "esto_pair_count",
             "leap_pair_count",
+            "exposed_esto_flow_codes",
             "exposed_esto_pairs",
             "missing_esto_pairs_from_row",
             "component_esto_pairs",
@@ -2827,6 +2827,7 @@ def write_dashboard_comparator_pair_coverage(
                 if not touched or touched == component_pairs_norm:
                     continue
                 missing = component_pairs_norm - touched
+                exposed_flow_codes = sorted({flow_code(flow) for flow, _ in touched if flow_code(flow)})
                 rows.append(
                     {
                         "issue": "linked_esto_component_split_across_dashboard_rows",
@@ -2838,6 +2839,7 @@ def write_dashboard_comparator_pair_coverage(
                         "dashboard_row": str(group_info.get("dashboard_row", "")),
                         "esto_pair_count": len(component_pairs_norm),
                         "leap_pair_count": len(component["leap_norm"]),
+                        "exposed_esto_flow_codes": " || ".join(exposed_flow_codes),
                         "exposed_esto_pairs": " || ".join(f"{flow} | {product}" for flow, product in sorted(touched)),
                         "missing_esto_pairs_from_row": " || ".join(f"{flow} | {product}" for flow, product in sorted(missing)),
                         "component_esto_pairs": " || ".join(f"{flow} | {product}" for flow, product in component_pairs_display),
@@ -2861,6 +2863,26 @@ def write_dashboard_comparator_pair_coverage(
             .drop(columns=["_sort_abs_value", "_sort_pair_count"])
             .reset_index(drop=True)
         )
+
+    def allowed_split_esto_mapping_components(all_split_components: pd.DataFrame) -> pd.DataFrame:
+        if all_split_components.empty:
+            return all_split_components.copy()
+
+        def _only_allowed_final_consumption_flows(value: object) -> bool:
+            codes = {
+                str(code).strip()
+                for code in str(value or "").split("||")
+                if str(code).strip()
+            }
+            return bool(codes) and codes.issubset(ALLOWED_SPLIT_ESTO_DASHBOARD_EXPOSURE_FLOW_CODES)
+
+        allowed = all_split_components[
+            all_split_components["exposed_esto_flow_codes"].map(_only_allowed_final_consumption_flows)
+        ].copy()
+        if allowed.empty:
+            return allowed
+        allowed["issue"] = "allowed_total_final_consumption_split_exposure"
+        return allowed.reset_index(drop=True)
 
     def parent_child_esto_exposure_warnings() -> pd.DataFrame:
         columns = [
@@ -2925,10 +2947,26 @@ def write_dashboard_comparator_pair_coverage(
     duplicate_ninth = duplicate_dashboard_pairs(["sector_code_9th", "ninth_fuel_code"], ninth_pairs.rename(columns={"ninth_sector": "sector_code_9th", "ninth_fuel": "ninth_fuel_code"}), ["sector_code_9th", "ninth_fuel_code"])
     all_duplicate_esto = duplicate_esto_dashboard_exposure()
     allowed_many_to_one_esto = allowed_many_to_one_esto_dashboard_exposure(all_duplicate_esto)
+    # Keep the Excel tab name under the 31-character worksheet limit.
+    allowed_split_sheet_name = "allowed_split_esto_components"
     duplicate_esto = all_duplicate_esto[
         ~all_duplicate_esto["mapping_type"].astype(str).eq("many_to_one")
     ].copy()
-    split_components = split_esto_mapping_components()
+    all_split_components = split_esto_mapping_components()
+    allowed_split_components = allowed_split_esto_mapping_components(all_split_components)
+    if allowed_split_components.empty:
+        split_components = all_split_components
+    else:
+        allowed_keys = set(
+            allowed_split_components[
+                ["component_id", "chart_group_id", "dashboard_row", "exposed_esto_pairs"]
+            ].itertuples(index=False, name=None)
+        )
+        split_components = all_split_components[
+            ~all_split_components[
+                ["component_id", "chart_group_id", "dashboard_row", "exposed_esto_pairs"]
+            ].apply(tuple, axis=1).isin(allowed_keys)
+        ].copy()
     parent_child_warnings = parent_child_esto_exposure_warnings()
     missing_leap = runtime_leap_missing_pairs()
     chart_group_exposure = chart_group_exposure_sheet()
@@ -2943,6 +2981,7 @@ def write_dashboard_comparator_pair_coverage(
         "duplicate_ninth_dashboard_pairs",
         "duplicate_esto_dashboard_pairs",
         "allowed_many_to_one_esto",
+        allowed_split_sheet_name,
         "split_esto_mapping_components",
         "parent_child_esto_warnings",
     ]
@@ -2957,6 +2996,7 @@ def write_dashboard_comparator_pair_coverage(
                 {"sheet": "duplicate_ninth_dashboard_pairs", "pair_rows": int(len(duplicate_ninth))},
                 {"sheet": "duplicate_esto_dashboard_pairs", "pair_rows": int(len(duplicate_esto))},
                 {"sheet": "allowed_many_to_one_esto", "pair_rows": int(len(allowed_many_to_one_esto))},
+                {"sheet": allowed_split_sheet_name, "pair_rows": int(len(allowed_split_components))},
                 {"sheet": "split_esto_mapping_components", "pair_rows": int(len(split_components))},
                 {"sheet": "parent_child_esto_warnings", "pair_rows": int(len(parent_child_warnings))},
             ]
@@ -2976,6 +3016,7 @@ def write_dashboard_comparator_pair_coverage(
         duplicate_ninth.to_excel(writer, sheet_name="duplicate_ninth_dashboard_pairs", index=False)
         duplicate_esto.to_excel(writer, sheet_name="duplicate_esto_dashboard_pairs", index=False)
         allowed_many_to_one_esto.to_excel(writer, sheet_name="allowed_many_to_one_esto", index=False)
+        allowed_split_components.to_excel(writer, sheet_name=allowed_split_sheet_name, index=False)
         split_components.to_excel(writer, sheet_name="split_esto_mapping_components", index=False)
         parent_child_warnings.to_excel(writer, sheet_name="parent_child_esto_warnings", index=False)
         summary.to_excel(writer, sheet_name="summary", index=False)
@@ -4768,6 +4809,8 @@ TEMPLATE_RESERVED_KEYS = {
     "by_fuel_graphs",
     "fuel_aggregate_mappings",
     "specified_fuel_mappings",
+    "specified_fuel_mappings_sets",
+    "placeholder_source_notes",
     "product_color_legend",
     "esto_flow",
     "_comments",
@@ -4827,6 +4870,36 @@ def _template_fuel_mapping_sets(template: dict[str, Any] | None) -> dict[str, li
         if key and values:
             sets[key] = values
     return sets
+
+
+def _template_placeholder_source_groups(template: dict[str, Any] | None) -> list[dict[str, list[str]]]:
+    """Read top-level placeholder_source_notes groups used for data-source notes.
+
+    Each group names placeholder/backup LEAP branch path prefixes and the ESTO
+    flow prefixes whose pages should report how much of the charted LEAP energy
+    those branches supply.
+    """
+    if not isinstance(template, dict):
+        return []
+    raw = template.get("placeholder_source_notes", {})
+    if not isinstance(raw, dict):
+        return []
+    groups: list[dict[str, list[str]]] = []
+    for entry in raw.get("groups", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        label = str(entry.get("label", "") or "").strip()
+        leap_prefixes = _as_clean_list(entry.get("leap_path_prefixes", []))
+        flow_prefixes = _as_clean_list(entry.get("watch_esto_flow_prefixes", []))
+        if label and leap_prefixes and flow_prefixes:
+            groups.append(
+                {
+                    "label": label,
+                    "leap_path_prefixes": leap_prefixes,
+                    "watch_esto_flow_prefixes": flow_prefixes,
+                }
+            )
+    return groups
 
 
 def _template_fuel_aggregate_mappings(template: dict[str, Any] | None) -> dict[str, list[str]]:
@@ -6020,6 +6093,7 @@ def _build_page_html(
     fallback_note: str = "",
     chart_bundle_file: str = "",
     visible_note: str = "",
+    data_note: str = "",
 ) -> str:
     title_href = current_file or "#page-header"
     separator_after = {"Others", "Other transformation"}
@@ -6108,6 +6182,8 @@ def _build_page_html(
         f'<div class="visible-note">{escape(visible_note)}</div>'
         if visible_note else ""
     )
+    if data_note:
+        visible_note_html += f'<div class="visible-note">{escape(data_note)}</div>'
 
     if chart_entries:
         grouped_chart_entries: dict[str, list[dict[str, str]]] = defaultdict(list)
@@ -6596,6 +6672,7 @@ def render_balance_dashboards(
     hide_leap_only_charts: bool = False,
     hide_charts_without_leap_data: bool = False,
     chart_navigation_guide_path: Path | str | None = None,
+    leap_source_long: pd.DataFrame | None = None,
 ) -> dict[str, Any]:
     """
     Render charts with existing utilities and dashboards from structure.json.
@@ -6882,6 +6959,95 @@ def render_balance_dashboards(
 
     def _display_path_tuple(path: tuple[str, ...]) -> tuple[str, ...]:
         return tuple(_display_path(path))
+
+    placeholder_source_groups = _template_placeholder_source_groups(template_allowlist)
+    placeholder_note_source = pd.DataFrame()
+    if (
+        placeholder_source_groups
+        and leap_source_long is not None
+        and not leap_source_long.empty
+        and {"esto_flow", "leap_sector", "value_pj"}.issubset(leap_source_long.columns)
+    ):
+        placeholder_note_source = leap_source_long[["esto_flow", "leap_sector", "value_pj"]].copy()
+        placeholder_note_source["esto_flow"] = (
+            placeholder_note_source["esto_flow"].fillna("").astype(str).str.strip()
+        )
+        placeholder_note_source["_leap_sector_key"] = (
+            placeholder_note_source["leap_sector"].fillna("").astype(str).str.strip().str.lower()
+        )
+        placeholder_note_source["_abs_value_pj"] = (
+            pd.to_numeric(placeholder_note_source["value_pj"], errors="coerce").fillna(0.0).abs()
+        )
+
+    def _template_node_esto_flows(display_path: tuple[str, ...]) -> list[str]:
+        node = allowed_template_nodes.get(display_path)
+        if not isinstance(node, dict):
+            return []
+        flows: list[str] = []
+        for spec in _dashboard_template_aggregate_specs(
+            node, default_measure=template_measure_default, fuel_mapping_sets=fuel_mapping_sets
+        ):
+            flows.extend(spec.get("esto_flows", []) or [])
+        for spec in _dashboard_template_graph_specs(node, default_measure=template_measure_default):
+            flows.extend(spec.get("esto_flows", []) or [])
+        unique_flows: list[str] = []
+        for flow in flows:
+            flow_text = str(flow or "").strip()
+            if flow_text and flow_text not in unique_flows:
+                unique_flows.append(flow_text)
+        return unique_flows
+
+    def _placeholder_data_note_for_path(path: tuple[str, ...]) -> str:
+        """Report how much of this page's LEAP energy comes from placeholder branches.
+
+        The check is data-driven: it inspects the mapped LEAP rows from the
+        current run, so the note distinguishes real modelled branches from the
+        backup/interim placeholder branches configured in the template.
+        """
+        if placeholder_note_source.empty:
+            return ""
+        page_flows = _template_node_esto_flows(_display_path_tuple(path))
+        if not page_flows:
+            return ""
+        sentences: list[str] = []
+        for group in placeholder_source_groups:
+            flow_prefixes = tuple(
+                prefix.lower() for prefix in group["watch_esto_flow_prefixes"]
+            )
+            watched_flows = [
+                flow for flow in page_flows if flow.lower().startswith(flow_prefixes)
+            ]
+            if not watched_flows:
+                continue
+            rows = placeholder_note_source[
+                placeholder_note_source["esto_flow"].isin(watched_flows)
+            ]
+            total_abs = float(rows["_abs_value_pj"].sum())
+            if total_abs <= 1e-9:
+                continue
+            leap_prefixes = tuple(prefix.lower() for prefix in group["leap_path_prefixes"])
+            placeholder_abs = float(
+                rows.loc[
+                    rows["_leap_sector_key"].str.startswith(leap_prefixes), "_abs_value_pj"
+                ].sum()
+            )
+            share = placeholder_abs / total_abs
+            label = group["label"]
+            if share >= 0.0005:
+                pct = f"{share * 100:.0f}%" if share >= 0.095 else f"{share * 100:.1f}%"
+                if pct == "0.0%":
+                    pct = "<0.1%"
+                sentences.append(
+                    f"Data check (this run): {pct} of the LEAP energy in this page's affected "
+                    f"charts comes from {label}. Treat that portion as temporary backup data, "
+                    "not final modelled results."
+                )
+            else:
+                sentences.append(
+                    f"Data check (this run): no meaningful contribution detected from {label} "
+                    "on this page, so the LEAP values here come from the real modelled branches."
+                )
+        return " ".join(sentences)
 
     def _path_allowed_by_template(path: tuple[str, ...]) -> bool:
         if not template_allowlist:
@@ -8251,6 +8417,7 @@ def render_balance_dashboards(
             fallback_note=fallback_note,
             chart_bundle_file=chart_bundle_file,
             visible_note=page_visible_note,
+            data_note=_placeholder_data_note_for_path(path),
         )
         (dashboards_dir / filename).write_text(html, encoding="utf-8")
 

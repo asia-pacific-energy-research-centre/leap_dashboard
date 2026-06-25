@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bunkers</title>
+  <style>
+:root {
+  color-scheme: light;
+  --page-padding-x: clamp(12px, 1.8vw, 24px);
+  --page-padding-y: clamp(14px, 1.8vw, 24px);
+  --body-font-size: clamp(15px, 0.22vw + 14px, 18px);
+  --title-font-size: clamp(24px, 0.75vw + 18px, 34px);
+  --section-title-size: clamp(18px, 0.45vw + 14px, 24px);
+}
+html { background: #f4f6f8; }
+body {
+  font-family: Segoe UI, Arial, sans-serif;
+  margin: 0;
+  background: #f4f6f8;
+  color: #111;
+  font-size: var(--body-font-size);
+  line-height: 1.45;
+  min-width: 320px;
+}
+a { color: #0b3d5c; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.page-shell { width: 100%; max-width: none; margin: 0 auto; padding: 0 var(--page-padding-x) 32px; box-sizing: border-box; }
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin: 0 0 14px 0;
+  padding: var(--page-padding-y) 0 10px 0;
+  background: rgba(244, 246, 248, 0.96);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #d8dee4;
+}
+.header-main-row { display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 16px; }
+.header-side-controls {
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;
+  gap:8px 10px;flex:1 1 460px;
+}
+.header-inline-controls {
+  display:flex;align-items:center;gap:8px;justify-content:flex-end;
+  flex:0 0 auto;flex-wrap:nowrap;margin-left:auto;
+}
+.dashboard-context { margin-top:6px;color:#4b5563;font-size:13px;line-height:1.35; }
+.header-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.header-chip {
+  padding: 6px 10px;
+  border: 1px solid #c5ccd3;
+  border-radius: 6px;
+  background: #fff;
+  color: #0b3d5c;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.header-chip[data-current="true"] {
+  border-color:#1f6feb;
+  box-shadow:0 0 0 2px rgba(31, 111, 235, 0.16);
+  font-weight:700;
+}
+.header-nav-separator { color:#6b7280;font-weight:700;line-height:1.25;padding:6px 2px; }
+.header-toggle {
+  width: 30px; height: 30px;
+  border: 1px solid #c5ccd3;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b3d5c;
+  cursor: pointer;
+}
+.header-toggle-row { display:flex;justify-content:flex-end;margin-top:8px; }
+.page-header.is-collapsed .header-collapsible { display: none; }
+.page-header.is-collapsed { padding-bottom:0;background:transparent;backdrop-filter:none;border-bottom-color:transparent; }
+.page-header.is-collapsed .header-toggle-row { margin-top:0; }
+.jump-nav {
+  margin-top:8px;padding-top:8px;border-top:1px solid #d8dee4;
+  display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-start;
+}
+.jump-nav-label { font-weight:600;color:#4b5563;font-size:12px;white-space:nowrap;padding-top:4px; }
+.jump-nav-groups { display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 640px; }
+.jump-nav-row { display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0; }
+.jump-nav-row[data-level="2"] { padding-left:18px; }
+.jump-chip {
+  position:relative;display:inline-flex;align-items:center;gap:6px;
+  padding:4px 9px;border:1px solid #c5ccd3;border-radius:999px;
+  background:#fff;color:#0b3d5c;text-decoration:none;font-size:12px;line-height:1.25;
+  box-shadow:0 1px 1px rgba(15,23,42,0.04);
+}
+.jump-chip::before { content:"";display:block;width:8px;height:8px;border-radius:999px;flex:0 0 auto;background:#94a3b8; }
+.jump-chip[data-level="1"] { background:#fff4e6;border-color:#f2a65a;color:#7a3b00; }
+.jump-chip[data-level="1"]::before { background:#f97316; }
+.jump-chip[data-level="2"] { background:#f5edff;border-color:#c69af0;color:#4c1d70; }
+.jump-chip[data-level="2"]::before { background:#9333ea; }
+.visible-note { margin:8px 0 10px 0;padding:8px 12px;background:#fffbe6;border-left:3px solid #f0a500;border-radius:4px;font-size:13px;color:#5a3e00;line-height:1.5; }
+.sort-bar {
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+  margin:10px 0 8px 0;font-size:12px;color:#4b5563;
+}
+.sort-bar-label { font-weight:600;white-space:nowrap; }
+.sort-btn {
+  padding:4px 10px;border:1px solid #c5ccd3;border-radius:999px;
+  background:#fff;color:#0b3d5c;font-size:12px;cursor:pointer;
+}
+.sort-btn.active { border-color:#1f6feb;background:#e8f0fe;font-weight:700; }
+.dashboard-grid {
+  display:grid;
+  grid-template-columns:repeat(4, minmax(0, 1fr));
+  gap:12px;
+  align-items:start;
+}
+.dashboard-grid.expand-1 { grid-template-columns:minmax(0, 1fr); }
+.dashboard-grid.expand-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.dashboard-grid.expand-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.chart-card { margin:0;padding:10px;border:1px solid #d0d7de;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.05); }
+.chart-caption { font-weight:600;margin-bottom:4px; }
+.meta-subline { margin-top:-4px;margin-bottom:8px;color:#4b5563;font-size:12px; }
+.chart-load-state { min-height:22px;margin:4px 0 6px 0;color:#64748b;font-size:12px; }
+.chart-load-state[data-loaded="true"] { display:none; }
+.lazy-chart-plot {
+  width:100%;height:clamp(380px, 62vh, 1100px);
+  border:1px solid #d0d7de;border-radius:6px;background:#fff;display:block;box-sizing:border-box;
+}
+.lazy-chart-plot.is-unloaded { background:#f8fafc; }
+.section-heading { margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d; }
+@media (max-width: 900px) { .dashboard-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .dashboard-grid { grid-template-columns:minmax(0, 1fr); } .lazy-chart-plot { height:420px; } }
+</style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="page-header" id="page-header">
+      <div class="header-collapsible">
+      <div class="header-main-row">
+        <div style="min-width:220px;flex:1 1 320px;">
+          <h1 style="margin:0;font-size:24px;line-height:1.15;">Bunkers</h1>
+          <div class="dashboard-context">Economy: <strong>United States</strong></div>
+        </div>
+        <div class="header-side-controls">
+          <div class="header-inline-controls"><a href="buildings.html" class="header-chip" data-current="false">Buildings</a><a href="bunkers.html" class="header-chip" data-current="true">Bunkers</a><a href="industry.html" class="header-chip" data-current="false">Industry</a><a href="transport.html" class="header-chip" data-current="false">Transport</a><a href="others.html" class="header-chip" data-current="false">Other demand</a><a href="non_energy.html" class="header-chip" data-current="false">Non-energy use</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="power.html" class="header-chip" data-current="false">Power</a><a href="refining.html" class="header-chip" data-current="false">Refining</a><a href="other_transformation.html" class="header-chip" data-current="false">Other transformation</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="supply.html" class="header-chip" data-current="false">Supply</a></div>
+        </div>
+      </div>
+      <div class="jump-nav"><span class="jump-nav-label">Sections:</span><div class="jump-nav-groups"><div class="jump-nav-row" data-level="1"><a href="#sec-bunkers__bunkers" class="jump-chip" data-level="1">Bunkers</a></div></div></div>
+      </div>
+      <div class="header-toggle-row">
+        <button id="header-toggle" class="header-toggle" type="button" aria-expanded="true" aria-label="Collapse header">&#9652;</button>
+      </div>
+    </header>
+    <main class="page-body">
+      
+      <h2 class="section-heading">Overview</h2><section class="section-sort-group"><div class="sort-bar"><span class="sort-bar-label">Sort:</span><button class="sort-btn active" data-sort="default">Default</button><button class="sort-btn" data-sort="totalAbs">Largest total</button><button class="sort-btn" data-sort="absDiff">Largest difference</button><button class="sort-btn" data-sort="pctDiff">Largest % diff</button></div><div class="dashboard-grid" data-sortable-grid="overview"><figure class="chart-card" data-default-order="0" data-total-abs="199076.4941" data-abs-diff="114922.4612" data-pct-diff="1.564838"><figcaption class="chart-caption">04 International marine bunkers</figcaption><div class="meta-subline">Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__04__04_international_marine_bunkers" class="lazy-chart-plot is-unloaded" role="img" aria-label="04 International marine bunkers"></div></figure><figure class="chart-card" data-default-order="1" data-total-abs="241514.3508" data-abs-diff="133486.2534" data-pct-diff="1.659645"><figcaption class="chart-caption">05 International aviation bunkers</figcaption><div class="meta-subline">Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__05__05_international_aviation_bunkers" class="lazy-chart-plot is-unloaded" role="img" aria-label="05 International aviation bunkers"></div></figure></div></section>
+      <section id="sec-bunkers__bunkers" style="scroll-margin-top:150px;"><h2 class="section-heading">Bunkers</h2><section class="section-sort-group"><div class="sort-bar"><span class="sort-bar-label">Sort:</span><button class="sort-btn active" data-sort="default">Default</button><button class="sort-btn" data-sort="totalAbs">Largest total</button><button class="sort-btn" data-sort="absDiff">Largest difference</button><button class="sort-btn" data-sort="pctDiff">Largest % diff</button></div><div class="dashboard-grid" data-sortable-grid="sec-bunkers__bunkers"><figure class="chart-card" data-default-order="0" data-total-abs="90187.6747" data-abs-diff="49121.1130" data-pct-diff="1.830371"><figcaption class="chart-caption">Gas/diesel oil</figcaption><div class="meta-subline">Bunkers &gt; Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__04_international_marine_bunkers__07_07_gas_diesel_oil" class="lazy-chart-plot is-unloaded" role="img" aria-label="Gas/diesel oil"></div></figure><figure class="chart-card" data-default-order="1" data-total-abs="63029.4865" data-abs-diff="42847.1616" data-pct-diff="1.216823"><figcaption class="chart-caption">Fuel oil</figcaption><div class="meta-subline">Bunkers &gt; Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__04_international_marine_bunkers__07_08_fuel_oil" class="lazy-chart-plot is-unloaded" role="img" aria-label="Fuel oil"></div></figure><figure class="chart-card" data-default-order="2" data-total-abs="1.0082" data-abs-diff="0.0000" data-pct-diff="0.000000"><figcaption class="chart-caption">LPG</figcaption><div class="meta-subline">Bunkers &gt; Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__04_international_marine_bunkers__07_09_lpg" class="lazy-chart-plot is-unloaded" role="img" aria-label="LPG"></div></figure><figure class="chart-card" data-default-order="3" data-total-abs="1.8584" data-abs-diff="0.0000" data-pct-diff="0.000000"><figcaption class="chart-caption">Natural gas</figcaption><div class="meta-subline">Bunkers &gt; Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__04_international_marine_bunkers__08_01_natural_gas" class="lazy-chart-plot is-unloaded" role="img" aria-label="Natural gas"></div></figure><figure class="chart-card" data-default-order="4" data-total-abs="34551.8330" data-abs-diff="17257.8924" data-pct-diff="1.524678"><figcaption class="chart-caption">LNG</figcaption><div class="meta-subline">Bunkers &gt; Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__04_international_marine_bunkers__08_02_lng" class="lazy-chart-plot is-unloaded" role="img" aria-label="LNG"></div></figure><figure class="chart-card" data-default-order="5" data-total-abs="72.4543" data-abs-diff="0.0000" data-pct-diff="0.000000"><figcaption class="chart-caption">Biodiesel</figcaption><div class="meta-subline">Bunkers &gt; Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__04_international_marine_bunkers__16_06_biodiesel" class="lazy-chart-plot is-unloaded" role="img" aria-label="Biodiesel"></div></figure><figure class="chart-card" data-default-order="6" data-total-abs="11232.1788" data-abs-diff="0.0000" data-pct-diff="0.000000"><figcaption class="chart-caption">Ammonia</figcaption><div class="meta-subline">Bunkers &gt; Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__04_international_marine_bunkers__16_10_ammonia" class="lazy-chart-plot is-unloaded" role="img" aria-label="Ammonia"></div></figure><figure class="chart-card" data-default-order="7" data-total-abs="8934.8938" data-abs-diff="4975.6632" data-pct-diff="4.887956"><figcaption class="chart-caption">Peat</figcaption><div class="meta-subline">Bunkers &gt; Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__05_international_aviation_bunkers__03_04_09_15_16_16_09_16_12_peat" class="lazy-chart-plot is-unloaded" role="img" aria-label="Peat"></div></figure><figure class="chart-card" data-default-order="8" data-total-abs="3.8977" data-abs-diff="0.0000" data-pct-diff="0.000000"><figcaption class="chart-caption">Aviation gasoline</figcaption><div class="meta-subline">Bunkers &gt; Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__05_international_aviation_bunkers__07_02_aviation_gasoline" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aviation gasoline"></div></figure><figure class="chart-card" data-default-order="9" data-total-abs="232575.1854" data-abs-diff="129016.6707" data-pct-diff="1.614289"><figcaption class="chart-caption">Petroleum products</figcaption><div class="meta-subline">Bunkers &gt; Bunkers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__05_international_aviation_bunkers__07_04_07_05_petroleum_products" class="lazy-chart-plot is-unloaded" role="img" aria-label="Petroleum products"></div></figure></div></section></section>
+    </main>
+  </div>
+  <script>
+(function() {
+  var pageHeader = document.getElementById('page-header');
+  var toggle = document.getElementById('header-toggle');
+  if (!pageHeader || !toggle) return;
+  var key = 'common-esto-header-collapsed';
+  var apply = function(collapsed) {
+    pageHeader.classList.toggle('is-collapsed', collapsed);
+    toggle.textContent = collapsed ? '▾' : '▴';
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggle.setAttribute('aria-label', collapsed ? 'Expand header' : 'Collapse header');
+  };
+  var collapsed = false;
+  try { collapsed = window.localStorage.getItem(key) === 'true'; } catch (e) {}
+  apply(collapsed);
+  toggle.addEventListener('click', function() {
+    collapsed = !pageHeader.classList.contains('is-collapsed');
+    apply(collapsed);
+    try { window.localStorage.setItem(key, collapsed ? 'true' : 'false'); } catch (e) {}
+  });
+})();
+</script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="../chart_bundles/bunkers__charts.js"></script>
+  <script>
+(function() {
+  var plots = Array.from(document.querySelectorAll('.lazy-chart-plot[data-chart-key]'));
+  if (!plots.length || !window.Plotly) return;
+  var bundleData = window.COMMON_ESTO_CHART_BUNDLE_DATA;
+
+  var setState = function(plot, text, loaded) {
+    var state = plot.previousElementSibling;
+    if (state && state.classList.contains('chart-load-state')) {
+      state.dataset.loaded = loaded ? 'true' : 'false';
+      state.textContent = text || '';
+    }
+  };
+
+  var renderPlot = function(plot) {
+    if (plot.dataset.rendered === 'true' || plot.dataset.rendering === 'true') return;
+    plot.dataset.rendering = 'true';
+    setState(plot, 'Loading chart…', false);
+    try {
+      var bundle = bundleData;
+      var chart = bundle && bundle.charts && bundle.charts[plot.dataset.chartKey];
+      if (!chart) throw new Error('Missing chart: ' + plot.dataset.chartKey);
+      window.Plotly.newPlot(plot, chart.data || [], chart.layout || {}, {responsive: true});
+      plot.dataset.rendered = 'true';
+      plot.classList.remove('is-unloaded');
+      setState(plot, '', true);
+      window.Plotly.Plots.resize(plot);
+    } catch (err) {
+      plot.classList.add('is-unloaded');
+      setState(plot, 'Chart failed: ' + (err.message || err), false);
+    } finally {
+      plot.dataset.rendering = 'false';
+    }
+  };
+
+  if ('IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) { renderPlot(entry.target); observer.unobserve(entry.target); }
+      });
+    }, {rootMargin: '900px 0px'});
+    plots.forEach(function(p) { observer.observe(p); });
+  } else {
+    plots.forEach(renderPlot);
+  }
+
+  window.addEventListener('resize', function() {
+    plots.forEach(function(p) { if (p.dataset.rendered === 'true') window.Plotly.Plots.resize(p); });
+  });
+})();
+</script>
+  <script>
+(function() {
+  document.querySelectorAll('.sort-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var sortKey = btn.dataset.sort;
+      var bar = btn.closest('.sort-bar');
+      var grid = btn.closest('.section-sort-group').querySelector('[data-sortable-grid]');
+      if (!grid) return;
+      var cards = Array.from(grid.querySelectorAll(':scope > .chart-card'));
+      if (sortKey === 'default') {
+        cards.sort(function(a, b) { return parseInt(a.dataset.defaultOrder||0) - parseInt(b.dataset.defaultOrder||0); });
+      } else {
+        cards.sort(function(a, b) { return parseFloat(b.dataset[sortKey]||0) - parseFloat(a.dataset[sortKey]||0); });
+      }
+      cards.forEach(function(c) { grid.appendChild(c); });
+      bar.querySelectorAll('.sort-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+    });
+  });
+})();
+</script>
+</body>
+</html>

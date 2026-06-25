@@ -184,6 +184,15 @@ def _parse_unit_factor_to_petajoule(unit_text: str) -> tuple[float | None, str, 
     return factor, "parsed", prefix, base_key
 
 
+GRAND_TOTAL_ESTO_FLOW_PREFIXES = ("07 total ", "09 total ", "12 total ", "13 total ", "19 total ")
+
+
+def _is_grand_total_esto_flow(esto_flow: object) -> bool:
+    """Return True for grand-total ESTO flows such as 12/13 total final consumption."""
+    text = str(esto_flow or "").strip().lower()
+    return text.startswith(GRAND_TOTAL_ESTO_FLOW_PREFIXES)
+
+
 def _infer_subtotal_flag(row: pd.Series) -> bool:
     sector_name = _normalize_text(row.get("leap_sector_name", ""))
     fuel_name = _normalize_text(row.get("leap_fuel_name", ""))
@@ -203,7 +212,7 @@ def _infer_subtotal_flag(row: pd.Series) -> bool:
     if any(
         text.startswith(prefix)
         for text in [esto_flow, esto_product]
-        for prefix in ["07 total ", "09 total ", "12 total ", "13 total ", "19 total "]
+        for prefix in GRAND_TOTAL_ESTO_FLOW_PREFIXES
     ):
         return True
     return False
@@ -282,6 +291,7 @@ class TemplateBalanceExtractor:
         self._balance_present_source_keys_by_sheet: dict[str, set[tuple[str, str]]] = {}
         self._balance_detail_mode: str = "detailed"
         self._balance_sheet_detail_modes: dict[str, str] = {}
+        self.many_to_many_is_ok_diagnostics = pd.DataFrame()
         self._flow_code_cache: dict[str, list[str]] = {}
         self._fuel_code_cache: dict[str, list[str]] = {}
         self._flow_esto_cache: dict[str, list[str]] = {}
@@ -317,6 +327,8 @@ class TemplateBalanceExtractor:
         return read_config_table(self.mapping_pairs_path, sheet_name=sheet_name, **kwargs)
 
     def load_mappings(self) -> None:
+        self.many_to_many_is_ok_diagnostics = pd.DataFrame()
+
         def add_unique(lookup: dict[str, list[str]], key: str, value: str) -> None:
             if not key or not value:
                 return
@@ -537,9 +549,10 @@ class TemplateBalanceExtractor:
             if "subtotal_mismatch_is_ok" not in out.columns:
                 out["subtotal_mismatch_is_ok"] = False
             out["subtotal_mismatch_is_ok"] = out["subtotal_mismatch_is_ok"].map(truthy)
-            if "many_to_many_is_ok" not in out.columns:
-                out["many_to_many_is_ok"] = False
-            out["many_to_many_is_ok"] = out["many_to_many_is_ok"].map(truthy)
+            if "many_to_many_is_ok" in out.columns:
+                out["legacy_many_to_many_is_ok"] = out["many_to_many_is_ok"].map(truthy)
+            else:
+                out["legacy_many_to_many_is_ok"] = False
 
             active = active_mask(out)
             active_paths = {
@@ -734,28 +747,47 @@ class TemplateBalanceExtractor:
                 )
 
             pair_many_to_many = out["pair_mapping_cardinality_computed"].eq("many_to_many")
-            violation = out[
+            many_to_many_rows = out[
                 valid
                 & pair_many_to_many
                 & ~out["leap_is_subtotal_computed"]
-                & ~out["many_to_many_is_ok"]
             ].copy()
-            if not violation.empty:
-                preview_cols = [
+            if not many_to_many_rows.empty:
+                many_to_many_rows["_diagnostic_sheet"] = sheet_label
+                many_to_many_rows["_diagnostic_issue"] = "non_subtotal_many_to_many_mapping"
+                many_to_many_rows["_diagnostic_explanation"] = (
+                    "Active non-subtotal LEAP sector/fuel pair has computed many-to-many "
+                    "cardinality. The extractor records this for audit; concrete safety "
+                    "checks are handled by duplicate, subtotal, and dashboard exposure diagnostics."
+                )
+                diagnostic_cols = [
+                    "_diagnostic_sheet",
+                    "_diagnostic_issue",
+                    "_diagnostic_explanation",
                     "leap_sector_name_full_path",
                     "raw_leap_fuel_name",
                     target_sector_col,
                     target_fuel_col,
+                    "pair_mapping_cardinality",
                     "pair_mapping_cardinality_computed",
                     "fuel_mapping_cardinality_computed",
                     "leap_is_subtotal_computed",
-                    "many_to_many_is_ok",
+                    target_subtotal_col,
+                    "legacy_many_to_many_is_ok",
                 ]
-                preview = violation[preview_cols].drop_duplicates().head(30).to_dict("records")
-                raise ValueError(
-                    f"{sheet_label} contains many-to-many mappings for non-subtotal LEAP rows. "
-                    f"Mark duplicate mappings inactive, set many_to_many_is_ok=True for intentional cases, "
-                    f"or map them to a deterministic level. Preview: {preview}"
+                for col in diagnostic_cols:
+                    if col not in many_to_many_rows.columns:
+                        many_to_many_rows[col] = ""
+                diagnostic = many_to_many_rows[diagnostic_cols].drop_duplicates().rename(
+                    columns={
+                        target_sector_col: "target_sector",
+                        target_fuel_col: "target_fuel",
+                        target_subtotal_col: "target_pair_is_subtotal",
+                    }
+                )
+                self.many_to_many_is_ok_diagnostics = pd.concat(
+                    [self.many_to_many_is_ok_diagnostics, diagnostic],
+                    ignore_index=True,
                 )
 
             return out
@@ -1392,9 +1424,22 @@ class TemplateBalanceExtractor:
             # only safe when the targets aggregate to one displayed series, so
             # equal split preserves the aggregate value without introducing
             # misleading historical weights.
-            share = 1.0 / float(len(target_pairs))
-            allocation_shares = [share for _ in target_pairs]
-            allocation_method = "equal_split"
+            # Grand-total flows (e.g. 12/13 total final consumption) are
+            # overlapping aggregates that are charted on their own and never
+            # summed with the other targets, so they receive the full source
+            # value instead of stealing share from the non-total targets.
+            pair_is_grand_total = [
+                _is_grand_total_esto_flow(esto_flow) for esto_flow, _ in target_pairs
+            ]
+            non_total_count = sum(1 for is_total in pair_is_grand_total if not is_total)
+            share = 1.0 / float(non_total_count) if non_total_count > 0 else 1.0
+            allocation_shares = [
+                1.0 if is_total else share for is_total in pair_is_grand_total
+            ]
+            if any(pair_is_grand_total):
+                allocation_method = "equal_split_with_full_grand_totals"
+            else:
+                allocation_method = "equal_split"
 
         match_resolution = "module_only" if use_descendant_records or self._balance_detail_mode == "less_detail" else "detailed"
 
@@ -1727,6 +1772,7 @@ class TemplateBalanceExtractor:
             "summary": summary,
             "diagnostics": diagnostics,
             "matching_diagnostics": matching_diagnostics,
+            "many_to_many_is_ok_diagnostics": self.many_to_many_is_ok_diagnostics.copy(),
             "detail_profile": detail_profile,
             "detail_mode": workbook_detail_mode,
         }
@@ -1777,6 +1823,7 @@ def run_template_balance_extraction(
     coverage_path = layout.checks / "balance_template_coverage.csv"
     unit_diag_path = layout.checks / "balance_template_units_to_petajoule.csv"
     diag_path = layout.mapping / "balance_template_mapping_diagnostics.csv"
+    many_to_many_diag_path = layout.mapping / "many_to_many_is_ok_diagnostics.csv"
     summary_path = layout.runtime / "balance_template_summary.csv"
 
     raw_long.to_csv(raw_path, index=False)
@@ -1785,6 +1832,7 @@ def run_template_balance_extraction(
     coverage.to_csv(coverage_path, index=False)
     unit_diag.to_csv(unit_diag_path, index=False)
     report["diagnostics"].to_csv(diag_path, index=False)
+    report["many_to_many_is_ok_diagnostics"].to_csv(many_to_many_diag_path, index=False)
     pd.DataFrame([report["summary"]]).to_csv(summary_path, index=False)
     manifest_path = write_output_manifest(
         out_dir=layout.root,
@@ -1795,6 +1843,7 @@ def run_template_balance_extraction(
             "coverage_csv": str(coverage_path),
             "unit_diagnostics_csv": str(unit_diag_path),
             "diagnostics_csv": str(diag_path),
+            "many_to_many_is_ok_diagnostics_csv": str(many_to_many_diag_path),
             "summary_csv": str(summary_path),
         },
         primary_output_descriptions={
@@ -1806,6 +1855,7 @@ def run_template_balance_extraction(
             "coverage_csv": "Coverage summary for mapped and unmapped template rows.",
             "unit_diagnostics_csv": "Unit parsing and conversion diagnostics.",
             "diagnostics_csv": "Row-level mapping diagnostics from template extraction.",
+            "many_to_many_is_ok_diagnostics_csv": "Active non-subtotal many-to-many mappings recorded for audit.",
             "summary_csv": "One-row summary of the extraction run.",
         },
         notes=[
@@ -1822,6 +1872,7 @@ def run_template_balance_extraction(
         "coverage_csv": str(coverage_path),
         "unit_diagnostics_csv": str(unit_diag_path),
         "diagnostics_csv": str(diag_path),
+        "many_to_many_is_ok_diagnostics_csv": str(many_to_many_diag_path),
         "summary_csv": str(summary_path),
         "output_manifest_json": str(manifest_path),
     }

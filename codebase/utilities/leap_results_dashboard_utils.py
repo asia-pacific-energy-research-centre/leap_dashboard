@@ -5721,7 +5721,7 @@ def make_stacked_area_chart(
             scenario_rows = area_rows[area_rows["scenario"].eq(scenario)].copy()
             scenario_label = _format_scenario_label(scenario)
             scenario_visible = True if scenario == visible_scenario else "legendonly"
-            stackgroup = f"leap_{_safe_token(scenario_label)}"
+            base_stackgroup = f"leap_{_safe_token(scenario_label)}"
             for idx, product in enumerate(product_order):
                 product_rows = scenario_rows[scenario_rows["fuel_label"].eq(product)].copy()
                 if product_rows.empty:
@@ -5729,6 +5729,9 @@ def make_stacked_area_chart(
                 series = product_rows.groupby("year", as_index=True)["value"].sum(min_count=1).sort_index()
                 if series.empty or not series.abs().gt(1e-12).any():
                     continue
+                numeric = pd.to_numeric(series, errors="coerce").dropna()
+                net_negative = bool(numeric.sum() < 0)
+                stackgroup = f"{base_stackgroup}_neg" if net_negative else base_stackgroup
                 name = str(product)
                 if len(scenario_values) > 1:
                     name = f"{product} - {scenario_label}"
@@ -5798,6 +5801,8 @@ def make_stacked_area_chart(
             hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=-0.28, xanchor="left", x=0),
             margin=dict(l=60, r=25, t=60, b=100),
+            xaxis=dict(zeroline=True, zerolinecolor="black", zerolinewidth=2),
+            yaxis=dict(zeroline=True, zerolinecolor="black", zerolinewidth=2),
         )
         if backend == "plotly_figure":
             return fig

@@ -132,3 +132,67 @@ def test_parent_row_does_not_reuse_descendant_mapping_when_child_source_is_prese
     assert records[0]["mapping_status"] == "unmapped"
     assert records[0]["remove_row"] is True
     assert records[0]["esto_flow"] == ""
+
+
+def test_load_mappings_reports_non_subtotal_many_to_many_rows(tmp_path: Path) -> None:
+    workbook = tmp_path / "mapping_fixture.xlsx"
+    codebook = pd.DataFrame(columns=["name", "9th_label", "9th_column", "esto_label", "esto_column"])
+    esto_leap = pd.DataFrame(columns=["category", "leap_name", "original_label"])
+    esto = pd.DataFrame(
+        [
+            {
+                "leap_sector_name_full_path": "Industry",
+                "raw_leap_fuel_name": "Gas",
+                "esto_flow": "14 Industry sector",
+                "esto_product": "08.01 Natural gas",
+                "many_to_many_is_ok": True,
+                "subtotal_mismatch_is_ok": True,
+            },
+            {
+                "leap_sector_name_full_path": "Industry",
+                "raw_leap_fuel_name": "Gas",
+                "esto_flow": "12 Total final consumption",
+                "esto_product": "08.01 Natural gas",
+                "many_to_many_is_ok": True,
+                "subtotal_mismatch_is_ok": True,
+            },
+            {
+                "leap_sector_name_full_path": "Buildings",
+                "raw_leap_fuel_name": "Electricity",
+                "esto_flow": "14 Industry sector",
+                "esto_product": "08.01 Natural gas",
+                "many_to_many_is_ok": True,
+                "subtotal_mismatch_is_ok": True,
+            },
+            {
+                "leap_sector_name_full_path": "Buildings",
+                "raw_leap_fuel_name": "Electricity",
+                "esto_flow": "12 Total final consumption",
+                "esto_product": "08.01 Natural gas",
+                "many_to_many_is_ok": True,
+                "subtotal_mismatch_is_ok": True,
+            },
+        ]
+    )
+    ninth = pd.DataFrame(columns=["leap_sector_name_full_path", "raw_leap_fuel_name", "ninth_sector", "ninth_fuel"])
+
+    with pd.ExcelWriter(workbook) as writer:
+        codebook.to_excel(writer, sheet_name="code_to_name", index=False)
+        esto_leap.to_excel(writer, sheet_name="ESTO_LEAP_names", index=False)
+        esto.to_excel(writer, sheet_name="leap_combined_esto", index=False)
+        ninth.to_excel(writer, sheet_name="leap_combined_ninth", index=False)
+
+    extractor = TemplateBalanceExtractor(
+        template_sheet="EBal|2060",
+        mapping_pairs_path=workbook,
+        codebook_path=workbook,
+        explicit_pair_mappings_only=True,
+    )
+
+    extractor.load_mappings()
+
+    diagnostics = extractor.many_to_many_is_ok_diagnostics
+    assert len(diagnostics) == 4
+    assert set(diagnostics["_diagnostic_issue"]) == {"non_subtotal_many_to_many_mapping"}
+    assert set(diagnostics["_diagnostic_sheet"]) == {"leap_combined_esto"}
+    assert set(diagnostics["legacy_many_to_many_is_ok"]) == {True}

@@ -1,0 +1,421 @@
+{
+  "title": "Common ESTO Comparison Dashboard",
+  "default_comparison_scope": "leap_vs_esto_vs_ninth",
+  "dashboard_mode": "auto_tree",
+  "default_chart_type": "line",
+  "chart_generation": {
+    "deep_chain_min_depth": 3,
+    "top_levels_for_deep_chains": 2,
+    "top_levels_for_other_chains": 1,
+    "max_area_charts_per_page": 30,
+    "primary_area_source_system": "LEAP",
+    "primary_area_scenario": "Target",
+    "base_year": 2023,
+    "comparison_source_system": "ESTO",
+    "ninth_source_system": "NINTH",
+    "suppression_threshold": 1.0
+  },
+  "sector_pages": [
+    {
+      "page_key": "supply",
+      "page_label": "Supply",
+      "priority": 10,
+      "flow_code_prefixes": [
+        "01",
+        "02",
+        "03",
+        "06",
+        "07",
+        "11"
+      ],
+      "flow_keywords": [
+        "Production",
+        "Imports",
+        "Exports",
+        "Stock changes",
+        "Statistical discrepancy",
+        "Total primary"
+      ],
+      "rule_note": "Supply and top-level balancing rows. Matches generated labels by any component code, not just the first displayed code."
+    },
+    {
+      "page_key": "bunkers",
+      "page_label": "Bunkers",
+      "priority": 20,
+      "flow_code_prefixes": [
+        "04",
+        "05"
+      ],
+      "flow_keywords": [
+        "International marine bunkers",
+        "International aviation bunkers"
+      ],
+      "rule_note": "International aviation and marine bunkers."
+    },
+    {
+      "page_key": "power",
+      "page_label": "Power",
+      "priority": 30,
+      "flow_code_prefixes": [
+        "18",
+        "19",
+        "10.01.01"
+      ],
+      "flow_keywords": [
+        "electricity plants",
+        "CHP plants",
+        "heat plants",
+        "Electricity, CHP and heat plants"
+      ],
+      "rule_note": "Electricity and heat output, plus directly related power-sector own-use rows. Also catches generated rollups such as 09.01.01,09.02.01 Electricity plants by label keyword."
+    },
+    {
+      "rule_id": "transfers_any_08_to_other_transformation",
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "section_key": "transfers",
+      "section_label": "Transfers",
+      "priority": 35,
+      "flow_code_prefixes": [
+        "08"
+      ],
+      "flow_keywords": [],
+      "rule_note": "Transfers rule: any generated/common row containing an 08 transfer component is assigned to the Transfers section under Other transformation, regardless of whether the display label mentions refining or blending."
+    },
+    {
+      "page_key": "refining",
+      "page_label": "Refining",
+      "priority": 40,
+      "flow_code_prefixes": [
+        "09.07",
+        "10.01.11"
+      ],
+      "flow_keywords": [
+        "Oil refineries"
+      ],
+      "rule_note": "Oil refining rows. Transfer rows beginning with 08 are intentionally kept in Other transformation > Transfers, even when their label mentions refinery or blending.",
+      "exclude_flow_code_prefixes": [
+        "08"
+      ]
+    },
+    {
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "priority": 50,
+      "flow_code_prefixes": [
+        "09",
+        "10.01",
+        "10.02"
+      ],
+      "flow_keywords": [
+        "transformation",
+        "Transfers",
+        "Gas processing",
+        "Coal mines",
+        "Oil and gas extraction",
+        "Transmission and distribution"
+      ],
+      "exclude_flow_code_prefixes": [
+        "17"
+      ],
+      "rule_note": "Transformation, energy own-use, extraction own-use, and losses not assigned to power/refining. Transfer rows beginning with 08 are handled by the higher-priority Transfers rule on this same page."
+    },
+    {
+      "page_key": "industry",
+      "page_label": "Industry",
+      "priority": 60,
+      "flow_code_prefixes": [
+        "14"
+      ],
+      "flow_keywords": [
+        "Manufacturing",
+        "Mining",
+        "Construction",
+        "Iron and steel",
+        "Chemical"
+      ],
+      "rule_note": "Industry final energy demand rows."
+    },
+    {
+      "page_key": "transport",
+      "page_label": "Transport",
+      "priority": 70,
+      "flow_code_prefixes": [
+        "15"
+      ],
+      "flow_keywords": [
+        "transport",
+        "Road",
+        "Rail",
+        "navigation",
+        "Pipeline transport"
+      ],
+      "rule_note": "Domestic transport final energy demand rows."
+    },
+    {
+      "page_key": "buildings",
+      "page_label": "Buildings",
+      "priority": 80,
+      "flow_code_prefixes": [
+        "16.01",
+        "16.02"
+      ],
+      "flow_keywords": [
+        "Commercial",
+        "Residential",
+        "Datacentres"
+      ],
+      "rule_note": "Residential, commercial, public services, and datacentre rows."
+    },
+    {
+      "page_key": "others",
+      "page_label": "Other demand",
+      "priority": 90,
+      "flow_code_prefixes": [
+        "16.03",
+        "16.04",
+        "16.05"
+      ],
+      "flow_keywords": [
+        "Agriculture",
+        "Fishing",
+        "Non-specified others",
+        "Other sector"
+      ],
+      "rule_note": "Other final demand rows outside buildings/industry/transport."
+    },
+    {
+      "page_key": "non_energy",
+      "page_label": "Non-energy use",
+      "priority": 55,
+      "flow_code_prefixes": [
+        "17"
+      ],
+      "flow_keywords": [
+        "Non-energy"
+      ],
+      "rule_note": "Non-energy use rows."
+    }
+  ],
+  "total_demand_page": {
+    "enabled": true,
+    "demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"],
+    "supply_codes": ["01", "02", "03"],
+    "tfec_exclude_page_keys": ["non_energy"],
+    "sector_colors": {
+      "industry": "#3b82f6",
+      "transport": "#f97316",
+      "buildings": "#10b981",
+      "others": "#8b5cf6",
+      "non_energy": "#94a3b8"
+    },
+    "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports). Bunkers (04,05) and stock changes (06) are excluded because they are not recorded in LEAP projection scenarios."
+  },
+  "scope_specific_pages": {
+    "enabled": true,
+    "_note": "Optional alternate-scope pages. These are generated only when matching rows exist in the input data; the normal dashboard pages remain on default_comparison_scope.",
+    "pages": [
+      {
+        "enabled": true,
+        "page_key": "transport_leap_vs_ninth",
+        "page_label": "Transport detail (LEAP vs 9th)",
+        "comparison_scope": "leap_vs_ninth",
+        "comparison_source_system": "NINTH",
+        "source_page_keys": ["transport"],
+        "include_flow_code_prefixes": ["15"],
+        "include_flow_keywords": ["transport", "Road", "Rail", "navigation", "Pipeline transport"],
+        "page_note": "Scope-specific LEAP vs 9th page for transport detail that may not exist in the full three-way common ESTO comparison."
+      },
+      {
+        "enabled": true,
+        "page_key": "datacentres_leap_vs_ninth",
+        "page_label": "Datacentres (LEAP vs 9th)",
+        "comparison_scope": "leap_vs_ninth",
+        "comparison_source_system": "NINTH",
+        "source_page_keys": ["buildings"],
+        "include_flow_keywords": ["Datacentres", "Data centres", "Data centers"],
+        "page_note": "Scope-specific LEAP vs 9th page for datacentre demand detail where the full three-way comparison is too coarse."
+      }
+    ]
+  },
+  "sankey_diagrams": {
+    "enabled": false,
+    "status": "design_scaffold_only",
+    "_note": "Sankey generation is intentionally disabled until balance-routing rules define how signed common ESTO flows connect without double-counting.",
+    "required_routing_fields": [
+      "route_id",
+      "comparison_scope",
+      "source_node",
+      "target_node",
+      "flow_code_prefixes",
+      "product_code_prefixes",
+      "value_sign",
+      "include_in_total",
+      "priority"
+    ],
+    "candidate_pages": ["supply", "power", "refining", "other_transformation", "total_demand"]
+  },
+  "sign_semantics": [
+    {
+      "rule_id": "production_supply",
+      "flow_code_prefixes": [
+        "01"
+      ],
+      "flow_keywords": [
+        "Production"
+      ],
+      "sign_convention": "production_supply",
+      "expected_sign": "positive",
+      "positive_value_meaning": "domestic production added to supply",
+      "negative_value_meaning": "negative production; check mapping/source sign convention",
+      "zero_value_meaning": "no production recorded"
+    },
+    {
+      "rule_id": "imports_supply",
+      "flow_code_prefixes": [
+        "02"
+      ],
+      "flow_keywords": [
+        "Imports"
+      ],
+      "sign_convention": "imports_supply",
+      "expected_sign": "positive",
+      "positive_value_meaning": "imports added to supply",
+      "negative_value_meaning": "negative imports; check mapping/source sign convention",
+      "zero_value_meaning": "no imports recorded"
+    },
+    {
+      "rule_id": "exports_supply_deduction",
+      "flow_code_prefixes": [
+        "03"
+      ],
+      "flow_keywords": [
+        "Exports"
+      ],
+      "sign_convention": "exports_removed_from_supply",
+      "expected_sign": "negative",
+      "positive_value_meaning": "positive exports; check mapping/source sign convention",
+      "negative_value_meaning": "exports removed from domestic supply",
+      "zero_value_meaning": "no exports recorded"
+    },
+    {
+      "rule_id": "international_bunkers",
+      "flow_code_prefixes": [
+        "04",
+        "05"
+      ],
+      "flow_keywords": [
+        "International marine bunkers",
+        "International aviation bunkers",
+        "Bunkers"
+      ],
+      "sign_convention": "bunkers_removed_from_supply",
+      "expected_sign": "negative",
+      "positive_value_meaning": "positive bunkers; check mapping/source sign convention",
+      "negative_value_meaning": "fuel supplied to international aviation/marine, removed from domestic supply",
+      "zero_value_meaning": "no bunker fuel recorded"
+    },
+    {
+      "rule_id": "stock_changes",
+      "flow_code_prefixes": [
+        "06"
+      ],
+      "flow_keywords": [
+        "Stock changes"
+      ],
+      "sign_convention": "stock_change",
+      "expected_sign": "both",
+      "positive_value_meaning": "stock draw, added to supply",
+      "negative_value_meaning": "stock build, removed from supply",
+      "zero_value_meaning": "no net stock change recorded"
+    },
+    {
+      "rule_id": "transfers",
+      "flow_code_prefixes": [
+        "08"
+      ],
+      "flow_keywords": [
+        "Transfers"
+      ],
+      "sign_convention": "transfer_balance",
+      "expected_sign": "both",
+      "positive_value_meaning": "fuel transferred into this product/category",
+      "negative_value_meaning": "fuel transferred out of this product/category",
+      "zero_value_meaning": "no transfer recorded"
+    },
+    {
+      "rule_id": "transformation",
+      "flow_code_prefixes": [
+        "09"
+      ],
+      "flow_keywords": [
+        "transformation",
+        "Oil refineries",
+        "Gas processing",
+        "Coal transformation"
+      ],
+      "sign_convention": "transformation_input_output",
+      "expected_sign": "both",
+      "positive_value_meaning": "transformation output",
+      "negative_value_meaning": "transformation input",
+      "zero_value_meaning": "no transformation activity recorded"
+    },
+    {
+      "rule_id": "energy_own_use_losses",
+      "flow_code_prefixes": [
+        "10"
+      ],
+      "flow_keywords": [
+        "Own use",
+        "Transmission and distribution losses",
+        "losses"
+      ],
+      "sign_convention": "own_use_or_loss_removed_from_supply",
+      "expected_sign": "negative",
+      "positive_value_meaning": "positive own-use/loss value; check mapping/source sign convention",
+      "negative_value_meaning": "energy used or lost within the energy sector",
+      "zero_value_meaning": "no own use or loss recorded"
+    },
+    {
+      "rule_id": "final_energy_demand",
+      "flow_code_prefixes": [
+        "14",
+        "15",
+        "16",
+        "17"
+      ],
+      "flow_keywords": [
+        "Manufacturing",
+        "Transport",
+        "Residential",
+        "Commercial",
+        "Non-energy use",
+        "Final energy"
+      ],
+      "sign_convention": "final_energy_use",
+      "expected_sign": "positive",
+      "positive_value_meaning": "final energy use by end-use sectors",
+      "negative_value_meaning": "negative final energy use; check mapping/source sign convention",
+      "zero_value_meaning": "no final energy use recorded"
+    },
+    {
+      "rule_id": "electricity_heat_output",
+      "flow_code_prefixes": [
+        "18",
+        "19"
+      ],
+      "flow_keywords": [
+        "electricity plants",
+        "CHP plants",
+        "heat plants",
+        "Electricity output",
+        "Heat output"
+      ],
+      "sign_convention": "electricity_heat_output",
+      "expected_sign": "positive",
+      "positive_value_meaning": "electricity or heat produced",
+      "negative_value_meaning": "negative electricity/heat output; check mapping/source sign convention",
+      "zero_value_meaning": "no electricity or heat output recorded"
+    }
+  ]
+}

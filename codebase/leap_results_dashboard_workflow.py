@@ -74,6 +74,11 @@ from codebase.utilities.leap_results_dashboard_balance import (  # noqa: E402
     write_ninth_mapping_data_coverage,
     write_runtime_missing_pair_summary,
 )
+from codebase.utilities.leap_results_dashboard_compare import (  # noqa: E402
+    build_comparison_dashboard,
+    snapshot_dashboard_baseline,
+    write_build_provenance,
+)
 from codebase.utilities.leap_results_dashboard_utils import _prepare_render_long  # noqa: E402
 from codebase.utilities.leap_results_dashboard_v2.comparison_engine import (  # noqa: E402
     build_chart_line_mapping_ledger,
@@ -269,6 +274,17 @@ BUNKER_SHEET_KEYS = {
 FAIL_ON_UNMAPPED_BALANCE_ROWS = os.getenv("FAIL_ON_UNMAPPED_BALANCE_ROWS", "1").strip().lower() in {
     "1", "true", "yes", "y",
 }
+
+# Visual regression comparison for code changes. Before re-rendering, the
+# previous run's chart bundles are snapshotted; after rendering, a comparison
+# site is written under outputs/<token>/comparison/ where each chart shows the
+# previous run's series as faded dotted "(prev)" lines next to the new values.
+#   BUILD_COMPARISON_DASHBOARD=0  skip snapshot and comparison entirely
+#   PIN_COMPARISON_BASELINE=1     keep the existing snapshot as a fixed baseline
+#                                 across repeated test runs (default refreshes
+#                                 the baseline from the previous run each time)
+BUILD_COMPARISON_DASHBOARD = _env_flag("BUILD_COMPARISON_DASHBOARD", default=False)
+PIN_COMPARISON_BASELINE = _env_flag("PIN_COMPARISON_BASELINE", default=False)
 
 
 #%%
@@ -566,6 +582,8 @@ def _stage_render_dashboards(
     mapping_workbook_path: Path,
     base_year: int,
     max_output_year: int,
+    build_comparison: bool,
+    pin_comparison_baseline: bool,
     timer,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict, pd.DataFrame, pd.DataFrame]:
     """Render HTML dashboards and write chart mapping ledgers.
@@ -588,6 +606,15 @@ def _stage_render_dashboards(
         )
         return chart_line_mapping_ledger, chart_total_component_ledger, {}, pd.DataFrame(), pd.DataFrame()
 
+    comparison_baseline_dir = layout.supporting / "comparison_baseline"
+    if build_comparison:
+        # Preserve the previous run's bundles before the renderer deletes them.
+        snapshot_dashboard_baseline(
+            publish_dir,
+            comparison_baseline_dir,
+            overwrite=not pin_comparison_baseline,
+        )
+
     split_comparison_long = _split_directional_balance_rows_for_charts(comparison_long, resolved_structure)
     chart_input = _prepare_render_long(split_comparison_long)
     chart_line_mapping_ledger = build_chart_line_mapping_ledger(chart_input, mapping_status)
@@ -603,11 +630,19 @@ def _stage_render_dashboards(
         hide_leap_only_charts=hide_leap_only_charts,
         hide_charts_without_leap_data=hide_charts_without_leap_data,
         chart_navigation_guide_path=chart_navigation_guide_path,
+        leap_source_long=conversion.get("esto_long", pd.DataFrame()),
     )
     _write_dashboard_about_supplements(
         dashboards_dir=Path(str(dashboard_paths["dashboards_dir"])),
         template_json_path=chart_navigation_guide_path,
     )
+    if build_comparison:
+        comparison_paths = build_comparison_dashboard(
+            publish_dir=publish_dir,
+            baseline_dir=comparison_baseline_dir,
+            comparison_dir=Path(publish_dir) / "comparison",
+        )
+        dashboard_paths.update(comparison_paths)
     timer.lap("render dashboards")
 
     chart_line_mapping_ledger = attach_chart_groups_to_dashboard_exposure(
@@ -874,6 +909,8 @@ def run_workflow(economy_code: str) -> dict[str, object]:
         mapping_workbook_path=_mapping_workbook(LEAP_TO_ESTO_MAPPING),
         base_year=BASE_YEAR,
         max_output_year=MAX_OUTPUT_YEAR,
+        build_comparison=BUILD_COMPARISON_DASHBOARD,
+        pin_comparison_baseline=PIN_COMPARISON_BASELINE,
         timer=timer,
     )
 
@@ -912,6 +949,7 @@ def run_workflow(economy_code: str) -> dict[str, object]:
             "charts_dir": str(publish_dir / "charts"),
             "chart_bundles_dir": dashboard_paths.get("chart_bundles_dir"),
             "dashboards_dir": str(publish_dir / "dashboards"),
+            "comparison_index": dashboard_paths.get("comparison_index"),
         },
         supporting_outputs={
             "shared_leap_balance_esto_long": shared_conversion_paths.get("shared_leap_balance_esto_long"),
@@ -951,6 +989,7 @@ def run_workflow(economy_code: str) -> dict[str, object]:
             "charts_dir": "Legacy per-chart HTML/PNG output directory, used when CHART_OUTPUT_MODE is not page_bundles.",
             "chart_bundles_dir": "Page-level Plotly JSON bundles used by the ESTO-axis dashboards.",
             "dashboards_dir": "Rendered ESTO-axis dashboard HTML pages.",
+            "comparison_index": "Visual regression comparison site: current charts with previous-run series overlaid as faded dotted lines.",
         },
         supporting_output_descriptions={
             "shared_leap_balance_esto_long": "Reusable LEAP balance long table mapped to ESTO rows.",
@@ -1006,6 +1045,8 @@ def run_workflow(economy_code: str) -> dict[str, object]:
         "chart_line_mapping_ledger": str(layout.ledgers / "chart_line_mapping_ledger.csv"),
         "chart_total_component_ledger": str(layout.ledgers / "chart_total_component_ledger.csv"),
         "dashboard_index": dashboard_paths.get("dashboard_index"),
+        "comparison_index": dashboard_paths.get("comparison_index"),
+        "comparison_summary_csv": dashboard_paths.get("comparison_summary_csv"),
         "charts_written": dashboard_paths.get("charts_written"),
         "chart_output_mode": CHART_OUTPUT_MODE,
         "chart_bundles_dir": dashboard_paths.get("chart_bundles_dir"),
@@ -1029,6 +1070,17 @@ def run_workflow(economy_code: str) -> dict[str, object]:
         "output_manifest": str(manifest),
         "workflow_stage_timings_csv": str(timing_path),
     }
+    write_build_provenance(
+        output_dir=output_dir,
+        economy=economy_code,
+        stage_flags={
+            "STAGE_EXTRACT": STAGE_EXTRACT,
+            "STAGE_COMPARE": STAGE_COMPARE,
+            "STAGE_WRITE_OUTPUTS": STAGE_WRITE_OUTPUTS,
+            "STAGE_RENDER_DASHBOARDS": STAGE_RENDER_DASHBOARDS,
+            "STAGE_WRITE_COVERAGE": STAGE_WRITE_COVERAGE,
+        },
+    )
     try:
         _raise_if_unmapped_balance_rows(
             filtered_runtime_issues,
