@@ -48,6 +48,7 @@ Thumbs.db
 *.dll
 *.code-workspace
 !.gitkeep
+!tests/fixtures/**/*.csv
 
 # Committed dashboard site assets (docs/ = GitHub Pages source)
 # HTML, JS, JSON in docs/ are committed; heavy data files inside docs/ are not.

@@ -37,10 +37,10 @@ def _resolve(path: str | Path) -> Path:
 
 #%%
 # Stable paths.
-DEFAULT_WIDE_INPUT_PATH = _resolve("data/common_esto_dashboard/sample/common_esto_comparison_wide.csv")
-DEFAULT_LONG_INPUT_PATH = _resolve("data/common_esto_dashboard/sample/common_esto_comparison_data_sample.csv")
+DEFAULT_WIDE_INPUT_PATH = _resolve("tests/fixtures/common_esto_dashboard/common_esto_comparison_wide.csv")
+DEFAULT_LONG_INPUT_PATH = _resolve("tests/fixtures/common_esto_dashboard/common_esto_comparison_data_sample.csv")
 INPUT_DATA_PATH = _resolve(os.getenv("COMMON_ESTO_INPUT_DATA_PATH", DEFAULT_WIDE_INPUT_PATH if DEFAULT_WIDE_INPUT_PATH.exists() else DEFAULT_LONG_INPUT_PATH))
-COMMON_ROWS_PATH = _resolve(os.getenv("COMMON_ESTO_ROWS_PATH", "data/common_esto_dashboard/sample/common_esto_rows.csv"))
+COMMON_ROWS_PATH = _resolve(os.getenv("COMMON_ESTO_ROWS_PATH", "tests/fixtures/common_esto_dashboard/common_esto_rows.csv"))
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
 OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
