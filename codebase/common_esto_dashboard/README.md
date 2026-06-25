@@ -26,12 +26,32 @@ The default sample economy is `20_USA`.
 By default, the workflow reads the tracked weekly sample fixture:
 
 ```text
-tests/fixtures/common_esto_dashboard/common_esto_comparison_wide.csv
+tests/fixtures/common_esto_dashboard/common_esto_comparison_data_sample.csv
 tests/fixtures/common_esto_dashboard/common_esto_rows.csv
 ```
 
 Update these fixture files when the upstream common ESTO data changes so the
 sample remains representative and dashboard regressions are easier to spot.
+
+To refresh the weekly sample from `leap_mappings/results/common_esto/` and run
+the standard checks:
+
+```powershell
+C:\Users\Work\miniconda3\python.exe scripts\update_common_esto_dashboard_fixture.py
+```
+
+The script copies:
+
+```text
+C:\Users\Work\github\leap_mappings\results\common_esto\common_esto_comparison_data.csv
+C:\Users\Work\github\leap_mappings\results\common_esto\common_esto_rows.csv
+```
+
+into `tests/fixtures/common_esto_dashboard/`, then runs the smoke test and a
+full dashboard render. The comparison fixture is written as a long-form
+single-economy sample for `20_USA`, preserving all comparison scopes including
+`leap_vs_ninth`. If `leap_mappings` is somewhere else, set `LEAP_MAPPINGS_ROOT`
+before running the script.
 
 For production or ad hoc runs, override the input paths with environment
 variables:
@@ -62,6 +82,8 @@ static dashboard switcher.
 
 Generated outputs stay under `outputs/` by default and are ignored by git. To
 copy serving assets to GitHub Pages, set `PUBLISH_TO_DOCS = True` in the workflow.
+This stays as a manual toggle so fixture refreshes and ordinary render checks do
+not accidentally update `docs/`.
 Only `.html`, `.js`, and `.json` dashboard-serving files are copied to `docs/`;
 supporting CSVs remain in `outputs/`.
 

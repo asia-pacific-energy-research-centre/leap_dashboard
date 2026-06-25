@@ -72,5 +72,5 @@ def test_common_esto_dashboard_renders_core_and_scope_pages(tmp_path: Path) -> N
 
 def test_weekly_common_esto_sample_fixture_is_present() -> None:
     fixture_dir = REPO_ROOT / "tests" / "fixtures" / "common_esto_dashboard"
-    assert (fixture_dir / "common_esto_comparison_wide.csv").exists()
+    assert (fixture_dir / "common_esto_comparison_data_sample.csv").exists()
     assert (fixture_dir / "common_esto_rows.csv").exists()
