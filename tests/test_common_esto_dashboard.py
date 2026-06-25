@@ -49,7 +49,7 @@ def _build_common_esto_rows() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_common_esto_dashboard_renders_core_and_scope_pages(tmp_path: Path) -> None:
+def test_common_esto_dashboard_renders_core_pages_by_default(tmp_path: Path) -> None:
     template = _load_template()
     series_config = _load_series_config()
     df = apply_sign_semantics(_build_common_esto_rows(), template["sign_semantics"])
@@ -61,12 +61,28 @@ def test_common_esto_dashboard_renders_core_and_scope_pages(tmp_path: Path) -> N
     assert (layout["dashboards"] / "index.html").exists()
     assert (layout["dashboards"] / "transport.html").exists()
     assert (layout["dashboards"] / "total_demand.html").exists()
-    assert (layout["dashboards"] / "transport_leap_vs_ninth.html").exists()
+    assert not (layout["dashboards"] / "transport_leap_vs_ninth.html").exists()
     assert (layout["supporting"] / "chart_manifest.csv").exists()
 
     page_keys = set(manifest["page_key"])
     assert "transport" in page_keys
     assert "total_demand" in page_keys
+    assert "transport_leap_vs_ninth" not in page_keys
+
+
+def test_common_esto_dashboard_can_render_opt_in_scope_pages(tmp_path: Path) -> None:
+    template = _load_template()
+    template["scope_specific_pages"]["enabled"] = True
+    series_config = _load_series_config()
+    df = apply_sign_semantics(_build_common_esto_rows(), template["sign_semantics"])
+    main_df = df[df["comparison_scope"] == "leap_vs_esto_vs_ninth"].copy()
+
+    layout = build_output_layout(tmp_path / "outputs", "20USA", clear_existing=True)
+    manifest = render_dashboard(main_df, template, series_config, layout, scope_df=df)
+
+    assert (layout["dashboards"] / "transport_leap_vs_ninth.html").exists()
+
+    page_keys = set(manifest["page_key"])
     assert "transport_leap_vs_ninth" in page_keys
 
 

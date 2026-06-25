@@ -74,9 +74,11 @@ config/common_esto_dashboard/series_config.json
 ```
 
 The template controls page assignment, sign semantics, total demand, optional
-scope-specific pages, and the disabled Sankey scaffold. `series_config.json`
-controls visible source/scenario series, labels, economy display text, and the
-static dashboard switcher.
+diagnostic scope-specific pages, and the disabled Sankey scaffold.
+Scope-specific pages are disabled by default until their content has been
+reviewed for production usefulness; enable `scope_specific_pages.enabled` only
+for focused review runs. `series_config.json` controls visible source/scenario
+series, labels, economy display text, and the static dashboard switcher.
 
 ## Publish
 

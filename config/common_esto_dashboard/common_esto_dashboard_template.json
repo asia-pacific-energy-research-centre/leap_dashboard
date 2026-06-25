@@ -212,29 +212,29 @@
     "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports). Bunkers (04,05) and stock changes (06) are excluded because they are not recorded in LEAP projection scenarios."
   },
   "scope_specific_pages": {
-    "enabled": true,
-    "_note": "Optional alternate-scope pages. These are generated only when matching rows exist in the input data; the normal dashboard pages remain on default_comparison_scope.",
+    "enabled": false,
+    "_note": "Optional diagnostic alternate-scope pages. Keep disabled by default until each page has been reviewed for production usefulness; when enabled, pages are generated only when matching rows exist in the input data.",
     "pages": [
       {
         "enabled": true,
         "page_key": "transport_leap_vs_ninth",
-        "page_label": "Transport detail (LEAP vs 9th)",
+        "page_label": "Diagnostic transport detail (LEAP vs 9th)",
         "comparison_scope": "leap_vs_ninth",
         "comparison_source_system": "NINTH",
         "source_page_keys": ["transport"],
         "include_flow_code_prefixes": ["15"],
         "include_flow_keywords": ["transport", "Road", "Rail", "navigation", "Pipeline transport"],
-        "page_note": "Scope-specific LEAP vs 9th page for transport detail that may not exist in the full three-way common ESTO comparison."
+        "page_note": "Diagnostic LEAP vs 9th transport detail. This view can include sparse alternate-scope rows that are not suitable for the default dashboard until reviewed."
       },
       {
         "enabled": true,
         "page_key": "datacentres_leap_vs_ninth",
-        "page_label": "Datacentres (LEAP vs 9th)",
+        "page_label": "Diagnostic datacentres (LEAP vs 9th)",
         "comparison_scope": "leap_vs_ninth",
         "comparison_source_system": "NINTH",
         "source_page_keys": ["buildings"],
         "include_flow_keywords": ["Datacentres", "Data centres", "Data centers"],
-        "page_note": "Scope-specific LEAP vs 9th page for datacentre demand detail where the full three-way comparison is too coarse."
+        "page_note": "Diagnostic LEAP vs 9th datacentre demand detail. This view is hidden by default because current fixtures expose only sparse alternate-scope rows."
       }
     ]
   },
