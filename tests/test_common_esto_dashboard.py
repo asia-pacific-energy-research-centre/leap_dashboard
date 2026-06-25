@@ -9,6 +9,8 @@ from codebase.common_esto_dashboard.output_layout import build_output_layout
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CORE_PAGES = ["index", "total_demand", "transport"]
+DEFAULT_DIAGNOSTIC_PAGES = ["transport_leap_vs_ninth", "datacentres_leap_vs_ninth"]
 
 
 def _load_template() -> dict:
@@ -49,6 +51,29 @@ def _build_common_esto_rows() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _assert_generated_dashboard_outputs(layout: dict[str, Path], expected_pages: list[str]) -> None:
+    """Check that generated pages and Plotly bundles are present and non-empty."""
+    for page_key in expected_pages:
+        assert (layout["dashboards"] / f"{page_key}.html").exists()
+
+    for page_key in DEFAULT_DIAGNOSTIC_PAGES:
+        assert not (layout["dashboards"] / f"{page_key}.html").exists()
+        assert not (layout["chart_bundles"] / f"{page_key}__charts.json").exists()
+
+    for page_key in expected_pages:
+        if page_key == "index":
+            continue
+        bundle_path = layout["chart_bundles"] / f"{page_key}__charts.json"
+        assert bundle_path.exists()
+        bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
+        charts = bundle.get("charts", {})
+        assert charts
+        for chart_key, figure in charts.items():
+            traces = figure.get("data", [])
+            assert traces, chart_key
+            assert any(trace.get("x") and trace.get("y") for trace in traces), chart_key
+
+
 def test_common_esto_dashboard_renders_core_pages_by_default(tmp_path: Path) -> None:
     template = _load_template()
     series_config = _load_series_config()
@@ -58,10 +83,7 @@ def test_common_esto_dashboard_renders_core_pages_by_default(tmp_path: Path) -> 
     layout = build_output_layout(tmp_path / "outputs", "20USA", clear_existing=True)
     manifest = render_dashboard(main_df, template, series_config, layout, scope_df=df)
 
-    assert (layout["dashboards"] / "index.html").exists()
-    assert (layout["dashboards"] / "transport.html").exists()
-    assert (layout["dashboards"] / "total_demand.html").exists()
-    assert not (layout["dashboards"] / "transport_leap_vs_ninth.html").exists()
+    _assert_generated_dashboard_outputs(layout, DEFAULT_CORE_PAGES)
     assert (layout["supporting"] / "chart_manifest.csv").exists()
 
     page_keys = set(manifest["page_key"])
