@@ -3,6 +3,7 @@
 
 #%%
 import json
+import csv
 from pathlib import Path
 
 
@@ -22,7 +23,9 @@ def _resolve(path: str | Path) -> Path:
 
 #%%
 # User-tuned constants.
-DASHBOARD_ROOT = _resolve("outputs/common_esto_dashboard/20USA")
+DASHBOARD_OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
+DASHBOARD_ROOT = DASHBOARD_OUTPUT_ROOT / "20USA"
+CHECK_ALL_RENDERED_DASHBOARDS = True
 EXPECTED_PAGE_KEYS = [
     "index",
     "total_demand",
@@ -45,6 +48,33 @@ RUN_PUBLISH_READY_CHECK = True
 
 
 #%%
+def find_rendered_dashboard_roots(output_root: Path) -> list[Path]:
+    """Return rendered economy dashboard roots under the Common ESTO output folder."""
+    if not output_root.exists():
+        return []
+    roots = []
+    for path in output_root.iterdir():
+        if not path.is_dir():
+            continue
+        if (path / "dashboards" / "index.html").exists():
+            roots.append(path)
+    return sorted(roots, key=lambda item: item.name)
+
+
+def expected_pages_from_manifest(dashboard_root: Path) -> list[str]:
+    """Return expected dashboard page keys from the rendered chart manifest."""
+    manifest_path = dashboard_root / "supporting_files" / "chart_manifest.csv"
+    if not manifest_path.exists():
+        return []
+    page_keys: set[str] = {"index"}
+    with manifest_path.open(newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            page_key = str(row.get("page_key", "")).strip()
+            if page_key:
+                page_keys.add(page_key)
+    return sorted(page_keys)
+
+
 def check_html_pages(dashboard_root: Path, expected_page_keys: list[str]) -> list[str]:
     """Return missing or empty expected dashboard HTML page errors."""
     errors: list[str] = []
@@ -120,8 +150,8 @@ def check_supporting_files(dashboard_root: Path) -> list[str]:
 def build_publish_checklist(dashboard_root: Path) -> list[str]:
     """Return the manual publishing checklist text."""
     return [
-        "Review the rendered dashboard index in outputs/common_esto_dashboard/20USA/dashboards/index.html.",
-        "Review supporting_files/chart_manifest.csv for page counts and noisy pages.",
+        f"Review the rendered dashboard index in {dashboard_root / 'dashboards' / 'index.html'}.",
+        "Review supporting_files/chart_manifest.csv for page counts and noisy pages in each rendered economy.",
         "Leave PUBLISH_TO_DOCS = False for fixture refreshes and ordinary render checks.",
         "Only when ready to publish, set PUBLISH_TO_DOCS = True in codebase/common_esto_dashboard/common_esto_dashboard_workflow.py.",
         "Run C:\\Users\\Work\\miniconda3\\python.exe codebase\\common_esto_dashboard\\common_esto_dashboard_workflow.py.",
@@ -131,17 +161,27 @@ def build_publish_checklist(dashboard_root: Path) -> list[str]:
     ]
 
 
-def run_publish_ready_check(
+def check_one_dashboard_root(
     dashboard_root: Path,
     expected_page_keys: list[str],
     diagnostic_page_keys: list[str],
-) -> dict[str, object]:
-    """Run all publish-readiness checks and print a manual checklist."""
+) -> list[str]:
+    """Run publish-readiness checks for one rendered dashboard root."""
     errors: list[str] = []
     errors.extend(check_html_pages(dashboard_root, expected_page_keys))
     errors.extend(check_diagnostic_pages_hidden(dashboard_root, diagnostic_page_keys))
     errors.extend(check_chart_bundles(dashboard_root, expected_page_keys))
     errors.extend(check_supporting_files(dashboard_root))
+    return errors
+
+
+def run_publish_ready_check(
+    dashboard_root: Path,
+    expected_page_keys: list[str],
+    diagnostic_page_keys: list[str],
+) -> dict[str, object]:
+    """Run publish-readiness checks for one dashboard and print a manual checklist."""
+    errors = check_one_dashboard_root(dashboard_root, expected_page_keys, diagnostic_page_keys)
 
     checklist = build_publish_checklist(dashboard_root)
     if errors:
@@ -156,14 +196,50 @@ def run_publish_ready_check(
     return {"ok": not errors, "errors": errors, "checklist": checklist}
 
 
+def run_all_publish_ready_checks(output_root: Path, diagnostic_page_keys: list[str]) -> dict[str, object]:
+    """Run publish-readiness checks for every rendered dashboard under output_root."""
+    roots = find_rendered_dashboard_roots(output_root)
+    errors: list[str] = []
+    checked: list[str] = []
+    if not roots:
+        errors.append(f"No rendered dashboards found under: {output_root}")
+    for root in roots:
+        expected_page_keys = expected_pages_from_manifest(root)
+        if not expected_page_keys:
+            errors.append(f"Could not derive expected pages from manifest: {root}")
+            continue
+        root_errors = check_one_dashboard_root(root, expected_page_keys, diagnostic_page_keys)
+        errors.extend([f"{root.name}: {error}" for error in root_errors])
+        checked.append(root.name)
+
+    checklist = build_publish_checklist(output_root / "20USA")
+    if errors:
+        print("Common ESTO publish readiness check failed:")
+        for error in errors:
+            print(f"- {error}")
+    else:
+        print("Common ESTO publish readiness check passed.")
+    print(f"Rendered dashboards checked: {', '.join(checked) if checked else '(none)'}")
+    print("\nManual publish checklist:")
+    for step_number, step in enumerate(checklist, start=1):
+        print(f"{step_number}. {step}")
+    return {"ok": not errors, "errors": errors, "checked": checked, "checklist": checklist}
+
+
 #%%
 try:
     if RUN_PUBLISH_READY_CHECK:
-        PUBLISH_READY_RESULT = run_publish_ready_check(
-            DASHBOARD_ROOT,
-            EXPECTED_PAGE_KEYS,
-            DIAGNOSTIC_PAGE_KEYS,
-        )
+        if CHECK_ALL_RENDERED_DASHBOARDS:
+            PUBLISH_READY_RESULT = run_all_publish_ready_checks(
+                DASHBOARD_OUTPUT_ROOT,
+                DIAGNOSTIC_PAGE_KEYS,
+            )
+        else:
+            PUBLISH_READY_RESULT = run_publish_ready_check(
+                DASHBOARD_ROOT,
+                EXPECTED_PAGE_KEYS,
+                DIAGNOSTIC_PAGE_KEYS,
+            )
         if not PUBLISH_READY_RESULT["ok"]:
             raise RuntimeError("Common ESTO dashboard is not ready to publish.")
     else:

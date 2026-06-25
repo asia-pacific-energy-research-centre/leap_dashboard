@@ -53,6 +53,33 @@ single-economy sample for `20_USA`, preserving all comparison scopes including
 `leap_vs_ninth`. If `leap_mappings` is somewhere else, set `LEAP_MAPPINGS_ROOT`
 before running the script.
 
+To render every available economy from the upstream common ESTO output:
+
+```powershell
+C:\Users\Work\miniconda3\python.exe scripts\render_common_esto_dashboard_all_economies.py
+```
+
+This writes one dashboard folder per compact economy code under
+`outputs/common_esto_dashboard/` and a compact run summary at:
+
+```text
+outputs/common_esto_dashboard/render_summary.csv
+```
+
+For quick checks, render a subset:
+
+```powershell
+$env:COMMON_ESTO_ECONOMIES = "01AUS,20USA"
+C:\Users\Work\miniconda3\python.exe scripts\render_common_esto_dashboard_all_economies.py
+```
+
+To rebuild only the summary from existing rendered folders:
+
+```powershell
+$env:COMMON_ESTO_RENDER_DASHBOARDS = "0"
+C:\Users\Work\miniconda3\python.exe scripts\render_common_esto_dashboard_all_economies.py
+```
+
 For production or ad hoc runs, override the input paths with environment
 variables:
 
@@ -94,6 +121,10 @@ check that the rendered dashboard is ready for manual publication, run:
 ```powershell
 C:\Users\Work\miniconda3\python.exe scripts\check_common_esto_dashboard_publish_ready.py
 ```
+
+The readiness check scans every rendered economy under
+`outputs/common_esto_dashboard/` and validates the pages and Plotly bundles
+listed in each economy's chart manifest.
 
 To copy serving assets to GitHub Pages, set `PUBLISH_TO_DOCS = True` in the
 workflow and rerun it. This stays as a manual toggle so fixture refreshes and
