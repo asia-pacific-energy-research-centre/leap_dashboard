@@ -83,9 +83,15 @@ series, labels, economy display text, and the static dashboard switcher.
 ## Publish
 
 Generated outputs stay under `outputs/` by default and are ignored by git. To
-copy serving assets to GitHub Pages, set `PUBLISH_TO_DOCS = True` in the workflow.
-This stays as a manual toggle so fixture refreshes and ordinary render checks do
-not accidentally update `docs/`.
+check that the rendered dashboard is ready for manual publication, run:
+
+```powershell
+C:\Users\Work\miniconda3\python.exe scripts\check_common_esto_dashboard_publish_ready.py
+```
+
+To copy serving assets to GitHub Pages, set `PUBLISH_TO_DOCS = True` in the
+workflow and rerun it. This stays as a manual toggle so fixture refreshes and
+ordinary render checks do not accidentally update `docs/`.
 Only `.html`, `.js`, and `.json` dashboard-serving files are copied to `docs/`;
 supporting CSVs remain in `outputs/`.
 
