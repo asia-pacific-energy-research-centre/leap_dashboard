@@ -91,7 +91,7 @@ The dashboard then decides what pages and charts to create by inspecting the com
 
 ## Why this approach is needed
 
-The old dashboard approach relied heavily on a large JSON template that defined the dashboard hierarchy and many of the specific graphs. That worked when the mapping structure was relatively stable, but it becomes difficult to maintain when LEAP, ESTO, and 9th Outlook have different levels of detail and when they change over time. The old approach also required researchers to maintain a large set of `relationship_id -> graph_id` links with many-to-many relationships. This was error-prone and hard to audit.
+The frozen dashboard in `C:\Users\Work\github\leap_dashboard_legacy` relied heavily on a large JSON template that defined the dashboard hierarchy and many of the specific graphs. That worked when the mapping structure was relatively stable, but it becomes difficult to maintain when LEAP, ESTO, and 9th Outlook have different levels of detail and when they change over time. The legacy approach also required researchers to maintain a large set of `relationship_id -> graph_id` links with many-to-many relationships. This was error-prone and hard to audit.
 
 The new mapping process in leap_mappings creates common comparison categories automatically. These categories can change when the relationship between source datasets changes. For example, if LEAP has detail for several ESTO products but the 9th Outlook has them as one aggregate, then the dashboard should compare all datasets at that aggregate level. This is not a presentation choice; it is required to avoid unfair or misleading comparisons.
 
@@ -106,9 +106,9 @@ Because the common categories are generated mechanically, the dashboard cannot d
 
 The dashboard should therefore classify rows using their component codes and common labels, not by assuming a small fixed set of manually named graph IDs.
 
-## Current prototype status
+## Current production status
 
-The current prototype has already moved in this direction. It can:
+The production dashboard implements this direction. It can:
 
 - read long-form common ESTO comparison data;
 - read wide-form comparison data with year columns;
@@ -121,13 +121,13 @@ The current prototype has already moved in this direction. It can:
 - generate line charts for individual flow/product series;
 - write supporting QA-style files such as chart manifests, page assignment summaries, and sign summaries that allow dashboard decisions to be audited and worked back to the original dataset from.
 
-The current prototype should still be treated as a design and development pack, not the final production dashboard. Its main value is that it proves the dashboard can be generated from common ESTO rows instead of graph IDs. It doesn't need updating when the mappings change, because it is designed to work with whatever common ESTO structure is produced.
+The dashboard is generated from Common ESTO rows rather than graph IDs and is designed to work with whatever valid Common ESTO structure the upstream mapping pipeline produces.
 
 ### What is and isn't built
 
-This distinction matters for anyone reading this document to extend or rebuild the dashboard. The prototype code in `src/` implements the following:
+The production modules in `codebase/` implement the following:
 
-**Already implemented in the prototype:**
+**Implemented in production:**
 
 - Long-form and wide-form input loading and normalisation
 - Sign semantics metadata attachment by flow code
@@ -143,16 +143,16 @@ This distinction matters for anyone reading this document to extend or rebuild t
 - Client-side chart sorting by size, absolute difference, and percentage difference
 - Dashboard index page
 
-**Planned but not yet built:**
+**Original follow-on plan (now largely implemented):**
 
-- Parent/child frontier check: exclude parent flow rows from line chart generation when their children are present in the dataset, to avoid double-counting
+- Parent/child frontier check: implemented; parent flow rows are excluded from line chart generation when children are present
 - Summary aggregate charts (the third chart family — sits between overview and detail level)
-- Total demand page with a supply line that includes bunkers
+- Total demand page with a supply line that includes bunkers: implemented
 - Difference traces on line charts: LEAP minus ESTO for historical years, LEAP minus 9th for projection years, pre-computed and stored in the manifest
-- Series suppression: hide charts below a configurable total-value threshold, with suppressed rows still written to the manifest
-- Economy/dashboard switcher in the header
-- Scope-specific charts for sectors where LEAP and 9th have more detail than ESTO (e.g. transport subsectors, datacentres)
-- Automatic copy of outputs to `docs/` for GitHub Pages publishing
+- Series suppression with retained manifest audit rows: implemented
+- Economy/dashboard switcher in the header: implemented
+- Scope-specific diagnostic pages: implemented and disabled by default pending review
+- Optional copy of serving outputs to `docs/` for GitHub Pages publishing: implemented behind `PUBLISH_TO_DOCS`
 - Sankey diagrams (deferred — not part of initial production build)
 - Full ranking metrics in the manifest (prototype writes `total_abs_value`, `abs_diff`, `pct_diff` only; the full field list is in [Suggested ranking metrics](#suggested-ranking-metrics))
 - Correct comparison year pairing: LEAP vs ESTO for years ≤ base year, LEAP vs 9th Outlook for years > base year (see [Sorting and prioritisation](#sorting-and-prioritisation))
@@ -273,7 +273,7 @@ There are two main input files:
 
 - **`common_esto_rows.csv`** (optional) — Component membership metadata generated by the `leap_mappings` pipeline. Each row describes which ESTO flow/product pairs make up a common category. The dashboard uses this file to enrich page-assignment QA outputs and the chart manifest with details about what went into each generated category. If this file is absent, the dashboard runs normally but the QA outputs contain less detail.
 
-The sample input files in `inputs/` were produced by `leap_mappings` for the USA economy and can be used to test the prototype without running the full upstream pipeline.
+The sample files in `tests/fixtures/common_esto_dashboard/` were produced by `leap_mappings` for the USA economy and can be used to test the production dashboard without running the full upstream pipeline.
 
 ## Input data expected by the dashboard
 
@@ -348,7 +348,7 @@ scenario = Target
 
 Where the wide file does not include `comparison_scope`, the workflow assigns a default comparison scope from the dashboard config.
 
-New scenarios are added by updating `config/series_config.json`. For example, adding a `LEAP EED` entry there means the dashboard will include it automatically on every line chart where matching data exists in the input file. No other code changes are needed — the chart generator picks up all configured visible series from the dataset.
+New scenarios are added by updating `config/common_esto_dashboard/series_config.json`. For example, adding a `LEAP EED` entry there means the dashboard will include it automatically on every line chart where matching data exists in the input file. No other code changes are needed — the chart generator picks up all configured visible series from the dataset.
 
 ## Dataset filtering
 
@@ -370,7 +370,7 @@ NINTH Reference
 NINTH Target
 ```
 
-The full list is configurable via `config/series_config.json`. Additional LEAP scenarios can be added there without any code changes. A smaller subset can also be configured if a particular dashboard view should be less crowded.
+The full list is configurable via `config/common_esto_dashboard/series_config.json`. Additional LEAP scenarios can be added there without any code changes. A smaller subset can also be configured if a particular dashboard view should be less crowded.
 
 ## Sign semantics
 
@@ -630,31 +630,24 @@ AI can help write and refine the rules, but the rules should then be implemented
 
 ## Repository structure
 
-The current prototype uses this structure:
+The production repository uses this structure:
 
 ```text
 AGENTS.md
-README_task.md
-config/
-  common_esto_dashboard_template.json
-  series_config.json
-inputs/
-  common_esto_comparison_data_sample.csv
-  common_esto_comparison_wide.csv
-  common_esto_rows.csv
-  esto_to_common_esto_map.csv
-  qa_common_esto_structure_summary.csv
-  qa_common_esto_total_check.csv
-reference_only/
-  leap_dashboard_template_v3.json
-  old_dashboard_workflow_notes.md
-src/
+README.md
+codebase/
   common_esto_dashboard_workflow.py
   common_esto_dashboard_data.py
   common_esto_dashboard_renderer.py
-  output_layout.py
+  common_esto_dashboard_output_layout.py
+config/common_esto_dashboard/
+  common_esto_dashboard_template.json
+  series_config.json
+tests/fixtures/common_esto_dashboard/
+  common_esto_comparison_data_sample.csv
+  common_esto_rows.csv
 outputs/
-  <economy>/
+  common_esto_dashboard/<economy>/
     dashboards/
     chart_bundles/
     supporting_files/
@@ -663,25 +656,25 @@ outputs/
 The main scripts are:
 
 ```text
-src/common_esto_dashboard_workflow.py
+codebase/common_esto_dashboard_workflow.py
 ```
 
 Workflow entry point. Loads configuration, reads input data, filters rows, applies sign semantics, calls the renderer, and writes supporting files.
 
 ```text
-src/common_esto_dashboard_data.py
+codebase/common_esto_dashboard_data.py
 ```
 
 Loads long or wide data, normalises it into common long format, splits combined scenario labels, filters by scope/economy/year, applies visible-series filters, and attaches sign metadata.
 
 ```text
-src/common_esto_dashboard_renderer.py
+codebase/common_esto_dashboard_renderer.py
 ```
 
 Assigns rows to pages, parses generated code expressions, chooses area-chart groups, builds Plotly charts, writes chart bundles, writes pages, writes the dashboard index, and produces chart/page manifests.
 
 ```text
-src/output_layout.py
+codebase/common_esto_dashboard_output_layout.py
 ```
 
 Builds standard output paths for each economy.
@@ -690,7 +683,7 @@ Builds standard output paths for each economy.
 
 The dashboard currently uses two main config files.
 
-### `config/common_esto_dashboard_template.json`
+### `config/common_esto_dashboard/common_esto_dashboard_template.json`
 
 This file should define:
 
@@ -703,7 +696,7 @@ This file should define:
 
 It should not list every chart manually.
 
-### `config/series_config.json`
+### `config/common_esto_dashboard/series_config.json`
 
 This file should define which source/scenario series are visible and how they are displayed. For example:
 
@@ -721,9 +714,9 @@ This separation is useful because page/chart logic and series display logic chan
 
 A typical local run is:
 
-```bash
-cd common_esto_dashboard_agent_pack
-python src/common_esto_dashboard_workflow.py
+```powershell
+cd C:\Users\Work\github\leap_dashboard
+C:\Users\Work\miniconda3\python.exe codebase\common_esto_dashboard_workflow.py
 ```
 
 Optional environment variables can override default inputs:
@@ -774,7 +767,7 @@ The following decisions have been made for the production build. One open questi
 Area charts follow flow hierarchy — they show product composition within a flow group (e.g. `09 Transformation` stacked by product). Product hierarchy charts across flows are not meaningful in a balance structure and are not generated. The prototype already implements this correctly.
 
 **2. Parent and child rows: do not double-chart.**
-When a parent flow (e.g. `09 Transformation`) and a child flow (e.g. `09.01 Electricity plants`) both exist in the dataset, the parent appears only as an area overview chart. Child rows get line charts. The dashboard must implement a frontier check so that parent rows are excluded from line chart generation when their children are present. The current prototype charts every flow/product pair without this deduplication — the frontier check is a required addition.
+When a parent flow (e.g. `09 Transformation`) and a child flow (e.g. `09.01 Electricity plants`) both exist in the dataset, the parent appears only as an area overview chart. Child rows get line charts. The production renderer implements this frontier check so parent rows are excluded from line chart generation when their children are present.
 
 **3. Suppressing tiny or empty series: threshold with audit trail.**
 Charts where the total absolute value across all years falls below a configurable threshold (e.g. < 1 PJ) are suppressed from display, but are still written to the chart manifest with `suppressed: true`. They are never silently dropped. This ensures data-quality problems remain visible in QA outputs even when charts are hidden.
@@ -788,14 +781,16 @@ Sankey diagrams are deferred and are not part of the initial production build. T
 **6. Sections within pages: yes, config-driven.**
 Page rules support explicit sections within pages (e.g. `Other transformation > Transfers`). This is already partially implemented — the `08` transfer rule assigns rows a `section_key` separate from `page_key`. This pattern should be applied consistently to all pages via configuration. No code changes are required, only config.
 
-### Still open
+### Repository placement
 
-**7. How much of the current prototype to port back to the main `leap_dashboard` repository.**
-The prototype lives in `test/`. It will eventually be moved into the main repo codebase, but the timing and target path have not been decided yet.
+**7. Production location.**
+Resolved on 2026-06-27: the production modules live directly in `codebase/`.
+The duplicate test pack was removed. Historical comparisons use
+`C:\Users\Work\github\leap_dashboard_legacy`.
 
-## Production build plan
+## Historical production build plan
 
-This section records the agreed sequence for building the production dashboard from the current prototype. It is ordered so that each phase produces a working, testable dashboard before the next phase begins.
+This section records the sequence used to build the current production dashboard. Retain it as design history; use the current-status section and decision log for implementation status.
 
 ### Phase 1 — Core correctness
 
@@ -847,7 +842,6 @@ These are not part of the initial production build and should not block earlier 
 - **Sankey diagrams:** routing rules need separate design work.
 - **Economy/dashboard switcher:** add a header control to switch between economy dashboards without navigating away.
 - **Scope-specific charts:** charts tailored to `leap_vs_ninth` or sector detail available only in LEAP (e.g. transport subsectors, datacentres).
-- **Port prototype to main repo** (open question 7): timing and target path not yet decided.
 
 ## Acceptance criteria for the dashboard plan
 
@@ -1036,7 +1030,7 @@ This card structure makes it possible to show many charts on one page without lo
 
 Charts should be lazy-loaded where possible. Large pages may contain many charts, and loading every Plotly figure at once can make the dashboard slow. The page should therefore queue charts and render them as the user scrolls near them.
 
-This keeps the old dashboard style, where many charts are visible on the page, while making the page practical for larger automatically generated chart sets.
+This keeps the dense-page style available in the frozen legacy repository while making the page practical for larger automatically generated chart sets.
 
 ## Main chart families
 
@@ -1357,7 +1351,7 @@ The toggle is implemented as a Plotly `updatemenus` dropdown on the sector chart
 
 #### Implementation note
 
-The total demand page is a config-driven bespoke page. It aggregates across sector pages rather than operating on a single assigned page's rows. The parameters (demand page keys, supply codes, excluded sector keys, sector colours) are all driven by the `total_demand_page` section in `config/common_esto_dashboard_template.json`. See the section [Adding bespoke pages and charts](#adding-bespoke-pages-and-charts) below for the pattern used.
+The total demand page is a config-driven bespoke page. It aggregates across sector pages rather than operating on a single assigned page's rows. The parameters (demand page keys, supply codes, excluded sector keys, sector colours) are all driven by the `total_demand_page` section in `config/common_esto_dashboard/common_esto_dashboard_template.json`. See the section [Adding bespoke pages and charts](#adding-bespoke-pages-and-charts) below for the pattern used.
 
 ## Adding bespoke pages and charts
 
@@ -1447,7 +1441,7 @@ chart manifest = what was actually produced
 
 ## Why this design is preferred
 
-This design keeps the old dashboard's strengths while improving maintainability.
+This design keeps the useful presentation strengths of the frozen legacy repository while improving maintainability.
 
 It keeps:
 

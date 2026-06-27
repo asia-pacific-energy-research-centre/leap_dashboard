@@ -1,6 +1,9 @@
-# Old Dashboard Reference Notes
+# Legacy Dashboard Reference Notes
 
-The old `leap_dashboard` workflow is useful as a rendering reference, but it should not be copied wholesale.
+The frozen repository at `C:\Users\Work\github\leap_dashboard_legacy` is the
+rendering reference. Its main entry point is
+`codebase/leap_results_dashboard_workflow.py`; do not copy that architecture
+back into the official repository.
 
 Reusable ideas:
 
@@ -28,4 +31,3 @@ The new dashboard should start from `common_esto_comparison_data.csv` and use:
 - `common_flow_label`
 - `common_product_label`
 - `value`
-

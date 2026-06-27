@@ -1,89 +1,60 @@
-# leap_dashboard
+# LEAP Common ESTO Dashboard
 
-Generates and publishes an interactive HTML dashboard comparing LEAP energy balance results against ESTO base-year data and 9th projection data.
+This repository contains the official static dashboard for Common ESTO
+comparison outputs. It consumes the comparison dataset produced by the sibling
+`leap_mappings` repository and renders one dashboard per economy.
 
-## How it works
+The production entry point is
+`codebase/common_esto_dashboard_workflow.py`. Supporting modules are flattened
+directly under `codebase/`; configuration is under
+`config/common_esto_dashboard/`; tests and sample fixtures are under `tests/`.
 
-The central script is [codebase/leap_results_dashboard_workflow.py](codebase/leap_results_dashboard_workflow.py). It runs five sequential stages:
-
-1. **Extract** — reads LEAP balance export workbooks and maps rows to ESTO flow/product pairs
-2. **Compare** — aligns LEAP, ESTO base-year, and 9th projection data on a common ESTO axis
-3. **Write outputs** — writes comparison tables and diagnostics CSVs
-4. **Render dashboards** — generates HTML/JS dashboard pages under `docs/`
-5. **Write coverage** — writes mapping coverage checks and audit workbooks
-
-The rendered dashboard is published via GitHub Pages from the `docs/` folder.
-
-## Dependencies
-
-This repo requires a sibling `leap_utilities` repo that contains shared config and data files:
+The previous ESTO-axis dashboard is frozen separately for historical and visual
+comparison at:
 
 ```text
-parent_folder/
-  leap_dashboard/     ← this repo
-  leap_utilities/     ← sibling repo (config, mappings, projection data)
+C:\Users\Work\github\leap_dashboard_legacy
 ```
 
-If `leap_utilities` is elsewhere, set `LEAP_UTILITIES_ROOT` to its path before running.
+## Run the sample dashboard
 
-## Getting data from LEAP (Export Balances)
+From the repository root:
 
-In LEAP, use **Results > Export Balances** to export the balance workbook for each scenario. Export at **level 4 (high detail)** — reduced-detail exports will be rejected.
-
-Name the exported files exactly as LEAP produces them:
-
-```
-full model output all years <date_id> REF.xlsx
-full model output all years <date_id> TGT.xlsx
+```powershell
+C:\Users\Work\miniconda3\python.exe codebase\common_esto_dashboard_workflow.py
 ```
 
-Place each file in the folder matching its economy code:
+The tracked `20_USA` fixture is used by default. Output is written to:
 
-```
-data/leap balances exports/
-  20_USA/
-    full model output all years 492026 REF.xlsx
-    full model output all years 492026 TGT.xlsx
+```text
+outputs/common_esto_dashboard/20USA/
 ```
 
-The workflow auto-detects the most recent export by date. These files are gitignored — do not commit them.
+The main artifacts are `dashboards/index.html`, page-level Plotly bundles under
+`chart_bundles/`, and audit files under `supporting_files/`, including
+`chart_manifest.csv` and `page_assignment_summary.csv`.
 
-## Running the workflow
+## Tests and operational checks
 
-1. Open [codebase/leap_results_dashboard_workflow.py](codebase/leap_results_dashboard_workflow.py) and set the `ECONOMIES` list to the economy codes you want to process (e.g. `["20_USA"]`).
-
-2. Run:
-
-```bash
-python codebase/leap_results_dashboard_workflow.py
+```powershell
+C:\Users\Work\miniconda3\python.exe -m pytest tests\test_common_esto_dashboard.py
+C:\Users\Work\miniconda3\python.exe scripts\check_common_esto_dashboard_publish_ready.py
+C:\Users\Work\miniconda3\python.exe scripts\analyze_common_esto_dashboard_page_noise.py
 ```
 
-Dashboard HTML is written to `docs/<economy>/`. Analytical outputs and diagnostics go to `outputs/<economy>/` (gitignored). Commit the `docs/` changes to publish.
-
-## Stage skipping
-
-Each stage can be skipped to reload cached outputs instead of recomputing. Common patterns at the top of the workflow file:
-
-```python
-# Re-render only (skip everything except dashboard rendering)
-STAGE_EXTRACT = False
-STAGE_COMPARE = False
-STAGE_WRITE_OUTPUTS = False
-STAGE_WRITE_COVERAGE = False
-
-# Skip just the slow Excel read
-STAGE_EXTRACT = False
-```
+Additional scripts refresh fixtures from `leap_mappings`, render all available
+economies, and validate the disabled Sankey routing scaffold. See
+`docs/common_esto_dashboard_guide.md` for operational details and
+`docs/common_esto_dashboard_plan.md` for the design.
 
 ## Repository structure
 
-```
-codebase/                   Python source
-config/                     Templates, mappings, schema files
-data/leap balances exports/ Raw LEAP exports, gitignored
-docs/                       Published dashboard site (GitHub Pages)
-  index.html                Economy selector
-  <economy>/dashboards/     Navigation HTML pages
-  <economy>/chart_bundles/  Per-page chart JS/JSON bundles
-outputs/                    Analytical outputs, gitignored
+```text
+codebase/                         production workflow and renderer modules
+config/common_esto_dashboard/     dashboard, series, and routing configuration
+tests/                            smoke tests
+tests/fixtures/common_esto_dashboard/
+scripts/                          refresh, batch render, QA, and publish checks
+docs/                             design and decision documentation
+outputs/                          generated dashboards and diagnostics (ignored)
 ```

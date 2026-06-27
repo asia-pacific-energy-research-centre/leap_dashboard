@@ -1,5 +1,5 @@
 #%%
-"""Small output-layout helpers for the common ESTO dashboard prototype."""
+"""Output-layout helpers for the production Common ESTO dashboard."""
 
 #%%
 from pathlib import Path

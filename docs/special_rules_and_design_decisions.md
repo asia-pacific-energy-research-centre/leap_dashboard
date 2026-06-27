@@ -9,7 +9,7 @@ Cross-repository decisions use a `CROSS-###` ID and have one authoritative entry
 **Status:** Confirmed
 **Owner:** leap_dashboard
 **Type:** Presentation
-**Affected areas:** `test/common_esto_dashboard_agent_pack_transfer_rules/src/common_esto_dashboard_renderer.py`; `frontier_flow_labels`; chart manifest; line and area chart generation
+**Affected areas:** `codebase/common_esto_dashboard_renderer.py`; `frontier_flow_labels`; chart manifest; line and area chart generation
 
 ### Situation
 
@@ -38,7 +38,7 @@ For every rendered group, verify that no selected line-chart flow is an ancestor
 **Status:** Provisional
 **Owner:** leap_dashboard
 **Type:** Presentation
-**Affected areas:** `test/common_esto_dashboard_agent_pack_transfer_rules/config/common_esto_dashboard_template.json`; `suppression_threshold`; renderer chart metrics; chart manifest
+**Affected areas:** `config/common_esto_dashboard/common_esto_dashboard_template.json`; `suppression_threshold`; renderer chart metrics; chart manifest
 
 ### Situation
 
@@ -65,6 +65,48 @@ Produce a threshold sensitivity table showing chart counts and total absolute en
 ### History
 
 - 2026-06-27: Recorded the implemented prototype behaviour; retained the numeric threshold as provisional pending all-economy review.
+
+## DASH-003: Make the Common ESTO implementation the sole production dashboard
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Architecture
+**Affected areas:** repository layout, production entry point, documentation, and legacy comparison boundary
+
+### Situation
+
+Commit `1984a6bdf592cabb49e9f5d4db0d09be1ffc8004` introduced the Common ESTO
+dashboard twice: an agent-transfer test pack under
+`test/common_esto_dashboard_agent_pack_transfer_rules/` and an initial copy
+under `codebase/common_esto_dashboard/`. The test pack stopped changing after
+introduction. The `codebase/` copy subsequently gained fixtures and smoke tests,
+fixture refresh tooling, diagnostic-page controls, publication checks,
+dashboard switching, all-economy rendering, page-noise analysis, page-status
+documentation, and the disabled Sankey routing QA scaffold.
+
+### Current rule
+
+The later production-hardened implementation is authoritative. Its four modules
+live directly under `codebase/`, with
+`codebase/common_esto_dashboard_workflow.py` as the sole production entry point.
+Configuration remains under `config/common_esto_dashboard/`, and tests and
+fixtures remain under `tests/`. New implementation work must not be placed in
+`test/`.
+
+The frozen legacy repository is
+`C:\Users\Work\github\leap_dashboard_legacy`, on branch `legacy-reference`.
+Its code boundary is commit `8747ca2bfeece881a34026517589ad9319f66bc4`,
+the parent of the introduction commit. No later commit independently modified
+legacy-owned files; changes to legacy files inside the mixed introduction
+commit were not retained because they alter the frozen visual/reference
+boundary rather than constituting isolated later fixes.
+
+### History
+
+- 2026-06-27: Confirmed the introduction boundary from path-addition history,
+  separated the frozen legacy repository, promoted the later implementation,
+  flattened it into `codebase/`, and removed both duplicate and legacy code from
+  the official repository.
 
 ## End-to-end run report
 

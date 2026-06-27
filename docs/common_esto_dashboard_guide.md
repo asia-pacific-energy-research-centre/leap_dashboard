@@ -1,9 +1,9 @@
 # Common ESTO Dashboard Generator
 
 The production workflow builds the static Common ESTO comparison dashboard from long-form
-or wide-form common ESTO comparison data. It is separate from the older LEAP
-results dashboard workflow and does not use `relationship_id -> graph_id` links
-or the old ESTO-axis mapping pipeline.
+or wide-form common ESTO comparison data. The frozen predecessor is at
+`C:\Users\Work\github\leap_dashboard_legacy`. This implementation does not use
+`relationship_id -> graph_id` links or the legacy ESTO-axis mapping pipeline.
 
 ## Run
 
