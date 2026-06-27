@@ -108,6 +108,41 @@ boundary rather than constituting isolated later fixes.
   flattened it into `codebase/`, and removed both duplicate and legacy code from
   the official repository.
 
+## DASH-004: Prefer readable responsive charts over maximum card density
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Presentation
+**Affected areas:** overview grid, chart grid, area-chart legends, responsive navigation
+
+### Situation
+
+Four overview cards at desktop width left too little room for Common ESTO
+product legends and sign subtitles. Visual comparison showed those elements
+overlapping the plot on Industry, Supply, and Buildings pages. On a 500-pixel
+viewport, the non-wrapping page navigation also extended beyond the viewport.
+
+### Current rule
+
+Use two columns for overview charts, three columns for ordinary chart grids,
+and one column below 600 pixels. Place dense overview legends below the plot
+with enough bottom margin to keep titles and data unobstructed. Allow the
+mobile page navigation to wrap. Keep every legend series available, using the
+Plotly legend scrollbar when the complete product list is longer than the
+available card height.
+
+### Validation
+
+Render representative dense and sparse pages at 1440 x 1000 and 500 x 900.
+Check that titles, sign notes, axes, and legends do not overlap the plotted
+data; navigation must remain reachable without widening the page. The smoke
+test also checks the overview legend position and reserved bottom margin.
+
+### History
+
+- 2026-06-27: Confirmed after side-by-side review of legacy and Common ESTO
+  Industry, Supply, and Buildings pages; implemented in commit `398d5bc`.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
@@ -120,3 +155,18 @@ Append a dated subsection after each end-to-end run. Report:
 - the next decisions requiring human guidance.
 
 Also report coverage, dropped rows, source-versus-output totals, hierarchy consistency, mapping cardinality inherited from upstream data, and semantic correctness of grouping and presentation. A successful render is not evidence that the published comparison is correct.
+
+### 2026-06-27 migration and visual-review run
+
+- No new mapping or grouping semantics were introduced.
+- DASH-004 was discovered and confirmed through rendered-page comparison.
+- DASH-002 remains provisional: the 1 PJ suppression threshold was not
+  confirmed from the USA fixture.
+- The 20_USA fixture rendered 860 charts from 18,366 filtered rows; focused
+  tests and publication readiness passed.
+- Existing all-economy page-noise output still flags 23 pages. USA Industry
+  (228 charts) and Supply (212 charts) require future aggregate-first or
+  section-navigation review; this should be configuration-driven and must not
+  remove manifest coverage.
+- Legacy regeneration is blocked by current external mapping cardinality, so
+  tracked legacy pages are the comparison baseline.
