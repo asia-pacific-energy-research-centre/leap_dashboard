@@ -535,8 +535,10 @@ def build_area_chart(
         title=title_with_sign_note(f"Aggregate by product: {area_spec['aggregate_flow_label']}", chart_df),
         xaxis_title="Year",
         yaxis_title="Signed energy (PJ)",
-        margin={"l": 64, "r": 28, "t": 56, "b": 72},
-        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "left", "x": 0},
+        # Product legends can contain 20+ entries. Keeping them above the plot
+        # made the legend collide with the title in narrow overview cards.
+        margin={"l": 64, "r": 28, "t": 84, "b": 160},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
     )
     return fig
 
@@ -758,10 +760,11 @@ a:hover { text-decoration: underline; }
 .sort-btn.active { border-color:#1f6feb;background:#e8f0fe;font-weight:700; }
 .dashboard-grid {
   display:grid;
-  grid-template-columns:repeat(4, minmax(0, 1fr));
+  grid-template-columns:repeat(3, minmax(0, 1fr));
   gap:12px;
   align-items:start;
 }
+.dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
 .dashboard-grid.expand-1 { grid-template-columns:minmax(0, 1fr); }
 .dashboard-grid.expand-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
 .dashboard-grid.expand-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
@@ -776,8 +779,14 @@ a:hover { text-decoration: underline; }
 }
 .lazy-chart-plot.is-unloaded { background:#f8fafc; }
 .section-heading { margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d; }
-@media (max-width: 900px) { .dashboard-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 600px) { .dashboard-grid { grid-template-columns:minmax(0, 1fr); } .lazy-chart-plot { height:420px; } }
+@media (max-width: 900px) { .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .header-side-controls { flex:1 1 100%;min-width:0;justify-content:flex-start; }
+  .header-inline-controls { margin-left:0;flex-wrap:wrap;justify-content:flex-start;width:100%; }
+  .header-links { width:100%; }
+  .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:minmax(0, 1fr); }
+  .lazy-chart-plot { height:420px; }
+}
 """
 
 _HEADER_TOGGLE_JS = """
@@ -1085,7 +1094,7 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
     """Build HTML for the page-level overview (area) charts."""
     if not area_rows:
         return ""
-    grid_class = "dashboard-grid" if len(area_rows) > 1 else "dashboard-grid expand-1"
+    grid_class = "dashboard-grid overview-grid" if len(area_rows) > 1 else "dashboard-grid expand-1"
     cards = []
     for i, row in enumerate(area_rows):
         caption = escape(str(row.get("title", "")))

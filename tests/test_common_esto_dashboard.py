@@ -121,6 +121,18 @@ def test_common_esto_dashboard_switcher_uses_current_dashboard_label(tmp_path: P
     assert "<strong>Australia</strong>" in html
     assert '<option value="transport.html" selected>Australia</option>' in html
     assert '../../20USA/dashboards/transport.html' in html
+    assert ".dashboard-grid.overview-grid" in html
+
+    bundle = json.loads(
+        (layout["chart_bundles"] / "transport__charts.json").read_text(encoding="utf-8")
+    )
+    overview_figure = next(
+        figure
+        for chart_key, figure in bundle["charts"].items()
+        if chart_key.startswith("chart__area__")
+    )
+    assert overview_figure["layout"]["legend"]["y"] == -0.20
+    assert overview_figure["layout"]["margin"]["b"] == 160
 
 
 def test_weekly_common_esto_sample_fixture_is_present() -> None:
