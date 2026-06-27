@@ -84,3 +84,12 @@ reproducible: the historical validator rejects current non-subtotal
 many-to-many mapping rows. The tracked legacy HTML is therefore the visual
 reference. Weakening the frozen validator or importing current mapping rules
 would invalidate the historical boundary.
+
+An additional one-economy batch smoke test used the upstream
+`leap_mappings/results/common_esto/` outputs and rendered 20USA successfully:
+850 charts from 19,103 visible rows. The mapping repository was at commit
+`52d2137`, but its worktree contained unrelated uncommitted mapping changes, so
+that commit does not fully identify the generated input state. The comparison
+data file was dated 2026-06-27 16:46 and `common_esto_rows.csv` was dated
+2026-06-27 11:52. Treat this as a production-path smoke test, not a frozen
+numerical benchmark.

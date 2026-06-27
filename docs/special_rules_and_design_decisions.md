@@ -164,6 +164,9 @@ Also report coverage, dropped rows, source-versus-output totals, hierarchy consi
   confirmed from the USA fixture.
 - The 20_USA fixture rendered 860 charts from 18,366 filtered rows; focused
   tests and publication readiness passed.
+- The upstream one-economy batch path separately rendered 850 charts from
+  19,103 visible rows. Its `leap_mappings` worktree was dirty, so this run
+  validates execution and presentation but is not a reproducible data baseline.
 - Existing all-economy page-noise output still flags 23 pages. USA Industry
   (228 charts) and Supply (212 charts) require future aggregate-first or
   section-navigation review; this should be configuration-driven and must not
