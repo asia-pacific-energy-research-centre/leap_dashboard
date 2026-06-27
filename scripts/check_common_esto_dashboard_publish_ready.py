@@ -154,7 +154,7 @@ def build_publish_checklist(dashboard_root: Path) -> list[str]:
         "Review supporting_files/chart_manifest.csv for page counts and noisy pages in each rendered economy.",
         "Leave PUBLISH_TO_DOCS = False for fixture refreshes and ordinary render checks.",
         "Only when ready to publish, set PUBLISH_TO_DOCS = True in codebase/common_esto_dashboard_workflow.py.",
-        "Run C:\\Users\\Work\\miniconda3\\python.exe codebase\\common_esto_dashboard\\common_esto_dashboard_workflow.py.",
+        "Run C:\\Users\\Work\\miniconda3\\python.exe codebase\\common_esto_dashboard_workflow.py.",
         f"Inspect docs/{dashboard_root.name}/dashboards/index.html after the copy.",
         "Commit the docs/ serving assets together with the scoped source/config changes being published.",
         "Set PUBLISH_TO_DOCS back to False after publishing.",
