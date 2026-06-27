@@ -75,6 +75,8 @@ The dashboard is being rebuilt. **Active development goes in the `test/` folder 
 Within `test/`, the active design plan is at:
 `test/common_esto_dashboard_agent_pack_transfer_rules/common_esto_dashboard_plan.md`
 
+Human-selected presentation rules and unresolved semantic decisions are tracked in `docs/special_rules_and_design_decisions.md`.
+
 Key dependency: `leap_mappings` (`C:\Users\Work\github\leap_mappings`) is the upstream source for the common ESTO comparison data the dashboard consumes. Mapping logic, rollup design, graph partitioning, and naming conventions are documented in `leap_mappings/docs/mappings_system.md`. Do not reproduce that logic in dashboard code or documentation — reference it.
 
 ---
