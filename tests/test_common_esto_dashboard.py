@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from codebase.common_esto_dashboard.common_esto_dashboard_data import apply_sign_semantics
-from codebase.common_esto_dashboard.common_esto_dashboard_renderer import render_dashboard
-from codebase.common_esto_dashboard.output_layout import build_output_layout
+from codebase.common_esto_dashboard_data import apply_sign_semantics
+from codebase.common_esto_dashboard_output_layout import build_output_layout
+from codebase.common_esto_dashboard_renderer import render_dashboard
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

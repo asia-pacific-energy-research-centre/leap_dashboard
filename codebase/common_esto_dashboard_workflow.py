@@ -1,5 +1,5 @@
 #%%
-"""Notebook-safe entry workflow for the common ESTO dashboard prototype."""
+"""Notebook-safe production workflow for the Common ESTO dashboard."""
 
 #%%
 import json
@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 CURRENT_FILE = Path(__file__).resolve()
-REPO_ROOT = CURRENT_FILE.parents[2]
+REPO_ROOT = CURRENT_FILE.parents[1]
 MODULE_ROOT = CURRENT_FILE.parent
 if str(MODULE_ROOT) not in sys.path:
     sys.path.insert(0, str(MODULE_ROOT))
@@ -22,7 +22,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     load_common_esto_data,
 )
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
-from output_layout import build_output_layout, publish_to_docs  # noqa: E402
+from common_esto_dashboard_output_layout import build_output_layout, publish_to_docs  # noqa: E402
 
 
 #%%
@@ -60,7 +60,7 @@ PUBLISH_TO_DOCS = False  # Set True to copy dashboard files to docs/<economy>/ a
 
 #%%
 def run_dashboard_workflow() -> dict[str, object]:
-    """Run the common ESTO dashboard prototype."""
+    """Run the production Common ESTO dashboard."""
     template = load_json(TEMPLATE_PATH)
     series_config = json.loads(SERIES_CONFIG_PATH.read_text(encoding="utf-8"))
     raw_df = load_common_esto_data(INPUT_DATA_PATH)

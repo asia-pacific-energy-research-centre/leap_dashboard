@@ -112,7 +112,7 @@ def run_common_esto_checks() -> None:
     if RUN_FULL_DASHBOARD_RENDER:
         run_command([
             sys.executable,
-            "codebase/common_esto_dashboard/common_esto_dashboard_workflow.py",
+            "codebase/common_esto_dashboard_workflow.py",
         ])
 
 

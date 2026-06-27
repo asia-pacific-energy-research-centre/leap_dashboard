@@ -1,6 +1,6 @@
 # Common ESTO Dashboard Generator
 
-This package builds the static Common ESTO comparison dashboard from long-form
+The production workflow builds the static Common ESTO comparison dashboard from long-form
 or wide-form common ESTO comparison data. It is separate from the older LEAP
 results dashboard workflow and does not use `relationship_id -> graph_id` links
 or the old ESTO-axis mapping pipeline.
@@ -10,7 +10,7 @@ or the old ESTO-axis mapping pipeline.
 From the repo root:
 
 ```powershell
-C:\Users\Work\miniconda3\python.exe codebase\common_esto_dashboard\common_esto_dashboard_workflow.py
+C:\Users\Work\miniconda3\python.exe codebase\common_esto_dashboard_workflow.py
 ```
 
 Default output:
@@ -101,7 +101,7 @@ $env:COMMON_ESTO_INPUT_DATA_PATH = "C:\path\to\common_esto_comparison_data.csv"
 $env:COMMON_ESTO_ROWS_PATH = "C:\path\to\common_esto_rows.csv"
 $env:COMMON_ESTO_ECONOMY = "20_USA"
 $env:COMMON_ESTO_COMPARISON_SCOPE = "leap_vs_esto_vs_ninth"
-C:\Users\Work\miniconda3\python.exe codebase\common_esto_dashboard\common_esto_dashboard_workflow.py
+C:\Users\Work\miniconda3\python.exe codebase\common_esto_dashboard_workflow.py
 ```
 
 ## Config

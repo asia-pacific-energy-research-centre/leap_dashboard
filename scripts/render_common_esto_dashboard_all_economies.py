@@ -14,7 +14,7 @@ import pandas as pd
 #%%
 # Stable paths.
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MODULE_ROOT = REPO_ROOT / "codebase" / "common_esto_dashboard"
+MODULE_ROOT = REPO_ROOT / "codebase"
 if str(MODULE_ROOT) not in sys.path:
     sys.path.insert(0, str(MODULE_ROOT))
 
@@ -27,7 +27,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     load_common_esto_data,
 )
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
-from output_layout import build_output_layout  # noqa: E402
+from common_esto_dashboard_output_layout import build_output_layout  # noqa: E402
 
 
 def _resolve(path: str | Path) -> Path:
