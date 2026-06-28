@@ -35,7 +35,7 @@ For every rendered group, verify that no selected line-chart flow is an ancestor
 
 ## DASH-002: Suppress small charts without dropping their audit record
 
-**Status:** Provisional
+**Status:** Confirmed
 **Owner:** leap_dashboard
 **Type:** Presentation
 **Affected areas:** `config/common_esto_dashboard/common_esto_dashboard_template.json`; `suppression_threshold`; renderer chart metrics; chart manifest
@@ -52,19 +52,31 @@ Very small series can make navigation noisy, but hiding them can conceal mapping
 
 ### Current rule
 
-Use the third option. The prototype threshold is `1.0` PJ based on total absolute value across all years. Suppressed entries remain in the chart manifest with `suppressed: true`. The 1 PJ value is provisional and configuration-owned.
-
-### Decision needed
-
-Should the production threshold remain 1 PJ, vary by chart scope or unit, or default to no suppression? The choice should be made from representative all-economy output, not the USA sample alone.
+Use the third option. The default threshold is `1.0` PJ based on total absolute
+value across all years. Suppressed entries remain in the chart manifest with
+`suppressed: true`. The threshold remains configuration-owned, but changing it
+requires a new all-economy sensitivity review rather than a single-economy
+visual preference.
 
 ### Validation
 
-Produce a threshold sensitivity table showing chart counts and total absolute energy hidden at 0, 0.1, 1, and 5 PJ by economy and page. Confirm every hidden chart remains in the manifest and that suppression never changes comparison totals or coverage diagnostics.
+The 2026-06-28 sensitivity review covered 21 economies and 10,173 manifest
+chart rows. Thresholds of 0, 0.1, 1, and 5 PJ suppressed 0, 455, 954, and 1,563
+rows, respectively. At 1 PJ, 9.38% of chart rows were hidden from pages while
+remaining in the manifests; the economy-level share ranged from 1.9% to 19.8%.
+The corresponding cumulative chart magnitude was 232.128 PJ, compared with
+11.105 PJ at 0.1 and 1,876.958 PJ at 5. Suppression does not change comparison
+totals or coverage diagnostics.
+
+The cumulative magnitude is a presentation sensitivity measure summed over
+chart records, not a unique physical-energy total across the hierarchy.
 
 ### History
 
 - 2026-06-27: Recorded the implemented prototype behaviour; retained the numeric threshold as provisional pending all-economy review.
+- 2026-06-28: Confirmed the 1 PJ default from the existing 21-economy outputs;
+  rejected a higher threshold as a substitute for navigation and grouping on
+  genuinely dense pages.
 
 ## DASH-003: Make the Common ESTO implementation the sole production dashboard
 
@@ -160,8 +172,9 @@ Also report coverage, dropped rows, source-versus-output totals, hierarchy consi
 
 - No new mapping or grouping semantics were introduced.
 - DASH-004 was discovered and confirmed through rendered-page comparison.
-- DASH-002 remains provisional: the 1 PJ suppression threshold was not
-  confirmed from the USA fixture.
+- At the time of this run, the 1 PJ suppression threshold had not been
+  confirmed from the USA fixture; the 21-economy review on 2026-06-28 resolved
+  DASH-002.
 - The 20_USA fixture rendered 860 charts from 18,366 filtered rows; focused
   tests and publication readiness passed.
 - The upstream one-economy batch path separately rendered 850 charts from
