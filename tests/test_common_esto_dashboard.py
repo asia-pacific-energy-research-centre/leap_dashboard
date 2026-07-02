@@ -5,7 +5,10 @@ import pandas as pd
 
 from codebase.common_esto_dashboard_data import apply_sign_semantics
 from codebase.common_esto_dashboard_output_layout import build_output_layout
-from codebase.common_esto_dashboard_renderer import render_dashboard
+from codebase.common_esto_dashboard_renderer import (
+    render_dashboard,
+    select_transformation_total_rows,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -48,6 +51,32 @@ def _build_common_esto_rows() -> pd.DataFrame:
                     "common_product_label": "07.01 Motor gasoline",
                     "value": base_value + (0.5 if year == 2024 else 0.0),
                 })
+    for source_system, scenario, is_exact_row, requires_rollup, base_value in [
+        ("ESTO", "historical", True, False, -3.0),
+        ("LEAP", "Target", False, True, -2.5),
+        ("NINTH", "Target", True, False, -2.8),
+    ]:
+        for year in [2022, 2024]:
+            rows.append({
+                "comparison_scope": "leap_vs_esto_vs_ninth",
+                "source_system": source_system,
+                "economy": "20_USA",
+                "scenario": scenario,
+                "year": year,
+                "common_flow_code": "09",
+                "common_flow_name": "Total transformation sector",
+                "common_flow_label": "09 Total transformation sector",
+                "common_product_code": "09",
+                "common_product_name": "Nuclear",
+                "common_product_label": "09 Nuclear",
+                "common_row_id": f"{source_system.lower()}_transformation_total",
+                "common_row_basis": "exact_esto_row" if is_exact_row else "connected_component_rollup",
+                "is_exact_row": is_exact_row,
+                "requires_rollup": requires_rollup,
+                "source_aggregate_labels": "Total transformation - no transfers",
+                "source_aggregate_group_ids": "rollup_total_transformation_nuclear",
+                "value": base_value - (0.1 if year == 2024 else 0.0),
+            })
     return pd.DataFrame(rows)
 
 
@@ -90,6 +119,25 @@ def test_common_esto_dashboard_renders_core_pages_by_default(tmp_path: Path) -> 
     assert "transport" in page_keys
     assert "total_demand" in page_keys
     assert "transport_leap_vs_ninth" not in page_keys
+    overview_rows = manifest[manifest["page_key"] == "total_demand"]
+    assert "chart__line__total_transformation_no_transfers" in set(overview_rows["chart_key"])
+    assert set(overview_rows["page_label"]) == {"Energy balance overview"}
+
+
+def test_transformation_total_selection_uses_rollup_membership_and_source_role() -> None:
+    df = _build_common_esto_rows()
+    config = {
+        "source_aggregate_label": "Total transformation - no transfers",
+        "generated_source_systems": ["LEAP"],
+    }
+
+    selected = select_transformation_total_rows(df, config)
+
+    assert set(selected["source_system"]) == {"ESTO", "LEAP", "NINTH"}
+    leap_rows = selected[selected["source_system"] == "LEAP"]
+    reference_rows = selected[selected["source_system"].isin(["ESTO", "NINTH"])]
+    assert leap_rows["requires_rollup"].all()
+    assert reference_rows["is_exact_row"].all()
 
 
 def test_common_esto_dashboard_can_render_opt_in_scope_pages(tmp_path: Path) -> None:

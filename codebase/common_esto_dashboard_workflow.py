@@ -5,6 +5,7 @@
 import json
 import os
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 CURRENT_FILE = Path(__file__).resolve()
@@ -36,11 +37,48 @@ def _resolve(path: str | Path) -> Path:
 
 
 #%%
+# ---------------------------------------------------------------------------
+# Output logging
+# ---------------------------------------------------------------------------
+_WORKFLOW_LOG_PATH = REPO_ROOT / "outputs" / "logs" / "common_esto_dashboard_workflow.log"
+
+
+class _TeeWriter:
+    def __init__(self, file_obj, stream):
+        self._file = file_obj
+        self._stream = stream
+
+    def write(self, data):
+        self._file.write(data)
+        self._stream.write(data)
+        return len(data)
+
+    def flush(self):
+        self._file.flush()
+        self._stream.flush()
+
+    def isatty(self):
+        return False
+
+
+@contextmanager
+def _log_to_file(log_path):
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    original = sys.stdout
+    with open(log_path, "w", encoding="utf-8") as f:
+        sys.stdout = _TeeWriter(f, original)
+        try:
+            yield log_path
+        finally:
+            sys.stdout = original
+
+
+#%%
 # Stable paths.
-DEFAULT_LONG_INPUT_PATH = _resolve("tests/fixtures/common_esto_dashboard/common_esto_comparison_data_sample.csv")
-DEFAULT_WIDE_INPUT_PATH = _resolve("tests/fixtures/common_esto_dashboard/common_esto_comparison_wide.csv")
-INPUT_DATA_PATH = _resolve(os.getenv("COMMON_ESTO_INPUT_DATA_PATH", DEFAULT_LONG_INPUT_PATH if DEFAULT_LONG_INPUT_PATH.exists() else DEFAULT_WIDE_INPUT_PATH))
-COMMON_ROWS_PATH = _resolve(os.getenv("COMMON_ESTO_ROWS_PATH", "tests/fixtures/common_esto_dashboard/common_esto_rows.csv"))
+_LEAP_MAPPINGS_RESULTS = Path(r"C:\Users\Work\github\leap_mappings\results\common_esto")
+DEFAULT_WIDE_INPUT_PATH = _LEAP_MAPPINGS_RESULTS / "common_esto_comparison_wide.csv"
+INPUT_DATA_PATH = _resolve(os.getenv("COMMON_ESTO_INPUT_DATA_PATH", str(DEFAULT_WIDE_INPUT_PATH)))
+COMMON_ROWS_PATH = _resolve(os.getenv("COMMON_ESTO_ROWS_PATH", str(_LEAP_MAPPINGS_RESULTS / "common_esto_rows.csv")))
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
 OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
@@ -107,15 +145,29 @@ def run_dashboard_workflow() -> dict[str, object]:
     return result
 
 
+def _chime() -> None:
+    try:
+        import time
+        import winsound  # type: ignore
+        for freq, dur in [(659, 90), (784, 90), (988, 140)]:
+            winsound.Beep(freq, dur)
+            time.sleep(0.04)
+    except Exception:
+        pass
+
+
 #%%
-try:
-    if RUN_DASHBOARD_WORKFLOW:
-        WORKFLOW_RESULT = run_dashboard_workflow()
-    else:
-        print("Set RUN_DASHBOARD_WORKFLOW = True to render the dashboard.")
-except Exception as exc:
-    print("Common ESTO dashboard workflow failed.")
-    print(f"Error: {exc}")
-    raise
+with _log_to_file(_WORKFLOW_LOG_PATH) as _log_path:
+    print(f"[LOG] Writing output to: {_log_path}")
+    try:
+        if RUN_DASHBOARD_WORKFLOW:
+            WORKFLOW_RESULT = run_dashboard_workflow()
+            _chime()
+        else:
+            print("Set RUN_DASHBOARD_WORKFLOW = True to render the dashboard.")
+    except Exception as exc:
+        print("Common ESTO dashboard workflow failed.")
+        print(f"Error: {exc}")
+        raise
 
 #%%

@@ -199,9 +199,15 @@
   ],
   "total_demand_page": {
     "enabled": true,
+    "page_label": "Energy balance overview",
     "demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"],
     "supply_codes": ["01", "02", "03"],
     "tfec_exclude_page_keys": ["non_energy"],
+    "transformation_total": {
+      "enabled": true,
+      "source_aggregate_label": "Total transformation - no transfers",
+      "generated_source_systems": ["LEAP"]
+    },
     "sector_colors": {
       "industry": "#3b82f6",
       "transport": "#f97316",

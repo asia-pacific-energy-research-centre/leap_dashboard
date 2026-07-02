@@ -29,6 +29,11 @@ REQUIRED_COLUMNS = [
 ]
 
 COMPONENT_METADATA_COLUMNS = [
+    "common_row_basis",
+    "is_exact_row",
+    "requires_rollup",
+    "source_aggregate_labels",
+    "source_aggregate_group_ids",
     "component_esto_flow",
     "component_esto_product",
     "component_flow_code",
@@ -240,21 +245,32 @@ def join_unique_text(values: pd.Series) -> str:
 def load_common_esto_component_metadata(common_rows_path: Path) -> pd.DataFrame:
     """Load common-row component membership as one metadata row per common row."""
     common_rows = pd.read_csv(common_rows_path, low_memory=False).fillna("")
-    key_columns = [
-        "comparison_scope",
-        "common_flow_label",
-        "common_product_label",
-    ]
+    if "common_row_id" in common_rows.columns:
+        key_columns = ["comparison_scope", "common_row_id"]
+    else:
+        key_columns = [
+            "comparison_scope",
+            "common_flow_label",
+            "common_product_label",
+        ]
     missing_keys = [column for column in key_columns if column not in common_rows.columns]
     if missing_keys:
         raise ValueError(f"Common ESTO rows file is missing columns: {missing_keys}")
 
+    # Always include label columns so callers can fall back to label-based merging
+    # even when common_row_id is the primary key.
+    extra_key_columns = [
+        col for col in ["common_flow_label", "common_product_label"]
+        if col not in key_columns and col in common_rows.columns
+    ]
+    all_key_columns = key_columns + extra_key_columns
+
     metadata_columns = [column for column in COMPONENT_METADATA_COLUMNS if column in common_rows.columns]
     if not metadata_columns:
-        return common_rows[key_columns].drop_duplicates().copy()
+        return common_rows[all_key_columns].drop_duplicates().copy()
 
     return (
-        common_rows.groupby(key_columns, as_index=False)[metadata_columns]
+        common_rows.groupby(all_key_columns, as_index=False)[metadata_columns]
         .agg(join_unique_text)
         .reset_index(drop=True)
     )
@@ -265,12 +281,19 @@ def enrich_with_component_metadata(df: pd.DataFrame, common_rows_path: Path | No
     if common_rows_path is None or not common_rows_path.exists() or df.empty:
         return df.copy()
     metadata = load_common_esto_component_metadata(common_rows_path)
-    merge_keys = [
-        "comparison_scope",
-        "common_flow_label",
-        "common_product_label",
+    if "common_row_id" in df.columns and "common_row_id" in metadata.columns:
+        merge_keys = ["comparison_scope", "common_row_id"]
+    else:
+        merge_keys = [
+            "comparison_scope",
+            "common_flow_label",
+            "common_product_label",
+        ]
+    attach_columns = [
+        column for column in metadata.columns
+        if column in merge_keys or column not in df.columns
     ]
-    out = df.merge(metadata, on=merge_keys, how="left")
+    out = df.merge(metadata[attach_columns], on=merge_keys, how="left")
     for column in COMPONENT_METADATA_COLUMNS:
         if column in out.columns:
             out[column] = out[column].fillna("").astype(str)

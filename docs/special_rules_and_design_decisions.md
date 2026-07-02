@@ -155,6 +155,38 @@ test also checks the overview legend position and reserved bottom margin.
 - 2026-06-27: Confirmed after side-by-side review of legacy and Common ESTO
   Industry, Supply, and Buildings pages; implemented in commit `398d5bc`.
 
+## DASH-005: Energy balance overview uses declared aggregate identities
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Comparison
+**Affected areas:** Energy balance overview; Common ESTO metadata loading; total transformation chart
+
+### Current rule
+
+The former Total demand page is presented as the Energy balance overview. It
+continues to show the reviewed supply, TFC, and TFEC aggregates and also shows
+`Total transformation sector (excluding transfers)`.
+
+Transformation selection is not inferred from display labels. Rows must carry
+source-aggregate membership for `Total transformation - no transfers`. LEAP
+uses generated rows with `requires_rollup = True`; ESTO and Ninth use exact
+parents with `is_exact_row = True`. Parent and generated representations are
+comparison alternatives and are never added together for one source series.
+
+### Validation
+
+Confirm the overview manifest contains
+`chart__line__total_transformation_no_transfers`, includes all available source
+systems, and contains no duplicate `(source, scenario, year, common_row_id)`
+rows after applying the source-role rule. Multiple exact component rows may
+share one displayed product rollup and are summed within the chart.
+
+### History
+
+- 2026-06-29: Added the configured no-transfers transformation comparison to
+  the aggregate overview and renamed its navigation label.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

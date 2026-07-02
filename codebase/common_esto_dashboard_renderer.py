@@ -1297,6 +1297,102 @@ def write_index(
     </div>
     <p style="color:#4b5563;">Charts are generated automatically from common ESTO flow/product rows.</p>
     <ul>{cards}</ul>
+    <div style="margin-top:32px;border-top:1px solid #d8dee4;padding-top:24px;">
+      <h2 style="margin:0 0 8px 0;font-size:18px;">Model guide</h2>
+      <p style="margin:0 0 16px 0;color:#4b5563;font-size:13px;">In the APERC LEAP system, the model is organised around the main LEAP branches of Demand, Transformation, and Resources. The dashboard sits outside LEAP and helps users check how these branches behave in the results, especially by comparing LEAP outputs with ESTO historical balances and 9th Outlook projections. The table below gives a short guide to the main model groups and how they should be understood when using either LEAP or the dashboard.</p>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:#f0f4f8;">
+              <th style="text-align:left;padding:8px 10px;border:1px solid #d0d7de;white-space:nowrap;">Main group</th>
+              <th style="text-align:left;padding:8px 10px;border:1px solid #d0d7de;">What it covers in LEAP</th>
+              <th style="text-align:left;padding:8px 10px;border:1px solid #d0d7de;">Main dashboard purpose</th>
+              <th style="text-align:left;padding:8px 10px;border:1px solid #d0d7de;">What users should understand</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Final energy demand from buildings, industry, transport, agriculture, fishing, and other demand sectors.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Shows how final energy use changes by sector, subsector, fuel, economy, and scenario.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Demand is where most end-use assumptions sit. Some sectors are simple activity &times; intensity models, while buildings, industry, and road transport contain more detailed structures.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Buildings demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Residential and commercial/public services demand, usually split into end uses, fuels, activity, and intensity.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check fuel use, sector totals, and whether modelled building demand remains consistent with expected energy balance trends.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Buildings is more detailed than a simple sector total. It is designed to preserve useful end-use and fuel-switching detail while still calibrating back to energy balance totals.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Industry demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Energy use by industrial subsector, with more detail for major energy-intensive activities and simpler treatment for smaller subsectors.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps compare industrial fuel use, subsector demand, and large changes against historical and projected values.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Industry is a hybrid model. Some parts are technology or process based, while others are simpler activity &times; intensity structures.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Road transport demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Passenger road and freight road transport. This includes vehicle stocks, sales, retirements, mileage, efficiency, vehicle types, engine types, and fuel use.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check road energy demand, vehicle stock, sales, turnover, fuel switching, and passenger/freight road trends.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Road transport is the most detailed demand model. It uses stock-flow logic, so changes in sales, retirements, mileage, and efficiency all affect future energy demand.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Non-road and international transport demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Domestic aviation, domestic navigation/shipping, rail, pipelines, non-specified transport, and international aviation and marine bunkers where represented.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check non-road fuel use, bunker demand, pipeline demand, and domestic aviation/shipping/rail trends.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Non-road transport is generally simpler than road transport. It is usually closer to an activity &times; intensity model, with calibration to ESTO energy totals where needed. International bunkers and pipelines are included here because they are transport-related flows but are not part of the road stock-flow model.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Other demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Agriculture, fishing, non-specified demand, and other relatively small final-demand sectors.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check whether smaller demand sectors remain stable, plausible, and aligned with the balance structure.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">These sectors are usually simpler and are mainly included to preserve the full energy balance structure.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Transformation</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Energy conversion sectors such as electricity generation, heat generation, refining, transfers, LNG regasification, NG liquefaction, gas processing, coal transformation, coke ovens, blast furnaces, and other transformation processes.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Shows transformation inputs, outputs, losses, efficiencies, and whether conversion sectors are producing plausible results.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Transformation is where fuels are converted into other fuels. Some modules are physical processes, while others mainly exist to reproduce the structure of the energy balance.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Power and heat</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Electricity and heat generation, including generation technologies, capacity, dispatch, load shapes, losses, and optimisation settings.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check electricity and heat output, generation mix, capacity, fuel inputs, losses, and unusual dispatch outcomes.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Power is the most complex transformation area because it may use NEMO optimisation inside LEAP. It usually needs more manual checking than simpler transformation sectors.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Refining</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Oil refining inputs, outputs, product yields, capacity assumptions, and refinery-related fuel production.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check refinery feedstocks, oil product outputs, product balances, and whether refining capacity or output shares are creating plausible results.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Refining is kept separate because it is a major transformation process with a clear physical interpretation: one or more inputs are converted into multiple oil-product outputs. It needs careful checking because product output shares can create surplus or shortage issues.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Other transformation, including transfers</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">LNG regasification, NG liquefaction, gas processing/blending, coal transformation, coke ovens, blast furnaces, patent fuel plants, non-specified transformation, upstream liquids transfers, refinery/blending transfers, and transfers unallocated.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps identify unusual transformation outputs, transfer flows, capacity limits, shortfalls, surpluses, and fuel-balance problems.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">This group contains a mixture of physical processes and balance-structure modules. Transfers are included here because they mainly organise ESTO transfer flows and may contain simplified or non-physical input-output relationships used to preserve balance-table consistency.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Resources / supply</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Domestic production, imports, exports, primary resources, and secondary fuel trade.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Shows whether fuels are being supplied through the intended mix of domestic production, imports, exports, and transformation outputs.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Resources is where LEAP balances remaining fuel requirements. Imports and exports are useful diagnostics because they reveal whether the rest of the system is producing too much or too little.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Reconciliation / QA</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">The whole-system checking process after LEAP has calculated demand, transformation, resources, imports, exports, and losses.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Highlights differences between LEAP results, ESTO historical balances, and 9th Outlook projections.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Reconciliation is not a separate LEAP branch. It is the checking layer that shows whether the integrated model is still aligned with the intended energy balance.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Dashboard</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">External results and checking interface built from LEAP exports, ESTO data, and comparison datasets.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Makes it easier to inspect sector totals, fuel totals, differences, percentage differences, and suspicious changes across the model.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">The dashboard is not the model itself. It is the main tool for reviewing whether the LEAP model behaves sensibly and whether further adjustment is needed.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
   <script>{_DASHBOARD_SWITCHER_JS}</script>
 </body>
@@ -1487,6 +1583,79 @@ def _build_td_fuel_chart(
     return fig
 
 
+def _metadata_bool(series: pd.Series) -> pd.Series:
+    """Parse optional boolean metadata from CSV-safe values."""
+    return series.astype(str).str.strip().str.casefold().isin({"true", "1", "yes"})
+
+
+def _contains_metadata_token(series: pd.Series, token: str) -> pd.Series:
+    """Match one exact token in a semicolon-delimited metadata column."""
+    expected = str(token).strip().casefold()
+    return series.fillna("").astype(str).apply(
+        lambda value: expected in {
+            part.strip().casefold() for part in value.split(";") if part.strip()
+        }
+    )
+
+
+def select_transformation_total_rows(df: pd.DataFrame, config: dict) -> pd.DataFrame:
+    """Select the configured transformation rollup without using display labels.
+
+    LEAP contributes the generated detail frontier. ESTO and Ninth contribute
+    the exact parent row. Both are linked by source-aggregate membership emitted
+    by the Common ESTO structure.
+    """
+    required = {"source_aggregate_labels", "is_exact_row", "requires_rollup"}
+    if df.empty or not required.issubset(df.columns):
+        return df.iloc[0:0].copy()
+
+    rollup_label = str(config.get("source_aggregate_label", "")).strip()
+    if not rollup_label:
+        return df.iloc[0:0].copy()
+    member_mask = _contains_metadata_token(df["source_aggregate_labels"], rollup_label)
+    exact_mask = _metadata_bool(df["is_exact_row"])
+    rollup_mask = _metadata_bool(df["requires_rollup"])
+    generated_systems = {
+        str(value).strip().casefold()
+        for value in config.get("generated_source_systems", ["LEAP"])
+    }
+    system_is_generated = df["source_system"].astype(str).str.strip().str.casefold().isin(generated_systems)
+    selection_mask = member_mask & (
+        (system_is_generated & rollup_mask)
+        | (~system_is_generated & exact_mask)
+    )
+    return df[selection_mask].copy()
+
+
+def _build_transformation_total_chart(
+    transformation_df: pd.DataFrame,
+    series_labels: dict[str, str],
+) -> go.Figure:
+    """Build the signed no-transfers transformation total comparison."""
+    fig = go.Figure()
+    totals = transformation_df.groupby(
+        ["source_system", "scenario", "year"], as_index=False
+    )["value"].sum()
+    for (source_system, scenario), group in totals.groupby(["source_system", "scenario"]):
+        label = series_label_from_values(source_system, scenario, series_labels)
+        ordered = group.sort_values("year")
+        fig.add_trace(go.Scatter(
+            x=ordered["year"],
+            y=ordered["value"],
+            mode="lines+markers",
+            name=label,
+            hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(label) + "</extra>",
+        ))
+    fig.update_layout(
+        title="Total transformation sector (excluding transfers)",
+        xaxis_title="Year",
+        yaxis_title="Signed energy balance (PJ)",
+        margin={"l": 64, "r": 28, "t": 56, "b": 72},
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "left", "x": 0},
+    )
+    return fig
+
+
 def build_total_demand_page(
     assigned_df: pd.DataFrame,
     template: dict,
@@ -1501,9 +1670,10 @@ def build_total_demand_page(
 ) -> tuple[list[dict], dict | None]:
     """Build the total demand summary page (config-driven bespoke page).
 
-    Generates two area charts:
+    Generates aggregate comparison charts:
     - By sector: stacked by demand page group with TFC/TFEC dropdown
     - By fuel: stacked by common_product_label across all demand (TFC)
+    - Total transformation excluding transfers, when configured rollup metadata exists
 
     Both charts include a supply total line defined as:
         supply_total = sum of signed values for codes 01, 02, 03
@@ -1537,6 +1707,7 @@ def build_total_demand_page(
         "others": "#8b5cf6",
         "non_energy": "#94a3b8",
     })
+    page_label = str(config.get("page_label", "Energy balance overview"))
 
     demand_df = assigned_df[assigned_df["_page_key"].isin(demand_page_keys)].copy()
     if demand_df.empty:
@@ -1570,7 +1741,7 @@ def build_total_demand_page(
             "total_abs_value": total_abs, "abs_diff": 0.0, "pct_diff": 0.0,
         })
         manifest_rows.append({
-            "page_key": "total_demand", "page_label": "Total demand",
+            "page_key": "total_demand", "page_label": page_label,
             "section_label": "Overview", "chart_type": "stacked_area",
             "chart_key": chart_key, "common_flow_label": title,
             "common_product_label": "All", "row_count": int(len(demand_df)),
@@ -1580,10 +1751,47 @@ def build_total_demand_page(
             "diff_hist_json": "", "diff_proj_json": "",
         })
 
+    transformation_config = config.get("transformation_total", {})
+    if transformation_config.get("enabled", False):
+        transformation_df = select_transformation_total_rows(assigned_df, transformation_config)
+        if not transformation_df.empty:
+            chart_key = "chart__line__total_transformation_no_transfers"
+            title = "Total transformation sector (excluding transfers)"
+            charts[chart_key] = _build_transformation_total_chart(transformation_df, series_labels)
+            total_abs = float(transformation_df["value"].abs().sum())
+            chart_rows.append({
+                "chart_key": chart_key,
+                "chart_type": "line",
+                "title": title,
+                "product_label": title,
+                "section_label": "Overview",
+                "total_abs_value": total_abs,
+                "abs_diff": 0.0,
+                "pct_diff": 0.0,
+            })
+            manifest_rows.append({
+                "page_key": "total_demand",
+                "page_label": page_label,
+                "section_label": "Overview",
+                "chart_type": "line",
+                "chart_key": chart_key,
+                "common_flow_label": title,
+                "common_product_label": "All products",
+                "row_count": int(len(transformation_df)),
+                "source_flow_labels": str(transformation_config.get("source_aggregate_label", "")),
+                "sign_note": "Signed total: transformation inputs are negative and outputs are positive.",
+                "suppressed": False,
+                "total_abs_value": total_abs,
+                "abs_diff": 0.0,
+                "pct_diff": 0.0,
+                "diff_hist_json": "",
+                "diff_proj_json": "",
+            })
+
     bundle_name = "total_demand__charts.json"
     write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
     write_dashboard_page(
-        {"page_key": "total_demand", "page_label": "Total demand"},
+        {"page_key": "total_demand", "page_label": page_label},
         chart_rows=chart_rows,
         bundle_js_name=bundle_name.replace(".json", ".js"),
         output_path=layout["dashboards"] / "total_demand.html",
@@ -1593,8 +1801,10 @@ def build_total_demand_page(
         current_dashboard=current_dashboard,
     )
     page_row = {
-        "file": "total_demand.html", "label": "Total demand",
-        "area_chart_count": len(charts), "summary_chart_count": 0, "line_chart_count": 0,
+        "file": "total_demand.html", "label": page_label,
+        "area_chart_count": sum(row["chart_type"] == "stacked_area" for row in chart_rows),
+        "summary_chart_count": 0,
+        "line_chart_count": sum(row["chart_type"] == "line" for row in chart_rows),
     }
     return manifest_rows, page_row
 
@@ -1890,7 +2100,10 @@ def render_dashboard(
     page_inventory: list[dict] = []
     # Add the synthetic total demand page first so it appears in nav on all other pages.
     if template.get("total_demand_page", {}).get("enabled", False):
-        page_inventory.append({"page_key": "total_demand", "page_label": "Total demand", "file": "total_demand.html"})
+        overview_label = str(
+            template.get("total_demand_page", {}).get("page_label", "Energy balance overview")
+        )
+        page_inventory.append({"page_key": "total_demand", "page_label": overview_label, "file": "total_demand.html"})
     for _, meta in page_meta.iterrows():
         page_key = safe_slug(meta["_page_key"])
         page_label = str(meta["_page_label"])
