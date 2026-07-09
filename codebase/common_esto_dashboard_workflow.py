@@ -6,6 +6,7 @@ import json
 import os
 import sys
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 CURRENT_FILE = Path(__file__).resolve()
@@ -75,6 +76,7 @@ def _log_to_file(log_path):
 
 #%%
 # Stable paths.
+_LEAP_MAPPINGS_REPO = Path(r"C:\Users\Work\github\leap_mappings")
 _LEAP_MAPPINGS_RESULTS = Path(r"C:\Users\Work\github\leap_mappings\results\common_esto")
 DEFAULT_WIDE_INPUT_PATH = _LEAP_MAPPINGS_RESULTS / "common_esto_comparison_wide.csv"
 INPUT_DATA_PATH = _resolve(os.getenv("COMMON_ESTO_INPUT_DATA_PATH", str(DEFAULT_WIDE_INPUT_PATH)))
@@ -94,11 +96,43 @@ MAX_YEAR = 2060
 RUN_DASHBOARD_WORKFLOW = True
 CLEAR_EXISTING_OUTPUTS = True
 PUBLISH_TO_DOCS = False  # Set True to copy dashboard files to docs/<economy>/ after each run.
+REGEN_COMMON_ESTO_FAST_PATH = os.getenv("COMMON_ESTO_REGEN_FAST_PATH", "0").strip().lower() in {"1", "true", "yes"}
 
 
 #%%
+def maybe_regen_common_esto_fast_path() -> None:
+    """Optionally refresh upstream Common ESTO outputs before dashboard rendering."""
+    if not REGEN_COMMON_ESTO_FAST_PATH:
+        return
+    if str(_LEAP_MAPPINGS_REPO) not in sys.path:
+        sys.path.insert(0, str(_LEAP_MAPPINGS_REPO))
+    from codebase.mapping_tools.apply_common_esto_structure import (  # noqa: E402
+        NINTH_PROJECTION_START_YEAR,
+        run_common_esto_comparison_fast_path,
+    )
+
+    relationship_dir = _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships"
+    run_timestamp = datetime.now(timezone.utc)
+    print("Refreshing Common ESTO comparison outputs via leap_mappings fast path.")
+    run_common_esto_comparison_fast_path(
+        source_paths={
+            "LEAP": relationship_dir / "leap_results_converted_to_esto.csv",
+            "NINTH": relationship_dir / "ninth_results_converted_to_esto.csv",
+            "ESTO": relationship_dir / "esto_results_exact_rows.csv",
+        },
+        common_rows_path=_LEAP_MAPPINGS_RESULTS / "common_esto_rows.csv",
+        output_dir=_LEAP_MAPPINGS_RESULTS,
+        default_economy="20_USA",
+        active_component_abs_tolerance=0.0,
+        ninth_projection_start_year=NINTH_PROJECTION_START_YEAR,
+        run_id=run_timestamp.strftime("common_esto_fast_path_%Y%m%dT%H%M%S%fZ"),
+        run_timestamp_utc=run_timestamp.isoformat(),
+    )
+
+
 def run_dashboard_workflow() -> dict[str, object]:
     """Run the production Common ESTO dashboard."""
+    maybe_regen_common_esto_fast_path()
     template = load_json(TEMPLATE_PATH)
     series_config = json.loads(SERIES_CONFIG_PATH.read_text(encoding="utf-8"))
     raw_df = load_common_esto_data(INPUT_DATA_PATH)
