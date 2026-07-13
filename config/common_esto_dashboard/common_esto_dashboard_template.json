@@ -65,7 +65,8 @@
         "electricity plants",
         "CHP plants",
         "heat plants",
-        "Electricity, CHP and heat plants"
+        "Electricity, CHP and heat plants",
+        "Power sector"
       ],
       "rule_note": "Electricity and heat output, plus directly related power-sector own-use rows. Also catches generated rollups such as 09.01.01,09.02.01 Electricity plants by label keyword."
     },
