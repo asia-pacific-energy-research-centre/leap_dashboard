@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Common ESTO Dashboard — Brunei Darussalam</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; margin: 0; background: #f4f6f8; color: #111; }
+    .shell { max-width: 860px; margin: 0 auto; padding: 32px 24px; }
+    h1 { margin-bottom: 6px; }
+    .top-row { display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap; }
+    .dashboard-switcher { display:flex;align-items:center;gap:6px;font-size:13px;color:#4b5563;white-space:nowrap; }
+    .dashboard-switcher select { max-width:240px;padding:6px 28px 6px 8px;border:1px solid #c5ccd3;border-radius:6px;background:#fff;color:#111;font:inherit; }
+    ul { list-style: none; padding: 0; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="top-row">
+      <div>
+        <h1>Common ESTO Dashboard — Brunei Darussalam</h1>
+        <p style="margin:0;color:#4b5563;font-size:13px;">Updated: 2026-07-14 15:47 Tokyo Standard Time</p>
+      </div>
+      <label class="dashboard-switcher"><span>Dashboard</span><select data-dashboard-switcher aria-label="Switch dashboard"><option value="../../01AUS/dashboards/index.html">Australia</option><option value="index.html" selected>Brunei Darussalam</option><option value="../../03CDA/dashboards/index.html">Canada</option><option value="../../04CHL/dashboards/index.html">Chile</option><option value="../../05PRC/dashboards/index.html">China</option><option value="../../06HKC/dashboards/index.html">Hong Kong, China</option><option value="../../07INA/dashboards/index.html">Indonesia</option><option value="../../08JPN/dashboards/index.html">Japan</option><option value="../../09ROK/dashboards/index.html">Korea</option><option value="../../10MAS/dashboards/index.html">Malaysia</option><option value="../../11MEX/dashboards/index.html">Mexico</option><option value="../../12NZ/dashboards/index.html">New Zealand</option><option value="../../13PNG/dashboards/index.html">Papua New Guinea</option><option value="../../14PE/dashboards/index.html">Peru</option><option value="../../15PHL/dashboards/index.html">Philippines</option><option value="../../16RUS/dashboards/index.html">Russia</option><option value="../../17SGP/dashboards/index.html">Singapore</option><option value="../../18CT/dashboards/index.html">Chinese Taipei</option><option value="../../19THA/dashboards/index.html">Thailand</option><option value="../../20USA/dashboards/index.html">United States</option><option value="../../21VN/dashboards/index.html">Viet Nam</option></select></label>
+    </div>
+    <p style="color:#4b5563;">Charts are generated automatically from common ESTO flow/product rows.</p>
+    <ul><li style="margin-bottom:8px;"><a href="other_transformation.html" style="font-weight:600;">Other transformation</a> <span style="color:#6b7280;font-size:13px;">(11 overview, 12 detail)</span></li><li style="margin-bottom:8px;"><a href="power.html" style="font-weight:600;">Power</a> <span style="color:#6b7280;font-size:13px;">(4 overview, 9 detail)</span></li><li style="margin-bottom:8px;"><a href="refining.html" style="font-weight:600;">Refining</a> <span style="color:#6b7280;font-size:13px;">(3 overview, 17 detail)</span></li><li style="margin-bottom:8px;"><a href="supply.html" style="font-weight:600;">Supply</a> <span style="color:#6b7280;font-size:13px;">(6 overview, 57 detail)</span></li><li style="margin-bottom:8px;"><a href="unassigned.html" style="font-weight:600;">Unassigned</a> <span style="color:#6b7280;font-size:13px;">(14 overview, 42 detail)</span></li></ul>
+    <div style="margin-top:32px;border-top:1px solid #d8dee4;padding-top:24px;">
+      <h2 style="margin:0 0 8px 0;font-size:18px;">Model guide</h2>
+      <p style="margin:0 0 16px 0;color:#4b5563;font-size:13px;">In the APERC LEAP system, the model is organised around the main LEAP branches of Demand, Transformation, and Resources. The dashboard sits outside LEAP and helps users check how these branches behave in the results, especially by comparing LEAP outputs with ESTO historical balances and 9th Outlook projections. The table below gives a short guide to the main model groups and how they should be understood when using either LEAP or the dashboard.</p>
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead>
+            <tr style="background:#f0f4f8;">
+              <th style="text-align:left;padding:8px 10px;border:1px solid #d0d7de;white-space:nowrap;">Main group</th>
+              <th style="text-align:left;padding:8px 10px;border:1px solid #d0d7de;">What it covers in LEAP</th>
+              <th style="text-align:left;padding:8px 10px;border:1px solid #d0d7de;">Main dashboard purpose</th>
+              <th style="text-align:left;padding:8px 10px;border:1px solid #d0d7de;">What users should understand</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Final energy demand from buildings, industry, transport, agriculture, fishing, and other demand sectors.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Shows how final energy use changes by sector, subsector, fuel, economy, and scenario.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Demand is where most end-use assumptions sit. Some sectors are simple activity &times; intensity models, while buildings, industry, and road transport contain more detailed structures.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Buildings demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Residential and commercial/public services demand, usually split into end uses, fuels, activity, and intensity.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check fuel use, sector totals, and whether modelled building demand remains consistent with expected energy balance trends.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Buildings is more detailed than a simple sector total. It is designed to preserve useful end-use and fuel-switching detail while still calibrating back to energy balance totals.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Industry demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Energy use by industrial subsector, with more detail for major energy-intensive activities and simpler treatment for smaller subsectors.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps compare industrial fuel use, subsector demand, and large changes against historical and projected values.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Industry is a hybrid model. Some parts are technology or process based, while others are simpler activity &times; intensity structures.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Road transport demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Passenger road and freight road transport. This includes vehicle stocks, sales, retirements, mileage, efficiency, vehicle types, engine types, and fuel use.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check road energy demand, vehicle stock, sales, turnover, fuel switching, and passenger/freight road trends.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Road transport is the most detailed demand model. It uses stock-flow logic, so changes in sales, retirements, mileage, and efficiency all affect future energy demand.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Non-road and international transport demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Domestic aviation, domestic navigation/shipping, rail, pipelines, non-specified transport, and international aviation and marine bunkers where represented.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check non-road fuel use, bunker demand, pipeline demand, and domestic aviation/shipping/rail trends.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Non-road transport is generally simpler than road transport. It is usually closer to an activity &times; intensity model, with calibration to ESTO energy totals where needed. International bunkers and pipelines are included here because they are transport-related flows but are not part of the road stock-flow model.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Other demand</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Agriculture, fishing, non-specified demand, and other relatively small final-demand sectors.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check whether smaller demand sectors remain stable, plausible, and aligned with the balance structure.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">These sectors are usually simpler and are mainly included to preserve the full energy balance structure.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Transformation</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Energy conversion sectors such as electricity generation, heat generation, refining, transfers, LNG regasification, NG liquefaction, gas processing, coal transformation, coke ovens, blast furnaces, and other transformation processes.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Shows transformation inputs, outputs, losses, efficiencies, and whether conversion sectors are producing plausible results.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Transformation is where fuels are converted into other fuels. Some modules are physical processes, while others mainly exist to reproduce the structure of the energy balance.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Power and heat</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Electricity and heat generation, including generation technologies, capacity, dispatch, load shapes, losses, and optimisation settings.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check electricity and heat output, generation mix, capacity, fuel inputs, losses, and unusual dispatch outcomes.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Power is the most complex transformation area because it may use NEMO optimisation inside LEAP. It usually needs more manual checking than simpler transformation sectors.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Refining</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Oil refining inputs, outputs, product yields, capacity assumptions, and refinery-related fuel production.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps check refinery feedstocks, oil product outputs, product balances, and whether refining capacity or output shares are creating plausible results.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Refining is kept separate because it is a major transformation process with a clear physical interpretation: one or more inputs are converted into multiple oil-product outputs. It needs careful checking because product output shares can create surplus or shortage issues.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Other transformation, including transfers</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">LNG regasification, NG liquefaction, gas processing/blending, coal transformation, coke ovens, blast furnaces, patent fuel plants, non-specified transformation, upstream liquids transfers, refinery/blending transfers, and transfers unallocated.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Helps identify unusual transformation outputs, transfer flows, capacity limits, shortfalls, surpluses, and fuel-balance problems.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">This group contains a mixture of physical processes and balance-structure modules. Transfers are included here because they mainly organise ESTO transfer flows and may contain simplified or non-physical input-output relationships used to preserve balance-table consistency.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Resources / supply</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Domestic production, imports, exports, primary resources, and secondary fuel trade.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Shows whether fuels are being supplied through the intended mix of domestic production, imports, exports, and transformation outputs.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Resources is where LEAP balances remaining fuel requirements. Imports and exports are useful diagnostics because they reveal whether the rest of the system is producing too much or too little.</td>
+            </tr>
+            <tr style="background:#fafbfc;">
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Reconciliation / QA</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">The whole-system checking process after LEAP has calculated demand, transformation, resources, imports, exports, and losses.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Highlights differences between LEAP results, ESTO historical balances, and 9th Outlook projections.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Reconciliation is not a separate LEAP branch. It is the checking layer that shows whether the integrated model is still aligned with the intended energy balance.</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;font-weight:600;white-space:nowrap;vertical-align:top;">Dashboard</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">External results and checking interface built from LEAP exports, ESTO data, and comparison datasets.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">Makes it easier to inspect sector totals, fuel totals, differences, percentage differences, and suspicious changes across the model.</td>
+              <td style="padding:8px 10px;border:1px solid #d0d7de;vertical-align:top;">The dashboard is not the model itself. It is the main tool for reviewing whether the LEAP model behaves sensibly and whether further adjustment is needed.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <script>
+(function() {
+  document.querySelectorAll('[data-dashboard-switcher]').forEach(function(select) {
+    select.addEventListener('change', function() {
+      var href = select.value;
+      if (href) window.location.href = href;
+    });
+  });
+})();
+</script>
+</body>
+</html>

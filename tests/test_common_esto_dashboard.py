@@ -6,6 +6,8 @@ import pandas as pd
 from codebase.common_esto_dashboard_data import apply_sign_semantics
 from codebase.common_esto_dashboard_output_layout import build_output_layout
 from codebase.common_esto_dashboard_renderer import (
+    assign_pages,
+    drop_excluded_flow_rows,
     render_dashboard,
     select_transformation_total_rows,
 )
@@ -124,6 +126,37 @@ def test_common_esto_dashboard_renders_core_pages_by_default(tmp_path: Path) -> 
     assert set(overview_rows["page_label"]) == {"Energy balance overview"}
 
 
+def test_common_esto_dashboard_excludes_electricity_and_heat_output_rows() -> None:
+    template = _load_template()
+    df = pd.DataFrame(
+        [
+            {"common_flow_code": "17", "common_flow_label": "17 Electricity"},
+            {"common_flow_code": "18", "common_flow_label": "18 Electricity output in GWh"},
+            {"common_flow_code": "19", "common_flow_label": "19 Heat output in PJ"},
+            {"common_flow_code": "19.01", "common_flow_label": "19.01 Heat output detail"},
+        ]
+    )
+
+    filtered = drop_excluded_flow_rows(df, template["excluded_flow_code_prefixes"])
+
+    assert filtered["common_flow_code"].tolist() == ["17"]
+
+
+def test_power_sector_rollup_is_not_assigned_to_other_transformation() -> None:
+    template = _load_template()
+    df = pd.DataFrame([
+        {
+            "common_flow_code": "09.01-09.02",
+            "common_flow_label": "09.01-09.02 Power sector",
+        }
+    ])
+
+    assigned = assign_pages(df, template["sector_pages"])
+
+    assert assigned.loc[0, "_page_key"] == "power"
+    assert assigned.loc[0, "_section_key"] == "power"
+
+
 def test_transformation_total_selection_uses_rollup_membership_and_source_role() -> None:
     df = _build_common_esto_rows()
     config = {
@@ -181,6 +214,29 @@ def test_common_esto_dashboard_switcher_uses_current_dashboard_label(tmp_path: P
     )
     assert overview_figure["layout"]["legend"]["y"] == -0.20
     assert overview_figure["layout"]["margin"]["b"] == 160
+
+
+def test_common_esto_dashboard_shows_updated_label(tmp_path: Path) -> None:
+    template = _load_template()
+    series_config = _load_series_config()
+    df = apply_sign_semantics(_build_common_esto_rows(), template["sign_semantics"])
+    main_df = df[df["comparison_scope"] == "leap_vs_esto_vs_ninth"].copy()
+
+    layout = build_output_layout(tmp_path / "outputs", "20USA", clear_existing=True)
+    render_dashboard(
+        main_df,
+        template,
+        series_config,
+        layout,
+        scope_df=df,
+        dashboard_updated_label="2026-07-10 14:30 JST",
+    )
+
+    transport_html = (layout["dashboards"] / "transport.html").read_text(encoding="utf-8")
+    index_html = (layout["dashboards"] / "index.html").read_text(encoding="utf-8")
+    assert "Economy: <strong>United States</strong>" in transport_html
+    assert "Updated: 2026-07-10 14:30 JST" in transport_html
+    assert "Updated: 2026-07-10 14:30 JST" in index_html
 
 
 def test_weekly_common_esto_sample_fixture_is_present() -> None:

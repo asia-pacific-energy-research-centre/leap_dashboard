@@ -318,6 +318,63 @@ def filter_common_esto_data(
     return out.reset_index(drop=True)
 
 
+def filter_template_for_leap_demand_coverage(
+    template: dict,
+    missing_leap_branches: set[str] | list[str],
+) -> dict:
+    """Drop demand-sector pages whose LEAP branches are all still aggregate-only.
+
+    ``missing_leap_branches`` is the resolved, economy-scoped list of LEAP
+    demand branch names with no separately modelled detail (see
+    ``leap_mappings.codebase.mapping_tools.source_branch_preflight.get_demand_sectors_without_detail``).
+    A page listed in the template's ``leap_demand_sector_coverage.page_leap_branches``
+    is dropped from ``sector_pages`` and ``total_demand_page`` only when every
+    one of its configured LEAP branches is in that missing set — a page with
+    at least one branch already modelled in detail is kept, since it still has
+    real LEAP data to show even if incomplete. Pages listed in
+    ``leap_demand_sector_coverage.always_skip_page_keys`` are dropped
+    unconditionally: they have no LEAP-to-ESTO mapping at all (not even an
+    aggregate-only one), so ``get_demand_sectors_without_detail`` can never
+    describe them.
+    """
+    coverage_config = template.get("leap_demand_sector_coverage", {})
+    if not coverage_config.get("enabled", False):
+        return template
+    page_branches = coverage_config.get("page_leap_branches", {})
+    always_skip = {str(key) for key in coverage_config.get("always_skip_page_keys", [])}
+    if not page_branches and not always_skip:
+        return template
+    missing = {str(branch).casefold() for branch in missing_leap_branches}
+    pages_to_drop = {
+        page_key
+        for page_key, branches in page_branches.items()
+        if branches and all(str(branch).casefold() in missing for branch in branches)
+    }
+    pages_to_drop |= always_skip
+    if not pages_to_drop:
+        return template
+
+    out = dict(template)
+    out["sector_pages"] = [
+        rule for rule in template.get("sector_pages", [])
+        if str(rule.get("page_key", "")) not in pages_to_drop
+    ]
+    total_demand_page = template.get("total_demand_page")
+    if total_demand_page:
+        total_demand_page = dict(total_demand_page)
+        total_demand_page["demand_page_keys"] = [
+            key for key in total_demand_page.get("demand_page_keys", [])
+            if key not in pages_to_drop
+        ]
+        total_demand_page["sector_colors"] = {
+            key: value
+            for key, value in total_demand_page.get("sector_colors", {}).items()
+            if key not in pages_to_drop
+        }
+        out["total_demand_page"] = total_demand_page
+    return out
+
+
 def apply_visible_series(df: pd.DataFrame, visible_series: list[dict[str, str]]) -> pd.DataFrame:
     """Keep only configured source/scenario series, matching case-insensitively."""
     if df.empty:

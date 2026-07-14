@@ -1,6 +1,23 @@
 #%%
 """Notebook-safe production workflow for the Common ESTO dashboard."""
 
+# Runtime toggles / environment variables (quick reference)
+# ---------------------------------------------------------
+# COMMON_ESTO_ECONOMIES
+#   Optional comma-separated list of economy codes to render in one run
+#   (e.g. "20_USA,02_BD"). You can also set ECONOMIES directly in this file
+#   as either a string ("20_USA") or list (["20_USA", "02_BD"]).
+# COMMON_ESTO_COMPARISON_SCOPE
+#   Comparison scope filter (default: leap_vs_esto_vs_ninth).
+# COMMON_ESTO_UPDATE_DATA
+#   Boolean toggle for upstream data refresh before rendering.
+#   When False, dashboard input files are reused as-is and are NOT refreshed.
+#   Accepted true values: 1, true, yes, on.
+# COMMON_ESTO_INPUT_DATA_PATH
+#   Optional override for dashboard input CSV path.
+# COMMON_ESTO_ROWS_PATH
+#   Optional override for common rows CSV path.
+
 #%%
 import json
 import os
@@ -21,10 +38,12 @@ from common_esto_dashboard_data import (  # noqa: E402
     build_sign_semantics_summary,
     enrich_with_component_metadata,
     filter_common_esto_data,
+    filter_template_for_leap_demand_coverage,
     load_common_esto_data,
 )
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
 from common_esto_dashboard_output_layout import build_output_layout, publish_to_docs  # noqa: E402
+from common_esto_dashboard_convergence import write_capacity_unmet_convergence_page  # noqa: E402
 
 
 #%%
@@ -35,6 +54,23 @@ def _resolve(path: str | Path) -> Path:
     if path_obj.is_absolute():
         return path_obj
     return REPO_ROOT / path_obj
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    """Parse a boolean environment variable with a safe default."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _normalize_economies(economies: str | list[str]) -> list[str]:
+    """Normalize ECONOMIES into a clean, non-empty list of economy codes."""
+    if isinstance(economies, str):
+        values = [part.strip() for part in economies.split(",") if part.strip()]
+    else:
+        values = [str(item).strip() for item in economies if str(item).strip()]
+    return values
 
 
 #%%
@@ -78,8 +114,11 @@ def _log_to_file(log_path):
 # Stable paths.
 _LEAP_MAPPINGS_REPO = Path(r"C:\Users\Work\github\leap_mappings")
 _LEAP_MAPPINGS_RESULTS = Path(r"C:\Users\Work\github\leap_mappings\results\common_esto")
-DEFAULT_WIDE_INPUT_PATH = _LEAP_MAPPINGS_RESULTS / "common_esto_comparison_wide.csv"
-INPUT_DATA_PATH = _resolve(os.getenv("COMMON_ESTO_INPUT_DATA_PATH", str(DEFAULT_WIDE_INPUT_PATH)))
+# The long-form file only contains rows a source system actually reported, so
+# years a source has no data for are simply absent instead of zero-filled
+# (unlike the wide CSV, which pads every year column with 0).
+DEFAULT_INPUT_PATH = _LEAP_MAPPINGS_RESULTS / "common_esto_comparison_data.csv"
+INPUT_DATA_PATH = _resolve(os.getenv("COMMON_ESTO_INPUT_DATA_PATH", str(DEFAULT_INPUT_PATH)))
 COMMON_ROWS_PATH = _resolve(os.getenv("COMMON_ESTO_ROWS_PATH", str(_LEAP_MAPPINGS_RESULTS / "common_esto_rows.csv")))
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
@@ -89,20 +128,70 @@ OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
 #%%
 # User-tuned constants.
 COMPARISON_SCOPE = os.getenv("COMMON_ESTO_COMPARISON_SCOPE", "leap_vs_esto_vs_ninth")
-ECONOMY = os.getenv("COMMON_ESTO_ECONOMY", "20_USA")
-MIN_YEAR = 1990
+ECONOMIES: str | list[str] = os.getenv("COMMON_ESTO_ECONOMIES", ["20_USA", "02_BD"])
+MIN_YEAR = 2010
 MAX_YEAR = 2060
 
-RUN_DASHBOARD_WORKFLOW = True
+# Env var override so importers (e.g. the batch render script) can load this
+# module's functions without triggering the full workflow run at import time.
+RUN_DASHBOARD_WORKFLOW = _env_bool("COMMON_ESTO_RUN_DASHBOARD_WORKFLOW", default=True)
 CLEAR_EXISTING_OUTPUTS = True
-PUBLISH_TO_DOCS = False  # Set True to copy dashboard files to docs/<economy>/ after each run.
-REGEN_COMMON_ESTO_FAST_PATH = os.getenv("COMMON_ESTO_REGEN_FAST_PATH", "0").strip().lower() in {"1", "true", "yes"}
+PUBLISH_TO_DOCS = True  # Set True to copy dashboard files to docs/<economy>/ after each run.
+# Explicit notebook/script toggle: refresh upstream Common ESTO comparison inputs
+# before rendering dashboard pages.
+#
+# What this does when True:
+# - recomputes fast-path Common ESTO outputs in leap_mappings/results/common_esto
+#   from latest mapping relationship files (Stage 3 fast-path equivalent);
+# - updates dashboard inputs such as common_esto_comparison_data.csv used below.
+#
+# Recommended default is True for normal production runs so dashboard output stays
+# aligned with latest upstream data.
+UPDATE_DATA = True
+
+# Env var override for automation.
+# Example: COMMON_ESTO_UPDATE_DATA=0 to skip refresh and render from existing files.
+UPDATE_DATA = _env_bool(
+    "COMMON_ESTO_UPDATE_DATA",
+    default=UPDATE_DATA,
+)
+INCLUDE_CAPACITY_UNMET_CONVERGENCE = True  # Set False to skip writing the capacity-unmet convergence page.
+CAPACITY_UNMET_CONVERGENCE_PATH = Path(
+    r"C:\Users\Work\github\leap_initialisation\outputs\leap_exports\supply_reconciliation\results_update\supporting_files\runtime\capacity_unmet_convergence.csv"
+)
+
+
+#%%
+def _dashboard_updated_label() -> str:
+    """Return the human-facing timestamp shown in rendered dashboard headers."""
+    return datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
+
+
+def _write_dashboard_metadata(layout: dict[str, Path], updated_label: str) -> None:
+    """Write lightweight render metadata for summary scripts and manual inspection."""
+    metadata = {
+        "economy": layout["root"].name,
+        "dashboard_updated_label": updated_label,
+        "rendered_at_local": datetime.now().astimezone().isoformat(timespec="seconds"),
+    }
+    (layout["supporting"] / "dashboard_metadata.json").write_text(
+        json.dumps(metadata, indent=2),
+        encoding="utf-8",
+    )
 
 
 #%%
 def maybe_regen_common_esto_fast_path() -> None:
-    """Optionally refresh upstream Common ESTO outputs before dashboard rendering."""
-    if not REGEN_COMMON_ESTO_FAST_PATH:
+    """Refresh upstream Common ESTO outputs before dashboard rendering when enabled.
+
+    This updates the fast-path input data under leap_mappings/results/common_esto
+    that the dashboard reads from (notably common_esto_comparison_data.csv).
+    """
+    if not UPDATE_DATA:
+        print(
+            "Skipping Common ESTO fast-path refresh "
+            "(COMMON_ESTO_UPDATE_DATA disabled; input data unchanged)."
+        )
         return
     if str(_LEAP_MAPPINGS_REPO) not in sys.path:
         sys.path.insert(0, str(_LEAP_MAPPINGS_REPO))
@@ -130,17 +219,42 @@ def maybe_regen_common_esto_fast_path() -> None:
     )
 
 
-def run_dashboard_workflow() -> dict[str, object]:
-    """Run the production Common ESTO dashboard."""
-    maybe_regen_common_esto_fast_path()
+def _missing_leap_demand_branches(economy: str) -> list[str]:
+    """Return LEAP demand branches with no separately modelled detail for *economy*.
+
+    Delegates to leap_mappings' own config-owned record of which sectors are
+    still only available via 'All demand aggregated'
+    (config/all_demand_aggregated_components.json), resolved per economy.
+    """
+    if str(_LEAP_MAPPINGS_REPO) not in sys.path:
+        sys.path.insert(0, str(_LEAP_MAPPINGS_REPO))
+    from codebase.mapping_tools.source_branch_preflight import (  # noqa: E402
+        get_demand_sectors_without_detail,
+        load_all_demand_aggregated_components,
+    )
+
+    components_path = _LEAP_MAPPINGS_REPO / "config" / "all_demand_aggregated_components.json"
+    components_df = load_all_demand_aggregated_components(components_path)
+    return get_demand_sectors_without_detail(components_df, economy)
+
+
+def run_dashboard_for_economy(economy: str) -> dict[str, object]:
+    """Render the production Common ESTO dashboard for one economy."""
+    # Accept both underscore ("20_USA") and compact ("20USA") economy keys by
+    # normalizing the key and the data's economy column to the compact form
+    # used for output folders (matches the batch render script).
+    economy = str(economy).replace("_", "").strip()
     template = load_json(TEMPLATE_PATH)
+    missing_leap_branches = _missing_leap_demand_branches(economy)
+    template = filter_template_for_leap_demand_coverage(template, missing_leap_branches)
     series_config = json.loads(SERIES_CONFIG_PATH.read_text(encoding="utf-8"))
     raw_df = load_common_esto_data(INPUT_DATA_PATH)
+    raw_df["economy"] = raw_df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
     filtered_df = filter_common_esto_data(
         raw_df,
         comparison_scope=COMPARISON_SCOPE,
-        economy=ECONOMY,
+        economy=economy,
         min_year=MIN_YEAR,
         max_year=MAX_YEAR,
     )
@@ -149,16 +263,49 @@ def run_dashboard_workflow() -> dict[str, object]:
     scope_filtered_df = filter_common_esto_data(
         raw_df,
         comparison_scope="__all_scopes__",
-        economy=ECONOMY,
+        economy=economy,
         min_year=MIN_YEAR,
         max_year=MAX_YEAR,
     )
     scope_visible_df = apply_visible_series(scope_filtered_df, series_config.get("visible_series", []))
     scope_visible_df = apply_sign_semantics(scope_visible_df, template.get("sign_semantics"))
-    layout = build_output_layout(OUTPUT_ROOT, ECONOMY.replace("_", ""), clear_existing=CLEAR_EXISTING_OUTPUTS)
+    layout = build_output_layout(OUTPUT_ROOT, economy, clear_existing=CLEAR_EXISTING_OUTPUTS)
+    dashboard_updated_label = _dashboard_updated_label()
+    _write_dashboard_metadata(layout, dashboard_updated_label)
     sign_summary_df = build_sign_semantics_summary(visible_df)
     sign_summary_df.to_csv(layout["supporting"] / "sign_semantics_summary.csv", index=False)
-    manifest_df = render_dashboard(visible_df, template, series_config, layout, scope_df=scope_visible_df)
+    manifest_df = render_dashboard(
+        visible_df,
+        template,
+        series_config,
+        layout,
+        scope_df=scope_visible_df,
+        dashboard_updated_label=dashboard_updated_label,
+    )
+    convergence_result = write_capacity_unmet_convergence_page(
+        CAPACITY_UNMET_CONVERGENCE_PATH,
+        layout,
+        enabled=INCLUDE_CAPACITY_UNMET_CONVERGENCE,
+    )
+    coverage_config = template.get("leap_demand_sector_coverage", {})
+    rendered_page_keys = {str(rule.get("page_key", "")) for rule in template.get("sector_pages", [])}
+    aggregate_only_skipped = sorted(
+        set(coverage_config.get("page_leap_branches", {})) - rendered_page_keys
+    )
+    always_skipped = sorted(
+        set(coverage_config.get("always_skip_page_keys", [])) - rendered_page_keys
+    )
+    if aggregate_only_skipped:
+        print(
+            f"Demand-sector pages skipped (no LEAP detail for {economy}, only 'All demand "
+            f"aggregated'): {', '.join(aggregate_only_skipped)}"
+        )
+    if always_skipped:
+        print(
+            f"Sector pages skipped (no LEAP-to-ESTO mapping at all for {economy}): "
+            f"{', '.join(always_skipped)}"
+        )
+    print(f"LEAP demand branches without detail for {economy}: {', '.join(missing_leap_branches) or 'none'}")
     print(f"Input rows read: {len(raw_df):,}")
     print(f"Rows after scope/economy/year filter: {len(filtered_df):,}")
     print(f"Rows after visible-series filter: {len(visible_df):,}")
@@ -166,17 +313,46 @@ def run_dashboard_workflow() -> dict[str, object]:
     print(f"Sign summary rows written: {len(sign_summary_df):,}")
     print(f"Dashboard index: {layout['dashboards'] / 'index.html'}")
     result: dict[str, object] = {
+        "economy": economy,
         "dashboard_index": str(layout["dashboards"] / "index.html"),
         "chart_manifest": str(layout["supporting"] / "chart_manifest.csv"),
         "sign_semantics_summary": str(layout["supporting"] / "sign_semantics_summary.csv"),
         "chart_count": len(manifest_df),
     }
+    if convergence_result:
+        result["capacity_unmet_convergence"] = convergence_result
     if PUBLISH_TO_DOCS:
         docs_root = REPO_ROOT / "docs"
         counts = publish_to_docs(layout, docs_root)
         print(f"Published to docs/: {counts}")
         result["docs_published"] = counts
     return result
+
+
+def run_dashboard_workflow() -> dict[str, object]:
+    """Run dashboard render once for all configured economies."""
+    maybe_regen_common_esto_fast_path()
+
+    configured_economies = _normalize_economies(ECONOMIES)
+    if not configured_economies:
+        raise ValueError("ECONOMIES is empty. Provide a string or list with at least one economy code.")
+
+    print(f"Configured economies: {', '.join(configured_economies)}")
+    economy_results: dict[str, dict[str, object]] = {}
+    for idx, economy in enumerate(configured_economies, start=1):
+        print("-" * 72)
+        print(f"[{idx}/{len(configured_economies)}] Rendering economy: {economy}")
+        economy_results[economy] = run_dashboard_for_economy(economy)
+
+    total_charts = sum(int(result.get("chart_count", 0)) for result in economy_results.values())
+    print("-" * 72)
+    print(f"Completed dashboard run for {len(economy_results)} economies.")
+    print(f"Total charts written across all economies: {total_charts:,}")
+    return {
+        "economies": configured_economies,
+        "economy_results": economy_results,
+        "total_chart_count": total_charts,
+    }
 
 
 def _chime() -> None:

@@ -86,6 +86,51 @@ def series_label(row: pd.Series, series_labels: dict[str, str]) -> str:
     return series_label_from_values(row["source_system"], row["scenario"], series_labels)
 
 
+def scenario_toggle_tag(source_system: object, scenario: object) -> str:
+    """Classify a series for the REF/TGT dashboard toggle.
+
+    ESTO historical rows are tagged "esto" and always stay visible; LEAP/9th
+    rows are tagged "ref" or "tgt" so the client-side toggle can show/hide
+    them. Anything else falls back to "esto" (always visible) rather than
+    silently disappearing under either toggle state.
+    """
+    scenario_text = str(scenario or "").strip().casefold()
+    if scenario_text == "reference":
+        return "ref"
+    if scenario_text == "target":
+        return "tgt"
+    return "esto"
+
+
+def trace_meta_entry(
+    source_system: object, scenario: object, active_visible: bool | str = True, metric: str = "both"
+) -> dict:
+    """Build one entry of a figure's trace_meta list (see scenario_toggle_tag).
+
+    ``metric`` carries a second, independent dimension used only by the
+    TFC/TFEC sector chart ("tfc"/"tfec"/"both"); every other chart leaves it
+    at the default "both" so the REF/TGT toggle is the only axis that applies.
+    """
+    return {"tag": scenario_toggle_tag(source_system, scenario), "metric": metric, "active_visible": active_visible}
+
+
+def chart_dataset_tokens(*dfs: pd.DataFrame | None) -> str:
+    """Comma-joined, uppercased source systems contributing nonzero energy to a chart.
+
+    Accepts one or more dataframes (e.g. demand + supply slices) and returns the
+    union, sorted, e.g. "ESTO,LEAP,NINTH". Used for the client-side dataset
+    filter buttons via each chart card's data-datasets attribute.
+    """
+    tokens: set[str] = set()
+    for df in dfs:
+        if df is None or df.empty or "source_system" not in df.columns or "value" not in df.columns:
+            continue
+        values = pd.to_numeric(df["value"], errors="coerce").fillna(0.0)
+        systems = df.loc[values.abs() > 0, "source_system"].astype(str).str.strip()
+        tokens.update(s.upper() for s in systems if s and s.casefold() != "nan")
+    return ",".join(sorted(tokens))
+
+
 def code_candidate_text(value: object) -> str:
     """Return the leading ESTO-style code expression from a label or code field."""
     text = str(value or "").strip()
@@ -444,6 +489,7 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
 
     specs: list[dict[str, object]] = []
     used_group_keys: set[tuple[int, str]] = set()
+    used_label_sets: set[frozenset[str]] = set()
     for level in range(1, level_count + 1):
         prefixes = sorted({code_prefix(code, level) for code in nodes["canonical_code"] if code_prefix(code, level)})
         for prefix in prefixes:
@@ -452,6 +498,15 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
                 continue
             labels = frontier_flow_labels(nodes, prefix, level + 1 if level == 1 else level)
             if not labels:
+                continue
+            # A prefix whose frontier resolves to the exact same leaf flows as an
+            # already-emitted card is a redundant rollup (e.g. a "10" card and a
+            # "10.01" card that both fall back to the single leaf "10.01.01" when
+            # the intermediate codes have no data of their own). Skip it rather
+            # than rendering two identical charts under different titles.
+            label_set = frozenset(labels)
+            if label_set in used_label_sets:
+                used_group_keys.add(group_key)
                 continue
             label = node_label_for_prefix(nodes, prefix)
             specs.append(
@@ -463,27 +518,31 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
                 }
             )
             used_group_keys.add(group_key)
+            used_label_sets.add(label_set)
             if len(specs) >= max_area_charts:
                 return specs
     return specs
 
 
-def area_source_priority(df: pd.DataFrame, template: dict) -> tuple[str, str] | None:
-    """Pick the source/scenario to use as stacked-area bars."""
-    chart_config = template.get("chart_generation", {})
-    preferred = (
-        str(chart_config.get("primary_area_source_system", "LEAP")),
-        str(chart_config.get("primary_area_scenario", "Target")),
-    )
-    available = {
-        (str(source), str(scenario))
-        for source, scenario in df[["source_system", "scenario"]].drop_duplicates().itertuples(index=False, name=None)
-    }
-    for candidate in [preferred, ("LEAP", "Reference"), ("NINTH", "Target"), ("NINTH", "Reference"), ("ESTO", "historical")]:
-        for source, scenario in available:
-            if source.casefold() == candidate[0].casefold() and scenario.casefold() == candidate[1].casefold():
-                return source, scenario
-    return next(iter(sorted(available))) if available else None
+_WHITE_BACKGROUND_LAYOUT: dict[str, object] = {"paper_bgcolor": "white", "plot_bgcolor": "white"}
+
+
+def apply_chart_chrome(fig: go.Figure, base_year: int | None = None) -> go.Figure:
+    """Apply the shared white background and base-year marker to a chart."""
+    fig.update_layout(**_WHITE_BACKGROUND_LAYOUT)
+    fig.update_xaxes(gridcolor="#e5e7eb", zerolinecolor="#e5e7eb")
+    fig.update_yaxes(gridcolor="#e5e7eb", zerolinecolor="#e5e7eb")
+    if base_year is not None:
+        fig.add_vline(
+            x=base_year,
+            line_dash="dot",
+            line_color="#6b7280",
+            annotation_text=f"Base year {base_year}",
+            annotation_position="top right",
+            annotation_font_size=10,
+            annotation_font_color="#6b7280",
+        )
+    return fig
 
 
 def build_area_chart(
@@ -491,36 +550,93 @@ def build_area_chart(
     area_spec: dict[str, object],
     series_labels: dict[str, str],
     template: dict,
+    group_col: str = "common_product_label",
+    title_prefix: str = "Aggregate by product",
 ) -> go.Figure:
-    """Build a stacked product area chart with dataset-comparison total lines."""
+    """Build a stacked product area chart with dataset-comparison total lines.
+
+    The stacked area colors switch datasets at the base year: ESTO actuals
+    fill the area through base_year, then the primary LEAP scenario fills it
+    from base_year onward. If a segment's dataset has no rows for this flow,
+    that segment is left blank rather than falling back to another dataset.
+
+    Two full stacks are built - one per primary scenario (Reference/Target) -
+    each embedding the same ESTO pre-base-year segment, tagged "ref"/"tgt" so
+    only one is visible at a time and the client-side REF/TGT toggle can swap
+    between them.
+    """
     source_flow_labels = [str(value) for value in area_spec["source_flow_labels"]]
     chart_df = df[df["common_flow_label"].isin(source_flow_labels)].copy()
-    primary = area_source_priority(chart_df, template)
+    chart_config = template.get("chart_generation", {})
+    comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
+    base_year = int(chart_config.get("base_year", 2023))
+    primary_source = str(chart_config.get("primary_area_source_system", "LEAP"))
+    default_scenario = str(chart_config.get("primary_area_scenario", "Target"))
+
+    pre_base_df = chart_df[
+        (chart_df["source_system"].astype(str).str.casefold() == comparison_source.casefold())
+        & (chart_df["year"] <= base_year)
+    ]
+    esto_keys = {
+        (str(source).casefold(), str(scenario).casefold())
+        for source, scenario in pre_base_df[["source_system", "scenario"]].drop_duplicates().itertuples(index=False, name=None)
+    }
+
     fig = go.Figure()
-    if primary is not None:
-        primary_source, primary_scenario = primary
-        primary_df = chart_df[
+    trace_meta: list[dict] = []
+    scenario_area_keys: set[tuple[str, str]] = set()
+    for scenario_name in ("Reference", "Target"):
+        post_base_df = chart_df[
             (chart_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
-            & (chart_df["scenario"].astype(str).str.casefold() == primary_scenario.casefold())
-        ].copy()
-        product_df = (
-            primary_df.groupby(["common_product_label", "year"], as_index=False)["value"].sum().sort_values(["common_product_label", "year"])
+            & (chart_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
+            & (chart_df["year"] > base_year)
+        ]
+        area_df = pd.concat([pre_base_df, post_base_df], ignore_index=True)
+        if area_df.empty:
+            continue
+        scenario_area_keys.add((primary_source.casefold(), scenario_name.casefold()))
+        tag = scenario_toggle_tag(primary_source, scenario_name)
+        is_default = scenario_name.casefold() == default_scenario.casefold()
+        group_df = (
+            area_df.groupby([group_col, "year"], as_index=False)["value"].sum().sort_values([group_col, "year"])
         )
-        for product_label, group in product_df.groupby("common_product_label", dropna=False):
+        for group_label, group in group_df.groupby(group_col, dropna=False):
+            # Plotly stacks traces cumulatively in the order they're added,
+            # regardless of sign - a positive (output) product added after
+            # several negative (input) products would render below zero,
+            # offset by the prior negative running total. Splitting into a
+            # positive and a negative stackgroup gives each its own
+            # from-zero baseline so outputs stack up and inputs stack down.
+            group_sign = "neg" if group["value"].sum() < 0 else "pos"
             fig.add_trace(
                 go.Scatter(
                     x=group["year"],
                     y=group["value"],
                     mode="lines",
-                    stackgroup="one",
-                    name=str(product_label),
-                    hovertemplate="%{x}<br>Signed value: %{y:,.2f} PJ<extra>" + escape(str(product_label)) + "</extra>",
+                    stackgroup=f"scenario_{tag}_{group_sign}",
+                    name=str(group_label),
+                    visible=True if is_default else False,
+                    hovertemplate="%{x}<br>Signed value: %{y:,.2f} PJ<extra>" + escape(str(group_label)) + "</extra>",
                 )
             )
+            trace_meta.append(trace_meta_entry(primary_source, scenario_name, True))
+
     total_df = (
         chart_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum().sort_values(["source_system", "scenario", "year"])
     )
     for (source_system, scenario), group in total_df.groupby(["source_system", "scenario"], dropna=False):
+        # Datasets already drawn as stacked area colors above don't also get a
+        # redundant total line; other datasets (e.g. NINTH) still show as lines.
+        key = (str(source_system).casefold(), str(scenario).casefold())
+        if key in esto_keys or key in scenario_area_keys:
+            continue
+        # Non-comparison-source totals (e.g. NINTH) are projections and should
+        # only be drawn from base_year onward, not over the historical range
+        # already covered by the ESTO-derived stacked area.
+        if str(source_system).casefold() != comparison_source.casefold():
+            group = group[group["year"] > base_year]
+        if group.empty:
+            continue
         label = series_label_from_values(source_system, scenario, series_labels)
         fig.add_trace(
             go.Scatter(
@@ -531,16 +647,106 @@ def build_area_chart(
                 line={"dash": "dash"},
             )
         )
+        trace_meta.append(trace_meta_entry(source_system, scenario, True))
     fig.update_layout(
-        title=title_with_sign_note(f"Aggregate by product: {area_spec['aggregate_flow_label']}", chart_df),
+        title=title_with_sign_note(f"{title_prefix}: {area_spec['aggregate_flow_label']}", chart_df),
         xaxis_title="Year",
         yaxis_title="Signed energy (PJ)",
         # Product legends can contain 20+ entries. Keeping them above the plot
         # made the legend collide with the title in narrow overview cards.
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
+        meta={"trace_meta": trace_meta},
     )
+    apply_chart_chrome(fig, base_year)
     return fig
+
+
+def _build_section_aggregate_charts(
+    page_df: pd.DataFrame,
+    page_key: str,
+    page_label: str,
+    parent_flow_labels: set[str],
+    template: dict,
+    series_labels: dict[str, str],
+) -> tuple[dict[str, go.Figure], list[dict], list[dict]]:
+    """Build the two aggregate area charts (by product, by flow) shown at the top of each section.
+
+    Replaces the old page-wide "By product" section: each real section (e.g.
+    Transfers) already breaks down into per-flow/product line charts, so these
+    aggregates summarise everything non-subtotal within just that section.
+    """
+    charts: dict[str, go.Figure] = {}
+    chart_rows: list[dict] = []
+    manifest_rows: list[dict] = []
+
+    non_parent_df = page_df[~page_df["common_flow_label"].isin(parent_flow_labels)]
+    if non_parent_df.empty:
+        return charts, chart_rows, manifest_rows
+
+    chart_config = template.get("chart_generation", {})
+    primary_source = str(chart_config.get("primary_area_source_system", "LEAP"))
+    primary_scenario = str(chart_config.get("primary_area_scenario", "Target"))
+    comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
+    base_year = int(chart_config.get("base_year", 2023))
+    ninth_source = str(chart_config.get("ninth_source_system", "NINTH"))
+    suppression_threshold = float(chart_config.get("suppression_threshold", 1.0))
+
+    flow_section = non_parent_df.groupby("common_flow_label")["_section_label"].agg(lambda s: s.mode().iloc[0])
+    section_flows: dict[str, list[str]] = {}
+    for flow_label, section_label in flow_section.items():
+        section_flows.setdefault(str(section_label), []).append(str(flow_label))
+
+    ordered_sections: list[str] = []
+    for flow_label in non_parent_df["common_flow_label"]:
+        section_label = str(flow_section.get(flow_label, page_label))
+        if section_label not in ordered_sections:
+            ordered_sections.append(section_label)
+
+    for section_label in ordered_sections:
+        flow_labels = sorted(set(section_flows.get(section_label, [])))
+        if not flow_labels:
+            continue
+        area_spec = {
+            "aggregate_flow_prefix": "",
+            "aggregate_flow_label": section_label,
+            "source_flow_labels": flow_labels,
+        }
+        area_df = page_df[page_df["common_flow_label"].isin(flow_labels)]
+        for group_col, group_noun, title_prefix, manifest_flow, manifest_product in (
+            ("common_product_label", "product", "Aggregate by product", section_label, "All products"),
+            ("common_flow_label", "flow", "Aggregate by flow", "All flows", section_label),
+        ):
+            chart_key = f"chart__area__section__{safe_slug(page_key)}__{safe_slug(section_label)}__{group_noun}"
+            metrics = compute_ranking_metrics(area_df, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
+            suppressed = metrics["total_abs_value"] < suppression_threshold
+            manifest_rows.append({
+                "page_key": page_key,
+                "page_label": page_label,
+                "section_label": section_label,
+                "chart_type": "stacked_area",
+                "chart_key": chart_key,
+                "common_flow_label": manifest_flow,
+                "common_product_label": manifest_product,
+                "row_count": int(len(area_df)),
+                "source_flow_labels": "; ".join(flow_labels),
+                "sign_note": sign_note_for_chart(area_df),
+                "suppressed": suppressed,
+                **metrics,
+            })
+            if suppressed:
+                continue
+            charts[chart_key] = build_area_chart(page_df, area_spec, series_labels, template, group_col=group_col, title_prefix=title_prefix)
+            chart_rows.append({
+                "chart_key": chart_key,
+                "chart_type": "stacked_area",
+                "title": f"{title_prefix}: {section_label}",
+                "product_label": f"{title_prefix}: {section_label}",
+                "section_label": section_label,
+                "datasets": chart_dataset_tokens(area_df),
+                **metrics,
+            })
+    return charts, chart_rows, manifest_rows
 
 
 def compute_diff_series(
@@ -577,20 +783,51 @@ def compute_diff_series(
     return hist_diff, proj_diff
 
 
+def compute_diff_series_by_scenario(
+    pair_df: pd.DataFrame,
+    primary_source: str = "LEAP",
+    comparison_source: str = "ESTO",
+    ninth_source: str = "NINTH",
+    base_year: int = 2023,
+    scenarios: tuple[str, ...] = ("Reference", "Target"),
+) -> tuple[dict[str, pd.Series], dict[str, pd.Series]]:
+    """Return (hist_diff_by_scenario, proj_diff_by_scenario) for each of ``scenarios``.
+
+    Lets the REF/TGT toggle switch between both scenarios' diff traces
+    instead of only ever computing the single build-time "primary" scenario.
+    """
+    hist_by_scenario: dict[str, pd.Series] = {}
+    proj_by_scenario: dict[str, pd.Series] = {}
+    for scenario_name in scenarios:
+        hist_diff, proj_diff = compute_diff_series(
+            pair_df, primary_source, scenario_name, comparison_source, ninth_source, base_year
+        )
+        hist_by_scenario[scenario_name] = hist_diff
+        proj_by_scenario[scenario_name] = proj_diff
+    return hist_by_scenario, proj_by_scenario
+
+
 def build_product_chart(
     chart_df: pd.DataFrame,
     flow_label: str,
     product_label: str,
     series_labels: dict[str, str],
     *,
-    hist_diff: pd.Series | None = None,
-    proj_diff: pd.Series | None = None,
+    hist_diff_by_scenario: dict[str, pd.Series] | None = None,
+    proj_diff_by_scenario: dict[str, pd.Series] | None = None,
     primary_source: str = "LEAP",
     primary_scenario: str = "Target",
+    base_year: int | None = None,
 ) -> go.Figure:
-    """Build a line chart for one common flow/product row."""
+    """Build a line chart for one common flow/product row.
+
+    ``hist_diff_by_scenario``/``proj_diff_by_scenario`` map scenario name
+    ("Reference"/"Target") to a diff series, so both scenarios' diff lines can
+    be built and left for the client-side REF/TGT toggle to show/hide.
+    """
     fig = go.Figure()
-    for (_source_system, _scenario), group in chart_df.groupby(["source_system", "scenario"], dropna=False):
+    trace_meta: list[dict] = []
+    for (source_system, scenario), group in chart_df.groupby(["source_system", "scenario"], dropna=False):
         group = group.sort_values("year")
         label = series_label(group.iloc[0], series_labels)
         customdata = None
@@ -613,12 +850,15 @@ def build_product_chart(
                 hovertemplate=hovertemplate,
             )
         )
-    if hist_diff is not None and not hist_diff.empty:
-        diff_label = f"{primary_source} {primary_scenario} minus comparison (hist)"
+        trace_meta.append(trace_meta_entry(source_system, scenario, True))
+    for scenario_name, diff_series in (hist_diff_by_scenario or {}).items():
+        if diff_series is None or diff_series.empty:
+            continue
+        diff_label = f"{primary_source} {scenario_name} minus comparison (hist)"
         fig.add_trace(
             go.Scatter(
-                x=hist_diff.index.tolist(),
-                y=hist_diff.values.tolist(),
+                x=diff_series.index.tolist(),
+                y=diff_series.values.tolist(),
                 mode="lines",
                 name=diff_label,
                 visible="legendonly",
@@ -626,12 +866,15 @@ def build_product_chart(
                 hovertemplate="%{x}<br>Diff: %{y:,.2f} PJ<extra>" + escape(diff_label) + "</extra>",
             )
         )
-    if proj_diff is not None and not proj_diff.empty:
-        diff_label = f"{primary_source} {primary_scenario} minus 9th (proj)"
+        trace_meta.append(trace_meta_entry(primary_source, scenario_name, "legendonly"))
+    for scenario_name, diff_series in (proj_diff_by_scenario or {}).items():
+        if diff_series is None or diff_series.empty:
+            continue
+        diff_label = f"{primary_source} {scenario_name} minus 9th (proj)"
         fig.add_trace(
             go.Scatter(
-                x=proj_diff.index.tolist(),
-                y=proj_diff.values.tolist(),
+                x=diff_series.index.tolist(),
+                y=diff_series.values.tolist(),
                 mode="lines",
                 name=diff_label,
                 visible="legendonly",
@@ -639,13 +882,18 @@ def build_product_chart(
                 hovertemplate="%{x}<br>Diff: %{y:,.2f} PJ<extra>" + escape(diff_label) + "</extra>",
             )
         )
+        trace_meta.append(trace_meta_entry(primary_source, scenario_name, "legendonly"))
     fig.update_layout(
         title=title_with_sign_note(f"{flow_label} - {product_label}", chart_df),
         xaxis_title="Year",
         yaxis_title="Signed energy (PJ)",
-        margin={"l": 64, "r": 28, "t": 56, "b": 72},
-        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "left", "x": 0},
+        # Legend below the plot, not above: long product legends collide
+        # with the title otherwise (see build_area_chart).
+        margin={"l": 64, "r": 28, "t": 84, "b": 160},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
+        meta={"trace_meta": trace_meta},
     )
+    apply_chart_chrome(fig, base_year)
     return fig
 
 
@@ -691,6 +939,7 @@ a:hover { text-decoration: underline; }
   flex:0 0 auto;flex-wrap:nowrap;margin-left:auto;
 }
 .dashboard-context { margin-top:6px;color:#4b5563;font-size:13px;line-height:1.35; }
+.dashboard-updated { margin-left:10px;padding-left:10px;border-left:1px solid #c5ccd3;color:#64748b;white-space:nowrap; }
 .dashboard-switcher {
   display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
   font-size:12px;color:#4b5563;white-space:nowrap;
@@ -758,6 +1007,28 @@ a:hover { text-decoration: underline; }
   background:#fff;color:#0b3d5c;font-size:12px;cursor:pointer;
 }
 .sort-btn.active { border-color:#1f6feb;background:#e8f0fe;font-weight:700; }
+.scenario-toggle {
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;white-space:nowrap;
+}
+.scenario-toggle-buttons { display:flex;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
+.scenario-toggle-btn {
+  padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
+}
+.scenario-toggle-btn + .scenario-toggle-btn { border-left:1px solid #c5ccd3; }
+.scenario-toggle-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.dataset-filter {
+  display:flex;align-items:center;gap:6px 4px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;
+}
+.dataset-filter-label { font-weight:600;max-width:260px;line-height:1.2; }
+.dataset-filter-buttons { display:flex;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
+.dataset-filter-btn {
+  padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
+}
+.dataset-filter-btn + .dataset-filter-btn { border-left:1px solid #c5ccd3; }
+.dataset-filter-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.chart-card.dataset-filtered { display:none; }
 .dashboard-grid {
   display:grid;
   grid-template-columns:repeat(3, minmax(0, 1fr));
@@ -779,6 +1050,7 @@ a:hover { text-decoration: underline; }
 }
 .lazy-chart-plot.is-unloaded { background:#f8fafc; }
 .section-heading { margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d; }
+.subsection-heading { margin:14px 0 6px 12px;font-size:15px;font-weight:600;color:#4c1d70;padding-left:8px;border-left:3px solid #c69af0; }
 @media (max-width: 900px) { .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
   .header-side-controls { flex:1 1 100%;min-width:0;justify-content:flex-start; }
@@ -812,6 +1084,113 @@ _HEADER_TOGGLE_JS = """
 })();
 """
 
+_SCENARIO_TOGGLE_HTML = """
+<div class="scenario-toggle" role="group" aria-label="Scenario">
+  <span>Scenario</span>
+  <div class="scenario-toggle-buttons">
+    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="ref">Reference</button>
+    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="tgt">Target</button>
+  </div>
+</div>
+"""
+
+_SCENARIO_TOGGLE_JS = """
+(function() {
+  var key = 'common-esto-scenario-mode';
+  var getMode = function() {
+    try {
+      var stored = window.localStorage.getItem(key);
+      if (stored === 'ref' || stored === 'tgt') return stored;
+    } catch (e) {}
+    return 'tgt';
+  };
+  var setMode = function(mode) {
+    try { window.localStorage.setItem(key, mode); } catch (e) {}
+  };
+
+  // Traces are tagged "esto" (always shown), or "ref"/"tgt" (LEAP/9th),
+  // with an independent optional "metric" dimension used only by the
+  // TFC/TFEC sector chart's own Plotly dropdown. See scenario_toggle_tag /
+  // trace_meta_entry in common_esto_dashboard_renderer.py.
+  var computeVisible = function(entry, scenarioMode, metricMode) {
+    var scenarioOk = entry.tag === 'esto' || entry.tag === scenarioMode;
+    var metricOk = !entry.metric || entry.metric === 'both' || entry.metric === metricMode;
+    return (scenarioOk && metricOk) ? entry.active_visible : false;
+  };
+
+  window.applyScenarioMode = function(plot) {
+    if (!window.Plotly || !plot || !plot.layout) return;
+    var meta = plot.layout.meta && plot.layout.meta.trace_meta;
+    if (!meta || !meta.length) return;
+    var scenarioMode = getMode();
+    var metricMode = plot._metricMode || 'tfc';
+    var visible = meta.map(function(entry) { return computeVisible(entry, scenarioMode, metricMode); });
+    window.Plotly.restyle(plot, {visible: visible});
+  };
+
+  var syncButtons = function() {
+    var mode = getMode();
+    document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.scenarioToggle === mode);
+    });
+  };
+  syncButtons();
+
+  document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setMode(btn.dataset.scenarioToggle);
+      syncButtons();
+      document.querySelectorAll('.lazy-chart-plot[data-rendered="true"]').forEach(function(plot) {
+        window.applyScenarioMode(plot);
+      });
+    });
+  });
+})();
+"""
+
+_DATASET_FILTER_JS = """
+(function() {
+  var buttons = Array.from(document.querySelectorAll('[data-dataset-filter]'));
+  if (!buttons.length) return;
+  var key = 'common-esto-dataset-filter';
+  var available = buttons.map(function(b) { return b.dataset.datasetFilter; });
+  var active = [];
+  try {
+    var stored = JSON.parse(window.localStorage.getItem(key) || '[]');
+    if (Array.isArray(stored)) {
+      active = stored.filter(function(d) { return available.indexOf(d) !== -1; });
+    }
+  } catch (e) {}
+
+  // A card stays visible only if it contains every highlighted (active) dataset.
+  var apply = function() {
+    buttons.forEach(function(btn) {
+      btn.classList.toggle('active', active.indexOf(btn.dataset.datasetFilter) !== -1);
+    });
+    document.querySelectorAll('.chart-card[data-datasets]').forEach(function(card) {
+      var have = (card.dataset.datasets || '').split(',').filter(Boolean);
+      var hidden = active.some(function(d) { return have.indexOf(d) === -1; });
+      card.classList.toggle('dataset-filtered', hidden);
+    });
+    try { window.localStorage.setItem(key, JSON.stringify(active)); } catch (e) {}
+    if (window.Plotly) {
+      document.querySelectorAll('.chart-card:not(.dataset-filtered) .lazy-chart-plot[data-rendered="true"]')
+        .forEach(function(p) { window.Plotly.Plots.resize(p); });
+    }
+  };
+
+  buttons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var d = btn.dataset.datasetFilter;
+      var i = active.indexOf(d);
+      if (i === -1) { active.push(d); } else { active.splice(i, 1); }
+      apply();
+    });
+  });
+  apply();
+})();
+"""
+
 _LAZY_LOAD_JS = """
 (function() {
   var plots = Array.from(document.querySelectorAll('.lazy-chart-plot[data-chart-key]'));
@@ -839,6 +1218,16 @@ _LAZY_LOAD_JS = """
       plot.classList.remove('is-unloaded');
       setState(plot, '', true);
       window.Plotly.Plots.resize(plot);
+      if (window.applyScenarioMode) {
+        if (plot.on) {
+          plot.on('plotly_buttonclicked', function(ev) {
+            var label = (ev && ev.button && ev.button.label) || '';
+            plot._metricMode = /TFEC/i.test(label) ? 'tfec' : 'tfc';
+            window.applyScenarioMode(plot);
+          });
+        }
+        window.applyScenarioMode(plot);
+      }
     } catch (err) {
       plot.classList.add('is-unloaded');
       setState(plot, 'Chart failed: ' + (err.message || err), false);
@@ -969,14 +1358,18 @@ def compute_ranking_metrics(
     return {"total_abs_value": total_abs, "abs_diff": abs_diff, "pct_diff": pct_diff}
 
 
-def _section_anchor(page_label: str, section_label: str) -> str:
-    """Generate a stable HTML anchor id for a page section."""
-    return "sec-" + safe_slug(page_label) + "__" + safe_slug(section_label)
+def _section_anchor(page_label: str, section_label: str, subsection_label: str | None = None) -> str:
+    """Generate a stable HTML anchor id for a page section or subsection."""
+    anchor = "sec-" + safe_slug(page_label) + "__" + safe_slug(section_label)
+    if subsection_label:
+        anchor = anchor + "__" + safe_slug(subsection_label)
+    return anchor
 
 
 def _nav_chips_html(all_pages: list[dict], current_file: str) -> str:
     """Build page-navigation chip HTML."""
-    demand = ["total_demand", "buildings", "bunkers", "industry", "transport", "others", "non_energy"]
+    overview = ["total_demand"]
+    demand = ["buildings", "bunkers", "industry", "transport", "others", "non_energy"]
     transform = ["power", "refining", "other_transformation"]
     supply = ["supply"]
     page_map = {p["page_key"]: p for p in all_pages}
@@ -993,12 +1386,16 @@ def _nav_chips_html(all_pages: list[dict], current_file: str) -> str:
             f'{escape(label)}</a>'
         )
 
+    sep = '<span class="header-nav-separator" aria-hidden="true">|</span>'
     parts: list[str] = []
+    overview_chips = [chip(k) for k in overview if chip(k)]
+    if overview_chips:
+        parts.extend(overview_chips)
+        parts.append(sep)
     for key in demand:
         h = chip(key)
         if h:
             parts.append(h)
-    sep = '<span class="header-nav-separator" aria-hidden="true">|</span>'
     transform_chips = [chip(k) for k in transform if chip(k)]
     if transform_chips:
         parts.append(sep)
@@ -1007,7 +1404,7 @@ def _nav_chips_html(all_pages: list[dict], current_file: str) -> str:
     if supply_chips:
         parts.append(sep)
         parts.extend(supply_chips)
-    remaining_keys = {p["page_key"] for p in all_pages} - set(demand + transform + supply)
+    remaining_keys = {p["page_key"] for p in all_pages} - set(overview + demand + transform + supply)
     remaining_chips = [chip(k) for k in sorted(remaining_keys) if chip(k)]
     if remaining_chips:
         parts.append(sep)
@@ -1076,17 +1473,57 @@ def _dashboard_switcher_html(dashboards: list[dict[str, str]], current_dashboard
     )
 
 
-def _jump_nav_html(page_label: str, section_labels: list[str]) -> str:
-    """Build the section jump-navigation block."""
-    if not section_labels:
+_DATASET_DISPLAY_LABELS = {"NINTH": "Ninth"}
+
+
+def _dataset_filter_html(datasets: list[str]) -> str:
+    """Build the header dataset-filter button group.
+
+    One toggle button per dataset (source system) present on the page. When a
+    button is active (blue), chart cards lacking that dataset are hidden.
+    """
+    if not datasets:
         return ""
-    chips = "".join(
-        f'<a href="#{_section_anchor(page_label, sl)}" class="jump-chip" data-level="1">{escape(sl)}</a>'
-        for sl in section_labels
+    buttons = "".join(
+        f'<button type="button" class="dataset-filter-btn" data-dataset-filter="{escape(d)}">'
+        f'{escape(_DATASET_DISPLAY_LABELS.get(d, d))}</button>'
+        for d in datasets
     )
     return (
+        '<div class="dataset-filter" role="group" aria-label="Dataset filter">'
+        '<span class="dataset-filter-label">'
+        "Exclude charts that don't contain the highlighted datasets:</span>"
+        f'<div class="dataset-filter-buttons">{buttons}</div>'
+        '</div>'
+    )
+
+
+def _jump_nav_html(page_label: str, section_tree: list[tuple[str, list[str]]]) -> str:
+    """Build the section jump-navigation block.
+
+    ``section_tree`` is an ordered list of (section_label, subsection_labels) pairs.
+    The top-level section chips render on row 1; each section that has more than one
+    subsection gets its own indented row directly beneath row 1, in section order, so a
+    page with several subdivided sections ends up with rows 2, 3, 4... one per parent.
+    """
+    if not section_tree:
+        return ""
+    top_chips = "".join(
+        f'<a href="#{_section_anchor(page_label, sl)}" class="jump-chip" data-level="1">{escape(sl)}</a>'
+        for sl, _ in section_tree
+    )
+    rows = [f'<div class="jump-nav-row" data-level="1">{top_chips}</div>']
+    for sl, subsection_labels in section_tree:
+        if len(subsection_labels) < 2:
+            continue
+        sub_chips = "".join(
+            f'<a href="#{_section_anchor(page_label, sl, sub)}" class="jump-chip" data-level="2">{escape(sub)}</a>'
+            for sub in subsection_labels
+        )
+        rows.append(f'<div class="jump-nav-row" data-level="2">{sub_chips}</div>')
+    return (
         f'<div class="jump-nav"><span class="jump-nav-label">Sections:</span>'
-        f'<div class="jump-nav-groups"><div class="jump-nav-row" data-level="1">{chips}</div></div></div>'
+        f'<div class="jump-nav-groups">{"".join(rows)}</div></div>'
     )
 
 
@@ -1100,7 +1537,7 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
         caption = escape(str(row.get("title", "")))
         key = escape(row["chart_key"])
         cards.append(
-            f'<figure class="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}">'
+            f'<figure class="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
             f'<figcaption class="chart-caption">{caption}</figcaption>'
             f'<div class="meta-subline">{escape(page_label)}</div>'
             f'<div class="chart-load-state" data-loaded="false">Chart queued</div>'
@@ -1121,8 +1558,67 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
     )
 
 
+def _grid_class_for(n: int) -> str:
+    """Pick a chart-grid layout class based on card count."""
+    if n == 1:
+        return "dashboard-grid expand-1"
+    if n == 2:
+        return "dashboard-grid expand-2"
+    if n == 3:
+        return "dashboard-grid expand-3"
+    return "dashboard-grid"
+
+
+def _chart_cards_html(rows: list[dict], subline: str) -> str:
+    """Build the chart-card <figure> markup for a set of rows sharing one subline."""
+    cards = []
+    for i, row in enumerate(rows):
+        product_name = escape(str(row.get("product_label", row.get("title", ""))))
+        key = escape(row["chart_key"])
+        cards.append(
+            f'<figure class="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
+            f'<figcaption class="chart-caption">{product_name}</figcaption>'
+            f'<div class="meta-subline">{escape(subline)}</div>'
+            f'<div class="chart-load-state" data-loaded="false">Chart queued</div>'
+            f'<div data-chart-key="{key}" class="lazy-chart-plot is-unloaded" role="img" aria-label="{product_name}"></div>'
+            f'</figure>'
+        )
+    return "".join(cards)
+
+
+def _sort_bar_html() -> str:
+    return (
+        '<div class="sort-bar"><span class="sort-bar-label">Sort:</span>'
+        '<button class="sort-btn active" data-sort="default">Default</button>'
+        '<button class="sort-btn" data-sort="totalAbs">Largest total</button>'
+        '<button class="sort-btn" data-sort="absDiff">Largest difference</button>'
+        '<button class="sort-btn" data-sort="pctDiff">Largest % diff</button>'
+        '</div>'
+    )
+
+
+def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[str]]]:
+    """Return ordered (section_label, subsection_labels) pairs for the jump nav.
+
+    A section only gets subsections when it contains more than one distinct
+    ``flow_group_label`` — sections that are already a single flow (e.g. Refining)
+    stay flat rather than gaining a pointless one-item subsection row.
+    """
+    tree: list[tuple[str, list[str]]] = []
+    seen_sections: dict[str, list[str]] = {}
+    for row in line_rows:
+        section_label = str(row.get("section_label") or "Other")
+        if section_label not in seen_sections:
+            seen_sections[section_label] = []
+            tree.append((section_label, seen_sections[section_label]))
+        group = str(row.get("flow_group_label") or "").strip()
+        if group and group not in seen_sections[section_label]:
+            seen_sections[section_label].append(group)
+    return [(sl, subs if len(subs) > 1 else []) for sl, subs in tree]
+
+
 def _line_sections_html(line_rows: list[dict], page_label: str) -> str:
-    """Build section-grouped HTML for line charts."""
+    """Build section-grouped HTML for line charts, with subsections keyed by flow."""
     if not line_rows:
         return ""
     seen: list[str] = []
@@ -1134,40 +1630,54 @@ def _line_sections_html(line_rows: list[dict], page_label: str) -> str:
     for section_label in seen:
         section_rows = [r for r in line_rows if str(r.get("section_label") or "Other") == section_label]
         anchor = _section_anchor(page_label, section_label)
-        n = len(section_rows)
-        if n == 1:
-            grid_class = "dashboard-grid expand-1"
-        elif n == 2:
-            grid_class = "dashboard-grid expand-2"
-        elif n == 3:
-            grid_class = "dashboard-grid expand-3"
-        else:
-            grid_class = "dashboard-grid"
-        cards = []
-        for i, row in enumerate(section_rows):
-            product_name = escape(str(row.get("product_label", row.get("title", ""))))
-            key = escape(row["chart_key"])
-            subline = escape(f"{page_label} > {section_label}")
-            cards.append(
-                f'<figure class="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}">'
-                f'<figcaption class="chart-caption">{product_name}</figcaption>'
-                f'<div class="meta-subline">{subline}</div>'
-                f'<div class="chart-load-state" data-loaded="false">Chart queued</div>'
-                f'<div data-chart-key="{key}" class="lazy-chart-plot is-unloaded" role="img" aria-label="{product_name}"></div>'
-                f'</figure>'
+
+        flow_groups: list[str] = []
+        for row in section_rows:
+            group = str(row.get("flow_group_label") or "").strip()
+            if group and group not in flow_groups:
+                flow_groups.append(group)
+
+        if len(flow_groups) < 2:
+            grid_class = _grid_class_for(len(section_rows))
+            cards_html = _chart_cards_html(section_rows, f"{page_label} > {section_label}")
+            body_html = (
+                f'<section class="section-sort-group">'
+                f'{_sort_bar_html()}'
+                f'<div class="{grid_class}" data-sortable-grid="{escape(anchor)}">{cards_html}</div>'
+                f'</section>'
             )
+        else:
+            direct_rows = [r for r in section_rows if not str(r.get("flow_group_label") or "").strip()]
+            sub_chunks = []
+            if direct_rows:
+                grid_class = _grid_class_for(len(direct_rows))
+                cards_html = _chart_cards_html(direct_rows, f"{page_label} > {section_label}")
+                sub_chunks.append(
+                    f'<section class="section-sort-group">'
+                    f'{_sort_bar_html()}'
+                    f'<div class="{grid_class}" data-sortable-grid="{escape(anchor)}">{cards_html}</div>'
+                    f'</section>'
+                )
+            for group in flow_groups:
+                group_rows = [r for r in section_rows if str(r.get("flow_group_label") or "").strip() == group]
+                group_anchor = _section_anchor(page_label, section_label, group)
+                grid_class = _grid_class_for(len(group_rows))
+                cards_html = _chart_cards_html(group_rows, f"{page_label} > {section_label} > {group}")
+                sub_chunks.append(
+                    f'<section id="{group_anchor}" style="scroll-margin-top:150px;">'
+                    f'<h3 class="subsection-heading">{escape(group)}</h3>'
+                    f'<section class="section-sort-group">'
+                    f'{_sort_bar_html()}'
+                    f'<div class="{grid_class}" data-sortable-grid="{escape(group_anchor)}">{cards_html}</div>'
+                    f'</section>'
+                    f'</section>'
+                )
+            body_html = "".join(sub_chunks)
+
         chunks.append(
             f'<section id="{anchor}" style="scroll-margin-top:150px;">'
             f'<h2 class="section-heading">{escape(section_label)}</h2>'
-            f'<section class="section-sort-group">'
-            f'<div class="sort-bar"><span class="sort-bar-label">Sort:</span>'
-            f'<button class="sort-btn active" data-sort="default">Default</button>'
-            f'<button class="sort-btn" data-sort="totalAbs">Largest total</button>'
-            f'<button class="sort-btn" data-sort="absDiff">Largest difference</button>'
-            f'<button class="sort-btn" data-sort="pctDiff">Largest % diff</button>'
-            f'</div>'
-            f'<div class="{grid_class}" data-sortable-grid="{escape(anchor)}">{"".join(cards)}</div>'
-            f'</section>'
+            f'{body_html}'
             f'</section>'
         )
     return "".join(chunks)
@@ -1183,25 +1693,34 @@ def write_dashboard_page(
     dashboard_switcher: list[dict[str, str]] | None = None,
     current_dashboard: str = "",
     page_note: str = "",
+    dashboard_updated_label: str = "",
 ) -> None:
     """Write a polished HTML dashboard page with sticky header, lazy loading, and sorting."""
     page_label = str(page_config.get("page_label", "Dashboard"))
     page_file = output_path.name
-    area_rows = [r for r in chart_rows if r.get("chart_type") == "stacked_area"]
-    line_rows = [r for r in chart_rows if r.get("chart_type") == "line"]
-    section_labels = []
-    for r in line_rows:
-        sl = str(r.get("section_label") or "Other")
-        if sl not in section_labels:
-            section_labels.append(sl)
+    area_rows = [r for r in chart_rows if r.get("chart_type") == "stacked_area" and str(r.get("section_label")) == "Overview"]
+    line_rows = [r for r in chart_rows if not (r.get("chart_type") == "stacked_area" and str(r.get("section_label")) == "Overview")]
+    section_tree = line_section_tree(line_rows)
+
+    page_datasets: list[str] = []
+    for r in chart_rows:
+        for token in str(r.get("datasets", "")).split(","):
+            token = token.strip()
+            if token and token not in page_datasets:
+                page_datasets.append(token)
+    preferred_order = ["LEAP", "ESTO", "NINTH"]
+    page_datasets.sort(key=lambda d: (preferred_order.index(d) if d in preferred_order else len(preferred_order), d))
 
     nav_chips = _nav_chips_html(all_pages or [], page_file)
     switcher_html = _dashboard_switcher_html(dashboard_switcher or [], current_dashboard, page_file)
-    jump_nav = _jump_nav_html(page_label, section_labels)
+    dataset_filter_html = _dataset_filter_html(page_datasets)
+    jump_nav = _jump_nav_html(page_label, section_tree)
     note_html = f'<div class="visible-note">{escape(page_note)}</div>' if page_note else ""
     overview_html = _area_charts_html(area_rows, page_label)
     sections_html = _line_sections_html(line_rows, page_label)
     economy_ctx = f"Economy: <strong>{escape(economy_label)}</strong>" if economy_label else ""
+    if economy_ctx and dashboard_updated_label:
+        economy_ctx = f'{economy_ctx}<span class="dashboard-updated">Updated: {escape(dashboard_updated_label)}</span>'
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -1221,7 +1740,9 @@ def write_dashboard_page(
           {f'<div class="dashboard-context">{economy_ctx}</div>' if economy_ctx else ""}
         </div>
         <div class="header-side-controls">
+          {_SCENARIO_TOGGLE_HTML}
           {switcher_html}
+          {dataset_filter_html}
           <div class="header-inline-controls">{nav_chips}</div>
         </div>
       </div>
@@ -1239,10 +1760,12 @@ def write_dashboard_page(
   </div>
   <script>{_HEADER_TOGGLE_JS}</script>
   <script>{_DASHBOARD_SWITCHER_JS}</script>
+  <script>{_SCENARIO_TOGGLE_JS}</script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script src="../chart_bundles/{escape(bundle_js_name)}"></script>
   <script>{_LAZY_LOAD_JS}</script>
   <script>{_SORT_JS}</script>
+  <script>{_DATASET_FILTER_JS}</script>
 </body>
 </html>
 """
@@ -1255,6 +1778,7 @@ def write_index(
     economy_label: str = "",
     dashboard_switcher: list[dict[str, str]] | None = None,
     current_dashboard: str = "",
+    dashboard_updated_label: str = "",
 ) -> None:
     """Write the dashboard index page."""
     economy_heading = f" — {escape(economy_label)}" if economy_label else ""
@@ -1273,6 +1797,10 @@ def write_index(
         for p in pages
     )
     switcher_html = _dashboard_switcher_html(dashboard_switcher or [], current_dashboard, "index.html")
+    updated_html = (
+        f'<p style="margin:0;color:#4b5563;font-size:13px;">Updated: {escape(dashboard_updated_label)}</p>'
+        if dashboard_updated_label else ""
+    )
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1292,7 +1820,10 @@ def write_index(
 <body>
   <div class="shell">
     <div class="top-row">
-      <h1>Common ESTO Dashboard{economy_heading}</h1>
+      <div>
+        <h1>Common ESTO Dashboard{economy_heading}</h1>
+        {updated_html}
+      </div>
       {switcher_html}
     </div>
     <p style="color:#4b5563;">Charts are generated automatically from common ESTO flow/product rows.</p>
@@ -1409,6 +1940,7 @@ def _build_td_sector_chart(
     primary_scenario: str,
     tfec_exclude_keys: list[str],
     sector_colors: dict[str, str],
+    base_year: int | None = None,
 ) -> go.Figure:
     """Stacked-area chart by demand sector with a TFC/TFEC Plotly dropdown.
 
@@ -1422,42 +1954,54 @@ def _build_td_sector_chart(
     making the supply line a valid comparison across the full time series.
     """
     fig = go.Figure()
-    trace_modes: list[str] = []  # "tfc", "tfec", or "both"
+    trace_meta: list[dict] = []
 
-    primary_mask = (
+    # Sector stacking order (largest TFC total first) is computed once from
+    # the default scenario and reused for both scenarios' stacks so switching
+    # REF/TGT doesn't reshuffle the sector layer order.
+    default_mask = (
         (demand_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
         & (demand_df["scenario"].astype(str).str.casefold() == primary_scenario.casefold())
     )
-    primary_df = demand_df[primary_mask]
-
-    # Sector order: largest TFC total first
     sector_order = (
-        primary_df.groupby(["_page_key", "_page_label"])["value"]
+        demand_df[default_mask].groupby(["_page_key", "_page_label"])["value"]
         .sum().abs().sort_values(ascending=False).reset_index()
     )
 
-    for _, sector_row in sector_order.iterrows():
-        page_key = str(sector_row["_page_key"])
-        page_label = str(sector_row["_page_label"])
-        sector_data = (
-            primary_df[primary_df["_page_key"] == page_key]
-            .groupby("year", as_index=False)["value"].sum()
-            .sort_values("year")
+    for scenario_name in ("Reference", "Target"):
+        scenario_mask = (
+            (demand_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
+            & (demand_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
         )
-        is_tfec_excluded = page_key in tfec_exclude_keys
-        color = sector_colors.get(page_key)
-        trace_kw: dict = dict(
-            x=sector_data["year"],
-            y=sector_data["value"],
-            mode="lines",
-            stackgroup="demand",
-            name=page_label,
-            hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(page_label) + "</extra>",
-        )
-        if color:
-            trace_kw["line"] = {"color": color}
-        fig.add_trace(go.Scatter(**trace_kw))
-        trace_modes.append("tfc" if is_tfec_excluded else "both")
+        scenario_df = demand_df[scenario_mask]
+        is_default = scenario_name.casefold() == primary_scenario.casefold()
+        for _, sector_row in sector_order.iterrows():
+            page_key = str(sector_row["_page_key"])
+            page_label = str(sector_row["_page_label"])
+            sector_data = (
+                scenario_df[scenario_df["_page_key"] == page_key]
+                .groupby("year", as_index=False)["value"].sum()
+                .sort_values("year")
+            )
+            if sector_data.empty:
+                continue
+            is_tfec_excluded = page_key in tfec_exclude_keys
+            color = sector_colors.get(page_key)
+            trace_kw: dict = dict(
+                x=sector_data["year"],
+                y=sector_data["value"],
+                mode="lines",
+                stackgroup=f"demand_{scenario_toggle_tag(primary_source, scenario_name)}",
+                name=page_label,
+                visible=True if is_default else False,
+                hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(page_label) + "</extra>",
+            )
+            if color:
+                trace_kw["line"] = {"color": color}
+            fig.add_trace(go.Scatter(**trace_kw))
+            trace_meta.append(trace_meta_entry(
+                primary_source, scenario_name, True, "tfc" if is_tfec_excluded else "both"
+            ))
 
     # TFC comparison demand totals (non-LEAP visible series)
     tfc_totals = demand_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
@@ -1470,7 +2014,7 @@ def _build_td_sector_chart(
             mode="lines+markers", name=lbl, line={"dash": "dash"},
             hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
         ))
-        trace_modes.append("tfc")
+        trace_meta.append(trace_meta_entry(src, scen, True, "tfc"))
 
     # TFEC comparison demand totals
     tfec_demand = demand_df[~demand_df["_page_key"].isin(tfec_exclude_keys)]
@@ -1485,7 +2029,7 @@ def _build_td_sector_chart(
             visible=False,
             hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
         ))
-        trace_modes.append("tfec")
+        trace_meta.append(trace_meta_entry(src, scen, True, "tfec"))
 
     # Supply total lines — always visible regardless of TFC/TFEC mode
     if not supply_df.empty:
@@ -1497,27 +2041,29 @@ def _build_td_sector_chart(
                 mode="lines", name=lbl, line={"dash": "dot"},
                 hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
             ))
-            trace_modes.append("both")
+            trace_meta.append(trace_meta_entry(src, scen, True, "both"))
 
-    tfc_vis = [m in ("tfc", "both") for m in trace_modes]
-    tfec_vis = [m in ("tfec", "both") for m in trace_modes]
+    tfc_vis = [m["metric"] in ("tfc", "both") for m in trace_meta]
+    tfec_vis = [m["metric"] in ("tfec", "both") for m in trace_meta]
     fig.update_layout(
-        title="Total demand by sector (TFC)",
+        title="Supply vs Demand by sector (TFC)",
         xaxis_title="Year",
         yaxis_title="Signed energy (PJ)",
-        margin={"l": 64, "r": 28, "t": 100, "b": 72},
-        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "left", "x": 0},
+        margin={"l": 64, "r": 28, "t": 100, "b": 160},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         updatemenus=[{
             "buttons": [
                 {"label": "TFC (incl. Non-energy use)", "method": "update",
-                 "args": [{"visible": tfc_vis}, {"title": "Total demand by sector (TFC)"}]},
+                 "args": [{"visible": tfc_vis}, {"title": "Supply vs Demand by sector (TFC)"}]},
                 {"label": "TFEC (excl. Non-energy use)", "method": "update",
-                 "args": [{"visible": tfec_vis}, {"title": "Total demand by sector (TFEC)"}]},
+                 "args": [{"visible": tfec_vis}, {"title": "Supply vs Demand by sector (TFEC)"}]},
             ],
             "direction": "down", "showactive": True,
             "x": 0.0, "xanchor": "left", "y": 1.22, "yanchor": "top",
         }],
+        meta={"trace_meta": trace_meta},
     )
+    apply_chart_chrome(fig, base_year)
     return fig
 
 
@@ -1527,28 +2073,43 @@ def _build_td_fuel_chart(
     series_labels: dict[str, str],
     primary_source: str,
     primary_scenario: str,
+    base_year: int | None = None,
 ) -> go.Figure:
     """Stacked-area chart by fuel across all demand sectors (TFC), with supply line."""
     fig = go.Figure()
-    primary_df = demand_df[
+    trace_meta: list[dict] = []
+
+    # Product stacking order (largest total first) computed once from the
+    # default scenario and reused for both scenarios' stacks.
+    default_mask = (
         (demand_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
         & (demand_df["scenario"].astype(str).str.casefold() == primary_scenario.casefold())
-    ]
-
-    # Stack by product — largest total first
+    )
     product_totals = (
-        primary_df.groupby("common_product_label")["value"].sum().abs()
+        demand_df[default_mask].groupby("common_product_label")["value"].sum().abs()
         .sort_values(ascending=False).index.tolist()
     )
-    product_by_year = primary_df.groupby(["common_product_label", "year"], as_index=False)["value"].sum()
-    for product in product_totals:
-        grp = product_by_year[product_by_year["common_product_label"] == product].sort_values("year")
-        lbl = str(product)
-        fig.add_trace(go.Scatter(
-            x=grp["year"], y=grp["value"],
-            mode="lines", stackgroup="demand", name=lbl,
-            hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
-        ))
+
+    for scenario_name in ("Reference", "Target"):
+        scenario_mask = (
+            (demand_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
+            & (demand_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
+        )
+        scenario_df = demand_df[scenario_mask]
+        is_default = scenario_name.casefold() == primary_scenario.casefold()
+        product_by_year = scenario_df.groupby(["common_product_label", "year"], as_index=False)["value"].sum()
+        for product in product_totals:
+            grp = product_by_year[product_by_year["common_product_label"] == product].sort_values("year")
+            if grp.empty:
+                continue
+            lbl = str(product)
+            fig.add_trace(go.Scatter(
+                x=grp["year"], y=grp["value"],
+                mode="lines", stackgroup=f"demand_{scenario_toggle_tag(primary_source, scenario_name)}", name=lbl,
+                visible=True if is_default else False,
+                hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+            ))
+            trace_meta.append(trace_meta_entry(primary_source, scenario_name, True))
 
     # Comparison demand total lines
     comp_totals = demand_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
@@ -1561,6 +2122,7 @@ def _build_td_fuel_chart(
             mode="lines+markers", name=lbl, line={"dash": "dash"},
             hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
         ))
+        trace_meta.append(trace_meta_entry(src, scen, True))
 
     # Supply total lines
     if not supply_df.empty:
@@ -1572,14 +2134,106 @@ def _build_td_fuel_chart(
                 mode="lines", name=lbl, line={"dash": "dot"},
                 hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
             ))
+            trace_meta.append(trace_meta_entry(src, scen, True))
 
     fig.update_layout(
-        title="Total demand by fuel (TFC)",
+        title="Supply vs Demand by fuel (TFC)",
         xaxis_title="Year",
         yaxis_title="Signed energy (PJ)",
-        margin={"l": 64, "r": 28, "t": 56, "b": 72},
-        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "left", "x": 0},
+        margin={"l": 64, "r": 28, "t": 84, "b": 160},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
+        meta={"trace_meta": trace_meta},
     )
+    apply_chart_chrome(fig, base_year)
+    return fig
+
+
+def _build_supply_stack_chart(
+    supply_detail_df: pd.DataFrame,
+    demand_df: pd.DataFrame,
+    series_labels: dict[str, str],
+    primary_source: str,
+    primary_scenario: str,
+    group_col: str,
+    chart_title: str,
+    base_year: int | None = None,
+) -> go.Figure:
+    """Stacked-area chart of supply (TPES) split by `group_col`, with a demand total line.
+
+    Mirrors _build_td_fuel_chart with roles reversed: supply is the stacked series
+    and demand is the comparison total line. `group_col` is "common_flow_label" for
+    a by-component (Production/Imports/Exports, ...) breakdown or
+    "common_product_label" for a by-fuel breakdown. Supply's row set is whatever the
+    caller filtered into supply_detail_df (total_demand_page.supply_codes), so adding
+    codes there (e.g. bunkers 04/05) automatically adds new stacked series here.
+    """
+    fig = go.Figure()
+    trace_meta: list[dict] = []
+
+    default_mask = (
+        (supply_detail_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
+        & (supply_detail_df["scenario"].astype(str).str.casefold() == primary_scenario.casefold())
+    )
+    group_totals = (
+        supply_detail_df[default_mask].groupby(group_col)["value"].sum().abs()
+        .sort_values(ascending=False).index.tolist()
+    )
+
+    for scenario_name in ("Reference", "Target"):
+        scenario_mask = (
+            (supply_detail_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
+            & (supply_detail_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
+        )
+        scenario_df = supply_detail_df[scenario_mask]
+        is_default = scenario_name.casefold() == primary_scenario.casefold()
+        group_by_year = scenario_df.groupby([group_col, "year"], as_index=False)["value"].sum()
+        for group_value in group_totals:
+            grp = group_by_year[group_by_year[group_col] == group_value].sort_values("year")
+            if grp.empty:
+                continue
+            lbl = str(group_value)
+            fig.add_trace(go.Scatter(
+                x=grp["year"], y=grp["value"],
+                mode="lines", stackgroup=f"supply_{scenario_toggle_tag(primary_source, scenario_name)}", name=lbl,
+                visible=True if is_default else False,
+                hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+            ))
+            trace_meta.append(trace_meta_entry(primary_source, scenario_name, True))
+
+    # Comparison supply total lines
+    comp_totals = supply_detail_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
+    for (src, scen), grp in comp_totals.groupby(["source_system", "scenario"]):
+        if str(src).casefold() == primary_source.casefold():
+            continue
+        lbl = series_label_from_values(src, scen, series_labels) + " supply total"
+        fig.add_trace(go.Scatter(
+            x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
+            mode="lines+markers", name=lbl, line={"dash": "dash"},
+            hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+        ))
+        trace_meta.append(trace_meta_entry(src, scen, True))
+
+    # Demand total lines
+    if not demand_df.empty:
+        demand_totals = demand_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
+        for (src, scen), grp in demand_totals.groupby(["source_system", "scenario"]):
+            lbl = series_label_from_values(src, scen, series_labels) + " demand (TFC)"
+            fig.add_trace(go.Scatter(
+                x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
+                mode="lines", name=lbl, line={"dash": "dot"},
+                hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+            ))
+            trace_meta.append(trace_meta_entry(src, scen, True))
+
+    fig.update_layout(
+        title=chart_title,
+        xaxis_title="Year",
+        yaxis_title="Signed energy (PJ)",
+        margin={"l": 64, "r": 28, "t": 84, "b": 160},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
+        meta={"trace_meta": trace_meta},
+    )
+    apply_chart_chrome(fig, base_year)
     return fig
 
 
@@ -1630,9 +2284,11 @@ def select_transformation_total_rows(df: pd.DataFrame, config: dict) -> pd.DataF
 def _build_transformation_total_chart(
     transformation_df: pd.DataFrame,
     series_labels: dict[str, str],
+    base_year: int | None = None,
 ) -> go.Figure:
     """Build the signed no-transfers transformation total comparison."""
     fig = go.Figure()
+    trace_meta: list[dict] = []
     totals = transformation_df.groupby(
         ["source_system", "scenario", "year"], as_index=False
     )["value"].sum()
@@ -1646,13 +2302,16 @@ def _build_transformation_total_chart(
             name=label,
             hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(label) + "</extra>",
         ))
+        trace_meta.append(trace_meta_entry(source_system, scenario, True))
     fig.update_layout(
         title="Total transformation sector (excluding transfers)",
         xaxis_title="Year",
         yaxis_title="Signed energy balance (PJ)",
-        margin={"l": 64, "r": 28, "t": 56, "b": 72},
-        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "left", "x": 0},
+        margin={"l": 64, "r": 28, "t": 84, "b": 160},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
+        meta={"trace_meta": trace_meta},
     )
+    apply_chart_chrome(fig, base_year)
     return fig
 
 
@@ -1667,15 +2326,24 @@ def build_total_demand_page(
     economy_label: str = "",
     dashboard_switcher: list[dict[str, str]] | None = None,
     current_dashboard: str = "",
+    dashboard_updated_label: str = "",
 ) -> tuple[list[dict], dict | None]:
     """Build the total demand summary page (config-driven bespoke page).
 
-    Generates aggregate comparison charts:
-    - By sector: stacked by demand page group with TFC/TFEC dropdown
-    - By fuel: stacked by common_product_label across all demand (TFC)
+    Generates aggregate balance-check comparison charts:
+    - Supply vs Demand by sector: demand stacked by demand page group, TFC/TFEC
+      dropdown, with a supply total line overlaid
+    - Supply vs Demand by fuel: demand stacked by common_product_label, with a
+      supply total line overlaid
+    - Demand vs Supply by component: supply (total_demand_page.supply_codes)
+      stacked by common_flow_label (Production/Imports/Exports/...), with a
+      demand total line overlaid. Adding codes to supply_codes (e.g. bunkers
+      04/05) automatically adds new stacked series here.
+    - Demand vs Supply by fuel: supply stacked by common_product_label, with a
+      demand total line overlaid
     - Total transformation excluding transfers, when configured rollup metadata exists
 
-    Both charts include a supply total line defined as:
+    The first two charts include a supply total line defined as:
         supply_total = sum of signed values for codes 01, 02, 03
         (Production + Imports - Exports)
 
@@ -1695,6 +2363,7 @@ def build_total_demand_page(
     if not config.get("enabled", False):
         return [], None
 
+    base_year = int(template.get("chart_generation", {}).get("base_year", 2023))
     demand_page_keys = [str(k) for k in config.get(
         "demand_page_keys", ["industry", "transport", "buildings", "others", "non_energy"]
     )]
@@ -1713,12 +2382,12 @@ def build_total_demand_page(
     if demand_df.empty:
         return [], None
 
+    supply_detail_mask = assigned_df["common_flow_code"].apply(
+        lambda c: code_expression_matches_any_prefix(c, supply_codes)
+    )
+    supply_detail_df = assigned_df[supply_detail_mask].copy()
     supply_df = (
-        assigned_df[
-            assigned_df["common_flow_code"].apply(
-                lambda c: code_expression_matches_any_prefix(c, supply_codes)
-            )
-        ]
+        supply_detail_df
         .groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     )
 
@@ -1726,26 +2395,72 @@ def build_total_demand_page(
     chart_rows: list[dict] = []
     manifest_rows: list[dict] = []
 
-    for kind, build_fn in [
-        ("sector", lambda: _build_td_sector_chart(demand_df, supply_df, series_labels, primary_source, primary_scenario, tfec_exclude_keys, sector_colors)),
-        ("fuel",   lambda: _build_td_fuel_chart(demand_df, supply_df, series_labels, primary_source, primary_scenario)),
-    ]:
-        chart_key = f"chart__area__total_demand__{kind}"
-        fig = build_fn()
+    demand_total_abs = float(demand_df["value"].abs().sum())
+    chart_specs: list[dict] = [
+        {
+            "chart_key": "chart__area__total_demand__sector",
+            "title": "Supply vs Demand by sector",
+            "build": lambda: _build_td_sector_chart(demand_df, supply_df, series_labels, primary_source, primary_scenario, tfec_exclude_keys, sector_colors, base_year=base_year),
+            "total_abs": demand_total_abs,
+            "row_count": len(demand_df),
+            "source_flow_labels": "; ".join(demand_page_keys),
+            "datasets": chart_dataset_tokens(demand_df, supply_df),
+        },
+        {
+            "chart_key": "chart__area__total_demand__fuel",
+            "title": "Supply vs Demand by fuel",
+            "build": lambda: _build_td_fuel_chart(demand_df, supply_df, series_labels, primary_source, primary_scenario, base_year=base_year),
+            "total_abs": demand_total_abs,
+            "row_count": len(demand_df),
+            "source_flow_labels": "; ".join(demand_page_keys),
+            "datasets": chart_dataset_tokens(demand_df, supply_df),
+        },
+    ]
+    if not supply_detail_df.empty:
+        supply_total_abs = float(supply_detail_df["value"].abs().sum())
+        chart_specs.append({
+            "chart_key": "chart__area__total_demand__supply_component",
+            "title": "Demand vs Supply by component",
+            "build": lambda: _build_supply_stack_chart(
+                supply_detail_df, demand_df, series_labels, primary_source, primary_scenario,
+                group_col="common_flow_label", chart_title="Demand vs Supply by component", base_year=base_year,
+            ),
+            "total_abs": supply_total_abs,
+            "row_count": len(supply_detail_df),
+            "source_flow_labels": "; ".join(supply_codes),
+            "datasets": chart_dataset_tokens(supply_detail_df, demand_df),
+        })
+        chart_specs.append({
+            "chart_key": "chart__area__total_demand__supply_fuel",
+            "title": "Demand vs Supply by fuel",
+            "build": lambda: _build_supply_stack_chart(
+                supply_detail_df, demand_df, series_labels, primary_source, primary_scenario,
+                group_col="common_product_label", chart_title="Demand vs Supply by fuel", base_year=base_year,
+            ),
+            "total_abs": supply_total_abs,
+            "row_count": len(supply_detail_df),
+            "source_flow_labels": "; ".join(supply_codes),
+            "datasets": chart_dataset_tokens(supply_detail_df, demand_df),
+        })
+
+    for spec in chart_specs:
+        chart_key = spec["chart_key"]
+        fig = spec["build"]()
         charts[chart_key] = fig
-        title = f"Total demand by {kind}"
-        total_abs = float(demand_df["value"].abs().sum())
+        title = spec["title"]
+        total_abs = spec["total_abs"]
         chart_rows.append({
             "chart_key": chart_key, "chart_type": "stacked_area",
             "title": title, "product_label": title, "section_label": "Overview",
             "total_abs_value": total_abs, "abs_diff": 0.0, "pct_diff": 0.0,
+            "datasets": spec["datasets"],
         })
         manifest_rows.append({
             "page_key": "total_demand", "page_label": page_label,
             "section_label": "Overview", "chart_type": "stacked_area",
             "chart_key": chart_key, "common_flow_label": title,
-            "common_product_label": "All", "row_count": int(len(demand_df)),
-            "source_flow_labels": "; ".join(demand_page_keys),
+            "common_product_label": "All", "row_count": int(spec["row_count"]),
+            "source_flow_labels": spec["source_flow_labels"],
             "sign_note": "", "suppressed": False,
             "total_abs_value": total_abs, "abs_diff": 0.0, "pct_diff": 0.0,
             "diff_hist_json": "", "diff_proj_json": "",
@@ -1757,7 +2472,7 @@ def build_total_demand_page(
         if not transformation_df.empty:
             chart_key = "chart__line__total_transformation_no_transfers"
             title = "Total transformation sector (excluding transfers)"
-            charts[chart_key] = _build_transformation_total_chart(transformation_df, series_labels)
+            charts[chart_key] = _build_transformation_total_chart(transformation_df, series_labels, base_year=base_year)
             total_abs = float(transformation_df["value"].abs().sum())
             chart_rows.append({
                 "chart_key": chart_key,
@@ -1768,6 +2483,7 @@ def build_total_demand_page(
                 "total_abs_value": total_abs,
                 "abs_diff": 0.0,
                 "pct_diff": 0.0,
+                "datasets": chart_dataset_tokens(transformation_df),
             })
             manifest_rows.append({
                 "page_key": "total_demand",
@@ -1799,6 +2515,7 @@ def build_total_demand_page(
         economy_label=economy_label,
         dashboard_switcher=dashboard_switcher,
         current_dashboard=current_dashboard,
+        dashboard_updated_label=dashboard_updated_label,
     )
     page_row = {
         "file": "total_demand.html", "label": page_label,
@@ -1849,8 +2566,9 @@ def _line_chart_manifest_and_rows(
     base_year: int,
     suppression_threshold: float,
     series_labels: dict[str, str],
+    template: dict,
 ) -> tuple[dict[str, go.Figure], list[dict], list[dict]]:
-    """Build product-summary and detail line chart records for a page dataframe."""
+    """Build section-aggregate and detail line chart records for a page dataframe."""
     charts: dict[str, go.Figure] = {}
     chart_rows: list[dict] = []
     manifest_rows: list[dict] = []
@@ -1863,73 +2581,12 @@ def _line_chart_manifest_and_rows(
         if code and any(c.startswith(code + ".") for c in all_canonical if c != code):
             parent_flow_labels.add(str(node["common_flow_label"]))
 
-    summary_products = sorted(
-        page_df.loc[~page_df["common_flow_label"].isin(parent_flow_labels), "common_product_label"]
-        .dropna().unique()
+    section_charts, section_chart_rows, section_manifest_rows = _build_section_aggregate_charts(
+        page_df, page_key, page_label, parent_flow_labels, template, series_labels,
     )
-    for product_label in summary_products:
-        prod_df = page_df[
-            (~page_df["common_flow_label"].isin(parent_flow_labels))
-            & (page_df["common_product_label"] == product_label)
-        ]
-        if prod_df.empty:
-            continue
-        agg_rows = prod_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
-        chart_key = f"chart__summary__{safe_slug(page_key)}__{safe_slug(product_label)}"
-        metrics = compute_ranking_metrics(
-            agg_rows,
-            primary_source,
-            primary_scenario,
-            comparison_source,
-            base_year=base_year,
-            ninth_source=ninth_source,
-        )
-        suppressed = metrics["total_abs_value"] < suppression_threshold
-        product_display = flow_name_without_code(product_label)
-        hist_diff, proj_diff = compute_diff_series(
-            agg_rows,
-            primary_source,
-            primary_scenario,
-            comparison_source,
-            ninth_source,
-            base_year,
-        )
-        manifest_rows.append({
-            "page_key": page_key,
-            "page_label": page_label,
-            "section_label": "By product",
-            "chart_type": "product_summary",
-            "chart_key": chart_key,
-            "common_flow_label": "(all flows)",
-            "common_product_label": product_label,
-            "row_count": int(len(prod_df)),
-            "source_flow_labels": "",
-            "sign_note": sign_note_for_chart(prod_df),
-            "suppressed": suppressed,
-            "diff_hist_json": hist_diff.to_json() if not hist_diff.empty else "",
-            "diff_proj_json": proj_diff.to_json() if not proj_diff.empty else "",
-            **metrics,
-        })
-        if suppressed:
-            continue
-        charts[chart_key] = build_product_chart(
-            agg_rows,
-            "All flows",
-            product_label,
-            series_labels,
-            hist_diff=hist_diff,
-            proj_diff=proj_diff,
-            primary_source=primary_source,
-            primary_scenario=primary_scenario,
-        )
-        chart_rows.append({
-            "chart_key": chart_key,
-            "chart_type": "line",
-            "title": f"All flows - {product_label}",
-            "product_label": product_display,
-            "section_label": "By product",
-            **metrics,
-        })
+    charts.update(section_charts)
+    chart_rows.extend(section_chart_rows)
+    manifest_rows.extend(section_manifest_rows)
 
     pairs = page_df[["common_flow_label", "common_product_label"]].drop_duplicates().sort_values(["common_flow_label", "common_product_label"])
     for _, pair in pairs.iterrows():
@@ -1954,15 +2611,12 @@ def _line_chart_manifest_and_rows(
             ninth_source=ninth_source,
         )
         suppressed = metrics["total_abs_value"] < suppression_threshold
-        product_display = flow_name_without_code(product_label)
-        hist_diff, proj_diff = compute_diff_series(
-            pair_rows,
-            primary_source,
-            primary_scenario,
-            comparison_source,
-            ninth_source,
-            base_year,
+        product_display = str(product_label)
+        hist_diff_by_scenario, proj_diff_by_scenario = compute_diff_series_by_scenario(
+            pair_rows, primary_source, comparison_source, ninth_source, base_year
         )
+        hist_diff = hist_diff_by_scenario[primary_scenario]
+        proj_diff = proj_diff_by_scenario[primary_scenario]
         manifest_rows.append({
             "page_key": page_key,
             "page_label": page_label,
@@ -1986,10 +2640,11 @@ def _line_chart_manifest_and_rows(
             flow_label,
             product_label,
             series_labels,
-            hist_diff=hist_diff,
-            proj_diff=proj_diff,
+            hist_diff_by_scenario=hist_diff_by_scenario,
+            proj_diff_by_scenario=proj_diff_by_scenario,
             primary_source=primary_source,
             primary_scenario=primary_scenario,
+            base_year=base_year,
         )
         chart_rows.append({
             "chart_key": chart_key,
@@ -1997,6 +2652,8 @@ def _line_chart_manifest_and_rows(
             "title": f"{flow_label} - {product_label}",
             "product_label": product_display,
             "section_label": section_label,
+            "flow_group_label": str(flow_label),
+            "datasets": chart_dataset_tokens(pair_rows),
             **metrics,
         })
     return charts, chart_rows, manifest_rows
@@ -2017,6 +2674,7 @@ def build_scope_specific_pages(
     economy_label: str,
     dashboard_switcher: list[dict[str, str]] | None,
     current_dashboard: str,
+    dashboard_updated_label: str = "",
 ) -> tuple[list[dict], list[dict]]:
     """Build optional pages for alternate comparison scopes such as LEAP vs 9th."""
     config = template.get("scope_specific_pages", {})
@@ -2047,6 +2705,7 @@ def build_scope_specific_pages(
             base_year=base_year,
             suppression_threshold=suppression_threshold,
             series_labels=series_labels,
+            template=template,
         )
         manifest_rows.extend(page_manifest_rows)
         if not charts:
@@ -2065,15 +2724,40 @@ def build_scope_specific_pages(
             dashboard_switcher=dashboard_switcher,
             current_dashboard=current_dashboard,
             page_note=str(scope_page.get("page_note", "")),
+            dashboard_updated_label=dashboard_updated_label,
         )
         page_rows.append({
             "file": page_file,
             "label": page_label,
-            "area_chart_count": 0,
-            "line_chart_count": sum(r.get("chart_type") == "line" and r.get("section_label") != "By product" for r in chart_rows),
-            "summary_chart_count": sum(r.get("section_label") == "By product" for r in chart_rows),
+            "area_chart_count": sum(r.get("chart_type") == "stacked_area" for r in chart_rows),
+            "line_chart_count": sum(r.get("chart_type") == "line" for r in chart_rows),
         })
     return manifest_rows, page_rows
+
+
+def drop_esto_post_base_year_rows(df: pd.DataFrame, comparison_source: str, base_year: int) -> pd.DataFrame:
+    """Drop comparison-source (ESTO) rows after the base year.
+
+    The wide input file zero-fills years ESTO has no historical data for, which
+    would otherwise plot as a flat series of 0s stretching into the projection
+    years. ESTO only reports actuals through base_year, so later rows are
+    fill artifacts rather than real data.
+    """
+    if df.empty:
+        return df
+    is_comparison_source = df["source_system"].astype(str).str.casefold() == comparison_source.casefold()
+    is_post_base_year = df["year"] > base_year
+    return df[~(is_comparison_source & is_post_base_year)].copy()
+
+
+def drop_excluded_flow_rows(df: pd.DataFrame, excluded_flow_code_prefixes: list[object]) -> pd.DataFrame:
+    """Drop rows whose common flow code matches a configured exclusion prefix."""
+    if df.empty or not excluded_flow_code_prefixes:
+        return df
+    excluded_mask = df["common_flow_code"].apply(
+        lambda value: code_expression_matches_any_prefix(value, excluded_flow_code_prefixes)
+    )
+    return df[~excluded_mask].copy()
 
 
 def render_dashboard(
@@ -2082,6 +2766,7 @@ def render_dashboard(
     series_config: dict,
     layout: dict[str, Path],
     scope_df: pd.DataFrame | None = None,
+    dashboard_updated_label: str = "",
 ) -> pd.DataFrame:
     """Render page bundles, dashboard pages, and a chart manifest."""
     series_labels = series_config.get("series_labels", {})
@@ -2091,6 +2776,15 @@ def render_dashboard(
     page_rules = template.get("sector_pages")
     if not page_rules:
         raise ValueError("Template is missing required 'sector_pages' rules.")
+    chart_config = template.get("chart_generation", {})
+    comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
+    base_year = int(chart_config.get("base_year", 2023))
+    excluded_flow_code_prefixes = template.get("excluded_flow_code_prefixes", [])
+    df = drop_esto_post_base_year_rows(df, comparison_source, base_year)
+    df = drop_excluded_flow_rows(df, excluded_flow_code_prefixes)
+    if scope_df is not None:
+        scope_df = drop_esto_post_base_year_rows(scope_df, comparison_source, base_year)
+        scope_df = drop_excluded_flow_rows(scope_df, excluded_flow_code_prefixes)
     assigned_df = assign_pages(df, page_rules)
     page_summary_df = build_page_assignment_summary(assigned_df)
     page_summary_df.to_csv(layout["supporting"] / "page_assignment_summary.csv", index=False)
@@ -2176,6 +2870,7 @@ def render_dashboard(
                 "title": str(area_spec["aggregate_flow_label"]),
                 "product_label": str(area_spec["aggregate_flow_label"]),
                 "section_label": "Overview",
+                "datasets": chart_dataset_tokens(area_df),
                 **metrics,
             })
 
@@ -2187,55 +2882,13 @@ def render_dashboard(
             if code and any(c.startswith(code + ".") for c in all_canonical if c != code):
                 parent_flow_labels.add(str(node["common_flow_label"]))
 
-        # Product summary charts: one chart per product, summing all non-parent flows.
-        summary_products = sorted(
-            page_df.loc[~page_df["common_flow_label"].isin(parent_flow_labels), "common_product_label"]
-            .dropna().unique()
+        # Section aggregate charts: two per section (by product, by flow), summing all non-parent flows.
+        section_charts, section_chart_rows, section_manifest_rows = _build_section_aggregate_charts(
+            page_df, page_key, page_label, parent_flow_labels, template, series_labels,
         )
-        for product_label in summary_products:
-            prod_df = page_df[
-                (~page_df["common_flow_label"].isin(parent_flow_labels))
-                & (page_df["common_product_label"] == product_label)
-            ]
-            if prod_df.empty:
-                continue
-            agg_rows = prod_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
-            chart_key = f"chart__summary__{safe_slug(page_key)}__{safe_slug(product_label)}"
-            metrics = compute_ranking_metrics(agg_rows, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
-            suppressed = metrics["total_abs_value"] < suppression_threshold
-            product_display = flow_name_without_code(product_label)
-            hist_diff, proj_diff = compute_diff_series(agg_rows, primary_source, primary_scenario, comparison_source, ninth_source, base_year)
-            manifest_rows.append({
-                "page_key": page_key,
-                "page_label": page_label,
-                "section_label": "By product",
-                "chart_type": "product_summary",
-                "chart_key": chart_key,
-                "common_flow_label": "(all flows)",
-                "common_product_label": product_label,
-                "row_count": int(len(prod_df)),
-                "source_flow_labels": "",
-                "sign_note": sign_note_for_chart(prod_df),
-                "suppressed": suppressed,
-                "diff_hist_json": hist_diff.to_json() if not hist_diff.empty else "",
-                "diff_proj_json": proj_diff.to_json() if not proj_diff.empty else "",
-                **metrics,
-            })
-            if suppressed:
-                continue
-            charts[chart_key] = build_product_chart(
-                agg_rows, "All flows", product_label, series_labels,
-                hist_diff=hist_diff, proj_diff=proj_diff,
-                primary_source=primary_source, primary_scenario=primary_scenario,
-            )
-            chart_rows.append({
-                "chart_key": chart_key,
-                "chart_type": "line",
-                "title": f"All flows — {product_label}",
-                "product_label": product_display,
-                "section_label": "By product",
-                **metrics,
-            })
+        charts.update(section_charts)
+        chart_rows.extend(section_chart_rows)
+        manifest_rows.extend(section_manifest_rows)
 
         pairs = page_df[["common_flow_label", "common_product_label"]].drop_duplicates().sort_values(["common_flow_label", "common_product_label"])
         for _, pair in pairs.iterrows():
@@ -2251,8 +2904,12 @@ def render_dashboard(
             chart_key = f"chart__line__{safe_slug(flow_label)}__{safe_slug(product_label)}"
             metrics = compute_ranking_metrics(pair_rows, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
             suppressed = metrics["total_abs_value"] < suppression_threshold
-            product_display = flow_name_without_code(product_label)
-            hist_diff, proj_diff = compute_diff_series(pair_rows, primary_source, primary_scenario, comparison_source, ninth_source, base_year)
+            product_display = str(product_label)
+            hist_diff_by_scenario, proj_diff_by_scenario = compute_diff_series_by_scenario(
+                pair_rows, primary_source, comparison_source, ninth_source, base_year
+            )
+            hist_diff = hist_diff_by_scenario[primary_scenario]
+            proj_diff = proj_diff_by_scenario[primary_scenario]
             manifest_rows.append({
                 "page_key": page_key,
                 "page_label": page_label,
@@ -2271,13 +2928,19 @@ def render_dashboard(
             })
             if suppressed:
                 continue
-            charts[chart_key] = build_product_chart(pair_rows, flow_label, product_label, series_labels, hist_diff=hist_diff, proj_diff=proj_diff, primary_source=primary_source, primary_scenario=primary_scenario)
+            charts[chart_key] = build_product_chart(
+                pair_rows, flow_label, product_label, series_labels,
+                hist_diff_by_scenario=hist_diff_by_scenario, proj_diff_by_scenario=proj_diff_by_scenario,
+                primary_source=primary_source, primary_scenario=primary_scenario, base_year=base_year,
+            )
             chart_rows.append({
                 "chart_key": chart_key,
                 "chart_type": "line",
                 "title": f"{flow_label} - {product_label}",
                 "product_label": product_display,
                 "section_label": section_label,
+                "flow_group_label": str(flow_label),
+                "datasets": chart_dataset_tokens(pair_rows),
                 **metrics,
             })
 
@@ -2295,13 +2958,13 @@ def render_dashboard(
             economy_label=economy_label,
             dashboard_switcher=dashboard_switcher,
             current_dashboard=current_dashboard,
+            dashboard_updated_label=dashboard_updated_label,
         )
         page_rows.append({
             "file": page_file,
             "label": page_label,
             "area_chart_count": sum(r.get("chart_type") == "stacked_area" for r in chart_rows),
-            "line_chart_count": sum(r.get("chart_type") == "line" and r.get("section_label") != "By product" for r in chart_rows),
-            "summary_chart_count": sum(r.get("section_label") == "By product" for r in chart_rows),
+            "line_chart_count": sum(r.get("chart_type") == "line" for r in chart_rows),
         })
 
     td_manifest_rows, td_page_row = build_total_demand_page(
@@ -2310,6 +2973,7 @@ def render_dashboard(
         economy_label=economy_label,
         dashboard_switcher=dashboard_switcher,
         current_dashboard=current_dashboard,
+        dashboard_updated_label=dashboard_updated_label,
     )
     manifest_rows.extend(td_manifest_rows)
     if td_page_row:
@@ -2330,6 +2994,7 @@ def render_dashboard(
         economy_label,
         dashboard_switcher,
         current_dashboard,
+        dashboard_updated_label,
     )
     manifest_rows.extend(scope_manifest_rows)
     page_rows.extend(scope_page_rows)
@@ -2340,6 +3005,7 @@ def render_dashboard(
         economy_label=economy_label,
         dashboard_switcher=dashboard_switcher,
         current_dashboard=current_dashboard,
+        dashboard_updated_label=dashboard_updated_label,
     )
     manifest_df = pd.DataFrame(manifest_rows)
     manifest_df.to_csv(layout["supporting"] / "chart_manifest.csv", index=False)

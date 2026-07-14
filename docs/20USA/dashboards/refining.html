@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Refining</title>
+  <style>
+:root {
+  color-scheme: light;
+  --page-padding-x: clamp(12px, 1.8vw, 24px);
+  --page-padding-y: clamp(14px, 1.8vw, 24px);
+  --body-font-size: clamp(15px, 0.22vw + 14px, 18px);
+  --title-font-size: clamp(24px, 0.75vw + 18px, 34px);
+  --section-title-size: clamp(18px, 0.45vw + 14px, 24px);
+}
+html { background: #f4f6f8; }
+body {
+  font-family: Segoe UI, Arial, sans-serif;
+  margin: 0;
+  background: #f4f6f8;
+  color: #111;
+  font-size: var(--body-font-size);
+  line-height: 1.45;
+  min-width: 320px;
+}
+a { color: #0b3d5c; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.page-shell { width: 100%; max-width: none; margin: 0 auto; padding: 0 var(--page-padding-x) 32px; box-sizing: border-box; }
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin: 0 0 14px 0;
+  padding: var(--page-padding-y) 0 10px 0;
+  background: rgba(244, 246, 248, 0.96);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #d8dee4;
+}
+.header-main-row { display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 16px; }
+.header-side-controls {
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;
+  gap:8px 10px;flex:1 1 460px;
+}
+.header-inline-controls {
+  display:flex;align-items:center;gap:8px;justify-content:flex-end;
+  flex:0 0 auto;flex-wrap:nowrap;margin-left:auto;
+}
+.dashboard-context { margin-top:6px;color:#4b5563;font-size:13px;line-height:1.35; }
+.dashboard-updated { margin-left:10px;padding-left:10px;border-left:1px solid #c5ccd3;color:#64748b;white-space:nowrap; }
+.dashboard-switcher {
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;white-space:nowrap;
+}
+.dashboard-switcher select {
+  max-width:220px;padding:5px 28px 5px 8px;border:1px solid #c5ccd3;border-radius:6px;
+  background:#fff;color:#111;font:inherit;
+}
+.header-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.header-chip {
+  padding: 6px 10px;
+  border: 1px solid #c5ccd3;
+  border-radius: 6px;
+  background: #fff;
+  color: #0b3d5c;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.header-chip[data-current="true"] {
+  border-color:#1f6feb;
+  box-shadow:0 0 0 2px rgba(31, 111, 235, 0.16);
+  font-weight:700;
+}
+.header-nav-separator { color:#6b7280;font-weight:700;line-height:1.25;padding:6px 2px; }
+.header-toggle {
+  width: 30px; height: 30px;
+  border: 1px solid #c5ccd3;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b3d5c;
+  cursor: pointer;
+}
+.header-toggle-row { display:flex;justify-content:flex-end;margin-top:8px; }
+.page-header.is-collapsed .header-collapsible { display: none; }
+.page-header.is-collapsed { padding-bottom:0;background:transparent;backdrop-filter:none;border-bottom-color:transparent; }
+.page-header.is-collapsed .header-toggle-row { margin-top:0; }
+.jump-nav {
+  margin-top:8px;padding-top:8px;border-top:1px solid #d8dee4;
+  display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-start;
+}
+.jump-nav-label { font-weight:600;color:#4b5563;font-size:12px;white-space:nowrap;padding-top:4px; }
+.jump-nav-groups { display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 640px; }
+.jump-nav-row { display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0; }
+.jump-nav-row[data-level="2"] { padding-left:18px; }
+.jump-chip {
+  position:relative;display:inline-flex;align-items:center;gap:6px;
+  padding:4px 9px;border:1px solid #c5ccd3;border-radius:999px;
+  background:#fff;color:#0b3d5c;text-decoration:none;font-size:12px;line-height:1.25;
+  box-shadow:0 1px 1px rgba(15,23,42,0.04);
+}
+.jump-chip::before { content:"";display:block;width:8px;height:8px;border-radius:999px;flex:0 0 auto;background:#94a3b8; }
+.jump-chip[data-level="1"] { background:#fff4e6;border-color:#f2a65a;color:#7a3b00; }
+.jump-chip[data-level="1"]::before { background:#f97316; }
+.jump-chip[data-level="2"] { background:#f5edff;border-color:#c69af0;color:#4c1d70; }
+.jump-chip[data-level="2"]::before { background:#9333ea; }
+.visible-note { margin:8px 0 10px 0;padding:8px 12px;background:#fffbe6;border-left:3px solid #f0a500;border-radius:4px;font-size:13px;color:#5a3e00;line-height:1.5; }
+.sort-bar {
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+  margin:10px 0 8px 0;font-size:12px;color:#4b5563;
+}
+.sort-bar-label { font-weight:600;white-space:nowrap; }
+.sort-btn {
+  padding:4px 10px;border:1px solid #c5ccd3;border-radius:999px;
+  background:#fff;color:#0b3d5c;font-size:12px;cursor:pointer;
+}
+.sort-btn.active { border-color:#1f6feb;background:#e8f0fe;font-weight:700; }
+.scenario-toggle {
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;white-space:nowrap;
+}
+.scenario-toggle-buttons { display:flex;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
+.scenario-toggle-btn {
+  padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
+}
+.scenario-toggle-btn + .scenario-toggle-btn { border-left:1px solid #c5ccd3; }
+.scenario-toggle-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.dataset-filter {
+  display:flex;align-items:center;gap:6px 4px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;
+}
+.dataset-filter-label { font-weight:600;max-width:260px;line-height:1.2; }
+.dataset-filter-buttons { display:flex;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
+.dataset-filter-btn {
+  padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
+}
+.dataset-filter-btn + .dataset-filter-btn { border-left:1px solid #c5ccd3; }
+.dataset-filter-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.chart-card.dataset-filtered { display:none; }
+.dashboard-grid {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:12px;
+  align-items:start;
+}
+.dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.dashboard-grid.expand-1 { grid-template-columns:minmax(0, 1fr); }
+.dashboard-grid.expand-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.dashboard-grid.expand-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.chart-card { margin:0;padding:10px;border:1px solid #d0d7de;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.05); }
+.chart-caption { font-weight:600;margin-bottom:4px; }
+.meta-subline { margin-top:-4px;margin-bottom:8px;color:#4b5563;font-size:12px; }
+.chart-load-state { min-height:22px;margin:4px 0 6px 0;color:#64748b;font-size:12px; }
+.chart-load-state[data-loaded="true"] { display:none; }
+.lazy-chart-plot {
+  width:100%;height:clamp(380px, 62vh, 1100px);
+  border:1px solid #d0d7de;border-radius:6px;background:#fff;display:block;box-sizing:border-box;
+}
+.lazy-chart-plot.is-unloaded { background:#f8fafc; }
+.section-heading { margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d; }
+.subsection-heading { margin:14px 0 6px 12px;font-size:15px;font-weight:600;color:#4c1d70;padding-left:8px;border-left:3px solid #c69af0; }
+@media (max-width: 900px) { .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .header-side-controls { flex:1 1 100%;min-width:0;justify-content:flex-start; }
+  .header-inline-controls { margin-left:0;flex-wrap:wrap;justify-content:flex-start;width:100%; }
+  .header-links { width:100%; }
+  .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:minmax(0, 1fr); }
+  .lazy-chart-plot { height:420px; }
+}
+</style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="page-header" id="page-header">
+      <div class="header-collapsible">
+      <div class="header-main-row">
+        <div style="min-width:220px;flex:1 1 320px;">
+          <h1 style="margin:0;font-size:24px;line-height:1.15;">Refining</h1>
+          <div class="dashboard-context">Economy: <strong>United States</strong><span class="dashboard-updated">Updated: 2026-07-14 19:20 Tokyo Standard Time</span></div>
+        </div>
+        <div class="header-side-controls">
+          
+<div class="scenario-toggle" role="group" aria-label="Scenario">
+  <span>Scenario</span>
+  <div class="scenario-toggle-buttons">
+    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="ref">Reference</button>
+    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="tgt">Target</button>
+  </div>
+</div>
+
+          <label class="dashboard-switcher"><span>Dashboard</span><select data-dashboard-switcher aria-label="Switch dashboard"><option value="../../01AUS/dashboards/refining.html">Australia</option><option value="../../02BD/dashboards/refining.html">Brunei Darussalam</option><option value="../../03CDA/dashboards/refining.html">Canada</option><option value="../../04CHL/dashboards/refining.html">Chile</option><option value="../../05PRC/dashboards/refining.html">China</option><option value="../../06HKC/dashboards/refining.html">Hong Kong, China</option><option value="../../07INA/dashboards/refining.html">Indonesia</option><option value="../../08JPN/dashboards/refining.html">Japan</option><option value="../../09ROK/dashboards/refining.html">Korea</option><option value="../../10MAS/dashboards/refining.html">Malaysia</option><option value="../../11MEX/dashboards/refining.html">Mexico</option><option value="../../12NZ/dashboards/refining.html">New Zealand</option><option value="../../13PNG/dashboards/refining.html">Papua New Guinea</option><option value="../../14PE/dashboards/refining.html">Peru</option><option value="../../15PHL/dashboards/refining.html">Philippines</option><option value="../../16RUS/dashboards/refining.html">Russia</option><option value="../../17SGP/dashboards/refining.html">Singapore</option><option value="../../18CT/dashboards/refining.html">Chinese Taipei</option><option value="../../19THA/dashboards/refining.html">Thailand</option><option value="refining.html" selected>United States</option><option value="../../21VN/dashboards/refining.html">Viet Nam</option></select></label>
+          <div class="dataset-filter" role="group" aria-label="Dataset filter"><span class="dataset-filter-label">Exclude charts that don't contain the highlighted datasets:</span><div class="dataset-filter-buttons"><button type="button" class="dataset-filter-btn" data-dataset-filter="LEAP">LEAP</button><button type="button" class="dataset-filter-btn" data-dataset-filter="ESTO">ESTO</button><button type="button" class="dataset-filter-btn" data-dataset-filter="NINTH">Ninth</button></div></div>
+          <div class="header-inline-controls"><a href="total_demand.html" class="header-chip" data-current="false">Energy balance overview</a><span class="header-nav-separator" aria-hidden="true">|</span><span class="header-nav-separator" aria-hidden="true">|</span><a href="power.html" class="header-chip" data-current="false">Power</a><a href="refining.html" class="header-chip" data-current="true">Refining</a><a href="other_transformation.html" class="header-chip" data-current="false">Other transformation</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="supply.html" class="header-chip" data-current="false">Supply</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="unassigned.html" class="header-chip" data-current="false">Unassigned</a></div>
+        </div>
+      </div>
+      <div class="jump-nav"><span class="jump-nav-label">Sections:</span><div class="jump-nav-groups"><div class="jump-nav-row" data-level="1"><a href="#sec-refining__refining" class="jump-chip" data-level="1">Refining</a></div></div></div>
+      </div>
+      <div class="header-toggle-row">
+        <button id="header-toggle" class="header-toggle" type="button" aria-expanded="true" aria-label="Collapse header">&#9652;</button>
+      </div>
+    </header>
+    <main class="page-body">
+      
+      <h2 class="section-heading">Overview</h2><section class="section-sort-group"><div class="sort-bar"><span class="sort-bar-label">Sort:</span><button class="sort-btn active" data-sort="default">Default</button><button class="sort-btn" data-sort="totalAbs">Largest total</button><button class="sort-btn" data-sort="absDiff">Largest difference</button><button class="sort-btn" data-sort="pctDiff">Largest % diff</button></div><div class="dashboard-grid expand-1" data-sortable-grid="overview"><figure class="chart-card" data-default-order="0" data-total-abs="21713414.6050" data-abs-diff="1442685.9449" data-pct-diff="2.432058" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">09 Oil refineries (including own use)</figcaption><div class="meta-subline">Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__09__09_oil_refineries_including_own_use" class="lazy-chart-plot is-unloaded" role="img" aria-label="09 Oil refineries (including own use)"></div></figure></div></section>
+      <section id="sec-refining__refining" style="scroll-margin-top:150px;"><h2 class="section-heading">Refining</h2><section class="section-sort-group"><div class="sort-bar"><span class="sort-bar-label">Sort:</span><button class="sort-btn active" data-sort="default">Default</button><button class="sort-btn" data-sort="totalAbs">Largest total</button><button class="sort-btn" data-sort="absDiff">Largest difference</button><button class="sort-btn" data-sort="pctDiff">Largest % diff</button></div><div class="dashboard-grid" data-sortable-grid="sec-refining__refining"><figure class="chart-card" data-default-order="0" data-total-abs="21713414.6050" data-abs-diff="1442685.9449" data-pct-diff="2.432058" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">Aggregate by product: Refining</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__section__refining__refining__product" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aggregate by product: Refining"></div></figure><figure class="chart-card" data-default-order="1" data-total-abs="21713414.6050" data-abs-diff="1442685.9449" data-pct-diff="2.432058" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">Aggregate by flow: Refining</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__section__refining__refining__flow" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aggregate by flow: Refining"></div></figure><figure class="chart-card" data-default-order="2" data-total-abs="7549676.8349" data-abs-diff="2001211.5128" data-pct-diff="1.519699" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">06.01 Crude oil</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__06_01_crude_oil" class="lazy-chart-plot is-unloaded" role="img" aria-label="06.01 Crude oil"></div></figure><figure class="chart-card" data-default-order="3" data-total-abs="166454.4250" data-abs-diff="44163.7571" data-pct-diff="1.536775" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">06.02 Natural gas liquids</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__06_02_natural_gas_liquids" class="lazy-chart-plot is-unloaded" role="img" aria-label="06.02 Natural gas liquids"></div></figure><figure class="chart-card" data-default-order="4" data-total-abs="59194.6969" data-abs-diff="364.0019" data-pct-diff="0.385615" data-datasets="ESTO,LEAP"><figcaption class="chart-caption">06.03 Refinery feedstocks</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__06_03_refinery_feedstocks" class="lazy-chart-plot is-unloaded" role="img" aria-label="06.03 Refinery feedstocks"></div></figure><figure class="chart-card" data-default-order="5" data-total-abs="1437642.2941" data-abs-diff="944507.8020" data-pct-diff="7.386932" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">06.03-06.05 Crude oil and NGL</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__06_03_06_05_crude_oil_and_ngl" class="lazy-chart-plot is-unloaded" role="img" aria-label="06.03-06.05 Crude oil and NGL"></div></figure><figure class="chart-card" data-default-order="6" data-total-abs="65.5458" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO"><figcaption class="chart-caption">06.04 Additives/ oxygenates</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__06_04_additives_oxygenates" class="lazy-chart-plot is-unloaded" role="img" aria-label="06.04 Additives/ oxygenates"></div></figure><figure class="chart-card" data-default-order="7" data-total-abs="1029089.4303" data-abs-diff="29078.2157" data-pct-diff="137.561485" data-datasets="ESTO,LEAP"><figcaption class="chart-caption">06.05 Other hydrocarbons</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__06_05_other_hydrocarbons" class="lazy-chart-plot is-unloaded" role="img" aria-label="06.05 Other hydrocarbons"></div></figure><figure class="chart-card" data-default-order="8" data-total-abs="3841034.5807" data-abs-diff="1457296.2064" data-pct-diff="2.650523" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">07.01 Motor gasoline</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_01_motor_gasoline" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.01 Motor gasoline"></div></figure><figure class="chart-card" data-default-order="9" data-total-abs="6805.7652" data-abs-diff="2724.6487" data-pct-diff="2.687175" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">07.02 Aviation gasoline</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_02_aviation_gasoline" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.02 Aviation gasoline"></div></figure><figure class="chart-card" data-default-order="10" data-total-abs="63111.8231" data-abs-diff="20267.0652" data-pct-diff="2.504002" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">07.03 Naphtha</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_03_naphtha" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.03 Naphtha"></div></figure><figure class="chart-card" data-default-order="11" data-total-abs="1109978.5944" data-abs-diff="25594.9022" data-pct-diff="0.082531" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">07.04-07.05 Petroleum products</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_04_07_05_petroleum_products" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.04-07.05 Petroleum products"></div></figure><figure class="chart-card" data-default-order="12" data-total-abs="332216.2049" data-abs-diff="3312.0874" data-pct-diff="1.000000" data-datasets="ESTO,LEAP"><figcaption class="chart-caption">07.05 Kerosene type jet fuel</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_05_kerosene_type_jet_fuel" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.05 Kerosene type jet fuel"></div></figure><figure class="chart-card" data-default-order="13" data-total-abs="1452.8443" data-abs-diff="54.9383" data-pct-diff="1.013564" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">07.06 Kerosene</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_06_kerosene" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.06 Kerosene"></div></figure><figure class="chart-card" data-default-order="14" data-total-abs="2767434.1803" data-abs-diff="1074456.1807" data-pct-diff="2.633129" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">07.07 Gas/diesel oil</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_07_gas_diesel_oil" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.07 Gas/diesel oil"></div></figure><figure class="chart-card" data-default-order="15" data-total-abs="141860.3314" data-abs-diff="43895.3302" data-pct-diff="2.457117" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">07.08 Fuel oil</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_08_fuel_oil" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.08 Fuel oil"></div></figure><figure class="chart-card" data-default-order="16" data-total-abs="136612.2696" data-abs-diff="51808.5314" data-pct-diff="2.585974" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">07.09 LPG</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_09_lpg" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.09 LPG"></div></figure><figure class="chart-card" data-default-order="17" data-total-abs="94197.6254" data-abs-diff="77841.4051" data-pct-diff="89.486234" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">07.10 Refinery gas (not liquefied)</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_10_refinery_gas_not_liquefied" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.10 Refinery gas (not liquefied)"></div></figure><figure class="chart-card" data-default-order="18" data-total-abs="478.0043" data-abs-diff="58.3864" data-pct-diff="4.407979" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">07.11 Ethane</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_11_ethane" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.11 Ethane"></div></figure><figure class="chart-card" data-default-order="19" data-total-abs="5539.6178" data-abs-diff="60.0638" data-pct-diff="0.999995" data-datasets="ESTO,LEAP"><figcaption class="chart-caption">07.12 White spirit SBP</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_12_white_spirit_sbp" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.12 White spirit SBP"></div></figure><figure class="chart-card" data-default-order="20" data-total-abs="2354958.0723" data-abs-diff="524470.0919" data-pct-diff="0.669936" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">07.12-07.17 Petroleum products</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_12_07_17_petroleum_products" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.12-07.17 Petroleum products"></div></figure><figure class="chart-card" data-default-order="21" data-total-abs="31362.1200" data-abs-diff="343.0794" data-pct-diff="1.000000" data-datasets="ESTO,LEAP"><figcaption class="chart-caption">07.13 Lubricants</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_13_lubricants" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.13 Lubricants"></div></figure><figure class="chart-card" data-default-order="22" data-total-abs="74076.7214" data-abs-diff="818.4951" data-pct-diff="1.000000" data-datasets="ESTO,LEAP"><figcaption class="chart-caption">07.14 Bitumen</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_14_bitumen" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.14 Bitumen"></div></figure><figure class="chart-card" data-default-order="23" data-total-abs="910.2767" data-abs-diff="9.8805" data-pct-diff="0.999999" data-datasets="ESTO,LEAP"><figcaption class="chart-caption">07.15 Paraffin waxes</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_15_paraffin_waxes" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.15 Paraffin waxes"></div></figure><figure class="chart-card" data-default-order="24" data-total-abs="156280.9139" data-abs-diff="1710.8385" data-pct-diff="1.000000" data-datasets="ESTO,LEAP"><figcaption class="chart-caption">07.16 Petroleum coke</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_16_petroleum_coke" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.16 Petroleum coke"></div></figure><figure class="chart-card" data-default-order="25" data-total-abs="43699.1994" data-abs-diff="483.6217" data-pct-diff="1.000000" data-datasets="ESTO,LEAP"><figcaption class="chart-caption">07.17 Other products</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__07_17_other_products" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.17 Other products"></div></figure><figure class="chart-card" data-default-order="26" data-total-abs="256881.3162" data-abs-diff="104517.6905" data-pct-diff="2.610256" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">08.01 Natural gas</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__08_01_natural_gas" class="lazy-chart-plot is-unloaded" role="img" aria-label="08.01 Natural gas"></div></figure><figure class="chart-card" data-default-order="27" data-total-abs="49989.9217" data-abs-diff="20108.6269" data-pct-diff="2.610256" data-datasets="ESTO,LEAP,NINTH"><figcaption class="chart-caption">17 Electricity</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__17_electricity" class="lazy-chart-plot is-unloaded" role="img" aria-label="17 Electricity"></div></figure><figure class="chart-card" data-default-order="28" data-total-abs="2410.9950" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">18 Heat</figcaption><div class="meta-subline">Refining &gt; Refining</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_07_oil_refineries_including_own_use__18_heat" class="lazy-chart-plot is-unloaded" role="img" aria-label="18 Heat"></div></figure></div></section></section>
+    </main>
+  </div>
+  <script>
+(function() {
+  var pageHeader = document.getElementById('page-header');
+  var toggle = document.getElementById('header-toggle');
+  if (!pageHeader || !toggle) return;
+  var key = 'common-esto-header-collapsed';
+  var apply = function(collapsed) {
+    pageHeader.classList.toggle('is-collapsed', collapsed);
+    toggle.textContent = collapsed ? '▾' : '▴';
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggle.setAttribute('aria-label', collapsed ? 'Expand header' : 'Collapse header');
+  };
+  var collapsed = false;
+  try { collapsed = window.localStorage.getItem(key) === 'true'; } catch (e) {}
+  apply(collapsed);
+  toggle.addEventListener('click', function() {
+    collapsed = !pageHeader.classList.contains('is-collapsed');
+    apply(collapsed);
+    try { window.localStorage.setItem(key, collapsed ? 'true' : 'false'); } catch (e) {}
+  });
+})();
+</script>
+  <script>
+(function() {
+  document.querySelectorAll('[data-dashboard-switcher]').forEach(function(select) {
+    select.addEventListener('change', function() {
+      var href = select.value;
+      if (href) window.location.href = href;
+    });
+  });
+})();
+</script>
+  <script>
+(function() {
+  var key = 'common-esto-scenario-mode';
+  var getMode = function() {
+    try {
+      var stored = window.localStorage.getItem(key);
+      if (stored === 'ref' || stored === 'tgt') return stored;
+    } catch (e) {}
+    return 'tgt';
+  };
+  var setMode = function(mode) {
+    try { window.localStorage.setItem(key, mode); } catch (e) {}
+  };
+
+  // Traces are tagged "esto" (always shown), or "ref"/"tgt" (LEAP/9th),
+  // with an independent optional "metric" dimension used only by the
+  // TFC/TFEC sector chart's own Plotly dropdown. See scenario_toggle_tag /
+  // trace_meta_entry in common_esto_dashboard_renderer.py.
+  var computeVisible = function(entry, scenarioMode, metricMode) {
+    var scenarioOk = entry.tag === 'esto' || entry.tag === scenarioMode;
+    var metricOk = !entry.metric || entry.metric === 'both' || entry.metric === metricMode;
+    return (scenarioOk && metricOk) ? entry.active_visible : false;
+  };
+
+  window.applyScenarioMode = function(plot) {
+    if (!window.Plotly || !plot || !plot.layout) return;
+    var meta = plot.layout.meta && plot.layout.meta.trace_meta;
+    if (!meta || !meta.length) return;
+    var scenarioMode = getMode();
+    var metricMode = plot._metricMode || 'tfc';
+    var visible = meta.map(function(entry) { return computeVisible(entry, scenarioMode, metricMode); });
+    window.Plotly.restyle(plot, {visible: visible});
+  };
+
+  var syncButtons = function() {
+    var mode = getMode();
+    document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.scenarioToggle === mode);
+    });
+  };
+  syncButtons();
+
+  document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setMode(btn.dataset.scenarioToggle);
+      syncButtons();
+      document.querySelectorAll('.lazy-chart-plot[data-rendered="true"]').forEach(function(plot) {
+        window.applyScenarioMode(plot);
+      });
+    });
+  });
+})();
+</script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="../chart_bundles/refining__charts.js"></script>
+  <script>
+(function() {
+  var plots = Array.from(document.querySelectorAll('.lazy-chart-plot[data-chart-key]'));
+  if (!plots.length || !window.Plotly) return;
+  var bundleData = window.COMMON_ESTO_CHART_BUNDLE_DATA;
+
+  var setState = function(plot, text, loaded) {
+    var state = plot.previousElementSibling;
+    if (state && state.classList.contains('chart-load-state')) {
+      state.dataset.loaded = loaded ? 'true' : 'false';
+      state.textContent = text || '';
+    }
+  };
+
+  var renderPlot = function(plot) {
+    if (plot.dataset.rendered === 'true' || plot.dataset.rendering === 'true') return;
+    plot.dataset.rendering = 'true';
+    setState(plot, 'Loading chart…', false);
+    try {
+      var bundle = bundleData;
+      var chart = bundle && bundle.charts && bundle.charts[plot.dataset.chartKey];
+      if (!chart) throw new Error('Missing chart: ' + plot.dataset.chartKey);
+      window.Plotly.newPlot(plot, chart.data || [], chart.layout || {}, {responsive: true});
+      plot.dataset.rendered = 'true';
+      plot.classList.remove('is-unloaded');
+      setState(plot, '', true);
+      window.Plotly.Plots.resize(plot);
+      if (window.applyScenarioMode) {
+        if (plot.on) {
+          plot.on('plotly_buttonclicked', function(ev) {
+            var label = (ev && ev.button && ev.button.label) || '';
+            plot._metricMode = /TFEC/i.test(label) ? 'tfec' : 'tfc';
+            window.applyScenarioMode(plot);
+          });
+        }
+        window.applyScenarioMode(plot);
+      }
+    } catch (err) {
+      plot.classList.add('is-unloaded');
+      setState(plot, 'Chart failed: ' + (err.message || err), false);
+    } finally {
+      plot.dataset.rendering = 'false';
+    }
+  };
+
+  if ('IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) { renderPlot(entry.target); observer.unobserve(entry.target); }
+      });
+    }, {rootMargin: '900px 0px'});
+    plots.forEach(function(p) { observer.observe(p); });
+  } else {
+    plots.forEach(renderPlot);
+  }
+
+  window.addEventListener('resize', function() {
+    plots.forEach(function(p) { if (p.dataset.rendered === 'true') window.Plotly.Plots.resize(p); });
+  });
+})();
+</script>
+  <script>
+(function() {
+  document.querySelectorAll('.sort-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var sortKey = btn.dataset.sort;
+      var bar = btn.closest('.sort-bar');
+      var grid = btn.closest('.section-sort-group').querySelector('[data-sortable-grid]');
+      if (!grid) return;
+      var cards = Array.from(grid.querySelectorAll(':scope > .chart-card'));
+      if (sortKey === 'default') {
+        cards.sort(function(a, b) { return parseInt(a.dataset.defaultOrder||0) - parseInt(b.dataset.defaultOrder||0); });
+      } else {
+        cards.sort(function(a, b) { return parseFloat(b.dataset[sortKey]||0) - parseFloat(a.dataset[sortKey]||0); });
+      }
+      cards.forEach(function(c) { grid.appendChild(c); });
+      bar.querySelectorAll('.sort-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+    });
+  });
+})();
+</script>
+  <script>
+(function() {
+  var buttons = Array.from(document.querySelectorAll('[data-dataset-filter]'));
+  if (!buttons.length) return;
+  var key = 'common-esto-dataset-filter';
+  var available = buttons.map(function(b) { return b.dataset.datasetFilter; });
+  var active = [];
+  try {
+    var stored = JSON.parse(window.localStorage.getItem(key) || '[]');
+    if (Array.isArray(stored)) {
+      active = stored.filter(function(d) { return available.indexOf(d) !== -1; });
+    }
+  } catch (e) {}
+
+  // A card stays visible only if it contains every highlighted (active) dataset.
+  var apply = function() {
+    buttons.forEach(function(btn) {
+      btn.classList.toggle('active', active.indexOf(btn.dataset.datasetFilter) !== -1);
+    });
+    document.querySelectorAll('.chart-card[data-datasets]').forEach(function(card) {
+      var have = (card.dataset.datasets || '').split(',').filter(Boolean);
+      var hidden = active.some(function(d) { return have.indexOf(d) === -1; });
+      card.classList.toggle('dataset-filtered', hidden);
+    });
+    try { window.localStorage.setItem(key, JSON.stringify(active)); } catch (e) {}
+    if (window.Plotly) {
+      document.querySelectorAll('.chart-card:not(.dataset-filtered) .lazy-chart-plot[data-rendered="true"]')
+        .forEach(function(p) { window.Plotly.Plots.resize(p); });
+    }
+  };
+
+  buttons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var d = btn.dataset.datasetFilter;
+      var i = active.indexOf(d);
+      if (i === -1) { active.push(d); } else { active.splice(i, 1); }
+      apply();
+    });
+  });
+  apply();
+})();
+</script>
+</body>
+</html>

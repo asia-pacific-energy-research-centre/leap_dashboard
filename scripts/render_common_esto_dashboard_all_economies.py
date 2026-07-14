@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import traceback
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -24,10 +25,16 @@ from common_esto_dashboard_data import (  # noqa: E402
     build_sign_semantics_summary,
     enrich_with_component_metadata,
     filter_common_esto_data,
+    filter_template_for_leap_demand_coverage,
     load_common_esto_data,
 )
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
 from common_esto_dashboard_output_layout import build_output_layout  # noqa: E402
+
+# The workflow module runs its full render (plus upstream data refresh and docs
+# publish) at import time unless this env override is set first.
+os.environ.setdefault("COMMON_ESTO_RUN_DASHBOARD_WORKFLOW", "0")
+from common_esto_dashboard_workflow import _missing_leap_demand_branches  # noqa: E402
 
 
 def _resolve(path: str | Path) -> Path:
@@ -50,7 +57,7 @@ OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
 SUMMARY_PATH = OUTPUT_ROOT / "render_summary.csv"
 
 COMPARISON_SCOPE = "leap_vs_esto_vs_ninth"
-MIN_YEAR = 1990
+MIN_YEAR = 2010
 MAX_YEAR = 2060
 ECONOMIES_TO_RENDER: list[str] = [
     item.strip()
@@ -80,6 +87,51 @@ def _available_economies(df: pd.DataFrame) -> list[str]:
     return sorted(e for e in df["economy"].dropna().astype(str).unique() if e)
 
 
+def _existing_dashboard_economies() -> list[str]:
+    """Return economy keys that already have rendered dashboard folders."""
+    if not OUTPUT_ROOT.exists():
+        return []
+    economies = []
+    for path in OUTPUT_ROOT.iterdir():
+        if path.is_dir() and (path / "dashboards" / "index.html").exists():
+            economies.append(path.name)
+    return sorted(economies)
+
+
+def _dashboard_updated_label() -> str:
+    """Return the human-facing timestamp shown in rendered dashboard headers."""
+    return datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
+
+
+def _metadata_path(economy: str) -> Path:
+    return OUTPUT_ROOT / economy / "supporting_files" / "dashboard_metadata.json"
+
+
+def _write_dashboard_metadata(layout: dict[str, Path], updated_label: str) -> None:
+    """Write lightweight render metadata for summary scripts and manual inspection."""
+    metadata = {
+        "economy": layout["root"].name,
+        "dashboard_updated_label": updated_label,
+        "rendered_at_local": datetime.now().astimezone().isoformat(timespec="seconds"),
+    }
+    (layout["supporting"] / "dashboard_metadata.json").write_text(
+        json.dumps(metadata, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _read_dashboard_updated_label(economy: str) -> str:
+    """Return the saved dashboard timestamp for an existing output, if available."""
+    path = _metadata_path(economy)
+    if not path.exists():
+        return ""
+    try:
+        metadata = json.loads(path.read_text(encoding="utf-8"))
+        return str(metadata.get("dashboard_updated_label") or "")
+    except Exception:
+        return ""
+
+
 def _render_one_economy(
     raw_df: pd.DataFrame,
     template: dict,
@@ -95,9 +147,12 @@ def _render_one_economy(
         "visible_rows": 0,
         "chart_count": 0,
         "dashboard_path": "",
+        "dashboard_updated": "",
         "error": "",
     }
     try:
+        missing_leap_branches = _missing_leap_demand_branches(economy)
+        template = filter_template_for_leap_demand_coverage(template, missing_leap_branches)
         filtered_df = filter_common_esto_data(
             raw_df,
             comparison_scope=COMPARISON_SCOPE,
@@ -117,9 +172,18 @@ def _render_one_economy(
         scope_visible_df = apply_visible_series(scope_filtered_df, series_config.get("visible_series", []))
         scope_visible_df = apply_sign_semantics(scope_visible_df, template.get("sign_semantics"))
         layout = build_output_layout(OUTPUT_ROOT, economy, clear_existing=CLEAR_EXISTING_OUTPUTS)
+        dashboard_updated_label = _dashboard_updated_label()
         sign_summary_df = build_sign_semantics_summary(visible_df)
         sign_summary_df.to_csv(layout["supporting"] / "sign_semantics_summary.csv", index=False)
-        manifest_df = render_dashboard(visible_df, template, series_config, layout, scope_df=scope_visible_df)
+        manifest_df = render_dashboard(
+            visible_df,
+            template,
+            series_config,
+            layout,
+            scope_df=scope_visible_df,
+            dashboard_updated_label=dashboard_updated_label,
+        )
+        _write_dashboard_metadata(layout, dashboard_updated_label)
 
         result.update({
             "status": "ok",
@@ -127,6 +191,7 @@ def _render_one_economy(
             "visible_rows": len(visible_df),
             "chart_count": len(manifest_df),
             "dashboard_path": str(layout["dashboards"] / "index.html"),
+            "dashboard_updated": dashboard_updated_label,
         })
     except Exception as exc:
         result["error"] = f"{exc}\n{traceback.format_exc(limit=5)}"
@@ -145,12 +210,17 @@ def _summarise_existing_economy(raw_df: pd.DataFrame, economy: str) -> dict[str,
         "visible_rows": "",
         "chart_count": 0,
         "dashboard_path": str(dashboard_root / "dashboards" / "index.html"),
+        "dashboard_updated": _read_dashboard_updated_label(economy),
         "error": "",
     }
     if not manifest_path.exists():
         result["error"] = f"Missing chart manifest: {manifest_path}"
         return result
-    manifest_df = pd.read_csv(manifest_path)
+    try:
+        manifest_df = pd.read_csv(manifest_path)
+    except pd.errors.EmptyDataError:
+        result["error"] = f"Empty chart manifest: {manifest_path}"
+        return result
     result["status"] = "ok"
     result["chart_count"] = len(manifest_df)
     return result
@@ -172,7 +242,8 @@ def render_all_economies() -> pd.DataFrame:
     raw_df = _normalise_economy_column(raw_df)
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
 
-    economies = [_dashboard_economy(e) for e in ECONOMIES_TO_RENDER] or _available_economies(raw_df)
+    requested_economies = [_dashboard_economy(e) for e in ECONOMIES_TO_RENDER]
+    economies = requested_economies or _available_economies(raw_df)
     summary_rows: list[dict[str, object]] = []
     for economy in economies:
         if RENDER_DASHBOARDS:
@@ -186,6 +257,14 @@ def render_all_economies() -> pd.DataFrame:
         print(f"  {row['status']}: {row['chart_count']} charts, {row['visible_rows']} visible rows")
         if row["error"]:
             print(f"  error: {row['error']}")
+
+    if requested_economies:
+        rendered = set(economies)
+        for economy in _existing_dashboard_economies():
+            if economy in rendered:
+                continue
+            print(f"Keeping existing output for {economy} in summary.")
+            summary_rows.append(_summarise_existing_economy(raw_df, economy))
 
     summary_df = _write_summary(summary_rows)
     print(f"Summary written: {SUMMARY_PATH}")

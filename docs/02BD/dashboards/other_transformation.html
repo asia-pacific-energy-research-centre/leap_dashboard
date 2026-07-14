@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Other transformation</title>
+  <style>
+:root {
+  color-scheme: light;
+  --page-padding-x: clamp(12px, 1.8vw, 24px);
+  --page-padding-y: clamp(14px, 1.8vw, 24px);
+  --body-font-size: clamp(15px, 0.22vw + 14px, 18px);
+  --title-font-size: clamp(24px, 0.75vw + 18px, 34px);
+  --section-title-size: clamp(18px, 0.45vw + 14px, 24px);
+}
+html { background: #f4f6f8; }
+body {
+  font-family: Segoe UI, Arial, sans-serif;
+  margin: 0;
+  background: #f4f6f8;
+  color: #111;
+  font-size: var(--body-font-size);
+  line-height: 1.45;
+  min-width: 320px;
+}
+a { color: #0b3d5c; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.page-shell { width: 100%; max-width: none; margin: 0 auto; padding: 0 var(--page-padding-x) 32px; box-sizing: border-box; }
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin: 0 0 14px 0;
+  padding: var(--page-padding-y) 0 10px 0;
+  background: rgba(244, 246, 248, 0.96);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #d8dee4;
+}
+.header-main-row { display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 16px; }
+.header-side-controls {
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;
+  gap:8px 10px;flex:1 1 460px;
+}
+.header-inline-controls {
+  display:flex;align-items:center;gap:8px;justify-content:flex-end;
+  flex:0 0 auto;flex-wrap:nowrap;margin-left:auto;
+}
+.dashboard-context { margin-top:6px;color:#4b5563;font-size:13px;line-height:1.35; }
+.dashboard-updated { margin-left:10px;padding-left:10px;border-left:1px solid #c5ccd3;color:#64748b;white-space:nowrap; }
+.dashboard-switcher {
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;white-space:nowrap;
+}
+.dashboard-switcher select {
+  max-width:220px;padding:5px 28px 5px 8px;border:1px solid #c5ccd3;border-radius:6px;
+  background:#fff;color:#111;font:inherit;
+}
+.header-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.header-chip {
+  padding: 6px 10px;
+  border: 1px solid #c5ccd3;
+  border-radius: 6px;
+  background: #fff;
+  color: #0b3d5c;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.header-chip[data-current="true"] {
+  border-color:#1f6feb;
+  box-shadow:0 0 0 2px rgba(31, 111, 235, 0.16);
+  font-weight:700;
+}
+.header-nav-separator { color:#6b7280;font-weight:700;line-height:1.25;padding:6px 2px; }
+.header-toggle {
+  width: 30px; height: 30px;
+  border: 1px solid #c5ccd3;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b3d5c;
+  cursor: pointer;
+}
+.header-toggle-row { display:flex;justify-content:flex-end;margin-top:8px; }
+.page-header.is-collapsed .header-collapsible { display: none; }
+.page-header.is-collapsed { padding-bottom:0;background:transparent;backdrop-filter:none;border-bottom-color:transparent; }
+.page-header.is-collapsed .header-toggle-row { margin-top:0; }
+.jump-nav {
+  margin-top:8px;padding-top:8px;border-top:1px solid #d8dee4;
+  display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-start;
+}
+.jump-nav-label { font-weight:600;color:#4b5563;font-size:12px;white-space:nowrap;padding-top:4px; }
+.jump-nav-groups { display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 640px; }
+.jump-nav-row { display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0; }
+.jump-nav-row[data-level="2"] { padding-left:18px; }
+.jump-chip {
+  position:relative;display:inline-flex;align-items:center;gap:6px;
+  padding:4px 9px;border:1px solid #c5ccd3;border-radius:999px;
+  background:#fff;color:#0b3d5c;text-decoration:none;font-size:12px;line-height:1.25;
+  box-shadow:0 1px 1px rgba(15,23,42,0.04);
+}
+.jump-chip::before { content:"";display:block;width:8px;height:8px;border-radius:999px;flex:0 0 auto;background:#94a3b8; }
+.jump-chip[data-level="1"] { background:#fff4e6;border-color:#f2a65a;color:#7a3b00; }
+.jump-chip[data-level="1"]::before { background:#f97316; }
+.jump-chip[data-level="2"] { background:#f5edff;border-color:#c69af0;color:#4c1d70; }
+.jump-chip[data-level="2"]::before { background:#9333ea; }
+.visible-note { margin:8px 0 10px 0;padding:8px 12px;background:#fffbe6;border-left:3px solid #f0a500;border-radius:4px;font-size:13px;color:#5a3e00;line-height:1.5; }
+.sort-bar {
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px;
+  margin:10px 0 8px 0;font-size:12px;color:#4b5563;
+}
+.sort-bar-label { font-weight:600;white-space:nowrap; }
+.sort-btn {
+  padding:4px 10px;border:1px solid #c5ccd3;border-radius:999px;
+  background:#fff;color:#0b3d5c;font-size:12px;cursor:pointer;
+}
+.sort-btn.active { border-color:#1f6feb;background:#e8f0fe;font-weight:700; }
+.scenario-toggle {
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;white-space:nowrap;
+}
+.scenario-toggle-buttons { display:flex;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
+.scenario-toggle-btn {
+  padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
+}
+.scenario-toggle-btn + .scenario-toggle-btn { border-left:1px solid #c5ccd3; }
+.scenario-toggle-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.dataset-filter {
+  display:flex;align-items:center;gap:6px 4px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;
+}
+.dataset-filter-label { font-weight:600;max-width:260px;line-height:1.2; }
+.dataset-filter-buttons { display:flex;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
+.dataset-filter-btn {
+  padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
+}
+.dataset-filter-btn + .dataset-filter-btn { border-left:1px solid #c5ccd3; }
+.dataset-filter-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.chart-card.dataset-filtered { display:none; }
+.dashboard-grid {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:12px;
+  align-items:start;
+}
+.dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.dashboard-grid.expand-1 { grid-template-columns:minmax(0, 1fr); }
+.dashboard-grid.expand-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.dashboard-grid.expand-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.chart-card { margin:0;padding:10px;border:1px solid #d0d7de;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.05); }
+.chart-caption { font-weight:600;margin-bottom:4px; }
+.meta-subline { margin-top:-4px;margin-bottom:8px;color:#4b5563;font-size:12px; }
+.chart-load-state { min-height:22px;margin:4px 0 6px 0;color:#64748b;font-size:12px; }
+.chart-load-state[data-loaded="true"] { display:none; }
+.lazy-chart-plot {
+  width:100%;height:clamp(380px, 62vh, 1100px);
+  border:1px solid #d0d7de;border-radius:6px;background:#fff;display:block;box-sizing:border-box;
+}
+.lazy-chart-plot.is-unloaded { background:#f8fafc; }
+.section-heading { margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d; }
+.subsection-heading { margin:14px 0 6px 12px;font-size:15px;font-weight:600;color:#4c1d70;padding-left:8px;border-left:3px solid #c69af0; }
+@media (max-width: 900px) { .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .header-side-controls { flex:1 1 100%;min-width:0;justify-content:flex-start; }
+  .header-inline-controls { margin-left:0;flex-wrap:wrap;justify-content:flex-start;width:100%; }
+  .header-links { width:100%; }
+  .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:minmax(0, 1fr); }
+  .lazy-chart-plot { height:420px; }
+}
+</style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="page-header" id="page-header">
+      <div class="header-collapsible">
+      <div class="header-main-row">
+        <div style="min-width:220px;flex:1 1 320px;">
+          <h1 style="margin:0;font-size:24px;line-height:1.15;">Other transformation</h1>
+          <div class="dashboard-context">Economy: <strong>Brunei Darussalam</strong><span class="dashboard-updated">Updated: 2026-07-14 15:47 Tokyo Standard Time</span></div>
+        </div>
+        <div class="header-side-controls">
+          
+<div class="scenario-toggle" role="group" aria-label="Scenario">
+  <span>Scenario</span>
+  <div class="scenario-toggle-buttons">
+    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="ref">Reference</button>
+    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="tgt">Target</button>
+  </div>
+</div>
+
+          <label class="dashboard-switcher"><span>Dashboard</span><select data-dashboard-switcher aria-label="Switch dashboard"><option value="../../01AUS/dashboards/other_transformation.html">Australia</option><option value="other_transformation.html" selected>Brunei Darussalam</option><option value="../../03CDA/dashboards/other_transformation.html">Canada</option><option value="../../04CHL/dashboards/other_transformation.html">Chile</option><option value="../../05PRC/dashboards/other_transformation.html">China</option><option value="../../06HKC/dashboards/other_transformation.html">Hong Kong, China</option><option value="../../07INA/dashboards/other_transformation.html">Indonesia</option><option value="../../08JPN/dashboards/other_transformation.html">Japan</option><option value="../../09ROK/dashboards/other_transformation.html">Korea</option><option value="../../10MAS/dashboards/other_transformation.html">Malaysia</option><option value="../../11MEX/dashboards/other_transformation.html">Mexico</option><option value="../../12NZ/dashboards/other_transformation.html">New Zealand</option><option value="../../13PNG/dashboards/other_transformation.html">Papua New Guinea</option><option value="../../14PE/dashboards/other_transformation.html">Peru</option><option value="../../15PHL/dashboards/other_transformation.html">Philippines</option><option value="../../16RUS/dashboards/other_transformation.html">Russia</option><option value="../../17SGP/dashboards/other_transformation.html">Singapore</option><option value="../../18CT/dashboards/other_transformation.html">Chinese Taipei</option><option value="../../19THA/dashboards/other_transformation.html">Thailand</option><option value="../../20USA/dashboards/other_transformation.html">United States</option><option value="../../21VN/dashboards/other_transformation.html">Viet Nam</option></select></label>
+          <div class="dataset-filter" role="group" aria-label="Dataset filter"><span class="dataset-filter-label">Exclude charts that don't contain the highlighted datasets:</span><div class="dataset-filter-buttons"><button type="button" class="dataset-filter-btn" data-dataset-filter="ESTO">ESTO</button><button type="button" class="dataset-filter-btn" data-dataset-filter="NINTH">Ninth</button></div></div>
+          <div class="header-inline-controls"><a href="total_demand.html" class="header-chip" data-current="false">Energy balance overview</a><span class="header-nav-separator" aria-hidden="true">|</span><span class="header-nav-separator" aria-hidden="true">|</span><a href="power.html" class="header-chip" data-current="false">Power</a><a href="refining.html" class="header-chip" data-current="false">Refining</a><a href="other_transformation.html" class="header-chip" data-current="true">Other transformation</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="supply.html" class="header-chip" data-current="false">Supply</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="unassigned.html" class="header-chip" data-current="false">Unassigned</a></div>
+        </div>
+      </div>
+      <div class="jump-nav"><span class="jump-nav-label">Sections:</span><div class="jump-nav-groups"><div class="jump-nav-row" data-level="1"><a href="#sec-other_transformation__other_transformation" class="jump-chip" data-level="1">Other transformation</a><a href="#sec-other_transformation__transfers" class="jump-chip" data-level="1">Transfers</a></div><div class="jump-nav-row" data-level="2"><a href="#sec-other_transformation__other_transformation__09_06_02_01_liquefaction" class="jump-chip" data-level="2">09.06.02.01 Liquefaction</a><a href="#sec-other_transformation__other_transformation__09_12_10_01_13_10_01_17_non_specified_transformation_including_own_use_and_pump_storage" class="jump-chip" data-level="2">09.12,10.01.13,10.01.17 Non-specified transformation (including own use and pump storage)</a><a href="#sec-other_transformation__other_transformation__10_01_12_oil_and_gas_extraction" class="jump-chip" data-level="2">10.01.12 Oil and gas extraction</a><a href="#sec-other_transformation__other_transformation__10_02_transmission_and_distribution_losses" class="jump-chip" data-level="2">10.02 Transmission and distribution losses</a></div></div></div>
+      </div>
+      <div class="header-toggle-row">
+        <button id="header-toggle" class="header-toggle" type="button" aria-expanded="true" aria-label="Collapse header">&#9652;</button>
+      </div>
+    </header>
+    <main class="page-body">
+      
+      <h2 class="section-heading">Overview</h2><section class="section-sort-group"><div class="sort-bar"><span class="sort-bar-label">Sort:</span><button class="sort-btn active" data-sort="default">Default</button><button class="sort-btn" data-sort="totalAbs">Largest total</button><button class="sort-btn" data-sort="absDiff">Largest difference</button><button class="sort-btn" data-sort="pctDiff">Largest % diff</button></div><div class="dashboard-grid overview-grid" data-sortable-grid="overview"><figure class="chart-card" data-default-order="0" data-total-abs="680.4762" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="NINTH"><figcaption class="chart-caption">08 Transfers</figcaption><div class="meta-subline">Other transformation</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__08__08_transfers" class="lazy-chart-plot is-unloaded" role="img" aria-label="08 Transfers"></div></figure><figure class="chart-card" data-default-order="1" data-total-abs="34204.9124" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">09 Total transformation sector</figcaption><div class="meta-subline">Other transformation</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__09__09_total_transformation_sector" class="lazy-chart-plot is-unloaded" role="img" aria-label="09 Total transformation sector"></div></figure><figure class="chart-card" data-default-order="2" data-total-abs="2235.5564" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">10 Oil and gas extraction</figcaption><div class="meta-subline">Other transformation</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__10__10_oil_and_gas_extraction" class="lazy-chart-plot is-unloaded" role="img" aria-label="10 Oil and gas extraction"></div></figure><figure class="chart-card" data-default-order="3" data-total-abs="24062.8461" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">09.06 Gas processing plants (including own use)</figcaption><div class="meta-subline">Other transformation</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__09_06__09_06_gas_processing_plants_including_own_use" class="lazy-chart-plot is-unloaded" role="img" aria-label="09.06 Gas processing plants (including own use)"></div></figure><figure class="chart-card" data-default-order="4" data-total-abs="10142.0663" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">09.12,10.01.13,10.01.17 Non-specified transformation (including own use and pump storage)</figcaption><div class="meta-subline">Other transformation</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__09_12__09_12_10_01_13_10_01_17_non_specified_transformation_including_own_use_and_pump_storage" class="lazy-chart-plot is-unloaded" role="img" aria-label="09.12,10.01.13,10.01.17 Non-specified transformation (including own use and pump storage)"></div></figure><figure class="chart-card" data-default-order="5" data-total-abs="1817.4951" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">10.01 Oil and gas extraction</figcaption><div class="meta-subline">Other transformation</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__10_01__10_01_oil_and_gas_extraction" class="lazy-chart-plot is-unloaded" role="img" aria-label="10.01 Oil and gas extraction"></div></figure><figure class="chart-card" data-default-order="6" data-total-abs="418.0614" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">10.02 Transmission and distribution losses</figcaption><div class="meta-subline">Other transformation</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__10_02__10_02_transmission_and_distribution_losses" class="lazy-chart-plot is-unloaded" role="img" aria-label="10.02 Transmission and distribution losses"></div></figure></div></section>
+      <section id="sec-other_transformation__other_transformation" style="scroll-margin-top:150px;"><h2 class="section-heading">Other transformation</h2><section class="section-sort-group"><div class="sort-bar"><span class="sort-bar-label">Sort:</span><button class="sort-btn active" data-sort="default">Default</button><button class="sort-btn" data-sort="totalAbs">Largest total</button><button class="sort-btn" data-sort="absDiff">Largest difference</button><button class="sort-btn" data-sort="pctDiff">Largest % diff</button></div><div class="dashboard-grid expand-2" data-sortable-grid="sec-other_transformation__other_transformation"><figure class="chart-card" data-default-order="0" data-total-abs="20273.0986" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">Aggregate by product: Other transformation</figcaption><div class="meta-subline">Other transformation &gt; Other transformation</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__section__other_transformation__other_transformation__product" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aggregate by product: Other transformation"></div></figure><figure class="chart-card" data-default-order="1" data-total-abs="20273.0986" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">Aggregate by flow: Other transformation</figcaption><div class="meta-subline">Other transformation &gt; Other transformation</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__section__other_transformation__other_transformation__flow" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aggregate by flow: Other transformation"></div></figure></div></section><section id="sec-other_transformation__other_transformation__09_06_02_01_liquefaction" style="scroll-margin-top:150px;"><h3 class="subsection-heading">09.06.02.01 Liquefaction</h3><section class="section-sort-group"><div class="sort-bar"><span class="sort-bar-label">Sort:</span><button class="sort-btn active" data-sort="default">Default</button><button class="sort-btn" data-sort="totalAbs">Largest total</button><button class="sort-btn" data-sort="absDiff">Largest difference</button><button class="sort-btn" data-sort="pctDiff">Largest % diff</button></div><div class="dashboard-grid expand-2" data-sortable-grid="sec-other_transformation__other_transformation__09_06_02_01_liquefaction"><figure class="chart-card" data-default-order="0" data-total-abs="3993.6993" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO"><figcaption class="chart-caption">08.01 Natural gas</figcaption><div class="meta-subline">Other transformation &gt; Other transformation &gt; 09.06.02.01 Liquefaction</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_06_02_01_liquefaction__08_01_natural_gas" class="lazy-chart-plot is-unloaded" role="img" aria-label="08.01 Natural gas"></div></figure><figure class="chart-card" data-default-order="1" data-total-abs="3901.7766" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO"><figcaption class="chart-caption">08.02 LNG</figcaption><div class="meta-subline">Other transformation &gt; Other transformation &gt; 09.06.02.01 Liquefaction</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_06_02_01_liquefaction__08_02_lng" class="lazy-chart-plot is-unloaded" role="img" aria-label="08.02 LNG"></div></figure></div></section></section><section id="sec-other_transformation__other_transformation__09_12_10_01_13_10_01_17_non_specified_transformation_including_own_use_and_pump_storage" style="scroll-margin-top:150px;"><h3 class="subsection-heading">09.12,10.01.13,10.01.17 Non-specified transformation (including own use and pump storage)</h3><section class="section-sort-group"><div class="sort-bar"><span class="sort-bar-label">Sort:</span><button class="sort-btn active" data-sort="default">Default</button><button class="sort-btn" data-sort="totalAbs">Largest total</button><button class="sort-btn" data-sort="absDiff">Largest difference</button><button class="sort-btn" data-sort="pctDiff">Largest % diff</button></div><div class="dashboard-grid expand-2" data-sortable-grid="sec-other_transformation__other_transformation__09_12_10_01_13_10_01_17_non_specified_transformation_including_own_use_and_pump_storage"><figure class="chart-card" data-default-order="0" data-total-abs="6308.0292" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">06.03-06.05 Crude oil and NGL</figcaption><div class="meta-subline">Other transformation &gt; Other transformation &gt; 09.12,10.01.13,10.01.17 Non-specified transformation (including own use and pump storage)</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_12_10_01_13_10_01_17_non_specified_transformation_including_own_use_and_pump_storage__06_03_06_05_crude_oil_and_ngl" class="lazy-chart-plot is-unloaded" role="img" aria-label="06.03-06.05 Crude oil and NGL"></div></figure><figure class="chart-card" data-default-order="1" data-total-abs="3834.0371" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">08.01 Natural gas</figcaption><div class="meta-subline">Other transformation &gt; Other transformation &gt; 09.12,10.01.13,10.01.17 Non-specified transformation (including own use and pump storage)</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__09_12_10_01_13_10_01_17_non_specified_transformation_including_own_use_and_pump_storage__08_01_natural_gas" class="lazy-chart-plot is-unloaded" role="img" aria-label="08.01 Natural gas"></div></figure></div></section></section><section id="sec-other_transformation__other_transformation__10_01_12_oil_and_gas_extraction" style="scroll-margin-top:150px;"><h3 class="subsection-heading">10.01.12 Oil and gas extraction</h3><section class="section-sort-group"><div class="sort-bar"><span class="sort-bar-label">Sort:</span><button class="sort-btn active" data-sort="default">Default</button><button class="sort-btn" data-sort="totalAbs">Largest total</button><button class="sort-btn" data-sort="absDiff">Largest difference</button><button class="sort-btn" data-sort="pctDiff">Largest % diff</button></div><div class="dashboard-grid expand-2" data-sortable-grid="sec-other_transformation__other_transformation__10_01_12_oil_and_gas_extraction"><figure class="chart-card" data-default-order="0" data-total-abs="1774.5725" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">08.01 Natural gas</figcaption><div class="meta-subline">Other transformation &gt; Other transformation &gt; 10.01.12 Oil and gas extraction</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__10_01_12_oil_and_gas_extraction__08_01_natural_gas" class="lazy-chart-plot is-unloaded" role="img" aria-label="08.01 Natural gas"></div></figure><figure class="chart-card" data-default-order="1" data-total-abs="42.9226" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">17 Electricity</figcaption><div class="meta-subline">Other transformation &gt; Other transformation &gt; 10.01.12 Oil and gas extraction</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__10_01_12_oil_and_gas_extraction__17_electricity" class="lazy-chart-plot is-unloaded" role="img" aria-label="17 Electricity"></div></figure></div></section></section><section id="sec-other_transformation__other_transformation__10_02_transmission_and_distribution_losses" style="scroll-margin-top:150px;"><h3 class="subsection-heading">10.02 Transmission and distribution losses</h3><section class="section-sort-group"><div class="sort-bar"><span class="sort-bar-label">Sort:</span><button class="sort-btn active" data-sort="default">Default</button><button class="sort-btn" data-sort="totalAbs">Largest total</button><button class="sort-btn" data-sort="absDiff">Largest difference</button><button class="sort-btn" data-sort="pctDiff">Largest % diff</button></div><div class="dashboard-grid expand-2" data-sortable-grid="sec-other_transformation__other_transformation__10_02_transmission_and_distribution_losses"><figure class="chart-card" data-default-order="0" data-total-abs="114.4239" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">08.01 Natural gas</figcaption><div class="meta-subline">Other transformation &gt; Other transformation &gt; 10.02 Transmission and distribution losses</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__10_02_transmission_and_distribution_losses__08_01_natural_gas" class="lazy-chart-plot is-unloaded" role="img" aria-label="08.01 Natural gas"></div></figure><figure class="chart-card" data-default-order="1" data-total-abs="303.6375" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO,NINTH"><figcaption class="chart-caption">17 Electricity</figcaption><div class="meta-subline">Other transformation &gt; Other transformation &gt; 10.02 Transmission and distribution losses</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__10_02_transmission_and_distribution_losses__17_electricity" class="lazy-chart-plot is-unloaded" role="img" aria-label="17 Electricity"></div></figure></div></section></section></section><section id="sec-other_transformation__transfers" style="scroll-margin-top:150px;"><h2 class="section-heading">Transfers</h2><section class="section-sort-group"><div class="sort-bar"><span class="sort-bar-label">Sort:</span><button class="sort-btn active" data-sort="default">Default</button><button class="sort-btn" data-sort="totalAbs">Largest total</button><button class="sort-btn" data-sort="absDiff">Largest difference</button><button class="sort-btn" data-sort="pctDiff">Largest % diff</button></div><div class="dashboard-grid" data-sortable-grid="sec-other_transformation__transfers"><figure class="chart-card" data-default-order="0" data-total-abs="680.4762" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="NINTH"><figcaption class="chart-caption">Aggregate by product: Transfers</figcaption><div class="meta-subline">Other transformation &gt; Transfers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__section__other_transformation__transfers__product" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aggregate by product: Transfers"></div></figure><figure class="chart-card" data-default-order="1" data-total-abs="680.4762" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="NINTH"><figcaption class="chart-caption">Aggregate by flow: Transfers</figcaption><div class="meta-subline">Other transformation &gt; Transfers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__section__other_transformation__transfers__flow" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aggregate by flow: Transfers"></div></figure><figure class="chart-card" data-default-order="2" data-total-abs="497.5841" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="NINTH"><figcaption class="chart-caption">06.03-06.05 Crude oil and NGL</figcaption><div class="meta-subline">Other transformation &gt; Transfers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__08_transfers__06_03_06_05_crude_oil_and_ngl" class="lazy-chart-plot is-unloaded" role="img" aria-label="06.03-06.05 Crude oil and NGL"></div></figure><figure class="chart-card" data-default-order="3" data-total-abs="41.3110" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="NINTH"><figcaption class="chart-caption">07.01 Motor gasoline</figcaption><div class="meta-subline">Other transformation &gt; Transfers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__08_transfers__07_01_motor_gasoline" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.01 Motor gasoline"></div></figure><figure class="chart-card" data-default-order="4" data-total-abs="120.3532" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="NINTH"><figcaption class="chart-caption">07.03 Naphtha</figcaption><div class="meta-subline">Other transformation &gt; Transfers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__08_transfers__07_03_naphtha" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.03 Naphtha"></div></figure><figure class="chart-card" data-default-order="5" data-total-abs="21.2280" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="NINTH"><figcaption class="chart-caption">07.12-07.17 Petroleum products</figcaption><div class="meta-subline">Other transformation &gt; Transfers</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__08_transfers__07_12_07_17_petroleum_products" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.12-07.17 Petroleum products"></div></figure></div></section></section>
+    </main>
+  </div>
+  <script>
+(function() {
+  var pageHeader = document.getElementById('page-header');
+  var toggle = document.getElementById('header-toggle');
+  if (!pageHeader || !toggle) return;
+  var key = 'common-esto-header-collapsed';
+  var apply = function(collapsed) {
+    pageHeader.classList.toggle('is-collapsed', collapsed);
+    toggle.textContent = collapsed ? '▾' : '▴';
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggle.setAttribute('aria-label', collapsed ? 'Expand header' : 'Collapse header');
+  };
+  var collapsed = false;
+  try { collapsed = window.localStorage.getItem(key) === 'true'; } catch (e) {}
+  apply(collapsed);
+  toggle.addEventListener('click', function() {
+    collapsed = !pageHeader.classList.contains('is-collapsed');
+    apply(collapsed);
+    try { window.localStorage.setItem(key, collapsed ? 'true' : 'false'); } catch (e) {}
+  });
+})();
+</script>
+  <script>
+(function() {
+  document.querySelectorAll('[data-dashboard-switcher]').forEach(function(select) {
+    select.addEventListener('change', function() {
+      var href = select.value;
+      if (href) window.location.href = href;
+    });
+  });
+})();
+</script>
+  <script>
+(function() {
+  var key = 'common-esto-scenario-mode';
+  var getMode = function() {
+    try {
+      var stored = window.localStorage.getItem(key);
+      if (stored === 'ref' || stored === 'tgt') return stored;
+    } catch (e) {}
+    return 'tgt';
+  };
+  var setMode = function(mode) {
+    try { window.localStorage.setItem(key, mode); } catch (e) {}
+  };
+
+  // Traces are tagged "esto" (always shown), or "ref"/"tgt" (LEAP/9th),
+  // with an independent optional "metric" dimension used only by the
+  // TFC/TFEC sector chart's own Plotly dropdown. See scenario_toggle_tag /
+  // trace_meta_entry in common_esto_dashboard_renderer.py.
+  var computeVisible = function(entry, scenarioMode, metricMode) {
+    var scenarioOk = entry.tag === 'esto' || entry.tag === scenarioMode;
+    var metricOk = !entry.metric || entry.metric === 'both' || entry.metric === metricMode;
+    return (scenarioOk && metricOk) ? entry.active_visible : false;
+  };
+
+  window.applyScenarioMode = function(plot) {
+    if (!window.Plotly || !plot || !plot.layout) return;
+    var meta = plot.layout.meta && plot.layout.meta.trace_meta;
+    if (!meta || !meta.length) return;
+    var scenarioMode = getMode();
+    var metricMode = plot._metricMode || 'tfc';
+    var visible = meta.map(function(entry) { return computeVisible(entry, scenarioMode, metricMode); });
+    window.Plotly.restyle(plot, {visible: visible});
+  };
+
+  var syncButtons = function() {
+    var mode = getMode();
+    document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.scenarioToggle === mode);
+    });
+  };
+  syncButtons();
+
+  document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setMode(btn.dataset.scenarioToggle);
+      syncButtons();
+      document.querySelectorAll('.lazy-chart-plot[data-rendered="true"]').forEach(function(plot) {
+        window.applyScenarioMode(plot);
+      });
+    });
+  });
+})();
+</script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="../chart_bundles/other_transformation__charts.js"></script>
+  <script>
+(function() {
+  var plots = Array.from(document.querySelectorAll('.lazy-chart-plot[data-chart-key]'));
+  if (!plots.length || !window.Plotly) return;
+  var bundleData = window.COMMON_ESTO_CHART_BUNDLE_DATA;
+
+  var setState = function(plot, text, loaded) {
+    var state = plot.previousElementSibling;
+    if (state && state.classList.contains('chart-load-state')) {
+      state.dataset.loaded = loaded ? 'true' : 'false';
+      state.textContent = text || '';
+    }
+  };
+
+  var renderPlot = function(plot) {
+    if (plot.dataset.rendered === 'true' || plot.dataset.rendering === 'true') return;
+    plot.dataset.rendering = 'true';
+    setState(plot, 'Loading chart…', false);
+    try {
+      var bundle = bundleData;
+      var chart = bundle && bundle.charts && bundle.charts[plot.dataset.chartKey];
+      if (!chart) throw new Error('Missing chart: ' + plot.dataset.chartKey);
+      window.Plotly.newPlot(plot, chart.data || [], chart.layout || {}, {responsive: true});
+      plot.dataset.rendered = 'true';
+      plot.classList.remove('is-unloaded');
+      setState(plot, '', true);
+      window.Plotly.Plots.resize(plot);
+      if (window.applyScenarioMode) {
+        if (plot.on) {
+          plot.on('plotly_buttonclicked', function(ev) {
+            var label = (ev && ev.button && ev.button.label) || '';
+            plot._metricMode = /TFEC/i.test(label) ? 'tfec' : 'tfc';
+            window.applyScenarioMode(plot);
+          });
+        }
+        window.applyScenarioMode(plot);
+      }
+    } catch (err) {
+      plot.classList.add('is-unloaded');
+      setState(plot, 'Chart failed: ' + (err.message || err), false);
+    } finally {
+      plot.dataset.rendering = 'false';
+    }
+  };
+
+  if ('IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) { renderPlot(entry.target); observer.unobserve(entry.target); }
+      });
+    }, {rootMargin: '900px 0px'});
+    plots.forEach(function(p) { observer.observe(p); });
+  } else {
+    plots.forEach(renderPlot);
+  }
+
+  window.addEventListener('resize', function() {
+    plots.forEach(function(p) { if (p.dataset.rendered === 'true') window.Plotly.Plots.resize(p); });
+  });
+})();
+</script>
+  <script>
+(function() {
+  document.querySelectorAll('.sort-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var sortKey = btn.dataset.sort;
+      var bar = btn.closest('.sort-bar');
+      var grid = btn.closest('.section-sort-group').querySelector('[data-sortable-grid]');
+      if (!grid) return;
+      var cards = Array.from(grid.querySelectorAll(':scope > .chart-card'));
+      if (sortKey === 'default') {
+        cards.sort(function(a, b) { return parseInt(a.dataset.defaultOrder||0) - parseInt(b.dataset.defaultOrder||0); });
+      } else {
+        cards.sort(function(a, b) { return parseFloat(b.dataset[sortKey]||0) - parseFloat(a.dataset[sortKey]||0); });
+      }
+      cards.forEach(function(c) { grid.appendChild(c); });
+      bar.querySelectorAll('.sort-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+    });
+  });
+})();
+</script>
+  <script>
+(function() {
+  var buttons = Array.from(document.querySelectorAll('[data-dataset-filter]'));
+  if (!buttons.length) return;
+  var key = 'common-esto-dataset-filter';
+  var available = buttons.map(function(b) { return b.dataset.datasetFilter; });
+  var active = [];
+  try {
+    var stored = JSON.parse(window.localStorage.getItem(key) || '[]');
+    if (Array.isArray(stored)) {
+      active = stored.filter(function(d) { return available.indexOf(d) !== -1; });
+    }
+  } catch (e) {}
+
+  // A card stays visible only if it contains every highlighted (active) dataset.
+  var apply = function() {
+    buttons.forEach(function(btn) {
+      btn.classList.toggle('active', active.indexOf(btn.dataset.datasetFilter) !== -1);
+    });
+    document.querySelectorAll('.chart-card[data-datasets]').forEach(function(card) {
+      var have = (card.dataset.datasets || '').split(',').filter(Boolean);
+      var hidden = active.some(function(d) { return have.indexOf(d) === -1; });
+      card.classList.toggle('dataset-filtered', hidden);
+    });
+    try { window.localStorage.setItem(key, JSON.stringify(active)); } catch (e) {}
+    if (window.Plotly) {
+      document.querySelectorAll('.chart-card:not(.dataset-filtered) .lazy-chart-plot[data-rendered="true"]')
+        .forEach(function(p) { window.Plotly.Plots.resize(p); });
+    }
+  };
+
+  buttons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var d = btn.dataset.datasetFilter;
+      var i = active.indexOf(d);
+      if (i === -1) { active.push(d); } else { active.splice(i, 1); }
+      apply();
+    });
+  });
+  apply();
+})();
+</script>
+</body>
+</html>

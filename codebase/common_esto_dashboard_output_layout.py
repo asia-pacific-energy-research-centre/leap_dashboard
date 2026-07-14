@@ -42,6 +42,10 @@ def publish_to_docs(layout: dict[str, Path], docs_root: Path) -> dict[str, int]:
     Supporting files (CSV, XLSX, page-assignment summaries, sign summaries,
     chart manifests) are never copied — they stay in outputs/ only.
 
+    Destination files matching the copied patterns that are no longer present
+    in the source (e.g. a demand-sector page dropped by the LEAP-coverage
+    filter) are removed, so stale pages don't linger in docs/.
+
     Returns {subfolder_name: file_count} for reporting.
     """
     economy = layout["root"].name
@@ -53,10 +57,16 @@ def publish_to_docs(layout: dict[str, Path], docs_root: Path) -> dict[str, int]:
     for src_dir, dst_dir, patterns in copy_specs:
         dst_dir.mkdir(parents=True, exist_ok=True)
         n = 0
+        keep_names: set[str] = set()
         for pattern in patterns:
             for src_file in src_dir.glob(pattern):
                 shutil.copy2(src_file, dst_dir / src_file.name)
+                keep_names.add(src_file.name)
                 n += 1
+        for pattern in patterns:
+            for dst_file in dst_dir.glob(pattern):
+                if dst_file.name not in keep_names:
+                    dst_file.unlink()
         counts[dst_dir.name] = n
     return counts
 

@@ -2,6 +2,13 @@
 
 Project instructions for the production Common ESTO dashboard.
 
+## Economy-code reminder
+
+- `02_BD` means **Brunei Darussalam**. It does not mean Bangladesh.
+- `20_USA` means **United States of America**.
+- The complete dashboard economy code/name list is maintained in this repository at `config/common_esto_dashboard/series_config.json`.
+- This file uses compact dashboard keys (`02BD`, `20USA`); workflow/data inputs commonly use underscore-normalized codes (`02_BD`, `20_USA`).
+
 ## Repository scope
 
 - This repository owns the official Common ESTO dashboard.
@@ -25,6 +32,11 @@ C:\Users\Work\github\leap_dashboard_legacy
 
 Do not reintroduce its ESTO-axis workflow, direct mapping pipeline, or config
 into this repository. Use that repository when a legacy comparison is needed.
+
+## Prompt docs workflow
+
+- Multi-step agent prompts (plan-first implementation tasks, investigation prompts, prompt packs) live in `docs/prompts/` (create it the first time a prompt is added).
+- Once the work a prompt describes is complete (implemented, tested, and committed), move that prompt file out of `docs/prompts/` into `docs/archive/` — see `leap_mappings/docs/archive/common_esto_lineage_validation/` for the pattern (a prompt pack archived together with its own status/findings/TODO notes once superseded or finished). Do not leave completed prompts in `docs/prompts/`; that folder should only contain active or pending work.
 
 ## Upstream data boundary
 
