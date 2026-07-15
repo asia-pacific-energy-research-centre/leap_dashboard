@@ -26,7 +26,6 @@
         "02",
         "03",
         "06",
-        "07",
         "11"
       ],
       "flow_keywords": [
@@ -34,8 +33,7 @@
         "Imports",
         "Exports",
         "Stock changes",
-        "Statistical discrepancy",
-        "Total primary"
+        "Statistical discrepancy"
       ],
       "rule_note": "Supply and top-level balancing rows. Matches generated labels by any component code, not just the first displayed code."
     },
