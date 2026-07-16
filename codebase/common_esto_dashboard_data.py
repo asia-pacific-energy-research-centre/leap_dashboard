@@ -10,7 +10,16 @@ import pandas as pd
 
 
 #%%
-DEFAULT_COMPARISON_SCOPE = "leap_vs_esto_vs_ninth"
+DEFAULT_COMPARISON_SCOPE = "esto_leap_ninth"
+
+# The wide common-ESTO file may stack multiple source comparison scopes in its
+# ``comparison_scope`` column (e.g. "esto_leap_ninth" for the 3-way
+# LEAP/ESTO/NINTH comparison and "esto_leap" for the 2-way LEAP/ESTO
+# comparison). Shared scenarios such as "ESTO historical" and "LEAP Target" are
+# byte-identical across scopes, so loading more than one scope double-counts
+# those series. The loader selects exactly one file scope; callers may choose a
+# different one in future (e.g. "esto_leap").
+DEFAULT_WIDE_FILE_SCOPE = "esto_leap_ninth"
 ID_COLUMNS_WIDE = ["economy", "scenario", "product", "flow"]
 
 REQUIRED_COLUMNS = [
@@ -45,6 +54,21 @@ COMPONENT_METADATA_COLUMNS = [
     "aggregate_group_source_id",
     "aggregation_reason",
 ]
+
+
+def filter_ninth_pre_base_year_data(
+    df: pd.DataFrame,
+    *,
+    base_year: int,
+    include_pre_base_year_data: bool,
+) -> pd.DataFrame:
+    """Optionally remove 9th-edition rows before the dashboard base year."""
+    if include_pre_base_year_data or df.empty:
+        return df.copy()
+
+    source_is_ninth = df["source_system"].astype(str).str.casefold().eq("ninth")
+    is_pre_base_year = pd.to_numeric(df["year"], errors="coerce") < int(base_year)
+    return df.loc[~(source_is_ninth & is_pre_base_year)].copy()
 
 
 #%%
@@ -169,12 +193,29 @@ def build_sign_semantics_summary(df: pd.DataFrame) -> pd.DataFrame:
     return grouped
 
 
-def load_wide_common_esto_data(path: Path) -> pd.DataFrame:
-    """Load a wide common ESTO comparison file and convert it to long form."""
+def load_wide_common_esto_data(
+    path: Path,
+    wide_file_scope: str = DEFAULT_WIDE_FILE_SCOPE,
+) -> pd.DataFrame:
+    """Load a wide common ESTO comparison file and convert it to long form.
+
+    ``wide_file_scope`` selects a single value from the file's own
+    ``comparison_scope`` column (see ``DEFAULT_WIDE_FILE_SCOPE``). This prevents
+    double-counting scenarios that appear identically under more than one scope.
+    """
     wide_df = pd.read_csv(path, low_memory=False).fillna(0)
     missing_columns = [column for column in ID_COLUMNS_WIDE if column not in wide_df.columns]
     if missing_columns:
         raise ValueError(f"Wide common ESTO file is missing columns: {missing_columns}")
+    if "comparison_scope" in wide_df.columns:
+        wide_df["comparison_scope"] = wide_df["comparison_scope"].astype(str)
+        available_scopes = sorted(set(wide_df["comparison_scope"]))
+        if wide_file_scope not in available_scopes:
+            raise ValueError(
+                f"Wide common ESTO file does not contain scope {wide_file_scope!r}. "
+                f"Available scopes: {available_scopes}"
+            )
+        wide_df = wide_df[wide_df["comparison_scope"] == wide_file_scope].copy()
     year_columns = get_year_columns(wide_df)
     if not year_columns:
         raise ValueError("Wide common ESTO file does not contain year columns.")
@@ -214,13 +255,20 @@ def load_long_common_esto_data(path: Path) -> pd.DataFrame:
     return df
 
 
-def load_common_esto_data(path: Path) -> pd.DataFrame:
-    """Load either long or wide common ESTO comparison data."""
+def load_common_esto_data(
+    path: Path,
+    wide_file_scope: str = DEFAULT_WIDE_FILE_SCOPE,
+) -> pd.DataFrame:
+    """Load either long or wide common ESTO comparison data.
+
+    ``wide_file_scope`` is only consulted for wide-format inputs; long-format
+    files already carry a resolved ``comparison_scope`` column.
+    """
     sample_df = pd.read_csv(path, nrows=5, low_memory=False)
     if all(column in sample_df.columns for column in REQUIRED_COLUMNS):
         return load_long_common_esto_data(path)
     if all(column in sample_df.columns for column in ID_COLUMNS_WIDE) and get_year_columns(sample_df):
-        return load_wide_common_esto_data(path)
+        return load_wide_common_esto_data(path, wide_file_scope=wide_file_scope)
     raise ValueError(
         "Input file is neither long common ESTO data nor recognised wide data. "
         f"Columns found: {list(sample_df.columns)}"
@@ -309,8 +357,18 @@ def filter_common_esto_data(
 ) -> pd.DataFrame:
     """Filter common ESTO data to the dashboard scope."""
     out = df[(df["economy"].astype(str) == str(economy))].copy()
-    if "comparison_scope" in out.columns and comparison_scope in set(out["comparison_scope"].astype(str)):
-        out = out[out["comparison_scope"].astype(str) == str(comparison_scope)].copy()
+    if "comparison_scope" not in out.columns:
+        raise ValueError(
+            "Common ESTO data is missing the required 'comparison_scope' column."
+        )
+    available_scopes = sorted(set(out["comparison_scope"].astype(str)))
+    if comparison_scope not in available_scopes:
+        raise ValueError(
+            f"Common ESTO data does not contain requested comparison scope "
+            f"{comparison_scope!r} for economy {economy!r}. "
+            f"Available scopes: {available_scopes}"
+        )
+    out = out[out["comparison_scope"].astype(str) == str(comparison_scope)].copy()
     if min_year is not None:
         out = out[out["year"] >= min_year].copy()
     if max_year is not None:
@@ -322,20 +380,26 @@ def filter_template_for_leap_demand_coverage(
     template: dict,
     missing_leap_branches: set[str] | list[str],
 ) -> dict:
-    """Drop demand-sector pages whose LEAP branches are all still aggregate-only.
+    """Hide standalone demand-sector pages whose LEAP branches are all aggregate-only.
 
     ``missing_leap_branches`` is the resolved, economy-scoped list of LEAP
     demand branch names with no separately modelled detail (see
     ``leap_mappings.codebase.mapping_tools.source_branch_preflight.get_demand_sectors_without_detail``).
     A page listed in the template's ``leap_demand_sector_coverage.page_leap_branches``
-    is dropped from ``sector_pages`` and ``total_demand_page`` only when every
-    one of its configured LEAP branches is in that missing set — a page with
-    at least one branch already modelled in detail is kept, since it still has
-    real LEAP data to show even if incomplete. Pages listed in
-    ``leap_demand_sector_coverage.always_skip_page_keys`` are dropped
-    unconditionally: they have no LEAP-to-ESTO mapping at all (not even an
-    aggregate-only one), so ``get_demand_sectors_without_detail`` can never
+    is hidden only when every one of its configured LEAP branches is in that
+    missing set — a page with at least one branch already modelled in detail
+    is kept, since it still has real LEAP data to show even if incomplete.
+    Pages listed in ``leap_demand_sector_coverage.always_skip_page_keys`` are
+    hidden unconditionally: they have no LEAP-to-ESTO mapping at all (not even
+    an aggregate-only one), so ``get_demand_sectors_without_detail`` can never
     describe them.
+
+    This only suppresses standalone page rendering/navigation (via the
+    resolved ``_hidden_page_keys`` the renderer reads). ``sector_pages`` rules
+    and ``total_demand_page.demand_page_keys`` are left untouched, so ESTO/
+    NINTH rows for a hidden sector keep their real ``_page_key`` instead of
+    falling into ``unassigned``, and ``total_demand`` can still aggregate them
+    even when the standalone sector page is hidden.
     """
     coverage_config = template.get("leap_demand_sector_coverage", {})
     if not coverage_config.get("enabled", False):
@@ -355,23 +419,9 @@ def filter_template_for_leap_demand_coverage(
         return template
 
     out = dict(template)
-    out["sector_pages"] = [
-        rule for rule in template.get("sector_pages", [])
-        if str(rule.get("page_key", "")) not in pages_to_drop
-    ]
-    total_demand_page = template.get("total_demand_page")
-    if total_demand_page:
-        total_demand_page = dict(total_demand_page)
-        total_demand_page["demand_page_keys"] = [
-            key for key in total_demand_page.get("demand_page_keys", [])
-            if key not in pages_to_drop
-        ]
-        total_demand_page["sector_colors"] = {
-            key: value
-            for key, value in total_demand_page.get("sector_colors", {}).items()
-            if key not in pages_to_drop
-        }
-        out["total_demand_page"] = total_demand_page
+    coverage_config = dict(coverage_config)
+    coverage_config["_hidden_page_keys"] = sorted(pages_to_drop)
+    out["leap_demand_sector_coverage"] = coverage_config
     return out
 
 

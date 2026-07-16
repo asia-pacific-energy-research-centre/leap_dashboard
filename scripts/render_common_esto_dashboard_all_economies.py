@@ -57,6 +57,7 @@ OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
 SUMMARY_PATH = OUTPUT_ROOT / "render_summary.csv"
 
 COMPARISON_SCOPE = "leap_vs_esto_vs_ninth"
+WIDE_FILE_SCOPE = os.getenv("COMMON_ESTO_WIDE_FILE_SCOPE", "esto_leap_ninth")
 MIN_YEAR = 2010
 MAX_YEAR = 2060
 ECONOMIES_TO_RENDER: list[str] = [
@@ -238,7 +239,7 @@ def render_all_economies() -> pd.DataFrame:
     """Load data once, render selected economies, and write render_summary.csv."""
     template = load_json(TEMPLATE_PATH)
     series_config = json.loads(SERIES_CONFIG_PATH.read_text(encoding="utf-8"))
-    raw_df = load_common_esto_data(INPUT_DATA_PATH)
+    raw_df = load_common_esto_data(INPUT_DATA_PATH, wide_file_scope=WIDE_FILE_SCOPE)
     raw_df = _normalise_economy_column(raw_df)
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
 

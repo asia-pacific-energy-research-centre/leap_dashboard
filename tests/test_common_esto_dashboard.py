@@ -3,7 +3,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from codebase.common_esto_dashboard_data import apply_sign_semantics
+from codebase.common_esto_dashboard_data import (
+    DEFAULT_WIDE_FILE_SCOPE,
+    apply_sign_semantics,
+    filter_common_esto_data,
+    filter_ninth_pre_base_year_data,
+    load_common_esto_data,
+)
 from codebase.common_esto_dashboard_output_layout import build_output_layout
 from codebase.common_esto_dashboard_renderer import (
     assign_pages,
@@ -142,6 +148,39 @@ def test_common_esto_dashboard_excludes_electricity_and_heat_output_rows() -> No
     assert filtered["common_flow_code"].tolist() == ["17"]
 
 
+def test_ninth_pre_base_year_rows_are_excluded_by_default() -> None:
+    df = pd.DataFrame(
+        [
+            {"source_system": "NINTH", "year": 2021, "value": 1.0},
+            {"source_system": "NINTH", "year": 2022, "value": 2.0},
+            {"source_system": "ESTO", "year": 2021, "value": 3.0},
+        ]
+    )
+
+    filtered = filter_ninth_pre_base_year_data(
+        df,
+        base_year=2022,
+        include_pre_base_year_data=False,
+    )
+
+    assert filtered[["source_system", "year"]].to_dict("records") == [
+        {"source_system": "NINTH", "year": 2022},
+        {"source_system": "ESTO", "year": 2021},
+    ]
+
+
+def test_ninth_pre_base_year_rows_can_be_retained() -> None:
+    df = pd.DataFrame([{"source_system": "NINTH", "year": 2021, "value": 1.0}])
+
+    filtered = filter_ninth_pre_base_year_data(
+        df,
+        base_year=2022,
+        include_pre_base_year_data=True,
+    )
+
+    assert len(filtered) == 1
+
+
 def test_power_sector_rollup_is_not_assigned_to_other_transformation() -> None:
     template = _load_template()
     df = pd.DataFrame([
@@ -237,6 +276,88 @@ def test_common_esto_dashboard_shows_updated_label(tmp_path: Path) -> None:
     assert "Economy: <strong>United States</strong>" in transport_html
     assert "Updated: 2026-07-10 14:30 JST" in transport_html
     assert "Updated: 2026-07-10 14:30 JST" in index_html
+
+
+def _write_multi_scope_wide_file(path: Path) -> None:
+    """A wide file where 'ESTO historical' is identical across two scopes."""
+    rows = []
+    for scope in ["esto_leap", "esto_leap_ninth"]:
+        rows.append(
+            {
+                "comparison_scope": scope,
+                "economy": "20_USA",
+                "scenario": "ESTO ESTO historical",
+                "product": "08.01 Natural gas",
+                "flow": "01 Production",
+                "is_subtotal": False,
+                "2022": 35785.0,
+            }
+        )
+    # NINTH exists only in the 3-way scope.
+    rows.append(
+        {
+            "comparison_scope": "esto_leap_ninth",
+            "economy": "20_USA",
+            "scenario": "NINTH NINTH reference",
+            "product": "08.01 Natural gas",
+            "flow": "01 Production",
+            "is_subtotal": False,
+            "2022": 35785.0,
+        }
+    )
+    pd.DataFrame(rows).to_csv(path, index=False)
+
+
+def test_wide_loader_selects_single_scope_without_double_counting(tmp_path: Path) -> None:
+    wide_path = tmp_path / "wide.csv"
+    _write_multi_scope_wide_file(wide_path)
+
+    df = load_common_esto_data(wide_path)  # defaults to the 3-way scope
+
+    esto_ng = df[(df["source_system"] == "ESTO") & (df["year"] == 2022)]
+    assert len(esto_ng) == 1, "ESTO historical must not be duplicated across scopes"
+    assert esto_ng["value"].iloc[0] == 35785.0
+    # NINTH is unique to esto_leap_ninth and must survive the selection.
+    assert (df["source_system"] == "NINTH").any()
+
+
+def test_wide_loader_can_select_alternate_scope(tmp_path: Path) -> None:
+    wide_path = tmp_path / "wide.csv"
+    _write_multi_scope_wide_file(wide_path)
+
+    df = load_common_esto_data(wide_path, wide_file_scope="esto_leap")
+
+    assert DEFAULT_WIDE_FILE_SCOPE == "esto_leap_ninth"
+    # esto_leap has no NINTH rows.
+    assert not (df["source_system"] == "NINTH").any()
+    assert len(df[df["source_system"] == "ESTO"]) == 1
+
+
+def test_common_esto_scope_filter_rejects_unavailable_scope() -> None:
+    df = pd.DataFrame(
+        [
+            {"economy": "20_USA", "comparison_scope": "esto_leap_ninth"},
+        ]
+    )
+
+    try:
+        filter_common_esto_data(df, comparison_scope="missing_scope", economy="20_USA")
+    except ValueError as exc:
+        assert "missing_scope" in str(exc)
+        assert "esto_leap_ninth" in str(exc)
+    else:
+        raise AssertionError("Unavailable comparison scopes must raise ValueError")
+
+
+def test_common_esto_scope_filter_rejects_missing_scope_column() -> None:
+    df = pd.DataFrame([{"economy": "20_USA"}])
+
+    try:
+        filter_common_esto_data(df, comparison_scope="esto_leap_ninth", economy="20_USA")
+    except ValueError as exc:
+        assert "comparison_scope" in str(exc)
+    else:
+        raise AssertionError("Missing comparison_scope must raise ValueError")
 
 
 def test_weekly_common_esto_sample_fixture_is_present() -> None:

@@ -17,6 +17,9 @@
 #   Optional override for dashboard input CSV path.
 # COMMON_ESTO_ROWS_PATH
 #   Optional override for common rows CSV path.
+# COMMON_ESTO_INCLUDE_NINTH_PRE_BASE_YEAR_DATA
+#   Boolean toggle for retaining 9th-edition rows before the dashboard base
+#   year. Default is False because ESTO is the preferred historical source.
 
 #%%
 import json
@@ -37,6 +40,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     apply_visible_series,
     build_sign_semantics_summary,
     enrich_with_component_metadata,
+    filter_ninth_pre_base_year_data,
     filter_common_esto_data,
     filter_template_for_leap_demand_coverage,
     load_common_esto_data,
@@ -127,7 +131,11 @@ OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
 
 #%%
 # User-tuned constants.
-COMPARISON_SCOPE = os.getenv("COMMON_ESTO_COMPARISON_SCOPE", "leap_vs_esto_vs_ninth")
+COMPARISON_SCOPE = os.getenv("COMMON_ESTO_COMPARISON_SCOPE", "esto_leap_ninth")
+# Which source scope to read from the wide comparison file (see
+# ``common_esto_dashboard_data.DEFAULT_WIDE_FILE_SCOPE``). Use "esto_leap" to
+# read the 2-way LEAP/ESTO comparison instead.
+WIDE_FILE_SCOPE = os.getenv("COMMON_ESTO_WIDE_FILE_SCOPE", "esto_leap_ninth")
 ECONOMIES: str | list[str] = os.getenv("COMMON_ESTO_ECONOMIES", ["20_USA", "02_BD"])
 MIN_YEAR = 2010
 MAX_YEAR = 2060
@@ -154,6 +162,12 @@ UPDATE_DATA = True
 UPDATE_DATA = _env_bool(
     "COMMON_ESTO_UPDATE_DATA",
     default=UPDATE_DATA,
+)
+# By default, use ESTO for pre-base-year values. Set this to True when a
+# diagnostic render needs the 9th-edition values retained as well.
+INCLUDE_NINTH_PRE_BASE_YEAR_DATA = _env_bool(
+    "COMMON_ESTO_INCLUDE_NINTH_PRE_BASE_YEAR_DATA",
+    default=False,
 )
 INCLUDE_CAPACITY_UNMET_CONVERGENCE = True  # Set False to skip writing the capacity-unmet convergence page.
 CAPACITY_UNMET_CONVERGENCE_PATH = Path(
@@ -248,9 +262,21 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
     missing_leap_branches = _missing_leap_demand_branches(economy)
     template = filter_template_for_leap_demand_coverage(template, missing_leap_branches)
     series_config = json.loads(SERIES_CONFIG_PATH.read_text(encoding="utf-8"))
-    raw_df = load_common_esto_data(INPUT_DATA_PATH)
+    raw_df = load_common_esto_data(INPUT_DATA_PATH, wide_file_scope=WIDE_FILE_SCOPE)
     raw_df["economy"] = raw_df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
+    base_year = int(template.get("chart_generation", {}).get("base_year", 2022))
+    input_row_count = len(raw_df)
+    raw_df = filter_ninth_pre_base_year_data(
+        raw_df,
+        base_year=base_year,
+        include_pre_base_year_data=INCLUDE_NINTH_PRE_BASE_YEAR_DATA,
+    )
+    if len(raw_df) != input_row_count:
+        print(
+            f"Excluded {input_row_count - len(raw_df):,} NINTH rows before base year "
+            f"{base_year} (ESTO retained for pre-base-year data)."
+        )
     filtered_df = filter_common_esto_data(
         raw_df,
         comparison_scope=COMPARISON_SCOPE,
@@ -260,13 +286,14 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
     )
     visible_df = apply_visible_series(filtered_df, series_config.get("visible_series", []))
     visible_df = apply_sign_semantics(visible_df, template.get("sign_semantics"))
-    scope_filtered_df = filter_common_esto_data(
-        raw_df,
-        comparison_scope="__all_scopes__",
-        economy=economy,
-        min_year=MIN_YEAR,
-        max_year=MAX_YEAR,
-    )
+    # Keep all scopes only for scope-specific diagnostic pages. The main
+    # dashboard dataframe above is always restricted to one required scope.
+    scope_filtered_df = raw_df[raw_df["economy"].astype(str) == str(economy)].copy()
+    if MIN_YEAR is not None:
+        scope_filtered_df = scope_filtered_df[scope_filtered_df["year"] >= MIN_YEAR]
+    if MAX_YEAR is not None:
+        scope_filtered_df = scope_filtered_df[scope_filtered_df["year"] <= MAX_YEAR]
+    scope_filtered_df = scope_filtered_df.reset_index(drop=True)
     scope_visible_df = apply_visible_series(scope_filtered_df, series_config.get("visible_series", []))
     scope_visible_df = apply_sign_semantics(scope_visible_df, template.get("sign_semantics"))
     layout = build_output_layout(OUTPUT_ROOT, economy, clear_existing=CLEAR_EXISTING_OUTPUTS)
@@ -288,21 +315,21 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         enabled=INCLUDE_CAPACITY_UNMET_CONVERGENCE,
     )
     coverage_config = template.get("leap_demand_sector_coverage", {})
-    rendered_page_keys = {str(rule.get("page_key", "")) for rule in template.get("sector_pages", [])}
+    hidden_page_keys = set(coverage_config.get("_hidden_page_keys", []))
     aggregate_only_skipped = sorted(
-        set(coverage_config.get("page_leap_branches", {})) - rendered_page_keys
+        set(coverage_config.get("page_leap_branches", {})) & hidden_page_keys
     )
     always_skipped = sorted(
-        set(coverage_config.get("always_skip_page_keys", [])) - rendered_page_keys
+        set(coverage_config.get("always_skip_page_keys", [])) & hidden_page_keys
     )
     if aggregate_only_skipped:
         print(
-            f"Demand-sector pages skipped (no LEAP detail for {economy}, only 'All demand "
-            f"aggregated'): {', '.join(aggregate_only_skipped)}"
+            f"Demand-sector standalone pages hidden (no LEAP detail for {economy}, only 'All "
+            f"demand aggregated'; still included in total_demand): {', '.join(aggregate_only_skipped)}"
         )
     if always_skipped:
         print(
-            f"Sector pages skipped (no LEAP-to-ESTO mapping at all for {economy}): "
+            f"Sector pages hidden (no LEAP-to-ESTO mapping at all for {economy}): "
             f"{', '.join(always_skipped)}"
         )
     print(f"LEAP demand branches without detail for {economy}: {', '.join(missing_leap_branches) or 'none'}")

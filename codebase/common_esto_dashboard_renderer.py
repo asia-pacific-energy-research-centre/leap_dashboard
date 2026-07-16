@@ -436,6 +436,13 @@ def get_existing_flow_nodes(page_df: pd.DataFrame) -> pd.DataFrame:
     nodes["canonical_code"] = nodes["common_flow_code"].apply(canonical_code)
     nodes["depth"] = nodes["common_flow_code"].apply(code_depth)
     nodes["flow_name"] = nodes["common_flow_label"].apply(flow_name_without_code)
+    if "source_system" in page_df.columns:
+        label_sources = page_df.groupby("common_flow_label")["source_system"].agg(
+            lambda values: frozenset(str(value) for value in values)
+        )
+        nodes["source_systems"] = nodes["common_flow_label"].map(label_sources)
+    else:
+        nodes["source_systems"] = [frozenset({""})] * len(nodes)
     return nodes[nodes["canonical_code"] != ""].reset_index(drop=True)
 
 
@@ -451,12 +458,8 @@ def node_label_for_prefix(nodes: pd.DataFrame, prefix: str, fallback_name: str =
     return f"{prefix} {fallback_name}".strip()
 
 
-def frontier_flow_labels(nodes: pd.DataFrame, parent_prefix: str, target_level: int) -> list[str]:
-    """Return flow labels that form a non-double-counting frontier under a prefix."""
-    subtree = nodes[nodes["canonical_code"].astype(str).apply(lambda value: value == parent_prefix or value.startswith(parent_prefix + "."))].copy()
-    if subtree.empty:
-        return []
-
+def _frontier_labels_for_subtree(subtree: pd.DataFrame, target_level: int) -> list[str]:
+    """Return flow labels forming a non-double-counting frontier within one subtree."""
     exact_at_target = subtree[subtree["canonical_code"].apply(lambda value: len(str(value).split(".")) == target_level)].copy()
     selected_labels: list[str] = []
     covered_prefixes: list[str] = []
@@ -475,6 +478,44 @@ def frontier_flow_labels(nodes: pd.DataFrame, parent_prefix: str, target_level: 
     return sorted(set(selected_labels))
 
 
+def frontier_flow_labels(nodes: pd.DataFrame, parent_prefix: str, target_level: int) -> dict[str, list[str]]:
+    """Return, per source system, flow labels forming a non-double-counting frontier.
+
+    The frontier must be computed independently per source system because
+    sources decompose the same subtree differently: LEAP reports a combined
+    "09.01-09.02 Power sector" rollup, while NINTH/ESTO only report the
+    per-plant-type children (09.01.01 Electricity plants, ...). A rollup node
+    may only suppress descendant rows for sources that actually carry the
+    rollup - a shared frontier would silently drop the other sources'
+    descendant rows from the aggregate.
+    """
+    subtree = nodes[nodes["canonical_code"].astype(str).apply(lambda value: value == parent_prefix or value.startswith(parent_prefix + "."))].copy()
+    if subtree.empty:
+        return {}
+
+    sources = sorted({source for systems in subtree["source_systems"] for source in systems})
+    labels_by_source: dict[str, list[str]] = {}
+    for source in sources:
+        source_subtree = subtree[subtree["source_systems"].apply(lambda systems: source in systems)]
+        labels = _frontier_labels_for_subtree(source_subtree, target_level)
+        if labels:
+            labels_by_source[source] = labels
+    return labels_by_source
+
+
+def area_spec_rows(df: pd.DataFrame, area_spec: dict[str, object]) -> pd.DataFrame:
+    """Select the rows an area spec aggregates, honoring per-source frontiers."""
+    labels_by_source = area_spec.get("source_flow_labels_by_system") or {}
+    if labels_by_source and "source_system" in df.columns:
+        mask = pd.Series(False, index=df.index)
+        source_col = df["source_system"].astype(str)
+        for source, labels in labels_by_source.items():
+            mask = mask | ((source_col == source) & df["common_flow_label"].isin(labels))
+        return df[mask]
+    source_flow_labels = [str(value) for value in area_spec["source_flow_labels"]]
+    return df[df["common_flow_label"].isin(source_flow_labels)]
+
+
 def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, object]]:
     """Choose aggregate area charts from the flow hierarchy."""
     nodes = get_existing_flow_nodes(page_df)
@@ -489,14 +530,15 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
 
     specs: list[dict[str, object]] = []
     used_group_keys: set[tuple[int, str]] = set()
-    used_label_sets: set[frozenset[str]] = set()
+    used_label_sets: set[frozenset[tuple[str, str]]] = set()
     for level in range(1, level_count + 1):
         prefixes = sorted({code_prefix(code, level) for code in nodes["canonical_code"] if code_prefix(code, level)})
         for prefix in prefixes:
             group_key = (level, prefix)
             if group_key in used_group_keys:
                 continue
-            labels = frontier_flow_labels(nodes, prefix, level + 1 if level == 1 else level)
+            labels_by_source = frontier_flow_labels(nodes, prefix, level + 1 if level == 1 else level)
+            labels = sorted({label for source_labels in labels_by_source.values() for label in source_labels})
             if not labels:
                 continue
             # A prefix whose frontier resolves to the exact same leaf flows as an
@@ -504,7 +546,7 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
             # "10.01" card that both fall back to the single leaf "10.01.01" when
             # the intermediate codes have no data of their own). Skip it rather
             # than rendering two identical charts under different titles.
-            label_set = frozenset(labels)
+            label_set = frozenset((source, label) for source, source_labels in labels_by_source.items() for label in source_labels)
             if label_set in used_label_sets:
                 used_group_keys.add(group_key)
                 continue
@@ -515,6 +557,7 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
                     "aggregate_flow_prefix": prefix,
                     "aggregate_flow_label": label,
                     "source_flow_labels": labels,
+                    "source_flow_labels_by_system": labels_by_source,
                 }
             )
             used_group_keys.add(group_key)
@@ -565,8 +608,7 @@ def build_area_chart(
     only one is visible at a time and the client-side REF/TGT toggle can swap
     between them.
     """
-    source_flow_labels = [str(value) for value in area_spec["source_flow_labels"]]
-    chart_df = df[df["common_flow_label"].isin(source_flow_labels)].copy()
+    chart_df = area_spec_rows(df, area_spec).copy()
     chart_config = template.get("chart_generation", {})
     comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
     base_year = int(chart_config.get("base_year", 2023))
@@ -577,14 +619,9 @@ def build_area_chart(
         (chart_df["source_system"].astype(str).str.casefold() == comparison_source.casefold())
         & (chart_df["year"] <= base_year)
     ]
-    esto_keys = {
-        (str(source).casefold(), str(scenario).casefold())
-        for source, scenario in pre_base_df[["source_system", "scenario"]].drop_duplicates().itertuples(index=False, name=None)
-    }
 
     fig = go.Figure()
     trace_meta: list[dict] = []
-    scenario_area_keys: set[tuple[str, str]] = set()
     for scenario_name in ("Reference", "Target"):
         post_base_df = chart_df[
             (chart_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
@@ -594,7 +631,6 @@ def build_area_chart(
         area_df = pd.concat([pre_base_df, post_base_df], ignore_index=True)
         if area_df.empty:
             continue
-        scenario_area_keys.add((primary_source.casefold(), scenario_name.casefold()))
         tag = scenario_toggle_tag(primary_source, scenario_name)
         is_default = scenario_name.casefold() == default_scenario.casefold()
         group_df = (
@@ -625,11 +661,12 @@ def build_area_chart(
         chart_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum().sort_values(["source_system", "scenario", "year"])
     )
     for (source_system, scenario), group in total_df.groupby(["source_system", "scenario"], dropna=False):
-        # Datasets already drawn as stacked area colors above don't also get a
-        # redundant total line; other datasets (e.g. NINTH) still show as lines.
-        key = (str(source_system).casefold(), str(scenario).casefold())
-        if key in esto_keys or key in scenario_area_keys:
-            continue
+        # Every dataset gets an explicit signed-sum total line, including ones
+        # already drawn as stacked area colors above (ESTO, primary LEAP
+        # scenario): when a group's components have mixed signs, the stack is
+        # split into separate pos/neg stackgroups (see comment above), so the
+        # stack alone no longer shows a single net total line to compare
+        # against ESTO/NINTH totals.
         # Non-comparison-source totals (e.g. NINTH) are projections and should
         # only be drawn from base_year onward, not over the historical range
         # already covered by the ESTO-derived stacked area.
@@ -749,6 +786,112 @@ def _build_section_aggregate_charts(
     return charts, chart_rows, manifest_rows
 
 
+def _build_flow_group_aggregate_charts(
+    page_df: pd.DataFrame,
+    page_key: str,
+    page_label: str,
+    parent_flow_labels: set[str],
+    template: dict,
+    series_labels: dict[str, str],
+) -> tuple[dict[str, go.Figure], list[dict], list[dict]]:
+    """Build per-subsection aggregate area charts (by product, by sub-flow).
+
+    Mirrors _build_section_aggregate_charts but at the finer common_flow_label
+    granularity, so a subsection like "Electricity plants" opens with its own
+    totals rather than only per-product small multiples. Only sections that
+    actually split into multiple flow-group subsections (the same threshold
+    line_section_tree/_line_sections_html use for the h3 headings) get these
+    charts - a section that's already a single flow would just duplicate the
+    section-level aggregate. The by-sub-flow breakdown only appears when a
+    flow's rows actually resolve to more than one distinct component flow
+    (i.e. the common flow label is a rollup of several raw ESTO/LEAP flows).
+    """
+    charts: dict[str, go.Figure] = {}
+    chart_rows: list[dict] = []
+    manifest_rows: list[dict] = []
+
+    non_parent_df = page_df[~page_df["common_flow_label"].isin(parent_flow_labels)]
+    if non_parent_df.empty:
+        return charts, chart_rows, manifest_rows
+
+    chart_config = template.get("chart_generation", {})
+    primary_source = str(chart_config.get("primary_area_source_system", "LEAP"))
+    primary_scenario = str(chart_config.get("primary_area_scenario", "Target"))
+    comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
+    base_year = int(chart_config.get("base_year", 2023))
+    ninth_source = str(chart_config.get("ninth_source_system", "NINTH"))
+    suppression_threshold = float(chart_config.get("suppression_threshold", 1.0))
+
+    page_df = page_df.copy()
+    if "component_flow_name" in page_df.columns:
+        subflow_label = page_df["component_flow_name"].astype(str).str.strip()
+        subflow_label = subflow_label.where(subflow_label != "", page_df["common_flow_label"])
+    else:
+        subflow_label = page_df["common_flow_label"]
+    page_df["_subflow_label"] = subflow_label
+
+    flow_section = non_parent_df.groupby("common_flow_label")["_section_label"].agg(lambda s: s.mode().iloc[0])
+
+    ordered_flows: list[str] = []
+    for flow_label in non_parent_df["common_flow_label"]:
+        flow_label = str(flow_label)
+        if flow_label not in ordered_flows:
+            ordered_flows.append(flow_label)
+
+    flows_per_section: dict[str, int] = {}
+    for flow_label in ordered_flows:
+        section_label = str(flow_section.get(flow_label, page_label))
+        flows_per_section[section_label] = flows_per_section.get(section_label, 0) + 1
+
+    for flow_label in ordered_flows:
+        section_label = str(flow_section.get(flow_label, page_label))
+        if flows_per_section.get(section_label, 0) < 2:
+            continue
+        flow_df = page_df[page_df["common_flow_label"].astype(str) == flow_label]
+        if flow_df.empty:
+            continue
+        area_spec = {
+            "aggregate_flow_prefix": "",
+            "aggregate_flow_label": flow_label,
+            "source_flow_labels": [flow_label],
+        }
+        group_specs = [("common_product_label", "product", "Aggregate by product", flow_label, "All products")]
+        if flow_df["_subflow_label"].nunique(dropna=True) > 1:
+            group_specs.append(("_subflow_label", "subflow", "Aggregate by sub-flow", flow_label, "All sub-flows"))
+        for group_col, group_noun, title_prefix, manifest_flow, manifest_product in group_specs:
+            chart_key = f"chart__area__flowgroup__{safe_slug(page_key)}__{safe_slug(flow_label)}__{group_noun}"
+            metrics = compute_ranking_metrics(flow_df, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
+            suppressed = metrics["total_abs_value"] < suppression_threshold
+            manifest_rows.append({
+                "page_key": page_key,
+                "page_label": page_label,
+                "section_label": section_label,
+                "chart_type": "stacked_area",
+                "chart_key": chart_key,
+                "common_flow_label": manifest_flow,
+                "common_product_label": manifest_product,
+                "row_count": int(len(flow_df)),
+                "source_flow_labels": flow_label,
+                "sign_note": sign_note_for_chart(flow_df),
+                "suppressed": suppressed,
+                **metrics,
+            })
+            if suppressed:
+                continue
+            charts[chart_key] = build_area_chart(page_df, area_spec, series_labels, template, group_col=group_col, title_prefix=title_prefix)
+            chart_rows.append({
+                "chart_key": chart_key,
+                "chart_type": "stacked_area",
+                "title": f"{title_prefix}: {flow_label}",
+                "product_label": f"{title_prefix}: {flow_label}",
+                "section_label": section_label,
+                "flow_group_label": flow_label,
+                "datasets": chart_dataset_tokens(flow_df),
+                **metrics,
+            })
+    return charts, chart_rows, manifest_rows
+
+
 def compute_diff_series(
     pair_df: pd.DataFrame,
     primary_source: str = "LEAP",
@@ -817,6 +960,7 @@ def build_product_chart(
     proj_diff_by_scenario: dict[str, pd.Series] | None = None,
     primary_source: str = "LEAP",
     primary_scenario: str = "Target",
+    comparison_source: str = "ESTO",
     base_year: int | None = None,
 ) -> go.Figure:
     """Build a line chart for one common flow/product row.
@@ -828,6 +972,14 @@ def build_product_chart(
     fig = go.Figure()
     trace_meta: list[dict] = []
     for (source_system, scenario), group in chart_df.groupby(["source_system", "scenario"], dropna=False):
+        # Non-comparison sources (LEAP, NINTH) publish a full outlook time
+        # series including their own historical backcast (e.g. NINTH goes
+        # back to 1980), not just projections. Only ESTO should draw the
+        # historical range here; other sources are projection-only.
+        if base_year is not None and str(source_system).casefold() != comparison_source.casefold():
+            group = group[group["year"] > base_year]
+        if group.empty:
+            continue
         group = group.sort_values("year")
         label = series_label(group.iloc[0], series_labels)
         customdata = None
@@ -1018,11 +1170,12 @@ a:hover { text-decoration: underline; }
 .scenario-toggle-btn + .scenario-toggle-btn { border-left:1px solid #c5ccd3; }
 .scenario-toggle-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
 .dataset-filter {
-  display:flex;align-items:center;gap:6px 4px;flex-wrap:nowrap;
+  display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap;flex:0 0 auto;
+  width:max-content;max-width:max-content;
   font-size:12px;color:#4b5563;
 }
-.dataset-filter-label { font-weight:600;max-width:260px;line-height:1.2; }
-.dataset-filter-buttons { display:flex;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
+.dataset-filter-label { flex:0 0 260px;font-weight:600;width:260px;line-height:1.2;text-align:right; }
+.dataset-filter-buttons { display:flex;flex:0 0 auto;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
 .dataset-filter-btn {
   padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
 }
@@ -1467,7 +1620,7 @@ def _dashboard_switcher_html(dashboards: list[dict[str, str]], current_dashboard
 
     return (
         '<label class="dashboard-switcher">'
-        '<span>Dashboard</span>'
+        '<span>Economy</span>'
         f'<select data-dashboard-switcher aria-label="Switch dashboard">{"".join(options)}</select>'
         '</label>'
     )
@@ -2003,11 +2156,11 @@ def _build_td_sector_chart(
                 primary_source, scenario_name, True, "tfc" if is_tfec_excluded else "both"
             ))
 
-    # TFC comparison demand totals (non-LEAP visible series)
+    # TFC demand totals, incl. primary LEAP scenarios: the sector stack above
+    # is split into pos/neg stackgroups when sectors have mixed signs, so it
+    # no longer shows a single net total line on its own.
     tfc_totals = demand_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in tfc_totals.groupby(["source_system", "scenario"]):
-        if str(src).casefold() == primary_source.casefold():
-            continue
         lbl = series_label_from_values(src, scen, series_labels) + " (TFC)"
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
@@ -2020,8 +2173,6 @@ def _build_td_sector_chart(
     tfec_demand = demand_df[~demand_df["_page_key"].isin(tfec_exclude_keys)]
     tfec_totals = tfec_demand.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in tfec_totals.groupby(["source_system", "scenario"]):
-        if str(src).casefold() == primary_source.casefold():
-            continue
         lbl = series_label_from_values(src, scen, series_labels) + " (TFEC)"
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
@@ -2111,11 +2262,11 @@ def _build_td_fuel_chart(
             ))
             trace_meta.append(trace_meta_entry(primary_source, scenario_name, True))
 
-    # Comparison demand total lines
+    # Demand total lines, incl. primary LEAP scenarios (see note in
+    # _build_td_sector_chart on why the stacked fuel breakdown alone doesn't
+    # show a single net total when fuels have mixed signs).
     comp_totals = demand_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in comp_totals.groupby(["source_system", "scenario"]):
-        if str(src).casefold() == primary_source.casefold():
-            continue
         lbl = series_label_from_values(src, scen, series_labels) + " total (TFC)"
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
@@ -2200,11 +2351,11 @@ def _build_supply_stack_chart(
             ))
             trace_meta.append(trace_meta_entry(primary_source, scenario_name, True))
 
-    # Comparison supply total lines
+    # Supply total lines, incl. primary LEAP scenarios (see note in
+    # _build_td_sector_chart on why the stacked breakdown alone doesn't show
+    # a single net total when components have mixed signs).
     comp_totals = supply_detail_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in comp_totals.groupby(["source_system", "scenario"]):
-        if str(src).casefold() == primary_source.casefold():
-            continue
         lbl = series_label_from_values(src, scen, series_labels) + " supply total"
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
@@ -2588,6 +2739,13 @@ def _line_chart_manifest_and_rows(
     chart_rows.extend(section_chart_rows)
     manifest_rows.extend(section_manifest_rows)
 
+    flow_group_charts, flow_group_chart_rows, flow_group_manifest_rows = _build_flow_group_aggregate_charts(
+        page_df, page_key, page_label, parent_flow_labels, template, series_labels,
+    )
+    charts.update(flow_group_charts)
+    chart_rows.extend(flow_group_chart_rows)
+    manifest_rows.extend(flow_group_manifest_rows)
+
     pairs = page_df[["common_flow_label", "common_product_label"]].drop_duplicates().sort_values(["common_flow_label", "common_product_label"])
     for _, pair in pairs.iterrows():
         flow_label = pair["common_flow_label"]
@@ -2644,6 +2802,7 @@ def _line_chart_manifest_and_rows(
             proj_diff_by_scenario=proj_diff_by_scenario,
             primary_source=primary_source,
             primary_scenario=primary_scenario,
+            comparison_source=comparison_source,
             base_year=base_year,
         )
         chart_rows.append({
@@ -2798,8 +2957,13 @@ def render_dashboard(
             template.get("total_demand_page", {}).get("page_label", "Energy balance overview")
         )
         page_inventory.append({"page_key": "total_demand", "page_label": overview_label, "file": "total_demand.html"})
+    hidden_page_keys = {
+        str(key) for key in template.get("leap_demand_sector_coverage", {}).get("_hidden_page_keys", [])
+    }
     for _, meta in page_meta.iterrows():
         page_key = safe_slug(meta["_page_key"])
+        if page_key in hidden_page_keys:
+            continue
         page_label = str(meta["_page_label"])
         if not assigned_df[assigned_df["_page_key"] == meta["_page_key"]].empty:
             page_inventory.append({"page_key": page_key, "page_label": page_label, "file": f"{page_key}.html"})
@@ -2844,7 +3008,7 @@ def render_dashboard(
 
         for area_spec in pick_area_specs(page_df, template):
             chart_key = f"chart__area__{safe_slug(area_spec['aggregate_flow_prefix'])}__{safe_slug(area_spec['aggregate_flow_label'])}"
-            area_df = page_df[page_df["common_flow_label"].isin(area_spec["source_flow_labels"])]
+            area_df = area_spec_rows(page_df, area_spec)
             metrics = compute_ranking_metrics(area_df, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
             suppressed = metrics["total_abs_value"] < suppression_threshold
             manifest_rows.append({
@@ -2890,6 +3054,14 @@ def render_dashboard(
         chart_rows.extend(section_chart_rows)
         manifest_rows.extend(section_manifest_rows)
 
+        # Subsection aggregate charts: two per flow-group subsection (by product, by sub-flow).
+        flow_group_charts, flow_group_chart_rows, flow_group_manifest_rows = _build_flow_group_aggregate_charts(
+            page_df, page_key, page_label, parent_flow_labels, template, series_labels,
+        )
+        charts.update(flow_group_charts)
+        chart_rows.extend(flow_group_chart_rows)
+        manifest_rows.extend(flow_group_manifest_rows)
+
         pairs = page_df[["common_flow_label", "common_product_label"]].drop_duplicates().sort_values(["common_flow_label", "common_product_label"])
         for _, pair in pairs.iterrows():
             flow_label = pair["common_flow_label"]
@@ -2931,7 +3103,8 @@ def render_dashboard(
             charts[chart_key] = build_product_chart(
                 pair_rows, flow_label, product_label, series_labels,
                 hist_diff_by_scenario=hist_diff_by_scenario, proj_diff_by_scenario=proj_diff_by_scenario,
-                primary_source=primary_source, primary_scenario=primary_scenario, base_year=base_year,
+                primary_source=primary_source, primary_scenario=primary_scenario,
+                comparison_source=comparison_source, base_year=base_year,
             )
             chart_rows.append({
                 "chart_key": chart_key,
