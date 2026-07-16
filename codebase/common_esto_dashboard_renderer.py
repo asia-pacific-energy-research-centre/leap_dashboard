@@ -1242,7 +1242,10 @@ a:hover { text-decoration: underline; }
 .lazy-chart-plot.is-unloaded { background:#f8fafc; }
 .section-heading { margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d; }
 .subsection-heading { margin:14px 0 6px 12px;font-size:15px;font-weight:600;color:#4c1d70;padding-left:8px;border-left:3px solid #c69af0; }
-@media (max-width: 900px) { .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) {
+  .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:minmax(0, 1fr); }
+  .dashboard-updated { display:block;margin:4px 0 0 0;padding:0;border-left:0;white-space:normal; }
+}
 @media (max-width: 600px) {
   .header-side-controls { flex:1 1 100%;min-width:0;justify-content:flex-start; }
   .header-inline-controls { margin-left:0;flex-wrap:wrap;justify-content:flex-start;width:100%; }
