@@ -569,12 +569,50 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
 
 _WHITE_BACKGROUND_LAYOUT: dict[str, object] = {"paper_bgcolor": "white", "plot_bgcolor": "white"}
 
+# Keep comparison totals visually stable even when a chart has a different
+# number or ordering of stacked product traces. These colours are the
+# colour-blind-friendly Okabe-Ito blue, vermillion, and green.
+_TOTAL_SERIES_COLORS: dict[str, str] = {
+    "ESTO": "#0072B2",
+    "LEAP": "#D55E00",
+    "NINTH": "#009E73",
+    "9TH": "#009E73",
+}
+
+
+def _apply_total_series_chrome(fig: go.Figure) -> None:
+    """Give ESTO, LEAP, and 9th comparison total traces stable visual roles."""
+    for trace in fig.data:
+        trace_name = str(getattr(trace, "name", ""))
+        if not trace_name.casefold().endswith(" total"):
+            continue
+        source = next((key for key in _TOTAL_SERIES_COLORS if key.casefold() in trace_name.casefold()), None)
+        if source is None:
+            continue
+        color = _TOTAL_SERIES_COLORS[source]
+        trace.line.color = color
+        trace.line.width = max(float(trace.line.width or 0), 2.25)
+        if getattr(trace, "marker", None) is not None:
+            trace.marker.color = color
+
 
 def apply_chart_chrome(fig: go.Figure, base_year: int | None = None) -> go.Figure:
     """Apply the shared white background and base-year marker to a chart."""
     fig.update_layout(**_WHITE_BACKGROUND_LAYOUT)
     fig.update_xaxes(gridcolor="#e5e7eb", zerolinecolor="#e5e7eb")
     fig.update_yaxes(gridcolor="#e5e7eb", zerolinecolor="#e5e7eb")
+    fig.update_layout(
+        legend={
+            "font": {"size": 11},
+            "bgcolor": "rgba(255,255,255,0.84)",
+            "bordercolor": "rgba(148,163,184,0.45)",
+            "borderwidth": 1,
+            "itemclick": "toggle",
+            "itemdoubleclick": "toggleothers",
+            "tracegroupgap": 3,
+        }
+    )
+    _apply_total_series_chrome(fig)
     if base_year is not None:
         fig.add_vline(
             x=base_year,
