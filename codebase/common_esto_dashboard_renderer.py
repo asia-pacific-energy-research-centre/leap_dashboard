@@ -569,6 +569,34 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
 
 _WHITE_BACKGROUND_LAYOUT: dict[str, object] = {"paper_bgcolor": "white", "plot_bgcolor": "white"}
 
+# Dark and muted categorical colours that remain visible on white Plotly
+# backgrounds. In particular, avoid the default bright lime / neon greens:
+# those are difficult to distinguish both from the background and from nearby
+# stacked areas. The sequence is deliberately long because product charts
+# often contain many traces; colours repeat only after every distinct option.
+_PRODUCT_COLORWAY: list[str] = [
+    "#3B6FB6",  # blue
+    "#C65D28",  # burnt orange
+    "#7A5195",  # purple
+    "#B64C67",  # muted red
+    "#007C78",  # dark teal
+    "#9A6B2F",  # brown
+    "#5A7D3A",  # olive, not lime
+    "#8B5A9F",  # violet
+    "#3A7CA5",  # steel blue
+    "#A63D40",  # brick red
+    "#6E6E6E",  # neutral grey
+    "#9B7000",  # dark gold
+    "#00758A",  # blue teal
+    "#9D4E93",  # plum
+    "#8C564B",  # umber
+    "#486581",  # slate blue
+    "#A8465B",  # rose
+    "#2F855A",  # forest green
+    "#7B5E57",  # taupe
+    "#5B6C8F",  # blue grey
+]
+
 # Keep comparison totals visually stable even when a chart has a different
 # number or ordering of stacked product traces. These colours are the
 # colour-blind-friendly Okabe-Ito blue, vermillion, and green.
@@ -598,7 +626,7 @@ def _apply_total_series_chrome(fig: go.Figure) -> None:
 
 def apply_chart_chrome(fig: go.Figure, base_year: int | None = None) -> go.Figure:
     """Apply the shared white background and base-year marker to a chart."""
-    fig.update_layout(**_WHITE_BACKGROUND_LAYOUT)
+    fig.update_layout(**_WHITE_BACKGROUND_LAYOUT, colorway=_PRODUCT_COLORWAY)
     fig.update_xaxes(gridcolor="#e5e7eb", zerolinecolor="#e5e7eb")
     fig.update_yaxes(gridcolor="#e5e7eb", zerolinecolor="#e5e7eb")
     fig.update_layout(
