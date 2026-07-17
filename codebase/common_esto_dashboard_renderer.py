@@ -628,7 +628,11 @@ def apply_chart_chrome(fig: go.Figure, base_year: int | None = None) -> go.Figur
     """Apply the shared white background and base-year marker to a chart."""
     fig.update_layout(**_WHITE_BACKGROUND_LAYOUT, colorway=_PRODUCT_COLORWAY)
     fig.update_xaxes(gridcolor="#e5e7eb", zerolinecolor="#e5e7eb")
-    fig.update_yaxes(gridcolor="#e5e7eb", zerolinecolor="#e5e7eb")
+    fig.update_yaxes(
+        gridcolor="#e5e7eb",
+        zerolinecolor="#4b5563",
+        zerolinewidth=2.5,
+    )
     fig.update_layout(
         legend={
             "font": {"size": 11},
