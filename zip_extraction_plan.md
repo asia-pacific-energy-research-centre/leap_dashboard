@@ -277,6 +277,8 @@ zip assumptions. The current sequence is:
 3. Add remaining ranking and warning metrics to the chart manifest.
 4. Keep page-status evidence synchronized with reproducible renders.
 
+The deferred work is tracked in `docs/future_dashboard_backlog.md`.
+
 Sankey diagrams, new bespoke scope pages, automatic publishing after ordinary
 runs, and dashboard-owned mapping logic remain deferred unless explicitly
 reopened.
