@@ -11,7 +11,7 @@ from codebase.common_esto_dashboard_data import (
     filter_ninth_pre_base_year_data,
     load_common_esto_data,
 )
-from codebase.common_esto_dashboard_output_layout import build_output_layout
+from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
 from codebase.common_esto_dashboard_renderer import (
     apply_chart_chrome,
     assign_pages,
@@ -373,6 +373,26 @@ def test_weekly_common_esto_sample_fixture_is_present() -> None:
     assert fixture["comparison_scope"].nunique() >= 2
     assert fixture["common_flow_label"].nunique() >= 50
     assert fixture["common_product_label"].nunique() >= 50
+
+
+def test_publishing_copies_browser_bundles_but_not_qa_json(tmp_path: Path) -> None:
+    output_root = tmp_path / "outputs"
+    docs_root = tmp_path / "docs"
+    layout = build_output_layout(output_root, "20USA")
+    (layout["dashboards"] / "index.html").write_text("html", encoding="utf-8")
+    (layout["chart_bundles"] / "transport__charts.js").write_text("js", encoding="utf-8")
+    (layout["chart_bundles"] / "transport__charts.json").write_text("json", encoding="utf-8")
+    stale_json = docs_root / "20USA" / "chart_bundles" / "stale__charts.json"
+    stale_json.parent.mkdir(parents=True, exist_ok=True)
+    stale_json.write_text("stale", encoding="utf-8")
+
+    counts = publish_to_docs(layout, docs_root)
+
+    assert counts["chart_bundles"] == 1
+    assert (docs_root / "20USA" / "dashboards" / "index.html").exists()
+    assert (docs_root / "20USA" / "chart_bundles" / "transport__charts.js").exists()
+    assert not (docs_root / "20USA" / "chart_bundles" / "transport__charts.json").exists()
+    assert not stale_json.exists()
 
 
 def test_code_colors_resolve_by_code_not_display_name() -> None:

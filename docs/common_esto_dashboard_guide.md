@@ -160,8 +160,8 @@ To copy serving assets to GitHub Pages, set
 `COMMON_ESTO_UPDATE_DATA=1` only when intentionally refreshing upstream
 inputs. These are opt-in controls so ordinary fixture refreshes and render
 checks do not accidentally update `docs/`.
-Only `.html`, `.js`, and `.json` dashboard-serving files are copied to `docs/`;
-supporting CSVs remain in `outputs/`.
+Only `.html` and browser-serving `.js` files are copied to `docs/`; the JSON
+bundles remain in `outputs/` for readiness checks and local audit tooling.
 
 ## Smoke Tests
 

@@ -149,9 +149,9 @@ docs/<economy>/dashboards/
 docs/<economy>/chart_bundles/
 ```
 
-The current publishing helper copies HTML, JavaScript, and JSON chart-bundle
-assets. Do not delete JSON bundles until their role has been checked against
-the current renderer, browser code, tests, and published pages.
+The current publishing helper copies HTML and browser JavaScript chart-bundle
+assets. JSON chart bundles remain in ignored `outputs/` for readiness checks and
+local audit tooling; they are not duplicated into tracked `docs/`.
 
 Publishing is a deliberate release action. Before changing tracked `docs/`,
 run publication-readiness checks, inspect the intended economies, and ensure
@@ -325,7 +325,7 @@ history, preferences, and session files.
 This is not a dashboard input or output. It must not be pushed or retained in
 the repository.
 
-Required action:
+Completed action:
 
 1. Stop before pushing the current branch.
 2. Confirm that the profile is not needed for any dashboard workflow.
@@ -448,9 +448,10 @@ Required action:
    assets together.
 4. Verify stale bundles are removed and every HTML reference resolves.
 
-Do not delete either format as a file-only cleanup.
+Do not delete local JSON bundles from `outputs/`; they remain the canonical
+machine-readable input for readiness checks and audit tooling.
 
-Status: **pending; design decision required**.
+Status: **completed; docs publication keeps JS only and local QA retains JSON**.
 
 ### Finding G — old ignored dashboard trees remain locally: low risk
 

@@ -37,7 +37,6 @@ def publish_to_docs(layout: dict[str, Path], docs_root: Path) -> dict[str, int]:
     Copies only:
         dashboards/*.html      -> docs/<economy>/dashboards/
         chart_bundles/*.js     -> docs/<economy>/chart_bundles/
-        chart_bundles/*.json   -> docs/<economy>/chart_bundles/
 
     Supporting files (CSV, XLSX, page-assignment summaries, sign summaries,
     chart manifests) are never copied — they stay in outputs/ only.
@@ -50,20 +49,20 @@ def publish_to_docs(layout: dict[str, Path], docs_root: Path) -> dict[str, int]:
     """
     economy = layout["root"].name
     copy_specs = [
-        (layout["dashboards"],    docs_root / economy / "dashboards",    ["*.html"]),
-        (layout["chart_bundles"], docs_root / economy / "chart_bundles", ["*.js", "*.json"]),
+        (layout["dashboards"],    docs_root / economy / "dashboards",    ["*.html"], ["*.html"]),
+        (layout["chart_bundles"], docs_root / economy / "chart_bundles", ["*.js"], ["*.js", "*.json"]),
     ]
     counts: dict[str, int] = {}
-    for src_dir, dst_dir, patterns in copy_specs:
+    for src_dir, dst_dir, copy_patterns, cleanup_patterns in copy_specs:
         dst_dir.mkdir(parents=True, exist_ok=True)
         n = 0
         keep_names: set[str] = set()
-        for pattern in patterns:
+        for pattern in copy_patterns:
             for src_file in src_dir.glob(pattern):
                 shutil.copy2(src_file, dst_dir / src_file.name)
                 keep_names.add(src_file.name)
                 n += 1
-        for pattern in patterns:
+        for pattern in cleanup_patterns:
             for dst_file in dst_dir.glob(pattern):
                 if dst_file.name not in keep_names:
                     dst_file.unlink()

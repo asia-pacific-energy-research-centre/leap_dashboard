@@ -157,11 +157,14 @@ Each economy output includes:
 ```text
 dashboards/*.html
 chart_bundles/*.js
-chart_bundles/*.json
 supporting_files/chart_manifest.csv
 supporting_files/page_assignment_summary.csv
 supporting_files/sign_semantics_summary.csv
 ```
+
+The renderer also writes JSON chart bundles under `outputs/` for local
+publication-readiness and audit checks, but publication copies only the
+browser-consumed JavaScript bundles into tracked `docs/`.
 
 The manifest currently provides the ranking metrics:
 

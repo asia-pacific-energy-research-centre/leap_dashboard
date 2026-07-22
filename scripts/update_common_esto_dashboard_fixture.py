@@ -98,9 +98,11 @@ def write_economy_comparison_fixture(source_path: Path, destination_path: Path, 
     if missing_columns:
         raise ValueError(f"Source comparison file is missing fixture columns: {missing_columns}")
     representative = full_fixture[full_fixture["year"].isin(REPRESENTATIVE_YEARS)]
+    full_fixture["_abs_value"] = full_fixture["value"].abs()
     coverage = (
-        full_fixture.sort_values("year")
+        full_fixture.sort_values(["_abs_value", "year"], ascending=[False, True])
         .drop_duplicates(subset=COVERAGE_COLUMNS, keep="first")
+        .drop(columns=["_abs_value"])
     )
     compact_fixture = (
         pd.concat([representative, coverage], ignore_index=True)

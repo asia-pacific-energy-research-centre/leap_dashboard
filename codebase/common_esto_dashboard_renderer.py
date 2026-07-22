@@ -3041,7 +3041,7 @@ def _line_chart_manifest_and_rows(
         })
         if suppressed:
             continue
-        charts[chart_key] = build_product_chart(
+        chart_figure = build_product_chart(
             pair_rows,
             flow_label,
             product_label,
@@ -3053,6 +3053,13 @@ def _line_chart_manifest_and_rows(
             comparison_source=comparison_source,
             base_year=base_year,
         )
+        if not chart_figure.data:
+            # A row can exist only at the base year for a non-comparison
+            # source. Do not publish an empty chart placeholder; retain the
+            # manifest row as suppressed so the omission remains auditable.
+            manifest_rows[-1]["suppressed"] = True
+            continue
+        charts[chart_key] = chart_figure
         chart_rows.append({
             "chart_key": chart_key,
             "chart_type": "line",
@@ -3362,12 +3369,16 @@ def render_dashboard(
             })
             if suppressed:
                 continue
-            charts[chart_key] = build_product_chart(
+            chart_figure = build_product_chart(
                 pair_rows, flow_label, product_label, series_labels,
                 hist_diff_by_scenario=hist_diff_by_scenario, proj_diff_by_scenario=proj_diff_by_scenario,
                 primary_source=primary_source, primary_scenario=primary_scenario,
                 comparison_source=comparison_source, base_year=base_year,
             )
+            if not chart_figure.data:
+                manifest_rows[-1]["suppressed"] = True
+                continue
+            charts[chart_key] = chart_figure
             chart_rows.append({
                 "chart_key": chart_key,
                 "chart_type": "line",
