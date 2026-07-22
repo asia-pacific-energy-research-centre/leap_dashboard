@@ -526,6 +526,66 @@ def area_spec_rows(df: pd.DataFrame, area_spec: dict[str, object]) -> pd.DataFra
     return df[df["common_flow_label"].isin(source_flow_labels)]
 
 
+def _non_overlapping_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep one non-overlapping flow frontier for each source/scenario.
+
+    Common ESTO output can contain both an exact transformation row and a
+    generated boundary-adjusted row (for example, oil refineries including
+    own use).  Those rows are valid comparison views individually, but adding
+    them to one stacked aggregate double-counts the same components.  Prefer
+    the boundary-adjusted label when it is available, and otherwise prefer a
+    parent code over its child codes.
+    """
+    required = {"common_flow_code", "common_flow_label", "source_system"}
+    if df.empty or not required.issubset(df.columns):
+        return df
+
+    work = df.copy()
+    work["_flow_code"] = work["common_flow_code"].map(canonical_code)
+    work["_flow_name"] = (
+        work["common_flow_label"].map(flow_name_without_code)
+        .str.casefold()
+        .str.replace(" (including own use)", "", regex=False)
+        .str.strip()
+    )
+    work["_is_boundary_adjusted"] = work["common_flow_label"].astype(str).str.casefold().str.contains(
+        "including own use", regex=False
+    )
+    keep = pd.Series(True, index=work.index)
+
+    category_rows = work[["common_flow_label", "_flow_code", "_flow_name", "_is_boundary_adjusted"]].drop_duplicates()
+    replacements: dict[str, str] = {}
+    for flow_name, same_name in category_rows.groupby("_flow_name", dropna=False):
+        same_name = same_name.copy()
+        boundary_rows = same_name[same_name["_is_boundary_adjusted"]]
+        candidates = boundary_rows if not boundary_rows.empty else same_name
+        preferred = min(
+            candidates.to_dict("records"),
+            key=lambda row: (code_depth(row["_flow_code"]), str(row["_flow_code"]), str(row["common_flow_label"])),
+        )
+        preferred_code = str(preferred["_flow_code"])
+        preferred_label = str(preferred["common_flow_label"])
+        same_name_mask = work["_flow_name"] == flow_name
+        keep.loc[same_name_mask & (work["_flow_code"] != preferred_code)] = False
+        replacements.update({str(label): preferred_label for label in same_name["common_flow_label"]})
+
+    # If a parent flow and its child are both present, retain the parent in an
+    # aggregate-by-flow chart. Detail charts remain responsible for showing the
+    # child categories individually.
+    kept_categories = category_rows[category_rows["common_flow_label"].isin(replacements)]
+    for _, category in kept_categories.iterrows():
+        code = str(category["_flow_code"])
+        if code and any(
+            other != code and code_matches_prefix(code, other)
+            for other in kept_categories["_flow_code"].astype(str)
+        ):
+            keep.loc[keep & (work["_flow_code"] == code)] = False
+
+    result = work.loc[keep].copy()
+    result["common_flow_label"] = result["common_flow_label"].map(replacements).fillna(result["common_flow_label"])
+    return result.drop(columns=["_flow_code", "_flow_name", "_is_boundary_adjusted"])
+
+
 def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, object]]:
     """Choose aggregate area charts from the flow hierarchy."""
     nodes = get_existing_flow_nodes(page_df)
@@ -670,11 +730,19 @@ def color_for_code(code_or_label: object, axis: str) -> str:
 
 
 def _apply_code_colors(fig: go.Figure, axis: str) -> None:
-    """Give stacked traces a stable colour derived from their ESTO code."""
+    """Give traces stable colours, resolving configured colour collisions."""
+    used_colors: set[str] = set()
+    assigned_by_name: dict[str, str] = {}
     for trace in fig.data:
-        color = color_for_code(getattr(trace, "name", ""), axis)
+        trace_name = str(getattr(trace, "name", ""))
+        name_key = trace_name.casefold()
+        color = assigned_by_name.get(name_key, color_for_code(trace_name, axis))
         if not color:
             continue
+        if name_key not in assigned_by_name and color.casefold() in {value.casefold() for value in used_colors}:
+            color = next((candidate for candidate in _PRODUCT_COLORWAY if candidate.casefold() not in {value.casefold() for value in used_colors}), color)
+        assigned_by_name[name_key] = color
+        used_colors.add(color)
         if getattr(trace, "line", None) is not None:
             trace.line.color = color
         if getattr(trace, "fillcolor", None) is not None or getattr(trace, "stackgroup", None):
@@ -773,6 +841,8 @@ def build_area_chart(
     between them.
     """
     chart_df = area_spec_rows(df, area_spec).copy()
+    if "flow" in group_col:
+        chart_df = _non_overlapping_flow_rows(chart_df)
     chart_config = template.get("chart_generation", {})
     comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
     base_year = int(chart_config.get("base_year", 2023))

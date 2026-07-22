@@ -20,6 +20,7 @@ from codebase.common_esto_dashboard_renderer import (
     drop_excluded_flow_rows,
     render_dashboard,
     select_transformation_total_rows,
+    _non_overlapping_flow_rows,
 )
 
 
@@ -456,6 +457,43 @@ def test_stacked_traces_take_their_code_colour_and_totals_keep_theirs() -> None:
     assert fig.data[0].fillcolor == color_for_code("17 Electricity", "product")
     # The total line must keep its stable source colour, not a code colour.
     assert fig.data[1].line.color == "#0072B2"
+
+
+def test_aggregate_flow_rows_drop_nested_refinery_categories_per_source() -> None:
+    rows = pd.DataFrame([
+        {"common_flow_code": "09.07", "common_flow_label": "09.07 Oil refineries", "source_system": "ESTO", "scenario": "historical"},
+        {"common_flow_code": "10.01.11", "common_flow_label": "10.01.11 Oil refineries", "source_system": "ESTO", "scenario": "historical"},
+        {"common_flow_code": "09.07", "common_flow_label": "09.07 Oil refineries (including own use)", "source_system": "ESTO", "scenario": "historical"},
+        {"common_flow_code": "09.07", "common_flow_label": "09.07 Oil refineries", "source_system": "LEAP", "scenario": "Target"},
+    ])
+
+    filtered = _non_overlapping_flow_rows(rows)
+
+    assert set(filtered.loc[filtered["source_system"] == "ESTO", "common_flow_label"]) == {
+        "09.07 Oil refineries (including own use)"
+    }
+    assert set(filtered.loc[filtered["source_system"] == "LEAP", "common_flow_label"]) == {
+        "09.07 Oil refineries (including own use)"
+    }
+
+
+def test_chart_chrome_resolves_duplicate_configured_category_colours() -> None:
+    import plotly.graph_objects as go
+    from codebase.common_esto_dashboard_renderer import load_code_colors
+
+    product_colors = load_code_colors()["product"]
+    labels_by_color: dict[str, list[str]] = {}
+    for code, color in product_colors.items():
+        labels_by_color.setdefault(color.casefold(), []).append(code)
+    duplicate_codes = next(values for values in labels_by_color.values() if len(values) > 1)
+
+    fig = go.Figure([
+        go.Scatter(x=[2020], y=[1.0], stackgroup="s", name=duplicate_codes[0]),
+        go.Scatter(x=[2020], y=[2.0], stackgroup="s", name=duplicate_codes[1]),
+    ])
+    apply_chart_chrome(fig, base_year=None, code_axis="product")
+
+    assert fig.data[0].fillcolor != fig.data[1].fillcolor
 
 
 def test_all_scopes_sentinel_keeps_every_scope_but_still_filters_economy_and_year() -> None:
