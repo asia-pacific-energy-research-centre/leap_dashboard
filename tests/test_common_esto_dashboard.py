@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 from codebase.common_esto_dashboard_data import (
+    ALL_SCOPES,
     DEFAULT_WIDE_FILE_SCOPE,
     apply_sign_semantics,
     filter_common_esto_data,
@@ -12,7 +13,10 @@ from codebase.common_esto_dashboard_data import (
 )
 from codebase.common_esto_dashboard_output_layout import build_output_layout
 from codebase.common_esto_dashboard_renderer import (
+    apply_chart_chrome,
     assign_pages,
+    color_for_code,
+    color_for_plotting_name,
     drop_excluded_flow_rows,
     render_dashboard,
     select_transformation_total_rows,
@@ -364,3 +368,103 @@ def test_weekly_common_esto_sample_fixture_is_present() -> None:
     fixture_dir = REPO_ROOT / "tests" / "fixtures" / "common_esto_dashboard"
     assert (fixture_dir / "common_esto_comparison_data_sample.csv").exists()
     assert (fixture_dir / "common_esto_rows.csv").exists()
+
+
+def test_code_colors_resolve_by_code_not_display_name() -> None:
+    # A rolled-up row keeps the first component's name but spans several codes;
+    # the colour must follow the code span, not the name it happens to carry.
+    assert color_for_code("01.02-01.04 Other bituminous coal", "product") == color_for_code("01.02", "product")
+    # A renamed label with the same code keeps its colour.
+    assert color_for_code("07.99 Anything At All", "product") == color_for_code("07.99 PetProd nonspecified", "product")
+
+
+def test_code_colors_walk_up_to_the_nearest_mapped_ancestor() -> None:
+    # An unmapped sub-code inherits its family colour rather than falling through.
+    assert color_for_code("10.99 Some New Hydro Split", "product") == color_for_code("10 Hydro", "product")
+    assert color_for_code("14.03.99 New Subsector", "flow") == color_for_code("14.03 Manufacturing", "flow")
+
+
+def test_code_colors_keep_product_and_flow_namespaces_separate() -> None:
+    # Product 16 is Others; flow 16.01 is Commercial and public services.
+    assert color_for_code("16 Others", "product") != color_for_code("16.01 Commercial and public services", "flow")
+
+
+def test_code_colors_return_empty_for_unmapped_and_uncoded_labels() -> None:
+    assert color_for_code("ESTO Historical total", "product") == ""
+    assert color_for_code("", "product") == ""
+
+
+def test_archived_plotting_catalogue_is_used_for_new_label_fallbacks() -> None:
+    assert color_for_plotting_name("electricity", "product") == "#FFD757"
+    assert color_for_code("99 Electricity", "product") == "#FFD757"
+    assert color_for_code("99 Power_input", "flow") == "#00B9CC"
+    assert color_for_plotting_name("Coal gasification production", "flow") == "#000001"
+
+
+def test_archived_plotting_catalogue_records_mapping_coverage() -> None:
+    colors_path = REPO_ROOT / "config" / "common_esto_dashboard" / "code_colors.json"
+    colors = json.loads(colors_path.read_text(encoding="utf-8"))
+    assert colors["_color_source"].endswith("master_config 9th visualisation.xlsx, colors sheet")
+    assert colors["_plotting_color_coverage"]["product"]["mapped"] > 0
+    assert colors["_plotting_color_coverage"]["flow"]["mapped"] > 0
+    assert colors["_plotting_color_coverage"]["capacity"]["mapped"] > 0
+
+
+def test_every_common_esto_label_in_the_sample_resolves_to_a_colour() -> None:
+    fixture = REPO_ROOT / "tests" / "fixtures" / "common_esto_dashboard" / "common_esto_comparison_data_sample.csv"
+    df = pd.read_csv(fixture, low_memory=False)
+    for axis, column in (("product", "common_product_label"), ("flow", "common_flow_label")):
+        if column not in df.columns:
+            continue
+        unmapped = sorted({str(v) for v in df[column].dropna().unique() if not color_for_code(v, axis)})
+        assert not unmapped, f"unmapped {axis} labels: {unmapped}"
+
+
+def test_stacked_traces_take_their_code_colour_and_totals_keep_theirs() -> None:
+    import plotly.graph_objects as go
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=[2020], y=[1.0], stackgroup="s", name="17 Electricity"))
+    fig.add_trace(go.Scatter(x=[2020], y=[2.0], mode="lines+markers", name="ESTO Historical total"))
+    apply_chart_chrome(fig, base_year=None, code_axis="product")
+
+    assert fig.data[0].fillcolor == color_for_code("17 Electricity", "product")
+    # The total line must keep its stable source colour, not a code colour.
+    assert fig.data[1].line.color == "#0072B2"
+
+
+def test_all_scopes_sentinel_keeps_every_scope_but_still_filters_economy_and_year() -> None:
+    df = pd.DataFrame([
+        {"economy": "20USA", "comparison_scope": "esto_leap", "year": 2020, "value": 1.0},
+        {"economy": "20USA", "comparison_scope": "esto_leap_ninth", "year": 2020, "value": 2.0},
+        {"economy": "20USA", "comparison_scope": "esto_leap_ninth", "year": 1990, "value": 3.0},
+        {"economy": "02BD", "comparison_scope": "esto_leap_ninth", "year": 2020, "value": 4.0},
+    ])
+
+    out = filter_common_esto_data(df, comparison_scope=ALL_SCOPES, economy="20USA", min_year=2010, max_year=2060)
+
+    assert sorted(out["comparison_scope"].unique()) == ["esto_leap", "esto_leap_ninth"]
+    assert set(out["economy"]) == {"20USA"}
+    assert set(out["year"]) == {2020}
+
+
+def test_all_scopes_sentinel_still_requires_the_scope_column() -> None:
+    df = pd.DataFrame([{"economy": "20USA", "year": 2020}])
+
+    try:
+        filter_common_esto_data(df, comparison_scope=ALL_SCOPES, economy="20USA")
+    except ValueError as exc:
+        assert "comparison_scope" in str(exc)
+    else:
+        raise AssertionError("Missing comparison_scope must raise ValueError even for ALL_SCOPES")
+
+
+def test_configured_balance_flows_are_assigned_to_energy_balance_overview() -> None:
+    fixture = REPO_ROOT / "tests" / "fixtures" / "common_esto_dashboard" / "common_esto_rows.csv"
+    df = pd.read_csv(fixture, low_memory=False)
+    template = json.loads((REPO_ROOT / "config" / "common_esto_dashboard" / "common_esto_dashboard_template.json").read_text(encoding="utf-8"))
+    assigned = assign_pages(df, template["sector_pages"])
+    codes = set(template["total_demand_page"]["overview_flow_codes"])
+    mask = assigned["common_flow_code"].astype(str).isin(codes)
+    assigned.loc[mask, "_page_key"] = "total_demand"
+    assert set(assigned.loc[mask, "_page_key"]) == {"total_demand"}

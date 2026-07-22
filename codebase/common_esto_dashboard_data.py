@@ -20,6 +20,13 @@ DEFAULT_COMPARISON_SCOPE = "esto_leap_ninth"
 # those series. The loader selects exactly one file scope; callers may choose a
 # different one in future (e.g. "esto_leap").
 DEFAULT_WIDE_FILE_SCOPE = "esto_leap_ninth"
+
+# Sentinel for ``filter_common_esto_data``: keep every comparison scope instead
+# of selecting one. Only the alternate-scope diagnostic pages need this, since
+# they compare scopes against each other. It must never reach a chart that sums
+# values: scenarios shared between scopes are byte-identical, so an unfiltered
+# frame double-counts them (see DEFAULT_WIDE_FILE_SCOPE above).
+ALL_SCOPES = "__all_scopes__"
 ID_COLUMNS_WIDE = ["economy", "scenario", "product", "flow"]
 
 REQUIRED_COLUMNS = [
@@ -355,20 +362,25 @@ def filter_common_esto_data(
     min_year: int | None = None,
     max_year: int | None = None,
 ) -> pd.DataFrame:
-    """Filter common ESTO data to the dashboard scope."""
+    """Filter common ESTO data to the dashboard scope.
+
+    Pass ``ALL_SCOPES`` to keep every scope; see the sentinel's note on why that
+    frame must not be charted directly.
+    """
     out = df[(df["economy"].astype(str) == str(economy))].copy()
     if "comparison_scope" not in out.columns:
         raise ValueError(
             "Common ESTO data is missing the required 'comparison_scope' column."
         )
     available_scopes = sorted(set(out["comparison_scope"].astype(str)))
-    if comparison_scope not in available_scopes:
-        raise ValueError(
-            f"Common ESTO data does not contain requested comparison scope "
-            f"{comparison_scope!r} for economy {economy!r}. "
-            f"Available scopes: {available_scopes}"
-        )
-    out = out[out["comparison_scope"].astype(str) == str(comparison_scope)].copy()
+    if comparison_scope != ALL_SCOPES:
+        if comparison_scope not in available_scopes:
+            raise ValueError(
+                f"Common ESTO data does not contain requested comparison scope "
+                f"{comparison_scope!r} for economy {economy!r}. "
+                f"Available scopes: {available_scopes}"
+            )
+        out = out[out["comparison_scope"].astype(str) == str(comparison_scope)].copy()
     if min_year is not None:
         out = out[out["year"] >= min_year].copy()
     if max_year is not None:

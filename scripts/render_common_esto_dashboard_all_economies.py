@@ -20,6 +20,7 @@ if str(MODULE_ROOT) not in sys.path:
     sys.path.insert(0, str(MODULE_ROOT))
 
 from common_esto_dashboard_data import (  # noqa: E402
+    ALL_SCOPES,
     apply_sign_semantics,
     apply_visible_series,
     build_sign_semantics_summary,
@@ -56,7 +57,7 @@ SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
 OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
 SUMMARY_PATH = OUTPUT_ROOT / "render_summary.csv"
 
-COMPARISON_SCOPE = "leap_vs_esto_vs_ninth"
+COMPARISON_SCOPE = os.getenv("COMMON_ESTO_COMPARISON_SCOPE", "esto_leap_ninth")
 WIDE_FILE_SCOPE = os.getenv("COMMON_ESTO_WIDE_FILE_SCOPE", "esto_leap_ninth")
 MIN_YEAR = 2010
 MAX_YEAR = 2060
@@ -165,7 +166,7 @@ def _render_one_economy(
         visible_df = apply_sign_semantics(visible_df, template.get("sign_semantics"))
         scope_filtered_df = filter_common_esto_data(
             raw_df,
-            comparison_scope="__all_scopes__",
+            comparison_scope=ALL_SCOPES,
             economy=economy,
             min_year=MIN_YEAR,
             max_year=MAX_YEAR,

@@ -8,7 +8,7 @@
 #   (e.g. "20_USA,02_BD"). You can also set ECONOMIES directly in this file
 #   as either a string ("20_USA") or list (["20_USA", "02_BD"]).
 # COMMON_ESTO_COMPARISON_SCOPE
-#   Comparison scope filter (default: leap_vs_esto_vs_ninth).
+#   Comparison scope filter (default: esto_leap_ninth).
 # COMMON_ESTO_UPDATE_DATA
 #   Boolean toggle for upstream data refresh before rendering.
 #   When False, dashboard input files are reused as-is and are NOT refreshed.

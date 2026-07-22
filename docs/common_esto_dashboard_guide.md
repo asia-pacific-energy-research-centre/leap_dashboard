@@ -100,7 +100,7 @@ variables:
 $env:COMMON_ESTO_INPUT_DATA_PATH = "C:\path\to\common_esto_comparison_data.csv"
 $env:COMMON_ESTO_ROWS_PATH = "C:\path\to\common_esto_rows.csv"
 $env:COMMON_ESTO_ECONOMY = "20_USA"
-$env:COMMON_ESTO_COMPARISON_SCOPE = "leap_vs_esto_vs_ninth"
+$env:COMMON_ESTO_COMPARISON_SCOPE = "esto_leap_ninth"
 C:\Users\Work\miniconda3\python.exe codebase\common_esto_dashboard_workflow.py
 ```
 

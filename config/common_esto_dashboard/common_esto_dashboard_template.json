@@ -1,6 +1,6 @@
 {
   "title": "Common ESTO Comparison Dashboard",
-  "default_comparison_scope": "leap_vs_esto_vs_ninth",
+  "default_comparison_scope": "esto_leap_ninth",
   "dashboard_mode": "auto_tree",
   "default_chart_type": "line",
   "excluded_flow_code_prefixes": ["06", "11", "18", "19"],
@@ -202,6 +202,7 @@
   "total_demand_page": {
     "enabled": true,
     "page_label": "Energy balance overview",
+    "overview_flow_codes": ["07", "12", "13"],
     "demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"],
     "supply_codes": ["01", "02", "03"],
     "tfec_exclude_page_keys": ["non_energy"],

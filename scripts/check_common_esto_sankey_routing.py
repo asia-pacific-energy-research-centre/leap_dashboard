@@ -34,7 +34,7 @@ ROUTING_TABLE_PATH = _resolve("config/common_esto_dashboard/sankey_routing_table
 OUTPUT_DIR = _resolve("outputs/common_esto_dashboard/sankey_routing_qa")
 
 ECONOMY = "20_USA"
-COMPARISON_SCOPE = "leap_vs_esto_vs_ninth"
+COMPARISON_SCOPE = "esto_leap_ninth"
 MIN_YEAR = 1990
 MAX_YEAR = 2060
 RUN_SANKEY_ROUTING_QA = True

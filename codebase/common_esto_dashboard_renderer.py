@@ -4,6 +4,7 @@
 #%%
 import json
 import re
+from functools import lru_cache
 from html import escape
 from pathlib import Path
 
@@ -241,6 +242,15 @@ def code_expression_matches_prefix(code_or_label: object, prefix: str) -> bool:
 def code_expression_matches_any_prefix(code_or_label: object, prefixes: list[object]) -> bool:
     """Return True when a code expression matches any configured prefix."""
     return any(code_expression_matches_prefix(code_or_label, str(prefix)) for prefix in prefixes)
+
+
+def code_axis_for_group_col(group_col: str) -> str | None:
+    """Return the colour-map axis for a grouping column, or None if not code-named."""
+    if "product" in group_col:
+        return "product"
+    if "flow" in group_col:
+        return "flow"
+    return None
 
 
 def flow_name_without_code(flow_label: object) -> str:
@@ -597,6 +607,80 @@ _PRODUCT_COLORWAY: list[str] = [
     "#5B6C8F",  # blue grey
 ]
 
+CODE_COLORS_PATH = Path(__file__).resolve().parents[1] / "config" / "common_esto_dashboard" / "code_colors.json"
+
+
+@lru_cache(maxsize=1)
+def load_code_colors() -> dict[str, dict[str, str]]:
+    """Load the per-axis ESTO code colour map, tolerating an absent config."""
+    if not CODE_COLORS_PATH.exists():
+        return {"product": {}, "flow": {}, "plotting": {}}
+    payload = load_json(CODE_COLORS_PATH)
+    return {
+        "product": dict(payload.get("product", {})),
+        "flow": dict(payload.get("flow", {})),
+        "plotting": {
+            axis: dict(values)
+            for axis, values in dict(payload.get("plotting", {})).items()
+            if isinstance(values, dict)
+        },
+        "source": dict(payload.get("_source_plotting_colors", {})),
+    }
+
+
+def color_for_plotting_name(name: object, axis: str) -> str:
+    """Resolve a workbook plotting category colour case-insensitively."""
+    text = str(name or "").strip().casefold()
+    if not text:
+        return ""
+    axis_color = next(
+        (color for label, color in load_code_colors().get("plotting", {}).get(axis, {}).items()
+         if str(label).casefold() == text),
+        "",
+    )
+    if axis_color:
+        return axis_color
+    return next(
+        (color for label, color in load_code_colors().get("source", {}).items()
+         if str(label).casefold() == text),
+        "",
+    )
+
+
+def color_for_code(code_or_label: object, axis: str) -> str:
+    """Resolve a common ESTO label or code to its axis colour, or "" if unmapped.
+
+    Colours are keyed by code rather than display name because a common label
+    takes its name from the first component of its partition: a rollup change
+    or a label override rewrites the name while the code span stays put. The
+    lookup uses the first code of the expression (07.12-07.17 -> 07.12) and
+    walks up the hierarchy, so an unseen sub-code inherits its family colour.
+    """
+    colors = load_code_colors().get(axis, {})
+    code = canonical_code(code_or_label)
+    while code:
+        if code in colors:
+            return colors[code]
+        if "." not in code:
+            break
+        code = code.rsplit(".", 1)[0]
+    text = str(code_or_label or "").strip()
+    label = text.split(maxsplit=1)[1] if " " in text else ""
+    return color_for_plotting_name(label, axis)
+
+
+def _apply_code_colors(fig: go.Figure, axis: str) -> None:
+    """Give stacked traces a stable colour derived from their ESTO code."""
+    for trace in fig.data:
+        color = color_for_code(getattr(trace, "name", ""), axis)
+        if not color:
+            continue
+        if getattr(trace, "line", None) is not None:
+            trace.line.color = color
+        if getattr(trace, "fillcolor", None) is not None or getattr(trace, "stackgroup", None):
+            trace.fillcolor = color
+
+
 # Keep comparison totals visually stable even when a chart has a different
 # number or ordering of stacked product traces. These colours are the
 # colour-blind-friendly Okabe-Ito blue, vermillion, and green.
@@ -624,8 +708,14 @@ def _apply_total_series_chrome(fig: go.Figure) -> None:
             trace.marker.color = color
 
 
-def apply_chart_chrome(fig: go.Figure, base_year: int | None = None) -> go.Figure:
-    """Apply the shared white background and base-year marker to a chart."""
+def apply_chart_chrome(fig: go.Figure, base_year: int | None = None, code_axis: str | None = None) -> go.Figure:
+    """Apply the shared white background and base-year marker to a chart.
+
+    Pass code_axis ("product"/"flow") when the stacked traces are named with
+    common ESTO labels, so they take their colour from the code map instead of
+    the positional colorway. The colorway stays as the fallback for traces the
+    map does not cover.
+    """
     fig.update_layout(**_WHITE_BACKGROUND_LAYOUT, colorway=_PRODUCT_COLORWAY)
     fig.update_xaxes(gridcolor="#e5e7eb", zerolinecolor="#e5e7eb")
     fig.update_yaxes(
@@ -644,6 +734,10 @@ def apply_chart_chrome(fig: go.Figure, base_year: int | None = None) -> go.Figur
             "tracegroupgap": 3,
         }
     )
+    if code_axis:
+        _apply_code_colors(fig, code_axis)
+    # Runs after the code colours so comparison total lines keep their stable
+    # source colour even when their name parses as a code expression.
     _apply_total_series_chrome(fig)
     if base_year is not None:
         fig.add_vline(
@@ -765,7 +859,7 @@ def build_area_chart(
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={"trace_meta": trace_meta},
     )
-    apply_chart_chrome(fig, base_year)
+    apply_chart_chrome(fig, base_year, code_axis=code_axis_for_group_col(group_col))
     return fig
 
 
@@ -2368,7 +2462,7 @@ def _build_td_fuel_chart(
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={"trace_meta": trace_meta},
     )
-    apply_chart_chrome(fig, base_year)
+    apply_chart_chrome(fig, base_year, code_axis="product")
     return fig
 
 
@@ -2457,7 +2551,7 @@ def _build_supply_stack_chart(
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={"trace_meta": trace_meta},
     )
-    apply_chart_chrome(fig, base_year)
+    apply_chart_chrome(fig, base_year, code_axis=code_axis_for_group_col(group_col))
     return fig
 
 
@@ -2539,6 +2633,41 @@ def _build_transformation_total_chart(
     return fig
 
 
+def _build_balance_flow_total_chart(
+    balance_df: pd.DataFrame,
+    flow_label: str,
+    series_labels: dict[str, str],
+    base_year: int | None = None,
+) -> go.Figure:
+    """Build a signed total line for one top-level energy-balance flow."""
+    fig = go.Figure()
+    trace_meta: list[dict] = []
+    totals = balance_df.groupby(
+        ["source_system", "scenario", "year"], as_index=False
+    )["value"].sum()
+    for (source_system, scenario), group in totals.groupby(["source_system", "scenario"]):
+        label = series_label_from_values(source_system, scenario, series_labels)
+        ordered = group.sort_values("year")
+        fig.add_trace(go.Scatter(
+            x=ordered["year"],
+            y=ordered["value"],
+            mode="lines+markers",
+            name=label,
+            hovertemplate="%{x}<br>Signed value: %{y:,.2f} PJ<extra>" + escape(label) + "</extra>",
+        ))
+        trace_meta.append(trace_meta_entry(source_system, scenario, True))
+    fig.update_layout(
+        title=flow_label,
+        xaxis_title="Year",
+        yaxis_title="Signed energy balance (PJ)",
+        margin={"l": 64, "r": 28, "t": 84, "b": 160},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
+        meta={"trace_meta": trace_meta},
+    )
+    apply_chart_chrome(fig, base_year)
+    return fig
+
+
 def build_total_demand_page(
     assigned_df: pd.DataFrame,
     template: dict,
@@ -2605,6 +2734,12 @@ def build_total_demand_page(
     demand_df = assigned_df[assigned_df["_page_key"].isin(demand_page_keys)].copy()
     if demand_df.empty:
         return [], None
+
+    overview_flow_codes = [str(code) for code in config.get("overview_flow_codes", [])]
+    overview_flow_df = assigned_df[
+        assigned_df["_page_key"].eq("total_demand")
+        & assigned_df["common_flow_code"].astype(str).isin(overview_flow_codes)
+    ].copy()
 
     supply_detail_mask = assigned_df["common_flow_code"].apply(
         lambda c: code_expression_matches_any_prefix(c, supply_codes)
@@ -2727,6 +2862,46 @@ def build_total_demand_page(
                 "diff_hist_json": "",
                 "diff_proj_json": "",
             })
+
+    for flow_code in overview_flow_codes:
+        flow_df = overview_flow_df[overview_flow_df["common_flow_code"].astype(str) == flow_code]
+        if flow_df.empty:
+            continue
+        flow_label = str(flow_df["common_flow_label"].mode().iloc[0])
+        chart_key = f"chart__line__total_demand__{safe_slug(flow_code)}"
+        charts[chart_key] = _build_balance_flow_total_chart(
+            flow_df, flow_label, series_labels, base_year=base_year
+        )
+        total_abs = float(flow_df["value"].abs().sum())
+        chart_rows.append({
+            "chart_key": chart_key,
+            "chart_type": "line",
+            "title": flow_label,
+            "product_label": flow_label,
+            "section_label": "Energy balance totals",
+            "total_abs_value": total_abs,
+            "abs_diff": 0.0,
+            "pct_diff": 0.0,
+            "datasets": chart_dataset_tokens(flow_df),
+        })
+        manifest_rows.append({
+            "page_key": "total_demand",
+            "page_label": page_label,
+            "section_label": "Energy balance totals",
+            "chart_type": "line",
+            "chart_key": chart_key,
+            "common_flow_label": flow_label,
+            "common_product_label": "All products",
+            "row_count": int(len(flow_df)),
+            "source_flow_labels": flow_label,
+            "sign_note": "Signed total across all products.",
+            "suppressed": False,
+            "total_abs_value": total_abs,
+            "abs_diff": 0.0,
+            "pct_diff": 0.0,
+            "diff_hist_json": "",
+            "diff_proj_json": "",
+        })
 
     bundle_name = "total_demand__charts.json"
     write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
@@ -3018,6 +3193,18 @@ def render_dashboard(
         scope_df = drop_esto_post_base_year_rows(scope_df, comparison_source, base_year)
         scope_df = drop_excluded_flow_rows(scope_df, excluded_flow_code_prefixes)
     assigned_df = assign_pages(df, page_rules)
+    overview_flow_codes = {
+        str(code) for code in template.get("total_demand_page", {}).get("overview_flow_codes", [])
+    }
+    if overview_flow_codes:
+        overview_mask = assigned_df["common_flow_code"].astype(str).isin(overview_flow_codes)
+        assigned_df.loc[overview_mask, "_page_key"] = "total_demand"
+        assigned_df.loc[overview_mask, "_page_label"] = str(
+            template.get("total_demand_page", {}).get("page_label", "Energy balance overview")
+        )
+        assigned_df.loc[overview_mask, "_section_key"] = "total_demand"
+        assigned_df.loc[overview_mask, "_section_label"] = "Energy balance totals"
+        assigned_df.loc[overview_mask, "_page_rule_note"] = "Configured top-level balance flow shown on the Energy balance overview page."
     page_summary_df = build_page_assignment_summary(assigned_df)
     page_summary_df.to_csv(layout["supporting"] / "page_assignment_summary.csv", index=False)
 
@@ -3035,6 +3222,8 @@ def render_dashboard(
     }
     for _, meta in page_meta.iterrows():
         page_key = safe_slug(meta["_page_key"])
+        if page_key == "total_demand":
+            continue
         if page_key in hidden_page_keys:
             continue
         page_label = str(meta["_page_label"])

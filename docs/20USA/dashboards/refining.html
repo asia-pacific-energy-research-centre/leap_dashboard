@@ -159,7 +159,10 @@ a:hover { text-decoration: underline; }
 .lazy-chart-plot.is-unloaded { background:#f8fafc; }
 .section-heading { margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d; }
 .subsection-heading { margin:14px 0 6px 12px;font-size:15px;font-weight:600;color:#4c1d70;padding-left:8px;border-left:3px solid #c69af0; }
-@media (max-width: 900px) { .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) {
+  .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:minmax(0, 1fr); }
+  .dashboard-updated { display:block;margin:4px 0 0 0;padding:0;border-left:0;white-space:normal; }
+}
 @media (max-width: 600px) {
   .header-side-controls { flex:1 1 100%;min-width:0;justify-content:flex-start; }
   .header-inline-controls { margin-left:0;flex-wrap:wrap;justify-content:flex-start;width:100%; }
@@ -176,7 +179,7 @@ a:hover { text-decoration: underline; }
       <div class="header-main-row">
         <div style="min-width:220px;flex:1 1 320px;">
           <h1 style="margin:0;font-size:24px;line-height:1.15;">Refining</h1>
-          <div class="dashboard-context">Economy: <strong>United States</strong><span class="dashboard-updated">Updated: 2026-07-17 00:26 Tokyo Standard Time</span></div>
+          <div class="dashboard-context">Economy: <strong>United States</strong><span class="dashboard-updated">Updated: 2026-07-17 15:08 Tokyo Standard Time</span></div>
         </div>
         <div class="header-side-controls">
           
@@ -190,7 +193,7 @@ a:hover { text-decoration: underline; }
 
           <label class="dashboard-switcher"><span>Economy</span><select data-dashboard-switcher aria-label="Switch dashboard"><option value="../../01AUS/dashboards/refining.html">Australia</option><option value="../../02BD/dashboards/refining.html">Brunei Darussalam</option><option value="../../03CDA/dashboards/refining.html">Canada</option><option value="../../04CHL/dashboards/refining.html">Chile</option><option value="../../05PRC/dashboards/refining.html">China</option><option value="../../06HKC/dashboards/refining.html">Hong Kong, China</option><option value="../../07INA/dashboards/refining.html">Indonesia</option><option value="../../08JPN/dashboards/refining.html">Japan</option><option value="../../09ROK/dashboards/refining.html">Korea</option><option value="../../10MAS/dashboards/refining.html">Malaysia</option><option value="../../11MEX/dashboards/refining.html">Mexico</option><option value="../../12NZ/dashboards/refining.html">New Zealand</option><option value="../../13PNG/dashboards/refining.html">Papua New Guinea</option><option value="../../14PE/dashboards/refining.html">Peru</option><option value="../../15PHL/dashboards/refining.html">Philippines</option><option value="../../16RUS/dashboards/refining.html">Russia</option><option value="../../17SGP/dashboards/refining.html">Singapore</option><option value="../../18CT/dashboards/refining.html">Chinese Taipei</option><option value="../../19THA/dashboards/refining.html">Thailand</option><option value="refining.html" selected>United States</option><option value="../../21VN/dashboards/refining.html">Viet Nam</option></select></label>
           <div class="dataset-filter" role="group" aria-label="Dataset filter"><span class="dataset-filter-label">Exclude charts that don't contain the highlighted datasets:</span><div class="dataset-filter-buttons"><button type="button" class="dataset-filter-btn" data-dataset-filter="LEAP">LEAP</button><button type="button" class="dataset-filter-btn" data-dataset-filter="ESTO">ESTO</button><button type="button" class="dataset-filter-btn" data-dataset-filter="NINTH">Ninth</button></div></div>
-          <div class="header-inline-controls"><a href="total_demand.html" class="header-chip" data-current="false">Energy balance overview</a><span class="header-nav-separator" aria-hidden="true">|</span><span class="header-nav-separator" aria-hidden="true">|</span><a href="power.html" class="header-chip" data-current="false">Power</a><a href="refining.html" class="header-chip" data-current="true">Refining</a><a href="other_transformation.html" class="header-chip" data-current="false">Other transformation</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="supply.html" class="header-chip" data-current="false">Supply</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="unassigned.html" class="header-chip" data-current="false">Unassigned</a></div>
+          <div class="header-inline-controls"><a href="total_demand.html" class="header-chip" data-current="false">Energy balance overview</a><span class="header-nav-separator" aria-hidden="true">|</span><span class="header-nav-separator" aria-hidden="true">|</span><a href="power.html" class="header-chip" data-current="false">Power</a><a href="refining.html" class="header-chip" data-current="true">Refining</a><a href="other_transformation.html" class="header-chip" data-current="false">Other transformation</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="supply.html" class="header-chip" data-current="false">Supply</a></div>
         </div>
       </div>
       <div class="jump-nav"><span class="jump-nav-label">Sections:</span><div class="jump-nav-groups"><div class="jump-nav-row" data-level="1"><a href="#sec-refining__refining" class="jump-chip" data-level="1">Refining</a></div><div class="jump-nav-row" data-level="2"><a href="#sec-refining__refining__09_07_oil_refineries" class="jump-chip" data-level="2">09.07 Oil refineries</a><a href="#sec-refining__refining__09_07_oil_refineries_including_own_use" class="jump-chip" data-level="2">09.07 Oil refineries (including own use)</a><a href="#sec-refining__refining__10_01_11_oil_refineries" class="jump-chip" data-level="2">10.01.11 Oil refineries</a></div></div></div>
