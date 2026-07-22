@@ -310,3 +310,204 @@ This repository is in a clean, supportable state when:
 5. Tracked `docs/` assets contain no stale or machine-specific artifacts.
 6. Cleanup changes are separated from feature work and pass focused tests,
    rendering checks, page-noise review, and publication-readiness checks.
+
+## 8. Audit findings and staged action plan
+
+This section records the follow-up repository audit completed on 2026-07-22.
+It is separate from the current-state boundary so findings are not mistaken
+for completed changes.
+
+### Finding A — tracked browser profile: urgent
+
+`.tmp-edge-profile/` is tracked in Git as 393 files totaling approximately
+15.4 MB. It was introduced by commit `157c689` (`aa`) and contains browser
+profile state such as cache files, cookie databases, login-data databases,
+history, preferences, and session files.
+
+This is not a dashboard input or output. It must not be pushed or retained in
+the repository.
+
+Required action:
+
+1. Stop before pushing the current branch.
+2. Confirm that the profile is not needed for any dashboard workflow.
+3. Remove it from the working tree and Git tracking using an explicit,
+   validated target.
+4. Add `.tmp-edge-profile/` to `.gitignore`.
+5. Check whether local-only history should be cleaned before publishing.
+6. Verify that no other browser/cache artifacts are tracked.
+
+Status: **pending; do before any push**.
+
+### Finding B — broken packaging metadata: high priority
+
+`pyproject.toml` declares the unavailable build backend
+`setuptools.backends.legacy:build`. `environment.yml` asks pip to install
+`pyproject.toml` as if it were a package.
+
+Required action:
+
+1. Change the backend to `setuptools.build_meta`.
+2. Change the pip entry to `-e .`.
+3. Add an explicit verification command for editable installation.
+4. Confirm the installed package/import surface from a clean environment.
+
+Status: **pending; safe isolated metadata change**.
+
+### Finding C — workflow defaults and documentation disagree: high priority
+
+The current workflow source defaults to:
+
+```text
+UPDATE_DATA = True
+PUBLISH_TO_DOCS = True
+INCLUDE_CAPACITY_UNMET_CONVERGENCE = True
+```
+
+The README and operating documents describe a safer fixture-first and
+manual-publication workflow. The source also hard-codes the main
+`leap_mappings` and optional `leap_initialisation` locations.
+
+Required action:
+
+1. Decide and document the safe ordinary-run defaults.
+2. Make publication opt-in and difficult to trigger accidentally.
+3. Make data refresh explicit for production runs.
+4. Centralize and override the `leap_mappings` root.
+5. Make the convergence input optional and configurable.
+6. Align `README.md`, `docs/common_esto_dashboard_guide.md`,
+   `docs/common_esto_dashboard_plan.md`, and workflow comments.
+7. Add tests proving ordinary validation does not publish or refresh.
+
+Do not change these defaults in the same commit as browser-profile cleanup or
+fixture reduction; the behavioral change needs its own verification.
+
+Status: **pending; design and implementation checkpoint required**.
+
+### Finding D — required colour configuration is untracked: high priority
+
+The current uncommitted renderer/test changes require:
+
+```text
+config/common_esto_dashboard/code_colors.json
+scripts/generate_code_colors.py
+```
+
+`code_colors.json` is read by production code and tests but is not present in
+the committed tree. A clean clone therefore cannot reproduce the current
+working-tree test result.
+
+Required action:
+
+1. Review the generator and generated file against the current colour rules.
+2. Decide whether the generated JSON is the canonical committed config.
+3. Commit the config and generator with the related colour-system code, or
+   provide a deterministic generation step before tests/imports require it.
+4. Run the focused test suite from a clean checkout/state.
+
+Status: **pending; coordinate with the existing colour feature changes**.
+
+### Finding E — tracked fixture is too large for a lightweight sample: medium
+
+`tests/fixtures/common_esto_dashboard/common_esto_comparison_data_sample.csv`
+is approximately 76.5 MB and contains 331,959 rows, four comparison scopes,
+91 years, 86 flow labels, and 72 product labels for one economy.
+
+Required action:
+
+1. Inventory which tests require full label and scope coverage.
+2. Design a compact fixture preserving the required hierarchy, colours, signs,
+   scenarios, scopes, and edge cases.
+3. Keep a full upstream snapshot outside the normal tracked fixture path, or
+   use an explicitly approved large-file mechanism if the full snapshot is
+   required for integration testing.
+4. Update fixture-refresh documentation and tests to distinguish regression
+   fixtures from full integration data.
+5. Compare render manifests and key QA summaries before and after reduction.
+
+Do not reduce this file mechanically before understanding the test coverage it
+currently provides.
+
+Status: **pending; requires fixture design and before/after validation**.
+
+### Finding F — published bundles duplicate JSON and JavaScript: medium
+
+The renderer writes both `<page>__charts.json` and `<page>__charts.js` from the
+same payload. The browser loads JavaScript, while readiness checks and tests
+read JSON. The tracked `docs/` chart bundles total approximately 13.6 MB.
+
+Required action:
+
+1. Confirm the browser, readiness checks, tests, and external links that rely
+   on each format.
+2. Choose one canonical serving format or explicitly separate serving assets
+   from QA artifacts.
+3. Update writer, publisher, readiness checks, tests, and tracked `docs/`
+   assets together.
+4. Verify stale bundles are removed and every HTML reference resolves.
+
+Do not delete either format as a file-only cleanup.
+
+Status: **pending; design decision required**.
+
+### Finding G — old ignored dashboard trees remain locally: low risk
+
+The working tree contains ignored legacy-style output trees under:
+
+```text
+docs/NZ/
+docs/USA/
+```
+
+The current published tree uses `docs/02BD/` and `docs/20USA/`. The old trees
+contain dashboard outputs, CSVs, XLSX files, and supporting files and are not
+part of the current tracked production site.
+
+Required action:
+
+1. Confirm they are not needed for historical comparison.
+2. Move them to an explicitly named external archive or remove them locally.
+3. Do not alter tracked `docs/02BD/` or `docs/20USA/` as part of this cleanup.
+
+Status: **pending; confirmation required before deletion**.
+
+### Finding H — missing continuous validation: medium
+
+There is no `.github/` CI workflow. The focused local suite currently passes
+29 tests, but the repository has a much larger production surface and no
+automated clean-install or publication-parity check.
+
+Required action:
+
+1. Add a lightweight CI job after packaging metadata is repaired.
+2. Run focused tests and configuration/import checks in CI.
+3. Keep full upstream-data rendering out of routine CI unless its inputs are
+   made reproducible and appropriately scoped.
+4. Add a separate reviewed publication or artifact-validation job if needed.
+
+Status: **pending; do after packaging and default-safety work**.
+
+## 9. Execution checkpoints
+
+Changes should be enacted in this order, with one coherent commit per
+checkpoint:
+
+1. **Security and repository hygiene:** remove the tracked browser profile,
+   add ignore protection, and verify no unrelated files were staged.
+2. **Packaging:** repair `pyproject.toml` and `environment.yml`; verify the
+   build backend and editable-install metadata.
+3. **Colour feature checkpoint:** review and commit the required colour config
+   and generator together with the existing uncommitted colour changes.
+4. **Workflow safety:** make refresh, publication, and convergence behavior
+   explicit, configurable, and consistent with the documentation.
+5. **Fixture reduction:** create and validate a compact regression fixture;
+   preserve full-data integration coverage separately.
+6. **Published-asset optimization:** resolve JSON/JavaScript bundle duplication
+   and republish only after readiness checks.
+7. **Local archive cleanup:** remove confirmed obsolete ignored output trees.
+8. **CI and final documentation:** add clean-install/test automation and
+   reconcile all operational documentation.
+
+Each checkpoint must pass focused tests and relevant targeted checks before the
+next checkpoint begins. Existing unrelated modifications must remain unstaged
+and uncommitted until deliberately assigned to one of these stages.
