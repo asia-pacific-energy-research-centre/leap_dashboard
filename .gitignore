@@ -25,6 +25,7 @@ config/archive/
 .ipynb_checkpoints/
 *.ipynb
 temp/
+.tmp-edge-profile/
 codebase/scrapbook/
 
 # IDE
