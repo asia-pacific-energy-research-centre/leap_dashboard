@@ -51,10 +51,10 @@ C:\Users\Work\github\leap_mappings\results\common_esto\common_esto_rows.csv
 ```
 
 into `tests/fixtures/common_esto_dashboard/`, then runs the smoke test and a
-full dashboard render. The comparison fixture is written as a long-form
-single-economy sample for `20_USA`, preserving all comparison scopes including
-`leap_vs_ninth`. If `leap_mappings` is somewhere else, set `LEAP_MAPPINGS_ROOT`
-before running the script.
+full dashboard render. The comparison fixture is written as a compact
+long-form single-economy sample for `20_USA`, preserving every source-provided
+comparison scope and semantic flow/product combination. If `leap_mappings` is
+somewhere else, set `LEAP_MAPPINGS_ROOT` before running the script.
 
 To render every available economy from the upstream common ESTO output:
 

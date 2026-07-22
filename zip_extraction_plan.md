@@ -410,10 +410,12 @@ implementation checkpoint**.
 ### Finding E — tracked fixture is too large for a lightweight sample: medium
 
 `tests/fixtures/common_esto_dashboard/common_esto_comparison_data_sample.csv`
-is approximately 76.5 MB and contains 331,959 rows, four comparison scopes,
-91 years, 86 flow labels, and 72 product labels for one economy.
+was approximately 76.5 MB and contained 331,959 rows. The compact replacement
+keeps the current upstream scope/source/scenario combinations, all available
+semantic flow/product labels, and representative years while staying below
+50,000 rows.
 
-Required action:
+Completed action:
 
 1. Inventory which tests require full label and scope coverage.
 2. Design a compact fixture preserving the required hierarchy, colours, signs,
@@ -425,10 +427,10 @@ Required action:
    fixtures from full integration data.
 5. Compare render manifests and key QA summaries before and after reduction.
 
-Do not reduce this file mechanically before understanding the test coverage it
-currently provides.
+The refresh script now performs this reduction from the full upstream output;
+the full snapshot used for this migration is archived outside the repository.
 
-Status: **pending; requires fixture design and before/after validation**.
+Status: **completed; compact fixture render and focused suite pass**.
 
 ### Finding F — published bundles duplicate JSON and JavaScript: medium
 

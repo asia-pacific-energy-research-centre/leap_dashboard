@@ -368,6 +368,11 @@ def test_weekly_common_esto_sample_fixture_is_present() -> None:
     fixture_dir = REPO_ROOT / "tests" / "fixtures" / "common_esto_dashboard"
     assert (fixture_dir / "common_esto_comparison_data_sample.csv").exists()
     assert (fixture_dir / "common_esto_rows.csv").exists()
+    fixture = pd.read_csv(fixture_dir / "common_esto_comparison_data_sample.csv", low_memory=False)
+    assert len(fixture) < 50_000
+    assert fixture["comparison_scope"].nunique() >= 2
+    assert fixture["common_flow_label"].nunique() >= 50
+    assert fixture["common_product_label"].nunique() >= 50
 
 
 def test_code_colors_resolve_by_code_not_display_name() -> None:
