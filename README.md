@@ -16,7 +16,7 @@ comparison at:
 C:\Users\Work\github\leap_dashboard_legacy
 ```
 
-## Run the sample dashboard
+## Run the dashboard
 
 From the repository root:
 
@@ -24,7 +24,8 @@ From the repository root:
 C:\Users\Work\miniconda3\python.exe codebase\common_esto_dashboard_workflow.py
 ```
 
-The tracked `20_USA` fixture is used by default. Output is written to:
+The ordinary workflow reuses existing Common ESTO outputs and writes generated
+files to:
 
 ```text
 outputs/common_esto_dashboard/20USA/
@@ -33,6 +34,12 @@ outputs/common_esto_dashboard/20USA/
 The main artifacts are `dashboards/index.html`, page-level Plotly bundles under
 `chart_bundles/`, and audit files under `supporting_files/`, including
 `chart_manifest.csv` and `page_assignment_summary.csv`.
+
+Focused tests use the tracked `20_USA` fixture. Set
+`COMMON_ESTO_INPUT_DATA_PATH` and `COMMON_ESTO_ROWS_PATH` for an explicit
+fixture render. Refreshing upstream inputs and publishing into tracked
+`docs/` are opt-in via `COMMON_ESTO_UPDATE_DATA=1` and
+`COMMON_ESTO_PUBLISH_TO_DOCS=1`.
 
 ## Tests and operational checks
 

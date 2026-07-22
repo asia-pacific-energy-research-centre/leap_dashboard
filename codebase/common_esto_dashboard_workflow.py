@@ -17,6 +17,12 @@
 #   Optional override for dashboard input CSV path.
 # COMMON_ESTO_ROWS_PATH
 #   Optional override for common rows CSV path.
+# LEAP_MAPPINGS_ROOT
+#   Optional sibling-repository root. Defaults to ../leap_mappings.
+# COMMON_ESTO_PUBLISH_TO_DOCS
+#   Boolean toggle for copying serving assets into tracked docs/. Default False.
+# COMMON_ESTO_CAPACITY_UNMET_CONVERGENCE_PATH
+#   Optional path to a capacity-unmet convergence CSV.
 # COMMON_ESTO_INCLUDE_NINTH_PRE_BASE_YEAR_DATA
 #   Boolean toggle for retaining 9th-edition rows before the dashboard base
 #   year. Default is False because ESTO is the preferred historical source.
@@ -116,8 +122,9 @@ def _log_to_file(log_path):
 
 #%%
 # Stable paths.
-_LEAP_MAPPINGS_REPO = Path(r"C:\Users\Work\github\leap_mappings")
-_LEAP_MAPPINGS_RESULTS = Path(r"C:\Users\Work\github\leap_mappings\results\common_esto")
+_DEFAULT_LEAP_MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
+_LEAP_MAPPINGS_REPO = _resolve(os.getenv("LEAP_MAPPINGS_ROOT", str(_DEFAULT_LEAP_MAPPINGS_ROOT)))
+_LEAP_MAPPINGS_RESULTS = _LEAP_MAPPINGS_REPO / "results" / "common_esto"
 # The long-form file only contains rows a source system actually reported, so
 # years a source has no data for are simply absent instead of zero-filled
 # (unlike the wide CSV, which pads every year column with 0).
@@ -144,7 +151,7 @@ MAX_YEAR = 2060
 # module's functions without triggering the full workflow run at import time.
 RUN_DASHBOARD_WORKFLOW = _env_bool("COMMON_ESTO_RUN_DASHBOARD_WORKFLOW", default=True)
 CLEAR_EXISTING_OUTPUTS = True
-PUBLISH_TO_DOCS = True  # Set True to copy dashboard files to docs/<economy>/ after each run.
+PUBLISH_TO_DOCS = _env_bool("COMMON_ESTO_PUBLISH_TO_DOCS", default=False)
 # Explicit notebook/script toggle: refresh upstream Common ESTO comparison inputs
 # before rendering dashboard pages.
 #
@@ -153,9 +160,8 @@ PUBLISH_TO_DOCS = True  # Set True to copy dashboard files to docs/<economy>/ af
 #   from latest mapping relationship files (Stage 3 fast-path equivalent);
 # - updates dashboard inputs such as common_esto_comparison_data.csv used below.
 #
-# Recommended default is True for normal production runs so dashboard output stays
-# aligned with latest upstream data.
-UPDATE_DATA = True
+# Data refresh is opt-in so ordinary renders cannot mutate the sibling repo.
+UPDATE_DATA = False
 
 # Env var override for automation.
 # Example: COMMON_ESTO_UPDATE_DATA=0 to skip refresh and render from existing files.
@@ -169,9 +175,26 @@ INCLUDE_NINTH_PRE_BASE_YEAR_DATA = _env_bool(
     "COMMON_ESTO_INCLUDE_NINTH_PRE_BASE_YEAR_DATA",
     default=False,
 )
-INCLUDE_CAPACITY_UNMET_CONVERGENCE = True  # Set False to skip writing the capacity-unmet convergence page.
-CAPACITY_UNMET_CONVERGENCE_PATH = Path(
-    r"C:\Users\Work\github\leap_initialisation\outputs\leap_exports\supply_reconciliation\results_update\supporting_files\runtime\capacity_unmet_convergence.csv"
+INCLUDE_CAPACITY_UNMET_CONVERGENCE = _env_bool(
+    "COMMON_ESTO_INCLUDE_CAPACITY_UNMET_CONVERGENCE",
+    default=False,
+)
+_DEFAULT_CAPACITY_UNMET_CONVERGENCE_PATH = (
+    REPO_ROOT.parent
+    / "leap_initialisation"
+    / "outputs"
+    / "leap_exports"
+    / "supply_reconciliation"
+    / "results_update"
+    / "supporting_files"
+    / "runtime"
+    / "capacity_unmet_convergence.csv"
+)
+CAPACITY_UNMET_CONVERGENCE_PATH = _resolve(
+    os.getenv(
+        "COMMON_ESTO_CAPACITY_UNMET_CONVERGENCE_PATH",
+        str(_DEFAULT_CAPACITY_UNMET_CONVERGENCE_PATH),
+    )
 )
 
 

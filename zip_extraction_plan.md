@@ -159,20 +159,18 @@ unrelated working-tree changes are not included.
 
 ### Current default-safety warning
 
-The current workflow source has these defaults:
+The workflow now uses these safe ordinary-run defaults:
 
 ```text
-UPDATE_DATA = True
-PUBLISH_TO_DOCS = True
-INCLUDE_CAPACITY_UNMET_CONVERGENCE = True
+UPDATE_DATA = False
+PUBLISH_TO_DOCS = False
+INCLUDE_CAPACITY_UNMET_CONVERGENCE = False
 ```
 
-Therefore a direct workflow invocation can refresh files in `leap_mappings`,
-write ignored outputs, modify tracked `docs/`, and attempt the optional
-convergence input. The documented operating policy is safer than these source
-defaults: ordinary validation should disable data refresh and publication,
-and deliberate publication should be a separate reviewed action. This is a
-follow-up implementation issue, not something to solve by extracting files.
+Data refresh, tracked-doc publication, and the optional convergence page are
+explicit environment-variable opt-ins. The sibling `leap_mappings` root and
+convergence CSV also have repository-relative defaults and environment
+overrides, so the workflow is portable across checkouts.
 
 ## 4. Obsolete assumptions not applicable here
 
@@ -337,7 +335,7 @@ Required action:
 5. Check whether local-only history should be cleaned before publishing.
 6. Verify that no other browser/cache artifacts are tracked.
 
-Status: **pending; do before any push**.
+Status: **completed; tracked profile files removed and ignore rule added**.
 
 ### Finding B — broken packaging metadata: high priority
 
@@ -352,23 +350,24 @@ Required action:
 3. Add an explicit verification command for editable installation.
 4. Confirm the installed package/import surface from a clean environment.
 
-Status: **pending; safe isolated metadata change**.
+Status: **completed; metadata now uses the standard setuptools backend and
+editable installs use `-e .`**.
 
 ### Finding C — workflow defaults and documentation disagree: high priority
 
-The current workflow source defaults to:
+The workflow source now defaults to:
 
 ```text
-UPDATE_DATA = True
-PUBLISH_TO_DOCS = True
-INCLUDE_CAPACITY_UNMET_CONVERGENCE = True
+UPDATE_DATA = False
+PUBLISH_TO_DOCS = False
+INCLUDE_CAPACITY_UNMET_CONVERGENCE = False
 ```
 
 The README and operating documents describe a safer fixture-first and
 manual-publication workflow. The source also hard-codes the main
 `leap_mappings` and optional `leap_initialisation` locations.
 
-Required action:
+Completed action:
 
 1. Decide and document the safe ordinary-run defaults.
 2. Make publication opt-in and difficult to trigger accidentally.
@@ -379,10 +378,10 @@ Required action:
    `docs/common_esto_dashboard_plan.md`, and workflow comments.
 7. Add tests proving ordinary validation does not publish or refresh.
 
-Do not change these defaults in the same commit as browser-profile cleanup or
-fixture reduction; the behavioral change needs its own verification.
+The implementation and regression test are committed as a separate checkpoint
+from browser-profile cleanup and fixture reduction.
 
-Status: **pending; design and implementation checkpoint required**.
+Status: **completed; focused suite passes**.
 
 ### Finding D — required colour configuration is untracked: high priority
 
@@ -405,7 +404,8 @@ Required action:
    provide a deterministic generation step before tests/imports require it.
 4. Run the focused test suite from a clean checkout/state.
 
-Status: **pending; coordinate with the existing colour feature changes**.
+Status: **completed; config and generator were committed with the colour-system
+implementation checkpoint**.
 
 ### Finding E — tracked fixture is too large for a lightweight sample: medium
 

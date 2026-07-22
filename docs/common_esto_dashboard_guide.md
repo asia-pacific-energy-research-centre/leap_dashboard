@@ -23,15 +23,18 @@ The default sample economy is `20_USA`.
 
 ## Inputs
 
-By default, the workflow reads the tracked weekly sample fixture:
+Focused tests use the tracked weekly sample fixture:
 
 ```text
 tests/fixtures/common_esto_dashboard/common_esto_comparison_data_sample.csv
 tests/fixtures/common_esto_dashboard/common_esto_rows.csv
 ```
 
-Update these fixture files when the upstream common ESTO data changes so the
-sample remains representative and dashboard regressions are easier to spot.
+The ordinary production workflow reuses existing outputs under
+`leap_mappings/results/common_esto/`. Set `COMMON_ESTO_INPUT_DATA_PATH` and
+`COMMON_ESTO_ROWS_PATH` to render an explicit fixture or dataset. Update the
+tracked fixture when the upstream common ESTO data changes so the sample
+remains representative and dashboard regressions are easier to spot.
 
 To refresh the weekly sample from `leap_mappings/results/common_esto/` and run
 the standard checks:
@@ -152,9 +155,11 @@ The readiness check scans every rendered economy under
 `outputs/common_esto_dashboard/` and validates the pages and Plotly bundles
 listed in each economy's chart manifest.
 
-To copy serving assets to GitHub Pages, set `PUBLISH_TO_DOCS = True` in the
-workflow and rerun it. This stays as a manual toggle so fixture refreshes and
-ordinary render checks do not accidentally update `docs/`.
+To copy serving assets to GitHub Pages, set
+`COMMON_ESTO_PUBLISH_TO_DOCS=1` and rerun the workflow. Use
+`COMMON_ESTO_UPDATE_DATA=1` only when intentionally refreshing upstream
+inputs. These are opt-in controls so ordinary fixture refreshes and render
+checks do not accidentally update `docs/`.
 Only `.html`, `.js`, and `.json` dashboard-serving files are copied to `docs/`;
 supporting CSVs remain in `outputs/`.
 
