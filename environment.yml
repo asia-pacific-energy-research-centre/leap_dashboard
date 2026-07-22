@@ -10,4 +10,4 @@ dependencies:
   - jinja2
   - pip
   - pip:
-      - pyproject.toml
+      - -e .
