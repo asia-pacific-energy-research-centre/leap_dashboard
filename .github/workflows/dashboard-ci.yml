@@ -1,0 +1,28 @@
+name: Common ESTO dashboard checks
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  focused-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: python -m pip install --upgrade pip && python -m pip install -e .
+
+      - name: Validate package metadata
+        run: python -c "import setuptools.build_meta; import codebase.common_esto_dashboard_data"
+
+      - name: Run focused dashboard tests
+        run: python -m pytest tests/test_common_esto_dashboard.py tests/test_capacity_unmet_convergence_dashboard.py tests/test_raw_input_boundary.py

@@ -472,7 +472,7 @@ Required action:
 2. Move them to an explicitly named external archive or remove them locally.
 3. Do not alter tracked `docs/02BD/` or `docs/20USA/` as part of this cleanup.
 
-Status: **pending; confirmation required before deletion**.
+Status: **completed; ignored legacy trees moved to an external local archive**.
 
 ### Finding H — missing continuous validation: medium
 
@@ -488,7 +488,7 @@ Required action:
    made reproducible and appropriately scoped.
 4. Add a separate reviewed publication or artifact-validation job if needed.
 
-Status: **pending; do after packaging and default-safety work**.
+Status: **completed; lightweight packaging and focused-test CI workflow added**.
 
 ## 9. Execution checkpoints
 
