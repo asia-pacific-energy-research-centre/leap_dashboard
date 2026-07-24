@@ -8,6 +8,7 @@ not infer mappings, modify workbooks, or change validation status semantics.
 from __future__ import annotations
 
 from html import escape
+from math import floor, log10
 from pathlib import Path
 
 import pandas as pd
@@ -57,40 +58,88 @@ def _failure_summary(frame: pd.DataFrame, group_columns: list[str]) -> pd.DataFr
     )
 
 
-def _tree_html(tree: pd.DataFrame, parent_code: str, failure_counts: dict[str, int], *, depth: int = 0) -> str:
-    """Render a bounded subtree with local anchor-failure counts."""
+def _three_significant_figures(value: float) -> str:
+    """Format a number to three significant figures without unnecessary scientific notation."""
+    if pd.isna(value) or value == 0:
+        return "0"
+    decimals = 2 - floor(log10(abs(value)))
+    rounded = round(value, decimals)
+    if decimals <= 0:
+        return f"{rounded:,.0f}"
+    return f"{rounded:,.{decimals}f}"
+
+
+def _anchor_value_summary(anchor: pd.DataFrame) -> pd.DataFrame:
+    """Sum failed parent/child comparisons across all economies, scenarios, and years."""
+    required = {"status", "source_system", "validation_axis", "parent_code"}
+    if anchor.empty or not required.issubset(anchor.columns):
+        return pd.DataFrame()
+    failures = anchor[anchor["status"].astype(str).eq("failed")].copy()
+    if failures.empty:
+        return pd.DataFrame()
+    value_columns = ["parent_value", "frontier_sum", "difference", "abs_error"]
+    for column in value_columns:
+        failures[column] = pd.to_numeric(failures.get(column, 0), errors="coerce").fillna(0.0)
+    summary = (
+        failures.groupby(["source_system", "validation_axis", "parent_code"], dropna=False)
+        .agg(
+            failed_checks=("status", "size"),
+            parent_total=("parent_value", "sum"),
+            children_total=("frontier_sum", "sum"),
+            net_difference=("difference", "sum"),
+            absolute_mismatch_total=("abs_error", "sum"),
+        )
+        .reset_index()
+        .sort_values("absolute_mismatch_total", ascending=False, kind="mergesort")
+    )
+    return summary
+
+
+def _tree_html(tree: pd.DataFrame, parent_code: str, value_summary: dict[str, dict[str, float]], *, depth: int = 0) -> str:
+    """Render a bounded subtree with aggregated parent/child mismatch values."""
     node = tree[tree["code"].astype(str).eq(parent_code)]
     label = str(node.iloc[0].get("label", parent_code)) if not node.empty else parent_code
-    count = int(failure_counts.get(parent_code, 0))
-    badge = f'<span class="failure-badge">{count:,} failed anchor checks</span>' if count else ""
+    values = value_summary.get(parent_code, {})
+    badge = ""
+    if values:
+        badge = (
+            '<span class="value-badge">'
+            f"Mismatch total {_three_significant_figures(values['absolute_mismatch_total'])}; "
+            f"parent {_three_significant_figures(values['parent_total'])}; "
+            f"children {_three_significant_figures(values['children_total'])}"
+            "</span>"
+        )
     children = tree[tree["parent_code"].astype(str).eq(parent_code)].copy()
     children = children.sort_values(["level", "code"], kind="mergesort").head(MAX_TREE_CHILDREN)
     code_detail = "" if label == parent_code else f'<code class="tree-code">{escape(parent_code)}</code>'
     title = f'<span class="tree-label">{escape(label)}</span>{code_detail}{badge}'
     if children.empty or depth >= MAX_TREE_DEPTH:
         return f"<li><span class=\"tree-node\">{title}</span></li>"
-    child_html = "".join(_tree_html(tree, str(row.code), failure_counts, depth=depth + 1) for row in children.itertuples())
+    child_html = "".join(_tree_html(tree, str(row.code), value_summary, depth=depth + 1) for row in children.itertuples())
     more = "" if len(tree[tree["parent_code"].astype(str).eq(parent_code)]) <= MAX_TREE_CHILDREN else "<li>… additional children omitted</li>"
     return f"<li><details open><summary>{title}</summary><ul>{child_html}{more}</ul></details></li>"
 
 
-def _issue_tree_section(tree: pd.DataFrame, anchor_failures: pd.DataFrame, source_system: str) -> str:
-    """Render the most frequent failed parent branches for one source system."""
-    if tree.empty or anchor_failures.empty:
-        return '<p class="empty-state">No tree or failed-anchor data is available.</p>'
-    failures = anchor_failures[
-        anchor_failures["status"].astype(str).eq("failed")
-        & anchor_failures["source_system"].astype(str).eq(source_system)
-    ].copy()
-    if failures.empty:
+def _issue_tree_section(tree: pd.DataFrame, value_summary: pd.DataFrame, source_system: str) -> str:
+    """Render the branches with the largest summed anchor mismatch for one source system."""
+    if tree.empty or value_summary.empty:
+        return '<p class="empty-state">No tree or failed-anchor value data is available.</p>'
+    values = value_summary[value_summary["source_system"].astype(str).eq(source_system)].copy()
+    if values.empty:
         return '<p class="empty-state">No failed anchor rows for this source system.</p>'
-    counts = failures.groupby("parent_code").size().sort_values(ascending=False)
     tree_codes = set(tree["code"].astype(str))
-    roots = [str(code) for code in counts.index if str(code) in tree_codes][:4]
+    roots = [str(code) for code in values["parent_code"] if str(code) in tree_codes][:4]
     if not roots:
         return '<p class="empty-state">The current failed parent labels do not resolve to this exported tree.</p>'
-    failure_counts = {str(code): int(value) for code, value in counts.items()}
-    return "<ul class=\"tree\">" + "".join(_tree_html(tree, root, failure_counts) for root in roots) + "</ul>"
+    value_lookup = {
+        str(row.parent_code): {
+            "parent_total": float(row.parent_total),
+            "children_total": float(row.children_total),
+            "absolute_mismatch_total": float(row.absolute_mismatch_total),
+        }
+        for row in values.itertuples(index=False)
+    }
+    return "<ul class=\"tree\">" + "".join(_tree_html(tree, root, value_lookup) for root in roots) + "</ul>"
 
 
 def _artifact_note(path: Path) -> str:
@@ -127,6 +176,11 @@ def write_mapping_diagnostics_page(
 
     stage_summary = _failure_summary(stage, ["source_system", "validation_axis", "parent_code"])
     anchor_summary = _failure_summary(anchor, ["source_system", "validation_axis", "reason", "parent_code"])
+    anchor_value_summary = _anchor_value_summary(anchor)
+    anchor_value_display = anchor_value_summary.copy()
+    for column in ["parent_total", "children_total", "net_difference", "absolute_mismatch_total"]:
+        if column in anchor_value_display.columns:
+            anchor_value_display[column] = anchor_value_display[column].map(_three_significant_figures)
     coverage_summary = (
         coverage.groupby([column for column in ["coverage_status", "mapping_status"] if column in coverage.columns], dropna=False)
         .size().reset_index(name="rows").sort_values("rows", ascending=False, kind="mergesort")
@@ -155,14 +209,14 @@ body {{ font-family: Inter,Segoe UI,Arial,sans-serif; margin:0; background:#f4f6
 h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b7a; }} .metrics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:16px 0; }}
 .metric-card,.panel {{ background:white; border:1px solid #d9e1ea; border-radius:10px; padding:14px; }} .metric-card span {{ display:block; color:#5f6b7a; font-size:13px; }} .metric-card strong {{ font-size:28px; }}
 .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:16px; }} .flow {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }} .flow div {{ background:#e8f0fa; border:1px solid #adc4df; border-radius:8px; padding:10px; font-size:13px; }} .arrow {{ color:#53718f; font-size:22px; }}
-.tree {{ padding-left:18px; }} .tree ul {{ padding-left:22px; }} summary,.tree-node {{ line-height:1.7; }} code {{ color:#254b75; }} .tree-label {{ color:#102a43; font-weight:600; }} .tree-code {{ color:#4b6378; display:block; font-size:.72rem; margin:.08rem 0 .16rem; overflow-wrap:anywhere; }} .failure-badge {{ background:#fde8e7; color:#9b1c1c; border-radius:999px; padding:2px 7px; font-size:12px; margin-left:5px; }}
+.tree {{ padding-left:18px; }} .tree ul {{ padding-left:22px; }} summary,.tree-node {{ line-height:1.7; }} code {{ color:#254b75; }} .tree-label {{ color:#102a43; font-weight:600; }} .tree-code {{ color:#4b6378; display:block; font-size:.72rem; margin:.08rem 0 .16rem; overflow-wrap:anywhere; }} .value-badge {{ background:#fde8e7; color:#9b1c1c; border-radius:999px; padding:2px 7px; font-size:12px; margin-left:5px; }}
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
 </style></head><body><div class="shell"><header><a href="index.html">← Dashboard overview</a><h1>Mapping diagnostics</h1><p class="subtle">Read-only inspection of hierarchy/anchor validation and direct mapping coverage. Updated: {escape(dashboard_updated_label)}</p></header>
 <div class="metrics">{cards}</div>
-<section class="panel"><h2>How the anchor validator connects the trees</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">A failed row can be a mapping boundary issue, a missing frontier, or an inconsistency already present in the source dataset. This page exposes the source tree and QA evidence; it does not decide the cause.</p></section>
-<div class="grid"><section class="panel"><h2>NINTH tree branches with failed anchor checks</h2>{_issue_tree_section(ninth_tree[ninth_tree.get('axis', '').astype(str).eq('sector')] if not ninth_tree.empty else ninth_tree, anchor, 'NINTH')}</section><section class="panel"><h2>LEAP tree branches with failed anchor checks</h2>{_issue_tree_section(leap_tree[leap_tree.get('axis', '').astype(str).eq('sector')] if not leap_tree.empty else leap_tree, anchor, 'LEAP')}</section></div>
+<section class="panel"><h2>How the anchor validator connects the trees</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">Tree badges sum all failed values across economies, scenarios, and years. They show the three-significant-figure parent total, child/frontier total, and total absolute mismatch; this ranks material gaps rather than frequent small failures.</p></section>
+<div class="grid"><section class="panel"><h2>NINTH branches with largest summed mismatch</h2>{_issue_tree_section(ninth_tree[ninth_tree.get('axis', '').astype(str).eq('sector')] if not ninth_tree.empty else ninth_tree, anchor_value_summary, 'NINTH')}</section><section class="panel"><h2>LEAP branches with largest summed mismatch</h2>{_issue_tree_section(leap_tree[leap_tree.get('axis', '').astype(str).eq('sector')] if not leap_tree.empty else leap_tree, anchor_value_summary, 'LEAP')}</section></div>
 <section class="panel"><h2>Stage 3 hierarchy failures</h2>{_table_html(stage_summary, ['source_system','validation_axis','parent_code','rows'])}</section>
-<section class="panel"><h2>Anchor-validator failures</h2>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</section>
+<section class="panel"><h2>Largest summed anchor mismatches</h2><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</section>
 <section class="panel"><h2>Direct mapping coverage review</h2><h3>Actionable partial coverage</h3>{_table_html(partial, ['source_system','comparison_scope','common_row_id','missing_component_pairs','relevance_evidence','mapping_action','mapping_sheet_to_review'])}<h3>Non-zero unmapped LEAP branches</h3>{_table_html(unmapped, ['leap_flow','leap_product','indirect_esto_flow','indirect_esto_product','qa_status'])}<h3>LEAP source-presence conflicts</h3>{_table_html(conflicts, ['leap_sector_name_full_path','raw_leap_fuel_name','presence_status','in_leap_combined_esto','in_leap_combined_ninth'])}<h3>Source-coverage audit summary</h3>{_table_html(coverage_summary, ['coverage_status','mapping_status','rows'])}</section>
 <footer><strong>Artifact provenance</strong><br>{artifact_notes}</footer></div></body></html>"""
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME
