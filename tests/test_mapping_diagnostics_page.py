@@ -27,6 +27,9 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
         {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "reason": "difference_exceeds_tolerance", "parent_code": "09_total", "parent_value": 10.0, "frontier_sum": 7.0, "difference": 3.0, "abs_error": 3.0},
         {"status": "failed", "source_system": "LEAP", "validation_axis": "flow", "reason": "frontier_rows_absent", "parent_code": "Oil Refining", "parent_value": 4.0, "frontier_sum": 0.0, "difference": 4.0, "abs_error": 4.0},
     ]).to_csv(tree_root / "source_parent_anchor_validation.csv", index=False)
+    pd.DataFrame([
+        {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "parent_code": "09_total", "child_code": "09_child", "raw_child_total": 7.0},
+    ]).to_csv(tree_root / "source_parent_anchor_child_values.csv", index=False)
     pd.DataFrame([{ "source_system": "LEAP", "common_row_id": "row", "missing_component_pairs": "flow :: product", "relevance_evidence": "nonzero", "mapping_action": "review", "mapping_sheet_to_review": "leap_combined_esto" }]).to_csv(common_root / "qa_common_esto_unresolved_partial_coverage.csv", index=False)
     pd.DataFrame([{ "leap_flow": "Industry", "leap_product": "Gas", "qa_status": "review" }]).to_csv(common_root / "qa_nonzero_unmapped_leap_branches.csv", index=False)
     pd.DataFrame([{ "leap_sector_name_full_path": "Industry", "raw_leap_fuel_name": "Gas", "presence_status": "ESTO only" }]).to_csv(maintenance_root / "leap_source_presence_conflicts.csv", index=False)
@@ -40,7 +43,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
 
     assert "How the anchor validator connects the trees" in html
     assert "09 Total" in html
-    assert "Mismatch total 3.00" in html
+    assert "absolute mismatch 3.00" in html
     assert "Largest summed anchor mismatches" in html
+    assert "raw child 7.00" in html
     assert "Direct mapping coverage review" in html
     assert Path(result["summary"]).exists()
