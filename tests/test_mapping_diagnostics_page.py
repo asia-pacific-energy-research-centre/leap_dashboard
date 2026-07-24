@@ -44,11 +44,13 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     result = write_mapping_diagnostics_page(layout, mappings_root, dashboard_updated_label="test")
     html = Path(result["page"]).read_text(encoding="utf-8")
 
-    assert "How the anchor validator connects the trees" in html
-    assert "09 Total" in html
-    assert "absolute mismatch 3.00" in html
+    assert "How the anchor validator connects the hierarchies" in html
+    assert "09_total" in html
+    assert "branch absolute mismatch" in html
     assert "Largest summed anchor mismatches" in html
-    assert "raw child 7.00" in html
-    assert "Raw NINTH hierarchy drilldown" in html
+    assert "09_child: 7.00" in html
+    assert "NINTH hierarchy drilldown with branch mismatch rank" in html
+    assert "LEAP hierarchy drilldown with branch mismatch rank" in html
+    assert "ESTO hierarchy drilldown with branch mismatch rank" in html
     assert "Direct mapping coverage review" in html
     assert Path(result["summary"]).exists()

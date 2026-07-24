@@ -131,8 +131,12 @@ def _anchor_child_value_summary(child_values: pd.DataFrame) -> dict[tuple[str, s
     return {(str(parent), str(child)): float(value) for (parent, child), value in grouped.items()}
 
 
-def _ninth_raw_context_summary(context_values: pd.DataFrame) -> pd.DataFrame:
-    """Build a context-level raw NINTH parent/child reconciliation table."""
+def _source_raw_context_summary(
+    context_values: pd.DataFrame,
+    anchor_value_summary: pd.DataFrame,
+    source_system: str,
+) -> pd.DataFrame:
+    """Build a context drilldown joined to each branch's summed mismatch rank."""
     required = {
         "source_system", "validation_axis", "comparison_scope", "economy", "scenario", "year",
         "other_axis_value", "parent_code", "child_code", "parent_value", "frontier_sum",
@@ -140,7 +144,7 @@ def _ninth_raw_context_summary(context_values: pd.DataFrame) -> pd.DataFrame:
     }
     if context_values.empty or not required.issubset(context_values.columns):
         return pd.DataFrame()
-    working = context_values[context_values["source_system"].astype(str).eq("NINTH")].copy()
+    working = context_values[context_values["source_system"].astype(str).eq(source_system)].copy()
     if working.empty:
         return pd.DataFrame()
     context_columns = [
@@ -152,12 +156,23 @@ def _ninth_raw_context_summary(context_values: pd.DataFrame) -> pd.DataFrame:
     for column in ["parent_value", "frontier_sum", "raw_child_value"]:
         working[column] = pd.to_numeric(working[column], errors="coerce").fillna(0.0)
     group_columns = context_columns
+    branch_values = anchor_value_summary[
+        anchor_value_summary["source_system"].astype(str).eq(source_system)
+    ].copy()
+    branch_values = branch_values.sort_values("absolute_mismatch_total", ascending=False, kind="mergesort")
+    branch_values["branch_mismatch_rank"] = range(1, len(branch_values) + 1)
+    branch_lookup = {
+        (str(row.validation_axis), str(row.parent_code)): row
+        for row in branch_values.itertuples(index=False)
+    }
+
     rows: list[dict[str, object]] = []
     for context, group in working.groupby(group_columns, dropna=False, sort=False):
         child_values = group.sort_values("child_code", kind="mergesort")
         raw_children_total = float(child_values["raw_child_value"].sum())
         parent_value = float(child_values["parent_value"].iloc[0])
         mapped_frontier = float(child_values["frontier_sum"].iloc[0])
+        branch = branch_lookup.get((str(context[0]), str(context[5])))
         child_breakdown = "; ".join(
             f"{str(row.child_code).split('/')[-1]}: {_three_significant_figures(float(row.raw_child_value))}"
             for row in child_values.itertuples(index=False)
@@ -174,6 +189,10 @@ def _ninth_raw_context_summary(context_values: pd.DataFrame) -> pd.DataFrame:
             "raw_residual": _three_significant_figures(parent_value - raw_children_total),
             "absolute_raw_residual": abs(parent_value - raw_children_total),
             "mapped_frontier": _three_significant_figures(mapped_frontier),
+            "branch_mismatch_rank": int(branch.branch_mismatch_rank) if branch else "",
+            "branch_absolute_mismatch": _three_significant_figures(float(branch.absolute_mismatch_total)) if branch else "",
+            "branch_parent_total": _three_significant_figures(float(branch.parent_total)) if branch else "",
+            "branch_mapped_frontier_total": _three_significant_figures(float(branch.children_total)) if branch else "",
             "raw_child_values": child_breakdown,
         })
     return pd.DataFrame(rows).sort_values("absolute_raw_residual", ascending=False, kind="mergesort")
@@ -288,7 +307,15 @@ def write_mapping_diagnostics_page(
     anchor_summary = _failure_summary(anchor, ["source_system", "validation_axis", "reason", "parent_code"])
     anchor_value_summary = _anchor_value_summary(anchor)
     anchor_child_value_lookup = _anchor_child_value_summary(anchor_child_values)
-    ninth_raw_context_summary = _ninth_raw_context_summary(anchor_child_context_values)
+    ninth_raw_context_summary = _source_raw_context_summary(
+        anchor_child_context_values, anchor_value_summary, "NINTH"
+    )
+    leap_raw_context_summary = _source_raw_context_summary(
+        anchor_child_context_values, anchor_value_summary, "LEAP"
+    )
+    esto_raw_context_summary = _source_raw_context_summary(
+        anchor_child_context_values, anchor_value_summary, "ESTO"
+    )
     anchor_value_display = anchor_value_summary.copy()
     for column in ["parent_total", "children_total", "net_difference", "absolute_mismatch_total"]:
         if column in anchor_value_display.columns:
@@ -325,11 +352,12 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
 </style></head><body><div class="shell"><header><a href="index.html">← Dashboard overview</a><h1>Mapping diagnostics</h1><p class="subtle">Read-only inspection of hierarchy/anchor validation and direct mapping coverage. Updated: {escape(dashboard_updated_label)}</p></header>
 <div class="metrics">{cards}</div>
-<section class="panel"><h2>How the anchor validator connects the trees</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">Tree badges sum failed values across economies, scenarios, and years. Each failed parent shows its raw parent total, mapped-frontier total, and absolute mismatch. Each listed direct child shows its raw source total for the same failed contexts.</p></section>
-<div class="grid"><section class="panel"><h2>NINTH branches with largest summed mismatch</h2>{_issue_tree_section(ninth_tree[ninth_tree.get('axis', '').astype(str).eq('sector')] if not ninth_tree.empty else ninth_tree, anchor_value_summary, anchor_child_value_lookup, 'NINTH')}</section><section class="panel"><h2>LEAP branches with largest summed mismatch</h2>{_issue_tree_section(leap_tree[leap_tree.get('axis', '').astype(str).eq('sector')] if not leap_tree.empty else leap_tree, anchor_value_summary, anchor_child_value_lookup, 'LEAP')}</section></div>
+<section class="panel"><h2>How the anchor validator connects the hierarchies</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">The tables below match each raw parent/children context to its branch-level summed absolute mismatch and rank. This makes the materiality ranking and the exact source evidence visible together.</p></section>
 <section class="panel"><h2>Stage 3 hierarchy failures</h2>{_table_html(stage_summary, ['source_system','validation_axis','parent_code','rows'])}</section>
 <section class="panel"><h2>Largest summed anchor mismatches</h2><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</section>
-<section class="panel"><h2>Raw NINTH hierarchy drilldown</h2><p class="subtle">Each row is one economy, scenario, year, and other-axis context before mapping. Raw residual is raw parent minus the sum of its immediate raw children. This separates source-hierarchy contradictions from mapped-frontier differences.</p>{_table_html(ninth_raw_context_summary, ['economy','scenario','year','validation_axis','other_axis_value','parent_code','raw_parent','raw_children_sum','raw_residual','mapped_frontier','raw_child_values'])}</section>
+<section class="panel"><h2>NINTH hierarchy drilldown with branch mismatch rank</h2><p class="subtle">Each row is one raw NINTH context before mapping. Raw residual is parent minus immediate raw children; branch columns are summed across that branch's failed contexts.</p>{_table_html(ninth_raw_context_summary, ['branch_mismatch_rank','branch_absolute_mismatch','branch_parent_total','branch_mapped_frontier_total','economy','scenario','year','validation_axis','other_axis_value','parent_code','raw_parent','raw_children_sum','raw_residual','mapped_frontier','raw_child_values'])}</section>
+<section class="panel"><h2>LEAP hierarchy drilldown with branch mismatch rank</h2>{_table_html(leap_raw_context_summary, ['branch_mismatch_rank','branch_absolute_mismatch','branch_parent_total','branch_mapped_frontier_total','economy','scenario','year','validation_axis','other_axis_value','parent_code','raw_parent','raw_children_sum','raw_residual','mapped_frontier','raw_child_values'])}</section>
+<section class="panel"><h2>ESTO hierarchy drilldown with branch mismatch rank</h2>{_table_html(esto_raw_context_summary, ['branch_mismatch_rank','branch_absolute_mismatch','branch_parent_total','branch_mapped_frontier_total','economy','scenario','year','validation_axis','other_axis_value','parent_code','raw_parent','raw_children_sum','raw_residual','mapped_frontier','raw_child_values'])}</section>
 <section class="panel"><h2>Direct mapping coverage review</h2><h3>Actionable partial coverage</h3>{_table_html(partial, ['source_system','comparison_scope','common_row_id','missing_component_pairs','relevance_evidence','mapping_action','mapping_sheet_to_review'])}<h3>Non-zero unmapped LEAP branches</h3>{_table_html(unmapped, ['leap_flow','leap_product','indirect_esto_flow','indirect_esto_product','qa_status'])}<h3>LEAP source-presence conflicts</h3>{_table_html(conflicts, ['leap_sector_name_full_path','raw_leap_fuel_name','presence_status','in_leap_combined_esto','in_leap_combined_ninth'])}<h3>Source-coverage audit summary</h3>{_table_html(coverage_summary, ['coverage_status','mapping_status','rows'])}</section>
 <footer><strong>Artifact provenance</strong><br>{artifact_notes}<br>{escape(_artifact_note(anchor_child_values_path))}<br>{escape(_artifact_note(anchor_child_context_values_path))}</footer></div></body></html>"""
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME
