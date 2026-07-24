@@ -54,6 +54,7 @@ from common_esto_dashboard_data import (  # noqa: E402
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
 from common_esto_dashboard_output_layout import build_output_layout, publish_to_docs  # noqa: E402
 from common_esto_dashboard_convergence import write_capacity_unmet_convergence_page  # noqa: E402
+from common_esto_dashboard_mapping_diagnostics import write_mapping_diagnostics_page  # noqa: E402
 
 
 #%%
@@ -331,6 +332,18 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         layout,
         scope_df=scope_visible_df,
         dashboard_updated_label=dashboard_updated_label,
+        additional_pages=[
+            {
+                "page_key": "mapping_diagnostics",
+                "page_label": "Mapping diagnostics",
+                "file": "mapping_diagnostics.html",
+            }
+        ],
+    )
+    mapping_diagnostics = write_mapping_diagnostics_page(
+        layout,
+        _LEAP_MAPPINGS_REPO,
+        dashboard_updated_label=dashboard_updated_label,
     )
     convergence_result = write_capacity_unmet_convergence_page(
         CAPACITY_UNMET_CONVERGENCE_PATH,
@@ -368,6 +381,7 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         "chart_manifest": str(layout["supporting"] / "chart_manifest.csv"),
         "sign_semantics_summary": str(layout["supporting"] / "sign_semantics_summary.csv"),
         "chart_count": len(manifest_df),
+        "mapping_diagnostics": mapping_diagnostics,
     }
     if convergence_result:
         result["capacity_unmet_convergence"] = convergence_result

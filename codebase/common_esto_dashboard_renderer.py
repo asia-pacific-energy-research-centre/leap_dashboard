@@ -3251,6 +3251,7 @@ def render_dashboard(
     layout: dict[str, Path],
     scope_df: pd.DataFrame | None = None,
     dashboard_updated_label: str = "",
+    additional_pages: list[dict[str, str]] | None = None,
 ) -> pd.DataFrame:
     """Render page bundles, dashboard pages, and a chart manifest."""
     series_labels = series_config.get("series_labels", {})
@@ -3322,6 +3323,15 @@ def render_dashboard(
                     "page_label": scope_page_label,
                     "file": f"{scope_page_key}.html",
                 })
+
+    for page in additional_pages or []:
+        page_key = safe_slug(page.get("page_key", ""))
+        if page_key and page_key not in {item["page_key"] for item in page_inventory}:
+            page_inventory.append({
+                "page_key": page_key,
+                "page_label": str(page.get("page_label", page_key)),
+                "file": str(page.get("file", f"{page_key}.html")),
+            })
 
     manifest_rows: list[dict[str, object]] = []
     page_rows: list[dict[str, object]] = []
@@ -3514,6 +3524,19 @@ def render_dashboard(
     )
     manifest_rows.extend(scope_manifest_rows)
     page_rows.extend(scope_page_rows)
+
+    # Diagnostics pages have no chart bundle, so they are not added in the
+    # chart-rendering loop above. Keep them visible from the overview index.
+    existing_page_files = {str(row["file"]) for row in page_rows}
+    for page in additional_pages or []:
+        page_file = str(page.get("file", ""))
+        if page_file and page_file not in existing_page_files:
+            page_rows.append({
+                "file": page_file,
+                "label": str(page.get("page_label", page_file)),
+                "area_chart_count": 0,
+                "line_chart_count": 0,
+            })
 
     write_index(
         page_rows,
