@@ -60,5 +60,7 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Original raw tree" in html
     assert "Mapped Common ESTO frontier (de-duplicated)" in html
     assert "09 Child → 09.00 Total / 08.01 Gas" in html
+    assert "Show zero-value children and mapped components" in html
+    assert "optional-zero" in html
     assert "Direct mapping coverage review" in html
     assert Path(result["summary"]).exists()
