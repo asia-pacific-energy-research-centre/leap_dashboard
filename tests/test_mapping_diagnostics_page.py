@@ -41,16 +41,20 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     layout = {"dashboards": tmp_path / "dashboard", "supporting": tmp_path / "supporting"}
     for path in layout.values():
         path.mkdir()
-    result = write_mapping_diagnostics_page(layout, mappings_root, dashboard_updated_label="test")
+    result = write_mapping_diagnostics_page(
+        layout, mappings_root, dashboard_updated_label="test", economy="01AUS"
+    )
     html = Path(result["page"]).read_text(encoding="utf-8")
 
     assert "How the anchor validator connects the hierarchies" in html
     assert "09_total" in html
-    assert "branch absolute mismatch" in html
+    assert "absolute mismatch total" in html
     assert "Largest summed anchor mismatches" in html
-    assert "09_child: 7.00" in html
-    assert "NINTH hierarchy drilldown with branch mismatch rank" in html
-    assert "LEAP hierarchy drilldown with branch mismatch rank" in html
-    assert "ESTO hierarchy drilldown with branch mismatch rank" in html
+    assert "09 Child" in html
+    assert ">7.00<" in html
+    assert "NINTH: original tree vs mapped representation" in html
+    assert "LEAP: original tree vs mapped representation" in html
+    assert "Original raw tree" in html
+    assert "Mapped Common ESTO frontier (de-duplicated)" in html
     assert "Direct mapping coverage review" in html
     assert Path(result["summary"]).exists()

@@ -198,6 +198,109 @@ def _source_raw_context_summary(
     return pd.DataFrame(rows).sort_values("absolute_raw_residual", ascending=False, kind="mergesort")
 
 
+def _paired_anchor_aggregate_summary(
+    context_values: pd.DataFrame,
+    source_system: str,
+    economy: str,
+) -> pd.DataFrame:
+    """Aggregate failed raw-tree contexts for one displayed source/economy.
+
+    The mapped frontier is deliberately one total, rather than being assigned
+    back to raw children: one Common ESTO row can legitimately represent more
+    than one raw child.  Showing a made-up per-child split would make the
+    comparison look additive when the validator specifically avoids that.
+    """
+    required = {
+        "source_system", "validation_axis", "comparison_scope", "economy", "scenario", "year",
+        "other_axis_value", "parent_code", "child_code", "parent_value", "frontier_sum",
+        "raw_child_value",
+    }
+    if context_values.empty or not required.issubset(context_values.columns):
+        return pd.DataFrame()
+    working = context_values[
+        context_values["source_system"].astype(str).eq(source_system)
+        & context_values["economy"].astype(str).str.replace("_", "", regex=False).eq(economy)
+    ].copy()
+    if working.empty:
+        return pd.DataFrame()
+    context_keys = [
+        "validation_axis", "economy", "scenario", "year", "other_axis_value", "parent_code",
+    ]
+    working["_scope_priority"] = working["comparison_scope"].map(SCOPE_PRIORITY).fillna(99)
+    working = working[
+        working["_scope_priority"].eq(
+            working.groupby(context_keys, dropna=False)["_scope_priority"].transform("min")
+        )
+    ]
+    for column in ["parent_value", "frontier_sum", "raw_child_value"]:
+        working[column] = pd.to_numeric(working[column], errors="coerce").fillna(0.0)
+    group_keys = ["validation_axis", "other_axis_value", "parent_code"]
+    rows: list[dict[str, object]] = []
+    for group_key, group in working.groupby(group_keys, dropna=False, sort=False):
+        contexts = group.drop_duplicates(context_keys)
+        child_totals = group.groupby("child_code", dropna=False)["raw_child_value"].sum()
+        parent_total = float(contexts["parent_value"].sum())
+        frontier_total = float(contexts["frontier_sum"].sum())
+        children_total = float(child_totals.sum())
+        rows.append({
+            "validation_axis": group_key[0],
+            "other_axis_value": group_key[1],
+            "parent_code": group_key[2],
+            "parent_total": parent_total,
+            "children_total": children_total,
+            "raw_residual": parent_total - children_total,
+            "mapped_frontier_total": frontier_total,
+            "mapped_difference": parent_total - frontier_total,
+            "absolute_mismatch": abs(parent_total - frontier_total),
+            "child_totals": child_totals.to_dict(),
+            "scenarios": ", ".join(sorted(contexts["scenario"].astype(str).unique())),
+            "years": ", ".join(str(year) for year in sorted(pd.to_numeric(contexts["year"]).dropna().astype(int).unique())),
+        })
+    return pd.DataFrame(rows).sort_values("absolute_mismatch", ascending=False, kind="mergesort")
+
+
+def _tree_label_lookup(tree: pd.DataFrame) -> dict[str, str]:
+    if tree.empty or not {"code", "label"}.issubset(tree.columns):
+        return {}
+    return {
+        str(row.code): str(row.label) if str(row.label).strip() else str(row.code)
+        for row in tree[["code", "label"]].drop_duplicates("code").itertuples(index=False)
+    }
+
+
+def _paired_tree_html(summary: pd.DataFrame, tree: pd.DataFrame, source_system: str) -> str:
+    """Render original raw tree beside its de-duplicated mapped frontier."""
+    if summary.empty:
+        return '<p class="empty-state">No failed anchor contexts for this dashboard economy.</p>'
+    labels = _tree_label_lookup(tree)
+    cards: list[str] = []
+    for row in summary.head(12).itertuples(index=False):
+        parent_label = labels.get(str(row.parent_code), str(row.parent_code))
+        raw_children = "".join(
+            "<li><span>└─ " + escape(labels.get(str(child), str(child))) + "</span>"
+            f"<strong>{_three_significant_figures(float(value))}</strong></li>"
+            for child, value in sorted(row.child_totals.items())
+        )
+        cards.append(
+            f'<article class="paired-case"><h3>{escape(source_system)} | {escape(str(row.validation_axis))} | '
+            f'{escape(str(row.other_axis_value))}</h3><p class="subtle">{escape(str(row.scenarios))}; checked years: '
+            f'{escape(str(row.years))}. Values are signed sums; display rounding is 1–3 significant figures.</p>'
+            '<div class="paired-trees">'
+            '<section><h4>Original raw tree</h4><ul class="value-tree">'
+            f'<li><span>Parent: {escape(parent_label)}</span><strong>{_three_significant_figures(float(row.parent_total))}</strong></li>'
+            f'{raw_children}'
+            f'<li class="tree-total"><span>Children sum</span><strong>{_three_significant_figures(float(row.children_total))}</strong></li>'
+            f'<li class="tree-residual"><span>Raw residual (parent − children)</span><strong>{_three_significant_figures(float(row.raw_residual))}</strong></li>'
+            '</ul></section>'
+            '<section><h4>Same branch represented through mappings</h4><ul class="value-tree">'
+            f'<li><span>Raw parent reference</span><strong>{_three_significant_figures(float(row.parent_total))}</strong></li>'
+            f'<li><span>Mapped Common ESTO frontier (de-duplicated)</span><strong>{_three_significant_figures(float(row.mapped_frontier_total))}</strong></li>'
+            f'<li class="tree-residual"><span>Anchor difference (parent − frontier)</span><strong>{_three_significant_figures(float(row.mapped_difference))}</strong></li>'
+            '</ul></section></div></article>'
+        )
+    return "".join(cards)
+
+
 def _tree_html(
     tree: pd.DataFrame,
     parent_code: str,
@@ -279,6 +382,7 @@ def write_mapping_diagnostics_page(
     mappings_root: Path,
     *,
     dashboard_updated_label: str,
+    economy: str = "",
 ) -> dict[str, str]:
     """Write one self-contained mapping diagnostics page and summary CSV."""
     results_root = mappings_root / "results"
@@ -306,15 +410,12 @@ def write_mapping_diagnostics_page(
     stage_summary = _failure_summary(stage, ["source_system", "validation_axis", "parent_code"])
     anchor_summary = _failure_summary(anchor, ["source_system", "validation_axis", "reason", "parent_code"])
     anchor_value_summary = _anchor_value_summary(anchor)
-    anchor_child_value_lookup = _anchor_child_value_summary(anchor_child_values)
-    ninth_raw_context_summary = _source_raw_context_summary(
-        anchor_child_context_values, anchor_value_summary, "NINTH"
+    dashboard_economy = str(economy).replace("_", "").strip()
+    ninth_paired_summary = _paired_anchor_aggregate_summary(
+        anchor_child_context_values, "NINTH", dashboard_economy
     )
-    leap_raw_context_summary = _source_raw_context_summary(
-        anchor_child_context_values, anchor_value_summary, "LEAP"
-    )
-    esto_raw_context_summary = _source_raw_context_summary(
-        anchor_child_context_values, anchor_value_summary, "ESTO"
+    leap_paired_summary = _paired_anchor_aggregate_summary(
+        anchor_child_context_values, "LEAP", dashboard_economy
     )
     anchor_value_display = anchor_value_summary.copy()
     for column in ["parent_total", "children_total", "net_difference", "absolute_mismatch_total"]:
@@ -348,16 +449,15 @@ body {{ font-family: Inter,Segoe UI,Arial,sans-serif; margin:0; background:#f4f6
 h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b7a; }} .metrics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:16px 0; }}
 .metric-card,.panel {{ background:white; border:1px solid #d9e1ea; border-radius:10px; padding:14px; }} .metric-card span {{ display:block; color:#5f6b7a; font-size:13px; }} .metric-card strong {{ font-size:28px; }}
 .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:16px; }} .flow {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }} .flow div {{ background:#e8f0fa; border:1px solid #adc4df; border-radius:8px; padding:10px; font-size:13px; }} .arrow {{ color:#53718f; font-size:22px; }}
-.tree {{ padding-left:18px; }} .tree ul {{ padding-left:22px; }} summary,.tree-node {{ line-height:1.7; }} code {{ color:#254b75; }} .tree-label {{ color:#102a43; font-weight:600; }} .tree-code {{ color:#4b6378; display:block; font-size:.72rem; margin:.08rem 0 .16rem; overflow-wrap:anywhere; }} .value-badge {{ background:#fde8e7; color:#9b1c1c; border-radius:999px; padding:2px 7px; font-size:12px; margin-left:5px; }} .child-value {{ color:#5f6b7a; font-size:12px; margin-left:7px; }}
+.paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
 </style></head><body><div class="shell"><header><a href="index.html">← Dashboard overview</a><h1>Mapping diagnostics</h1><p class="subtle">Read-only inspection of hierarchy/anchor validation and direct mapping coverage. Updated: {escape(dashboard_updated_label)}</p></header>
 <div class="metrics">{cards}</div>
 <section class="panel"><h2>How the anchor validator connects the hierarchies</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">The tables below match each raw parent/children context to its branch-level summed absolute mismatch and rank. This makes the materiality ranking and the exact source evidence visible together.</p></section>
 <section class="panel"><h2>Stage 3 hierarchy failures</h2>{_table_html(stage_summary, ['source_system','validation_axis','parent_code','rows'])}</section>
 <section class="panel"><h2>Largest summed anchor mismatches</h2><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</section>
-<section class="panel"><h2>NINTH hierarchy drilldown with branch mismatch rank</h2><p class="subtle">Each row is one raw NINTH context before mapping. Raw residual is parent minus immediate raw children; branch columns are summed across that branch's failed contexts.</p>{_table_html(ninth_raw_context_summary, ['branch_mismatch_rank','branch_absolute_mismatch','branch_parent_total','branch_mapped_frontier_total','economy','scenario','year','validation_axis','other_axis_value','parent_code','raw_parent','raw_children_sum','raw_residual','mapped_frontier','raw_child_values'])}</section>
-<section class="panel"><h2>LEAP hierarchy drilldown with branch mismatch rank</h2>{_table_html(leap_raw_context_summary, ['branch_mismatch_rank','branch_absolute_mismatch','branch_parent_total','branch_mapped_frontier_total','economy','scenario','year','validation_axis','other_axis_value','parent_code','raw_parent','raw_children_sum','raw_residual','mapped_frontier','raw_child_values'])}</section>
-<section class="panel"><h2>ESTO hierarchy drilldown with branch mismatch rank</h2>{_table_html(esto_raw_context_summary, ['branch_mismatch_rank','branch_absolute_mismatch','branch_parent_total','branch_mapped_frontier_total','economy','scenario','year','validation_axis','other_axis_value','parent_code','raw_parent','raw_children_sum','raw_residual','mapped_frontier','raw_child_values'])}</section>
+<section class="panel"><h2>NINTH: original tree vs mapped representation</h2><p class="subtle">Each case aggregates the validator's failed contexts across Reference and Target. The raw residual identifies a contradiction within the source tree; the anchor difference identifies the mismatch after mapping.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, 'NINTH')}</section>
+<section class="panel"><h2>LEAP: original tree vs mapped representation</h2><p class="subtle">Each case aggregates the validator's failed contexts across its checked scenarios and years.</p>{_paired_tree_html(leap_paired_summary, leap_tree, 'LEAP')}</section>
 <section class="panel"><h2>Direct mapping coverage review</h2><h3>Actionable partial coverage</h3>{_table_html(partial, ['source_system','comparison_scope','common_row_id','missing_component_pairs','relevance_evidence','mapping_action','mapping_sheet_to_review'])}<h3>Non-zero unmapped LEAP branches</h3>{_table_html(unmapped, ['leap_flow','leap_product','indirect_esto_flow','indirect_esto_product','qa_status'])}<h3>LEAP source-presence conflicts</h3>{_table_html(conflicts, ['leap_sector_name_full_path','raw_leap_fuel_name','presence_status','in_leap_combined_esto','in_leap_combined_ninth'])}<h3>Source-coverage audit summary</h3>{_table_html(coverage_summary, ['coverage_status','mapping_status','rows'])}</section>
 <footer><strong>Artifact provenance</strong><br>{artifact_notes}<br>{escape(_artifact_note(anchor_child_values_path))}<br>{escape(_artifact_note(anchor_child_context_values_path))}</footer></div></body></html>"""
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME

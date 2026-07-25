@@ -344,6 +344,7 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         layout,
         _LEAP_MAPPINGS_REPO,
         dashboard_updated_label=dashboard_updated_label,
+        economy=economy,
     )
     convergence_result = write_capacity_unmet_convergence_page(
         CAPACITY_UNMET_CONVERGENCE_PATH,
