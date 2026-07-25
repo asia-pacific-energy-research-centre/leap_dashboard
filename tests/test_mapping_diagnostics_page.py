@@ -91,7 +91,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Mapped components reached from source branch" in html
     assert "Resolved from source parent" in html
     assert "09 Total / 08.01 Gas" in html
-    assert "Raw roll-up: this source parent" in html
+    assert "Manual LEAP roll-up" in html
+    assert "Raw roll-up: this source parent" not in html
     assert "One-to-many mapping: this raw parent reaches 2 ESTO components." in html
     assert "09 Child → 09.00 Total / 08.01 Gas" in html
     assert '<li class="tree-category"><span>Children</span></li>' in html
