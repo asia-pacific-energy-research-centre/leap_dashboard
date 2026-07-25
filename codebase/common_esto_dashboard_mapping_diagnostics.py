@@ -324,6 +324,21 @@ def _paired_tree_html(
             & (mapped_components["economy"].astype(str).str.replace("_", "", regex=False) == economy)
         ].copy() if not mapped_components.empty else pd.DataFrame()
         if not component_rows.empty:
+            # Match the paired raw-tree summary's scope selection.  The same
+            # source context can occur in both ``esto_leap_ninth`` and the
+            # narrower ``esto_leap`` scope; displaying both here doubles the
+            # component values even though the left tree chose only one.
+            if "comparison_scope" in component_rows.columns:
+                component_scope_keys = [
+                    "validation_axis", "economy", "scenario", "year",
+                    "other_axis_value", "parent_code",
+                ]
+                component_rows["_scope_priority"] = component_rows["comparison_scope"].map(SCOPE_PRIORITY).fillna(99)
+                component_rows = component_rows[
+                    component_rows["_scope_priority"].eq(
+                        component_rows.groupby(component_scope_keys, dropna=False)["_scope_priority"].transform("min")
+                    )
+                ].drop(columns="_scope_priority")
             if "raw_node_role" not in component_rows.columns:
                 component_rows["raw_node_role"] = "child"
             component_rows["mapped_value"] = pd.to_numeric(component_rows["mapped_value"], errors="coerce").fillna(0.0)
@@ -550,8 +565,8 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 <div class="metrics">{cards}</div>
 <section class="panel"><h2>How the anchor validator connects the hierarchies</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">The tables below match each raw parent/children context to its branch-level summed absolute mismatch and rank. This makes the materiality ranking and the exact source evidence visible together.</p></section>
 <details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2><span></span></summary><div>{_table_html(stage_summary, ['source_system','validation_axis','parent_code','rows'])}</div></details>
-<section class="panel"><h2>Largest summed anchor mismatches</h2><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</section>
-<section class="panel"><h2>Reviewed source-hierarchy exceptions</h2><p class="subtle">These are known source-data conditions from the exception workbook. They are skipped from actionable anchor failures but remain visible here with their review notes.</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','reason','exception_resolution','data_quality_exception_notes'])}<h3>Leaf-reconciliation candidates awaiting review</h3><p class="subtle">These are not exceptions yet. Their immediate children do not reconcile, while their descendant leaves do; review before copying an enabled row into <code>source_mismatch_allowed</code>.</p>{_table_html(leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</section>
+<details class="panel collapsed-panel"><summary><h2>Largest summed anchor mismatches</h2><span></span></summary><div><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</div></details>
+<details class="panel collapsed-panel"><summary><h2>Reviewed source-hierarchy exceptions</h2><span></span></summary><div><p class="subtle">These are known source-data conditions from the exception workbook. They are skipped from actionable anchor failures but remain visible here with their review notes.</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','reason','exception_resolution','data_quality_exception_notes'])}<h3>Leaf-reconciliation candidates awaiting review</h3><p class="subtle">These are not exceptions yet. Their immediate children do not reconcile, while their descendant leaves do; review before copying an enabled row into <code>source_mismatch_allowed</code>.</p>{_table_html(leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>
 <label class="zero-toggle"><input id="show-zero-children" type="checkbox" autocomplete="off" onchange="document.body.classList.toggle('show-zero-children', this.checked)"> Show zero-value children and mapped components</label>
 <section class="panel"><h2>NINTH flow tree: original vs mapped representation</h2><p class="subtle">These drilldowns traverse only the flow hierarchy. Product is the fixed context, which avoids presenting a fixed flow as though it were a product-tree parent.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, 'NINTH', anchor_mapped_component_context_values, dashboard_economy)}</section>
 <section class="panel"><h2>LEAP flow tree: original vs mapped representation</h2><p class="subtle">These drilldowns traverse only the flow hierarchy; product remains fixed context.</p>{_paired_tree_html(leap_paired_summary, leap_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy)}</section>

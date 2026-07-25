@@ -49,6 +49,7 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     ]).to_csv(tree_root / "source_parent_anchor_child_context_values.csv", index=False)
     pd.DataFrame([
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "parent", "raw_child_code": "09_total", "component_esto_flow": "09 Total", "component_esto_product": "08.01 Gas", "common_row_id": "parent", "mapped_value": 10.0, "mapping_status": "mapped"},
+        {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "parent", "raw_child_code": "09_total", "component_esto_flow": "09 Total", "component_esto_product": "08.01 Gas", "common_row_id": "parent", "mapped_value": 10.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "parent", "raw_child_code": "09_total", "component_esto_flow": "09 Extra", "component_esto_product": "08.01 Gas", "common_row_id": "extra", "mapped_value": 1.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "child", "raw_child_code": "09_child", "component_esto_flow": "09.00 Total", "component_esto_product": "08.01 Gas", "common_row_id": "common", "mapped_value": 7.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_child_code": "missing_child", "component_esto_flow": "", "component_esto_product": "", "common_row_id": "", "mapped_value": 0.0, "mapping_status": "missing_source_mapping:missing_child"},
@@ -91,6 +92,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Mapped components reached from source branch" in html
     assert "Resolved from source parent" in html
     assert "09 Total / 08.01 Gas" in html
+    assert ">10.0<" in html
+    assert ">20.0<" not in html
     assert "Manual LEAP roll-up" in html
     assert "Raw roll-up: this source parent" not in html
     assert "One-to-many mapping: this raw parent reaches 2 ESTO components." in html
@@ -106,4 +109,6 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Direct mapping coverage review" in html
     assert '<details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2>' in html
     assert '<details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2>' in html
+    assert '<details class="panel collapsed-panel"><summary><h2>Largest summed anchor mismatches</h2>' in html
+    assert '<details class="panel collapsed-panel"><summary><h2>Reviewed source-hierarchy exceptions</h2>' in html
     assert Path(result["summary"]).exists()
