@@ -38,6 +38,14 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "child", "raw_child_code": "09_child", "component_esto_flow": "09.00 Total", "component_esto_product": "08.01 Gas", "common_row_id": "common", "mapped_value": 7.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_child_code": "missing_child", "component_esto_flow": "", "component_esto_product": "", "common_row_id": "", "mapped_value": 0.0, "mapping_status": "missing_source_mapping:missing_child"},
     ]).to_csv(tree_root / "source_parent_anchor_mapped_component_context_values.csv", index=False)
+    pd.DataFrame([{
+        "enabled": False, "source_system": "NINTH", "validation_axis": "flow",
+        "parent_code": "09_total", "other_axis_value": "Gas", "economy": "01AUS",
+        "scenario": "reference", "year": 2023, "parent_value": 10.0,
+        "direct_children_sum": 7.0, "leaf_descendants_sum": 10.0,
+        "candidate_classification": "direct_children_incomplete_but_leaves_reconcile",
+        "notes": "Review before enabling.",
+    }]).to_csv(tree_root / "source_parent_anchor_leaf_reconciliation_candidates.csv", index=False)
     pd.DataFrame([{ "source_system": "LEAP", "common_row_id": "row", "missing_component_pairs": "flow :: product", "relevance_evidence": "nonzero", "mapping_action": "review", "mapping_sheet_to_review": "leap_combined_esto" }]).to_csv(common_root / "qa_common_esto_unresolved_partial_coverage.csv", index=False)
     pd.DataFrame([{ "leap_flow": "Industry", "leap_product": "Gas", "qa_status": "review" }]).to_csv(common_root / "qa_nonzero_unmapped_leap_branches.csv", index=False)
     pd.DataFrame([{ "leap_sector_name_full_path": "Industry", "raw_leap_fuel_name": "Gas", "presence_status": "ESTO only" }]).to_csv(maintenance_root / "leap_source_presence_conflicts.csv", index=False)
@@ -68,5 +76,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "optional-zero" in html
     assert "onchange=\"document.body.classList.toggle('show-zero-children', this.checked)\"" in html
     assert "Missing source mapping" not in html
+    assert "Reviewed source-hierarchy exceptions" in html
+    assert "Leaf-reconciliation candidates awaiting review" in html
+    assert "direct_children_incomplete_but_leaves_reconcile" in html
     assert "Direct mapping coverage review" in html
     assert Path(result["summary"]).exists()
