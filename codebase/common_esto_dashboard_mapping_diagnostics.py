@@ -283,9 +283,11 @@ def _paired_tree_html(
     for row in summary.head(12).itertuples(index=False):
         parent_label = labels.get(str(row.parent_code), str(row.parent_code))
         raw_children = "".join(
-            '<li class="optional-zero" data-zero-child="true">' if float(value) == 0 else "<li>"
+            (
+                '<li class="optional-zero" data-zero-child="true">' if float(value) == 0 else "<li>"
+            )
             + "<span>child: " + escape(labels.get(str(child), str(child))) + "</span>"
-            f"<strong>{_three_significant_figures(float(value))}</strong></li>"
+            + f"<strong>{_three_significant_figures(float(value))}</strong></li>"
             for child, value in sorted(row.child_totals.items())
         )
         component_rows = mapped_components[
@@ -295,25 +297,29 @@ def _paired_tree_html(
             & (mapped_components["economy"].astype(str).str.replace("_", "", regex=False) == economy)
         ].copy() if not mapped_components.empty else pd.DataFrame()
         if not component_rows.empty:
+            if "raw_node_role" not in component_rows.columns:
+                component_rows["raw_node_role"] = "child"
             component_rows["mapped_value"] = pd.to_numeric(component_rows["mapped_value"], errors="coerce").fillna(0.0)
-            mapped_branches = []
+            mapped_parent_rows = []
+            mapped_child_rows = []
             for component_key, group in component_rows.groupby(
-                ["raw_child_code", "component_esto_flow", "component_esto_product", "common_row_id", "mapping_status"],
+                ["raw_node_role", "raw_child_code", "component_esto_flow", "component_esto_product", "common_row_id", "mapping_status"],
                 dropna=False,
             ):
-                raw_child, flow, product, common_id, status = component_key
+                node_role, raw_child, flow, product, common_id, status = component_key
                 if str(status).startswith("missing_source_mapping"):
                     continue
                 elif str(status) == "component_not_registered_in_common_esto":
                     mapping_label = f"Unregistered Common ESTO component: {flow} / {product}"
+                elif str(node_role) == "parent":
+                    mapping_label = f"Mapped parent: {flow} / {product}"
                 else:
-                    mapping_label = f"{labels.get(str(raw_child), str(raw_child))} → {flow} / {product}"
+                    mapping_label = f"child: {labels.get(str(raw_child), str(raw_child))} → {flow} / {product}"
                 mapped_value = float(group["mapped_value"].sum())
-                optional_zero = ' class="optional-zero" data-zero-child="true"' if mapped_value == 0 and str(status).startswith("mapped") else ""
-                mapped_branches.append(
-                    f'<li{optional_zero}><span>{escape(mapping_label)}</span><strong>{_three_significant_figures(mapped_value)}</strong></li>'
-                )
-            mapped_branch_html = "".join(mapped_branches)
+                optional_zero = ' class="optional-zero" data-zero-child="true"' if mapped_value == 0 and str(status).startswith("mapped") and str(node_role) == "child" else ""
+                html = f'<li{optional_zero}><span>{escape(mapping_label)}</span><strong>{_three_significant_figures(mapped_value)}</strong></li>'
+                (mapped_parent_rows if str(node_role) == "parent" else mapped_child_rows).append(html)
+            mapped_branch_html = "".join(mapped_parent_rows + mapped_child_rows)
         else:
             mapped_branch_html = '<li><span>No resolved component detail is available.</span><strong>—</strong></li>'
         cards.append(
@@ -327,8 +333,7 @@ def _paired_tree_html(
             f'<li class="tree-total"><span>Children sum</span><strong>{_three_significant_figures(float(row.children_total))}</strong></li>'
             f'<li class="tree-residual"><span>Raw residual (parent − children)</span><strong>{_three_significant_figures(float(row.raw_residual))}</strong></li>'
             '</ul></section>'
-            '<section><h4>Same branch represented through mappings</h4><ul class="value-tree">'
-            f'<li><span>Raw parent reference</span><strong>{_three_significant_figures(float(row.parent_total))}</strong></li>'
+            '<section><h4>Mapped parent and child structure</h4><ul class="value-tree">'
             f'{mapped_branch_html}'
             f'<li><span>Mapped Common ESTO frontier (de-duplicated)</span><strong>{_three_significant_figures(float(row.mapped_frontier_total))}</strong></li>'
             f'<li class="tree-residual"><span>Anchor difference (parent − frontier)</span><strong>{_three_significant_figures(float(row.mapped_difference))}</strong></li>'
@@ -494,11 +499,11 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 <section class="panel"><h2>How the anchor validator connects the hierarchies</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">The tables below match each raw parent/children context to its branch-level summed absolute mismatch and rank. This makes the materiality ranking and the exact source evidence visible together.</p></section>
 <section class="panel"><h2>Stage 3 hierarchy failures</h2>{_table_html(stage_summary, ['source_system','validation_axis','parent_code','rows'])}</section>
 <section class="panel"><h2>Largest summed anchor mismatches</h2><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</section>
-<label class="zero-toggle"><input id="show-zero-children" type="checkbox"> Show zero-value children and mapped components</label>
-<section class="panel"><h2>NINTH: original tree vs mapped representation</h2><p class="subtle">Each case aggregates the validator's failed contexts across Reference and Target. The raw residual identifies a contradiction within the source tree; the right-hand tree lists the actual resolved Common ESTO components and visibly retains any missing mapping paths.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, 'NINTH', anchor_mapped_component_context_values, dashboard_economy)}</section>
+<label class="zero-toggle"><input id="show-zero-children" type="checkbox" autocomplete="off"> Show zero-value children and mapped components</label>
+<section class="panel"><h2>NINTH: original tree vs mapped representation</h2><p class="subtle">Each case aggregates the validator's failed contexts across Reference and Target. The raw residual identifies a contradiction within the source tree; the right-hand tree lists the resolved mapped parent and mapped children.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, 'NINTH', anchor_mapped_component_context_values, dashboard_economy)}</section>
 <section class="panel"><h2>LEAP: original tree vs mapped representation</h2><p class="subtle">Each case aggregates the validator's failed contexts across its checked scenarios and years.</p>{_paired_tree_html(leap_paired_summary, leap_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy)}</section>
 <section class="panel"><h2>Direct mapping coverage review</h2><h3>Actionable partial coverage</h3>{_table_html(partial, ['source_system','comparison_scope','common_row_id','missing_component_pairs','relevance_evidence','mapping_action','mapping_sheet_to_review'])}<h3>Non-zero unmapped LEAP branches</h3>{_table_html(unmapped, ['leap_flow','leap_product','indirect_esto_flow','indirect_esto_product','qa_status'])}<h3>LEAP source-presence conflicts</h3>{_table_html(conflicts, ['leap_sector_name_full_path','raw_leap_fuel_name','presence_status','in_leap_combined_esto','in_leap_combined_ninth'])}<h3>Source-coverage audit summary</h3>{_table_html(coverage_summary, ['coverage_status','mapping_status','rows'])}</section>
-<footer><strong>Artifact provenance</strong><br>{artifact_notes}<br>{escape(_artifact_note(anchor_child_values_path))}<br>{escape(_artifact_note(anchor_child_context_values_path))}<br>{escape(_artifact_note(anchor_mapped_component_context_values_path))}</footer></div><script>document.getElementById('show-zero-children').addEventListener('change', function () {{ document.body.classList.toggle('show-zero-children', this.checked); }});</script></body></html>"""
+<footer><strong>Artifact provenance</strong><br>{artifact_notes}<br>{escape(_artifact_note(anchor_child_values_path))}<br>{escape(_artifact_note(anchor_child_context_values_path))}<br>{escape(_artifact_note(anchor_mapped_component_context_values_path))}</footer></div><script>const zeroToggle = document.getElementById('show-zero-children'); zeroToggle.checked = false; document.body.classList.remove('show-zero-children'); zeroToggle.addEventListener('change', function () {{ document.body.classList.toggle('show-zero-children', this.checked); }});</script></body></html>"""
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME
     output_path.write_text(html, encoding="utf-8")
     return {"page": str(output_path), "summary": str(layout["supporting"] / "mapping_diagnostics_summary.csv")}
