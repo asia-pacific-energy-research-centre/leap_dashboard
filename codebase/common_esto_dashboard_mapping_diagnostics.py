@@ -303,7 +303,7 @@ def _paired_tree_html(
             ):
                 raw_child, flow, product, common_id, status = component_key
                 if str(status).startswith("missing_source_mapping"):
-                    mapping_label = f"Missing source mapping: {labels.get(str(raw_child), str(raw_child))}"
+                    continue
                 elif str(status) == "component_not_registered_in_common_esto":
                     mapping_label = f"Unregistered Common ESTO component: {flow} / {product}"
                 else:
