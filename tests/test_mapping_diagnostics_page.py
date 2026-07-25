@@ -75,6 +75,10 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     html = Path(result["page"]).read_text(encoding="utf-8")
 
     assert "How the anchor validator connects the hierarchies" in html
+    assert "How to read a hierarchy case" in html
+    assert "One-to-many fan-out" in html
+    assert "De-duplicated frontier" in html
+    assert "Raw source contradiction" in html
     assert "09_total" in html
     assert "absolute mismatch total" in html
     assert "Largest summed anchor mismatches" in html
