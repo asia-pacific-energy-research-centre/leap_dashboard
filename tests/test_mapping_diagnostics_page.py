@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from codebase.common_esto_dashboard_mapping_diagnostics import (
+    _mapped_target_structure_html,
     _paired_anchor_aggregate_summary,
     write_mapping_diagnostics_page,
 )
@@ -34,6 +35,11 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     ])
     tree.to_csv(tree_root / "ninth_tree.csv", index=False)
     tree.assign(code=["Oil Refining", "Oil Refining/Child"]).to_csv(tree_root / "leap_tree.csv", index=False)
+    pd.DataFrame([
+        {"axis": "flow", "code": "09 Total", "label": "09 Total", "level": 1, "parent_code": ""},
+        {"axis": "flow", "code": "09.00 Total", "label": "09.00 Total", "level": 2, "parent_code": "09 Total"},
+        {"axis": "flow", "code": "09 Extra", "label": "09 Extra", "level": 1, "parent_code": ""},
+    ]).to_csv(tree_root / "esto_tree.csv", index=False)
     pd.DataFrame([
         {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "parent_code": "09_total"},
     ]).to_csv(tree_root / "common_esto_validation.csv", index=False)
@@ -84,20 +90,20 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "absolute mismatch total" in html
     assert "Largest summed anchor mismatches" in html
     assert "09 Child" in html
-    assert ">7.00<" in html
+    assert ">7<" in html
     assert "NINTH flow tree: original vs mapped representation" in html
     assert "LEAP flow tree: original vs mapped representation" in html
     assert "Original raw tree" in html
-    assert "Mapped Common ESTO frontier (de-duplicated)" in html
-    assert "Mapped components reached from source branch" in html
-    assert "Resolved from source parent" in html
+    assert "Unique mapped comparison total" in html
+    assert "Mapped Common ESTO representation" in html
+    assert "Mapped Common ESTO hierarchy" in html
     assert "09 Total / 08.01 Gas" in html
-    assert ">10.0<" in html
-    assert ">20.0<" not in html
+    assert ">10<" in html
+    assert ">20<" not in html
     assert "Manual LEAP roll-up" in html
     assert "Raw roll-up: this source parent" not in html
-    assert "One-to-many mapping: this raw parent reaches 2 ESTO components." in html
-    assert "09 Child → 09.00 Total / 08.01 Gas" in html
+    assert "Mapped target hierarchy" in html
+    assert "Direct mapping fan-out" not in html
     assert '<li class="tree-category"><span>Children</span></li>' in html
     assert "Show zero-value children and mapped components" in html
     assert "optional-zero" in html
@@ -112,3 +118,27 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert '<details class="panel collapsed-panel"><summary><h2>Largest summed anchor mismatches</h2>' in html
     assert '<details class="panel collapsed-panel"><summary><h2>Reviewed source-hierarchy exceptions</h2>' in html
     assert Path(result["summary"]).exists()
+
+
+def test_mapped_target_structure_uses_direct_fanout_without_target_edge() -> None:
+    components = pd.DataFrame([
+        {
+            "comparison_scope": "esto_leap_ninth", "economy": "20USA", "scenario": "reference", "year": 2030,
+            "common_row_id": "coal", "component_esto_flow": "10.01.06 Coal mines",
+            "component_esto_product": "08.01 Natural gas", "mapped_value": -11.4, "mapping_status": "mapped",
+        },
+        {
+            "comparison_scope": "esto_leap_ninth", "economy": "20USA", "scenario": "reference", "year": 2030,
+            "common_row_id": "oil", "component_esto_flow": "10.01.12 Oil and gas extraction",
+            "component_esto_product": "08.01 Natural gas", "mapped_value": -24488.6, "mapping_status": "mapped",
+        },
+    ])
+    target_tree = pd.DataFrame([
+        {"code": "10.01.06 Coal mines", "parent_code": "10.01 Own Use"},
+        {"code": "10.01.12 Oil and gas extraction", "parent_code": "10.01 Own Use"},
+    ])
+
+    html, note = _mapped_target_structure_html(components, target_tree, "Other loss and own use", str)
+
+    assert "Direct mapping fan-out" in html
+    assert "Other loss and own use maps directly to these target rows." in note
