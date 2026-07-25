@@ -2,7 +2,21 @@ from pathlib import Path
 
 import pandas as pd
 
-from codebase.common_esto_dashboard_mapping_diagnostics import write_mapping_diagnostics_page
+from codebase.common_esto_dashboard_mapping_diagnostics import (
+    _paired_anchor_aggregate_summary,
+    write_mapping_diagnostics_page,
+)
+
+
+def test_paired_tree_summary_only_traverses_flow_axis() -> None:
+    context_values = pd.DataFrame([
+        {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "20USA", "scenario": "reference", "year": 2030, "other_axis_value": "08_01_natural_gas", "parent_code": "09_total", "child_code": "09_child", "parent_value": 10.0, "frontier_sum": 7.0, "raw_child_value": 7.0},
+        {"source_system": "NINTH", "validation_axis": "product", "comparison_scope": "esto_leap_ninth", "economy": "20USA", "scenario": "reference", "year": 2030, "other_axis_value": "15_pipeline", "parent_code": "08_gas", "child_code": "08_01_natural_gas", "parent_value": 10.0, "frontier_sum": 7.0, "raw_child_value": 7.0},
+    ])
+
+    summary = _paired_anchor_aggregate_summary(context_values, "NINTH", "20USA")
+
+    assert summary["parent_code"].tolist() == ["09_total"]
 
 
 def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Path) -> None:
@@ -65,8 +79,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Largest summed anchor mismatches" in html
     assert "09 Child" in html
     assert ">7.00<" in html
-    assert "NINTH: original tree vs mapped representation" in html
-    assert "LEAP: original tree vs mapped representation" in html
+    assert "NINTH flow tree: original vs mapped representation" in html
+    assert "LEAP flow tree: original vs mapped representation" in html
     assert "Original raw tree" in html
     assert "Mapped Common ESTO frontier (de-duplicated)" in html
     assert "Mapped parent: 09 Total / 08.01 Gas" in html
