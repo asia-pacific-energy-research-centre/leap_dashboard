@@ -65,6 +65,7 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "child: 09 Child → 09.00 Total / 08.01 Gas" in html
     assert "Show zero-value children and mapped components" in html
     assert "optional-zero" in html
+    assert "onchange=\"document.body.classList.toggle('show-zero-children', this.checked)\"" in html
     assert "Missing source mapping" not in html
     assert "Direct mapping coverage review" in html
     assert Path(result["summary"]).exists()
