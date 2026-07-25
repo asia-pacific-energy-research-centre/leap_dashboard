@@ -286,7 +286,7 @@ def _paired_tree_html(
             (
                 '<li class="optional-zero" data-zero-child="true">' if float(value) == 0 else "<li>"
             )
-            + "<span>child: " + escape(labels.get(str(child), str(child))) + "</span>"
+            + "<span>" + escape(labels.get(str(child), str(child))) + "</span>"
             + f"<strong>{_three_significant_figures(float(value))}</strong></li>"
             for child, value in sorted(row.child_totals.items())
         )
@@ -314,12 +314,15 @@ def _paired_tree_html(
                 elif str(node_role) == "parent":
                     mapping_label = f"Mapped parent: {flow} / {product}"
                 else:
-                    mapping_label = f"child: {labels.get(str(raw_child), str(raw_child))} → {flow} / {product}"
+                    mapping_label = f"{labels.get(str(raw_child), str(raw_child))} → {flow} / {product}"
                 mapped_value = float(group["mapped_value"].sum())
                 optional_zero = ' class="optional-zero" data-zero-child="true"' if mapped_value == 0 and str(status).startswith("mapped") and str(node_role) == "child" else ""
                 html = f'<li{optional_zero}><span>{escape(mapping_label)}</span><strong>{_three_significant_figures(mapped_value)}</strong></li>'
                 (mapped_parent_rows if str(node_role) == "parent" else mapped_child_rows).append(html)
-            mapped_branch_html = "".join(mapped_parent_rows + mapped_child_rows)
+            mapped_branch_html = (
+                '<li class="tree-category"><span>Parent</span></li>' + "".join(mapped_parent_rows)
+                + '<li class="tree-category"><span>Children</span></li>' + "".join(mapped_child_rows)
+            )
         else:
             mapped_branch_html = '<li><span>No resolved component detail is available.</span><strong>—</strong></li>'
         cards.append(
@@ -328,7 +331,9 @@ def _paired_tree_html(
             f'{escape(str(row.years))}. Values are signed sums; display rounding is 1–3 significant figures.</p>'
             '<div class="paired-trees">'
             '<section><h4>Original raw tree</h4><ul class="value-tree">'
-            f'<li><span>Parent: {escape(parent_label)}</span><strong>{_three_significant_figures(float(row.parent_total))}</strong></li>'
+            '<li class="tree-category"><span>Parent</span></li>'
+            f'<li><span>{escape(parent_label)}</span><strong>{_three_significant_figures(float(row.parent_total))}</strong></li>'
+            '<li class="tree-category"><span>Children</span></li>'
             f'{raw_children}'
             f'<li class="tree-total"><span>Children sum</span><strong>{_three_significant_figures(float(row.children_total))}</strong></li>'
             f'<li class="tree-residual"><span>Raw residual (parent − children)</span><strong>{_three_significant_figures(float(row.raw_residual))}</strong></li>'
@@ -492,7 +497,7 @@ body {{ font-family: Inter,Segoe UI,Arial,sans-serif; margin:0; background:#f4f6
 h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b7a; }} .metrics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:16px 0; }}
 .metric-card,.panel {{ background:white; border:1px solid #d9e1ea; border-radius:10px; padding:14px; }} .metric-card span {{ display:block; color:#5f6b7a; font-size:13px; }} .metric-card strong {{ font-size:28px; }}
 .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:16px; }} .flow {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }} .flow div {{ background:#e8f0fa; border:1px solid #adc4df; border-radius:8px; padding:10px; font-size:13px; }} .arrow {{ color:#53718f; font-size:22px; }}
-.paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .optional-zero {{ display:none; }} body.show-zero-children .optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
+.paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .value-tree li.tree-category {{ display:block; border-bottom:0; color:#5f6b7a; font-size:12px; font-weight:600; padding-top:10px; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .value-tree li.optional-zero {{ display:none; }} body.show-zero-children .value-tree li.optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
 </style></head><body><div class="shell"><header><a href="index.html">← Dashboard overview</a><h1>Mapping diagnostics</h1><p class="subtle">Read-only inspection of hierarchy/anchor validation and direct mapping coverage. Updated: {escape(dashboard_updated_label)}</p></header>
 <div class="metrics">{cards}</div>

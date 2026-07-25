@@ -62,7 +62,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Original raw tree" in html
     assert "Mapped Common ESTO frontier (de-duplicated)" in html
     assert "Mapped parent: 09 Total / 08.01 Gas" in html
-    assert "child: 09 Child → 09.00 Total / 08.01 Gas" in html
+    assert "09 Child → 09.00 Total / 08.01 Gas" in html
+    assert '<li class="tree-category"><span>Children</span></li>' in html
     assert "Show zero-value children and mapped components" in html
     assert "optional-zero" in html
     assert "onchange=\"document.body.classList.toggle('show-zero-children', this.checked)\"" in html
