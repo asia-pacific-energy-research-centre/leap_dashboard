@@ -335,7 +335,7 @@ def _paired_tree_html(
                 elif str(status) == "component_not_registered_in_common_esto":
                     mapping_label = f"Unregistered Common ESTO component: {flow} / {product}"
                 elif str(node_role) == "parent":
-                    mapping_label = f"Mapped parent: {flow} / {product}"
+                    mapping_label = f"{flow} / {product}"
                 else:
                     mapping_label = f"{labels.get(str(raw_child), str(raw_child))} → {flow} / {product}"
                 mapped_value = float(group["mapped_value"].sum())
@@ -343,11 +343,22 @@ def _paired_tree_html(
                 html = f'<li{optional_zero}><span>{escape(mapping_label)}</span><strong>{_three_significant_figures(mapped_value)}</strong></li>'
                 (mapped_parent_rows if str(node_role) == "parent" else mapped_child_rows).append(html)
             mapped_branch_html = (
-                '<li class="tree-category"><span>Parent</span></li>' + "".join(mapped_parent_rows)
-                + '<li class="tree-category"><span>Children</span></li>' + "".join(mapped_child_rows)
+                '<li class="tree-category"><span>Resolved from source parent</span></li>' + "".join(mapped_parent_rows)
+                + '<li class="tree-category"><span>Resolved from source children</span></li>' + "".join(mapped_child_rows)
             )
         else:
             mapped_branch_html = '<li><span>No resolved component detail is available.</span><strong>—</strong></li>'
+        raw_rollup_note = '<p class="helper-note">Raw roll-up: this source parent is compared with the sum of its immediate source-tree children.</p>'
+        source_warning = (
+            '<p class="source-warning">Source-data warning: the raw parent is 0 while its children sum to a non-zero value. '
+            'This is a contradiction within the original source hierarchy, not evidence that a mapping row is missing.</p>'
+            if float(row.parent_total) == 0 and float(row.children_total) != 0 else ""
+        )
+        fanout_note = (
+            f'<p class="helper-note">One-to-many mapping: this raw parent reaches {len(mapped_parent_rows):,} ESTO components. '
+            'Component values can overlap with the child routes below, so use the de-duplicated frontier rather than adding these rows.</p>'
+            if not component_rows.empty and len(mapped_parent_rows) > 1 else ""
+        )
         cards.append(
             f'<article class="paired-case"><h3>{escape(source_system)} | {escape(str(row.validation_axis))} | '
             f'{escape(str(row.other_axis_value))}</h3><p class="subtle">{escape(str(row.scenarios))}; checked years: '
@@ -360,12 +371,12 @@ def _paired_tree_html(
             f'{raw_children}'
             f'<li class="tree-total"><span>Children sum</span><strong>{_three_significant_figures(float(row.children_total))}</strong></li>'
             f'<li class="tree-residual"><span>Raw residual (parent − children)</span><strong>{_three_significant_figures(float(row.raw_residual))}</strong></li>'
-            '</ul></section>'
-            '<section><h4>Mapped parent and child structure</h4><ul class="value-tree">'
+            f'</ul>{raw_rollup_note}{source_warning}</section>'
+            '<section><h4>Mapped components reached from source branch</h4><ul class="value-tree">'
             f'{mapped_branch_html}'
             f'<li><span>Mapped Common ESTO frontier (de-duplicated)</span><strong>{_three_significant_figures(float(row.mapped_frontier_total))}</strong></li>'
             f'<li class="tree-residual"><span>Anchor difference (parent − frontier)</span><strong>{_three_significant_figures(float(row.mapped_difference))}</strong></li>'
-            '</ul></section></div></article>'
+            f'</ul>{fanout_note}</section></div></article>'
         )
     return "".join(cards)
 
@@ -525,7 +536,7 @@ body {{ font-family: Inter,Segoe UI,Arial,sans-serif; margin:0; background:#f4f6
 h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b7a; }} .metrics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:16px 0; }}
 .metric-card,.panel {{ background:white; border:1px solid #d9e1ea; border-radius:10px; padding:14px; }} .metric-card span {{ display:block; color:#5f6b7a; font-size:13px; }} .metric-card strong {{ font-size:28px; }}
 .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:16px; }} .flow {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }} .flow div {{ background:#e8f0fa; border:1px solid #adc4df; border-radius:8px; padding:10px; font-size:13px; }} .arrow {{ color:#53718f; font-size:22px; }}
-.paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .value-tree li.tree-category {{ display:block; border-bottom:0; color:#5f6b7a; font-size:12px; font-weight:600; padding-top:10px; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .value-tree li.optional-zero {{ display:none; }} body.show-zero-children .value-tree li.optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
+.paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .value-tree li.tree-category {{ display:block; border-bottom:0; color:#5f6b7a; font-size:12px; font-weight:600; padding-top:10px; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .helper-note,.source-warning {{ font-size:12px; line-height:1.4; margin:10px 0 0; padding:8px; border-radius:6px; }} .helper-note {{ background:#e8f5e9; color:#176b35; }} .source-warning {{ background:#fff4e5; color:#8a4b08; }} .value-tree li.optional-zero {{ display:none; }} body.show-zero-children .value-tree li.optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
 </style></head><body><div class="shell"><header><a href="index.html">← Dashboard overview</a><h1>Mapping diagnostics</h1><p class="subtle">Read-only inspection of hierarchy/anchor validation and direct mapping coverage. Updated: {escape(dashboard_updated_label)}</p></header>
 <div class="metrics">{cards}</div>

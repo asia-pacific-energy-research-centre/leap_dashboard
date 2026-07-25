@@ -49,6 +49,7 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     ]).to_csv(tree_root / "source_parent_anchor_child_context_values.csv", index=False)
     pd.DataFrame([
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "parent", "raw_child_code": "09_total", "component_esto_flow": "09 Total", "component_esto_product": "08.01 Gas", "common_row_id": "parent", "mapped_value": 10.0, "mapping_status": "mapped"},
+        {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "parent", "raw_child_code": "09_total", "component_esto_flow": "09 Extra", "component_esto_product": "08.01 Gas", "common_row_id": "extra", "mapped_value": 1.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "child", "raw_child_code": "09_child", "component_esto_flow": "09.00 Total", "component_esto_product": "08.01 Gas", "common_row_id": "common", "mapped_value": 7.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_child_code": "missing_child", "component_esto_flow": "", "component_esto_product": "", "common_row_id": "", "mapped_value": 0.0, "mapping_status": "missing_source_mapping:missing_child"},
     ]).to_csv(tree_root / "source_parent_anchor_mapped_component_context_values.csv", index=False)
@@ -83,7 +84,11 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "LEAP flow tree: original vs mapped representation" in html
     assert "Original raw tree" in html
     assert "Mapped Common ESTO frontier (de-duplicated)" in html
-    assert "Mapped parent: 09 Total / 08.01 Gas" in html
+    assert "Mapped components reached from source branch" in html
+    assert "Resolved from source parent" in html
+    assert "09 Total / 08.01 Gas" in html
+    assert "Raw roll-up: this source parent" in html
+    assert "One-to-many mapping: this raw parent reaches 2 ESTO components." in html
     assert "09 Child → 09.00 Total / 08.01 Gas" in html
     assert '<li class="tree-category"><span>Children</span></li>' in html
     assert "Show zero-value children and mapped components" in html
