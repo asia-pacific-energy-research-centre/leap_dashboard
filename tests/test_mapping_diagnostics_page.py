@@ -104,4 +104,6 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Leaf-reconciliation candidates awaiting review" in html
     assert "direct_children_incomplete_but_leaves_reconcile" in html
     assert "Direct mapping coverage review" in html
+    assert '<details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2>' in html
+    assert '<details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2>' in html
     assert Path(result["summary"]).exists()
