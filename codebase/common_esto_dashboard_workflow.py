@@ -183,6 +183,10 @@ INCLUDE_CAPACITY_UNMET_CONVERGENCE = _env_bool(
     "COMMON_ESTO_INCLUDE_CAPACITY_UNMET_CONVERGENCE",
     default=False,
 )
+PREFER_EXTENDED_ESTO = _env_bool(
+    "COMMON_ESTO_PREFER_EXTENDED_ESTO",
+    default=False,
+)
 _DEFAULT_CAPACITY_UNMET_CONVERGENCE_PATH = (
     REPO_ROOT.parent
     / "leap_initialisation"
@@ -357,6 +361,7 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
     mapping_tree_explorer = render_full_tree_explorer(
         output_path=layout["dashboards"] / "mapping_tree_explorer.html",
         comparison_data=raw_df,
+        prefer_extended_esto=PREFER_EXTENDED_ESTO,
     )
     convergence_result = write_capacity_unmet_convergence_page(
         CAPACITY_UNMET_CONVERGENCE_PATH,
