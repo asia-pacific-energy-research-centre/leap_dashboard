@@ -112,6 +112,9 @@ def test_rollup_boundary_details_show_parent_children_components_and_mode_meanin
     assert "09.08.01 Coke ovens" in html
     assert "10.01.05 Coke ovens" in html
     assert "deliberately not folded into an ordinary ancestor total" in html
+    assert html.count('data-rollup-flow="09 Total transformation sector"') == 1
+    assert html.count('data-rollup-flow="09.08.01 Coke ovens"') == 1
+    assert html.count('data-rollup-flow="10.01.05 Coke ovens"') == 1
 
 
 def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Path) -> None:
