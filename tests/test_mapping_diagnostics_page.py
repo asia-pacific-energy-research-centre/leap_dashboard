@@ -27,11 +27,10 @@ def test_mapping_cardinality_diagnostics_detects_only_real_overlap_and_many_to_m
         {"dataset": "ninth", "code": "source_b", "parent_code": "source_a"},
     ])
 
-    many_to_many, overlaps, source_overlaps = _mapping_cardinality_diagnostics(
+    overlaps, source_overlaps = _mapping_cardinality_diagnostics(
         source_to_common, target_tree, source_tree,
     )
 
-    assert len(many_to_many) == 4
     assert len(overlaps) == 2
     assert set(overlaps["ancestor_target"]) == {"14.03 Manufacturing / 08.01 Natural gas"}
     assert len(source_overlaps) == 2

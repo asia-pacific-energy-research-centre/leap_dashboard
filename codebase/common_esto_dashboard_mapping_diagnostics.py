@@ -71,7 +71,7 @@ def _mapping_cardinality_diagnostics(
     target_tree: pd.DataFrame,
     source_tree: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Return mapping cardinality and both directions of hierarchy overlap.
+    """Return both directions of source/target hierarchy overlap.
 
     Both checks use the structural source-to-Common-ESTO map rather than the
     explanatory parent/child routes shown in an anchor card.  That avoids
@@ -81,7 +81,7 @@ def _mapping_cardinality_diagnostics(
     source_columns = ["source_system", "original_source_flow", "original_source_product"]
     required = set(source_columns + ["common_row_id", "common_flow_label", "common_product_label"])
     if source_to_common.empty or not required.issubset(source_to_common.columns):
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
 
     relations = source_to_common.drop_duplicates(source_columns + ["common_row_id"]).copy()
     source_counts = (
@@ -94,10 +94,6 @@ def _mapping_cardinality_diagnostics(
         relations.groupby(["source_system", "common_row_id"], dropna=False).size()
         .rename("mapped_source_count").reset_index()
     )
-    cardinality = fanout_relations.merge(target_counts, on=["source_system", "common_row_id"])
-    many_to_many = cardinality[
-        cardinality["mapped_target_count"].gt(1) & cardinality["mapped_source_count"].gt(1)
-    ].copy()
 
     parent_by_flow = (
         target_tree.set_index("code")["parent_code"].fillna("").astype(str).to_dict()
@@ -163,7 +159,7 @@ def _mapping_cardinality_diagnostics(
                     break
                 ancestor = parent_by_source_flow.get(ancestor, "")
     source_overlaps = pd.DataFrame(reverse_rows).drop_duplicates() if reverse_rows else pd.DataFrame()
-    return many_to_many, overlaps, source_overlaps
+    return overlaps, source_overlaps
 
 
 def _three_significant_figures(value: float) -> str:
@@ -719,6 +715,7 @@ def write_mapping_diagnostics_page(
     conflicts_path = results_root / "maintenance" / "leap_source_presence_conflicts.csv"
     coverage_path = results_root / "source_coverage" / "all_demand_aggregated_coverage_gaps.csv"
     source_to_common_path = results_root / "common_esto" / "structural_artifacts" / "source_pair_to_common_row.csv"
+    many_to_many_path = results_root / "maintenance" / "many_to_many_conflicts.csv"
 
     anchor = _read_csv(anchor_path)
     anchor_child_values = _read_csv(anchor_child_values_path)
@@ -735,6 +732,7 @@ def write_mapping_diagnostics_page(
     conflicts = _read_csv(conflicts_path)
     coverage = _read_csv(coverage_path)
     source_to_common = _read_csv(source_to_common_path)
+    many_to_many = _read_csv(many_to_many_path)
 
     stage_summary = _failure_summary(stage, ["source_system", "validation_axis", "parent_code"])
     anchor_summary = _failure_summary(anchor, ["source_system", "validation_axis", "reason", "parent_code"])
@@ -756,7 +754,7 @@ def write_mapping_diagnostics_page(
         .size().reset_index(name="rows").sort_values("rows", ascending=False, kind="mergesort")
         if not coverage.empty else pd.DataFrame(columns=["coverage_status", "mapping_status", "rows"])
     )
-    many_to_many, target_ancestor_overlaps, source_ancestor_overlaps = _mapping_cardinality_diagnostics(
+    target_ancestor_overlaps, source_ancestor_overlaps = _mapping_cardinality_diagnostics(
         source_to_common, common_esto_tree, source_tree,
     )
     cardinality_sections = ""
@@ -780,12 +778,12 @@ def write_mapping_diagnostics_page(
         )
     if not many_to_many.empty:
         cardinality_sections += (
-            '<h3>Active many-to-many mappings</h3>'
-            '<p class="subtle">These source pairs map to multiple Common ESTO rows, and each target row is '
-            'also reached by multiple source pairs.</p>'
+            '<h3>Active many-to-many mapping conflicts</h3>'
+            '<p class="subtle">These active workbook mappings have multiple targets for a source and multiple '
+            'sources for a target. They require an explicit modelling decision.</p>'
             + _table_html(many_to_many, [
-                "source_system", "original_source_flow", "original_source_product", "common_row_id",
-                "mapped_target_count", "mapped_source_count",
+                "sheet", "leap_sector_name_full_path", "raw_leap_fuel_name", "ninth_sector", "ninth_fuel",
+                "n_targets_for_source", "n_sources_for_target", "cardinality",
             ])
         )
     summary = pd.DataFrame([
@@ -804,7 +802,7 @@ def write_mapping_diagnostics_page(
         f'<div class="metric-card"><span>{escape(str(row.metric))}</span><strong>{int(row.rows):,}</strong></div>'
         for row in summary.itertuples(index=False)
     )
-    artifact_notes = "<br>".join(escape(_artifact_note(path)) for path in [anchor_path, stage_path, partial_path, unmapped_path, conflicts_path, coverage_path, source_to_common_path])
+    artifact_notes = "<br>".join(escape(_artifact_note(path)) for path in [anchor_path, stage_path, partial_path, unmapped_path, conflicts_path, coverage_path, source_to_common_path, many_to_many_path])
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mapping diagnostics</title><style>
