@@ -658,6 +658,72 @@ def _tree_html(
     return f"<li><details open><summary>{title}</summary><ul>{child_html}{more}</ul></details></li>"
 
 
+def _transformation_rollup_diagram_html(
+    common_esto_tree: pd.DataFrame,
+    rollup_catalogue: pd.DataFrame,
+) -> str:
+    """Render mapping-owned 09 transformation tree and rollup boundaries."""
+    required = {"source_system", "rollup_mode", "non_expanding_rollup_id", "rolled_flow_label", "input_flow"}
+    if common_esto_tree.empty or rollup_catalogue.empty or not required.issubset(rollup_catalogue.columns):
+        return '<p class="empty-state">Current transformation-tree or rollup-catalogue artifacts are unavailable.</p>'
+
+    tree = common_esto_tree[common_esto_tree["axis"].astype(str).eq("flow")].copy()
+    ordinary_parent = "09 Total transformation sector"
+    ordinary_children = tree[
+        tree["parent_code"].fillna("").astype(str).eq(ordinary_parent)
+    ].sort_values("code", kind="mergesort")
+    catalogue = rollup_catalogue[
+        rollup_catalogue["source_system"].astype(str).eq("ESTO")
+        & rollup_catalogue["rolled_flow_label"].astype(str).str.startswith("09")
+    ].copy()
+    if ordinary_children.empty and catalogue.empty:
+        return '<p class="empty-state">No ESTO 09-transformation rollup boundaries are registered.</p>'
+
+    ordinary_html = "".join(
+        f'<li><span class="solid-edge">→</span>{escape(str(row.code))}</li>'
+        for row in ordinary_children.itertuples(index=False)
+    ) or '<li class="empty-state">No ordinary children found.</li>'
+    boundary_cards: list[str] = []
+    for boundary_id, group in catalogue.groupby("non_expanding_rollup_id", dropna=False, sort=True):
+        first = group.iloc[0]
+        label = str(first["rolled_flow_label"])
+        mode = str(first["rollup_mode"])
+        contributors = sorted(set(group["input_flow"].dropna().astype(str)) - {"", "nan"})
+        registered_children = tree[
+            tree["parent_code"].fillna("").astype(str).eq(label)
+        ].sort_values("code", kind="mergesort")
+        children_html = "".join(
+            f'<li><span class="solid-edge">→</span>{escape(str(row.code))}</li>'
+            for row in registered_children.itertuples(index=False)
+        ) or '<li class="muted">No registered ordinary children.</li>'
+        contributor_html = "".join(
+            f'<li>{escape(contributor)} <span class="dashed-edge">⋯→</span></li>'
+            for contributor in contributors
+        )
+        mode_explanation = (
+            "This boundary is not folded back into an ordinary ancestor total."
+            if mode == "DETACHED"
+            else "This boundary can support ordinary ancestor/frontier resolution."
+        )
+        boundary_cards.append(
+            f'<article class="rollup-boundary {escape(mode.lower())}">'
+            f'<h3><span class="mode-pill">{escape(mode)}</span> {escape(label)}</h3>'
+            '<div class="boundary-columns"><div><h4>Dashed composition inputs</h4>'
+            f'<ul>{contributor_html}</ul></div><div><h4>Solid registered children</h4>'
+            f'<ul>{children_html}</ul></div></div>'
+            f'<p class="helper-note">{escape(mode_explanation)}</p>'
+            f'<p class="artifact-id">{escape(str(boundary_id))}</p></article>'
+        )
+    return (
+        '<div class="transformation-diagram">'
+        '<section class="ordinary-hierarchy"><h3>Ordinary hierarchy</h3>'
+        f'<div class="tree-root">{escape(ordinary_parent)}</div><ul>{ordinary_html}</ul></section>'
+        '<section class="rollup-boundaries"><h3>Registered rollup boundaries</h3>'
+        '<p class="subtle">Solid arrows are ordinary tree edges. Dotted arrows are rollup composition, not additive tree edges.</p>'
+        f'{"".join(boundary_cards)}</section></div>'
+    )
+
+
 def _issue_tree_section(
     tree: pd.DataFrame,
     value_summary: pd.DataFrame,
@@ -716,6 +782,7 @@ def write_mapping_diagnostics_page(
     coverage_path = results_root / "source_coverage" / "all_demand_aggregated_coverage_gaps.csv"
     source_to_common_path = results_root / "common_esto" / "structural_artifacts" / "source_pair_to_common_row.csv"
     many_to_many_path = results_root / "maintenance" / "many_to_many_conflicts.csv"
+    rollup_catalogue_path = results_root / "mapping_relationships" / "non_expanding_rollups.csv"
 
     anchor = _read_csv(anchor_path)
     anchor_child_values = _read_csv(anchor_child_values_path)
@@ -733,6 +800,10 @@ def write_mapping_diagnostics_page(
     coverage = _read_csv(coverage_path)
     source_to_common = _read_csv(source_to_common_path)
     many_to_many = _read_csv(many_to_many_path)
+    rollup_catalogue = _read_csv(rollup_catalogue_path)
+    transformation_rollup_diagram = _transformation_rollup_diagram_html(
+        common_esto_tree, rollup_catalogue
+    )
 
     stage_summary = _failure_summary(stage, ["source_system", "validation_axis", "parent_code"])
     anchor_summary = _failure_summary(anchor, ["source_system", "validation_axis", "reason", "parent_code"])
@@ -812,11 +883,13 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 .metric-card,.panel {{ background:white; border:1px solid #d9e1ea; border-radius:10px; padding:14px; }} .metric-card span {{ display:block; color:#5f6b7a; font-size:13px; }} .metric-card strong {{ font-size:28px; }} .collapsed-panel summary {{ cursor:pointer; display:flex; align-items:center; justify-content:space-between; }} .collapsed-panel summary h2 {{ margin:0; }} .collapsed-panel summary span {{ color:#1b5e9a; font-size:0; }} .collapsed-panel[open] summary span::after {{ content:'Hide'; font-size:13px; }} .collapsed-panel:not([open]) summary span::after {{ content:'Show'; font-size:13px; }} .collapsed-panel > div {{ margin-top:14px; }}
 .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:16px; }} .guide-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; }} .guide-card {{ border-radius:8px; padding:10px; font-size:13px; line-height:1.4; }} .guide-card strong {{ display:block; margin-bottom:3px; }} .guide-good {{ background:#e8f5e9; color:#176b35; }} .guide-warning {{ background:#fff4e5; color:#8a4b08; }} .guide-neutral {{ background:#e8f0fa; color:#294f78; }} .flow {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }} .flow div {{ background:#e8f0fa; border:1px solid #adc4df; border-radius:8px; padding:10px; font-size:13px; }} .arrow {{ color:#53718f; font-size:22px; }}
 .paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .value-tree li.tree-category {{ display:block; border-bottom:0; color:#5f6b7a; font-size:12px; font-weight:600; padding-top:10px; }} .value-tree li.tree-structural {{ color:#5f6b7a; font-style:italic; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .helper-note,.source-warning {{ font-size:12px; line-height:1.4; margin:10px 0 0; padding:8px; border-radius:6px; }} .helper-note {{ background:#e8f5e9; color:#176b35; }} .source-warning {{ background:#fff4e5; color:#8a4b08; }} .value-tree li.optional-zero {{ display:none; }} body.show-zero-children .value-tree li.optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
+.transformation-diagram {{ display:grid; grid-template-columns:minmax(260px,0.8fr) minmax(520px,2fr); gap:16px; }} .ordinary-hierarchy,.rollup-boundaries {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .ordinary-hierarchy h3,.rollup-boundaries h3,.rollup-boundary h3,.rollup-boundary h4 {{ margin:0 0 8px; }} .tree-root {{ background:#dceaf8; border:1px solid #8eb2d4; border-radius:6px; font-weight:600; padding:8px; }} .ordinary-hierarchy ul,.rollup-boundary ul {{ list-style:none; padding-left:12px; margin:8px 0; }} .ordinary-hierarchy li,.rollup-boundary li {{ margin:5px 0; }} .solid-edge {{ color:#2d6a9f; font-weight:700; margin-right:4px; }} .dashed-edge {{ color:#7c5b00; font-weight:700; margin-left:6px; }} .rollup-boundary {{ border:1px solid #d9e1ea; border-left:5px solid #3d7fb1; border-radius:8px; padding:10px; margin-top:10px; background:#fff; }} .rollup-boundary.detached {{ border-left-color:#9b5c00; background:#fffaf0; }} .mode-pill {{ display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#dceaf8; color:#174b73; }} .detached .mode-pill {{ background:#ffe7ba; color:#754300; }} .boundary-columns {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px; }} .artifact-id {{ margin:8px 0 0; color:#5f6b7a; font-family:ui-monospace,monospace; font-size:11px; }} @media (max-width:760px) {{ .paired-trees,.transformation-diagram,.boundary-columns {{ grid-template-columns:1fr; }} }}
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
 </style></head><body><div class="shell"><header><a href="index.html">← Dashboard overview</a><h1>Mapping diagnostics</h1><p class="subtle">Read-only inspection of hierarchy/anchor validation and direct mapping coverage. Updated: {escape(dashboard_updated_label)}</p></header>
 <section class="panel"><h2>How to read a hierarchy case</h2><div class="guide-grid"><div class="guide-card guide-good"><strong>Manual LEAP roll-up</strong>Only constructed LEAP subtotal branches receive this label; they are compared with their immediate source-tree children.</div><div class="guide-card guide-good"><strong>One-to-many fan-out</strong>One raw parent can reach several ESTO components. Those routes are not additional source-tree parents.</div><div class="guide-card guide-neutral"><strong>De-duplicated frontier</strong>Mapped component rows can overlap. The frontier counts each Common ESTO row once, so do not add the displayed component rows.</div><div class="guide-card guide-warning"><strong>Raw source contradiction</strong>If a raw parent is 0 while its children are non-zero, the original source hierarchy disagrees with itself. It is not, by itself, a missing mapping.</div></div></section>
 <div class="metrics">{cards}</div>
 <section class="panel"><h2>How the anchor validator connects the hierarchies</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">The tables below match each raw parent/children context to its branch-level summed absolute mismatch and rank. This makes the materiality ranking and the exact source evidence visible together.</p></section>
+<section class="panel"><h2>09 transformation rollup boundaries</h2><p class="subtle">Automatically rendered from the Common ESTO tree and the mapping-owned compiled non-expanding rollup catalogue. It keeps ordinary hierarchy edges and comparison-boundary composition visibly distinct.</p>{transformation_rollup_diagram}</section>
 <details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2><span></span></summary><div>{_table_html(stage_summary, ['source_system','validation_axis','parent_code','rows'])}</div></details>
 <details class="panel collapsed-panel"><summary><h2>Largest summed anchor mismatches</h2><span></span></summary><div><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</div></details>
 <details class="panel collapsed-panel"><summary><h2>Reviewed source-hierarchy exceptions</h2><span></span></summary><div><p class="subtle">These are known source-data conditions from the exception workbook. They are skipped from actionable anchor failures but remain visible here with their review notes.</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','reason','exception_resolution','data_quality_exception_notes'])}<h3>Leaf-reconciliation candidates awaiting review</h3><p class="subtle">These are not exceptions yet. Their immediate children do not reconcile, while their descendant leaves do; review before copying an enabled row into <code>source_mismatch_allowed</code>.</p>{_table_html(leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>

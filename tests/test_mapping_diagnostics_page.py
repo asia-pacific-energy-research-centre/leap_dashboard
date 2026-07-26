@@ -6,6 +6,7 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     _mapping_cardinality_diagnostics,
     _mapped_target_structure_html,
     _paired_anchor_aggregate_summary,
+    _transformation_rollup_diagram_html,
     write_mapping_diagnostics_page,
 )
 
@@ -46,6 +47,29 @@ def test_paired_tree_summary_only_traverses_flow_axis() -> None:
     summary = _paired_anchor_aggregate_summary(context_values, "NINTH", "20USA")
 
     assert summary["parent_code"].tolist() == ["09_total"]
+
+
+def test_transformation_rollup_diagram_keeps_boundary_modes_distinct() -> None:
+    tree = pd.DataFrame([
+        {"axis": "flow", "code": "09 Total transformation sector", "parent_code": ""},
+        {"axis": "flow", "code": "09.06 Gas processing plants", "parent_code": "09 Total transformation sector"},
+        {"axis": "flow", "code": "09.08 Coal transformation", "parent_code": "09 Total transformation sector"},
+        {"axis": "flow", "code": "09.08.01 Coke ovens", "parent_code": "09.08 Coal transformation (including own use)"},
+    ])
+    rollups = pd.DataFrame([
+        {"source_system": "ESTO", "rollup_mode": "NON_EXPANDING", "non_expanding_rollup_id": "gas", "rolled_flow_label": "09.06 Gas processing plants (including own use)", "input_flow": "09.06 Gas processing plants"},
+        {"source_system": "ESTO", "rollup_mode": "NON_EXPANDING", "non_expanding_rollup_id": "gas", "rolled_flow_label": "09.06 Gas processing plants (including own use)", "input_flow": "10.01.02 Gas works plants"},
+        {"source_system": "ESTO", "rollup_mode": "DETACHED", "non_expanding_rollup_id": "coal", "rolled_flow_label": "09.08 Coal transformation (including own use)", "input_flow": "09.08 Coal transformation"},
+    ])
+
+    html = _transformation_rollup_diagram_html(tree, rollups)
+
+    assert "Solid arrows are ordinary tree edges" in html
+    assert "NON_EXPANDING" in html
+    assert "DETACHED" in html
+    assert "This boundary can support ordinary ancestor/frontier resolution." in html
+    assert "This boundary is not folded back into an ordinary ancestor total." in html
+    assert "10.01.02 Gas works plants" in html
 
 
 def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Path) -> None:
