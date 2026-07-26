@@ -761,6 +761,47 @@ def _rollup_boundary_register_html(rollup_catalogue: pd.DataFrame) -> str:
     return '<div class="rollup-register">' + "".join(cards) + "</div>"
 
 
+def _rollup_boundary_details_html(rollup_catalogue: pd.DataFrame) -> str:
+    """Render each ESTO rollup with its ordinary and composition relationships."""
+    required = {"source_system", "rollup_mode", "rolled_flow_label", "input_flow"}
+    if rollup_catalogue.empty or not required.issubset(rollup_catalogue.columns):
+        return '<p class="empty-state">No compiled rollup-edge catalogue is available.</p>'
+    catalogue = rollup_catalogue[rollup_catalogue["source_system"].astype(str).eq("ESTO")].copy()
+    id_column = "rollup_id" if "rollup_id" in catalogue.columns else "non_expanding_rollup_id"
+    explanations = {
+        "EXPANDING": "An ordinary combined category: its registered children remain part of the hierarchy, so this boundary may expand through them.",
+        "NON_EXPANDING": "An inclusive comparison boundary: it can support the ordinary parent/frontier check, but is not an additional additive hierarchy expansion.",
+        "DETACHED": "A separate comparison boundary: it is deliberately not folded into an ordinary ancestor total, even where its label resembles an ordinary sector.",
+    }
+    cards: list[str] = []
+    for rollup_id, group in catalogue.groupby(id_column, dropna=False, sort=True):
+        first = group.iloc[0]
+        label = str(first["rolled_flow_label"])
+        mode = str(first["rollup_mode"])
+        contributors = sorted(set(group["input_flow"].dropna().astype(str)) - {"", "nan"})
+        parents = sorted(set(group.get("parent_flow_label", pd.Series(dtype=str)).dropna().astype(str)) - {"", "nan"})
+        children = sorted({
+            child.strip()
+            for value in group.get("child_flow_labels", pd.Series(dtype=str)).dropna().astype(str)
+            for child in value.split(";")
+            if child.strip()
+        })
+        parent_html = "".join(f"<li>{escape(item)}</li>" for item in parents) or '<li class="muted">No ordinary parent.</li>'
+        child_html = "".join(f"<li>{escape(item)}</li>" for item in children) or '<li class="muted">No ordinary children.</li>'
+        component_html = "".join(f"<li>{escape(item)}</li>" for item in contributors) or '<li class="muted">No composition components.</li>'
+        note = str(first.get("note", "")).strip()
+        cards.append(
+            f'<article class="rollup-boundary {escape(mode.lower())}" data-rollup-target="{escape(label)}" data-rollup-inputs="{escape("|".join(contributors))}">'
+            f'<h3><span class="mode-pill">{escape(mode)}</span> {escape(label)} <strong class="rollup-value" data-rollup-flow="{escape(label)}">â€”</strong></h3>'
+            '<div class="boundary-columns"><div><h4>Ordinary hierarchy</h4><strong>Parent</strong>'
+            f'<ul>{parent_html}</ul><strong>Children</strong><ul>{child_html}</ul></div>'
+            f'<div><h4>Composition components</h4><ul>{component_html}</ul></div></div>'
+            f'<p class="helper-note">{escape(explanations.get(mode, "Defined by the mapping workbook."))}</p>'
+            f'<p class="artifact-id">{escape(note)}<br>{escape(str(rollup_id))}</p></article>'
+        )
+    return '<div class="rollup-register">' + "".join(cards) + "</div>"
+
+
 def _rollup_graph_data(
     common_esto_tree: pd.DataFrame,
     rollup_catalogue: pd.DataFrame,
@@ -878,7 +919,7 @@ def write_mapping_diagnostics_page(
     source_to_common = _read_csv(source_to_common_path)
     many_to_many = _read_csv(many_to_many_path)
     rollup_catalogue = _read_csv(rollup_catalogue_path)
-    rollup_boundary_register = _rollup_boundary_register_html(rollup_catalogue)
+    rollup_boundary_register = _rollup_boundary_details_html(rollup_catalogue)
     transformation_graph_json = json.dumps(
         _rollup_graph_data(common_esto_tree, rollup_catalogue), ensure_ascii=False
     ).replace("</", "<\\/")
@@ -988,9 +1029,22 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 <section class="panel"><h2>LEAP flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(leap_paired_summary, leap_tree, common_esto_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy)}</section>
 <details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2><span></span></summary><div><h3>Actionable partial coverage</h3>{_table_html(partial, ['source_system','comparison_scope','common_row_id','missing_component_pairs','relevance_evidence','mapping_action','mapping_sheet_to_review'])}<h3>Non-zero unmapped LEAP branches</h3>{_table_html(unmapped, ['leap_flow','leap_product','indirect_esto_flow','indirect_esto_product','qa_status'])}<h3>LEAP source-presence conflicts</h3>{_table_html(conflicts, ['leap_sector_name_full_path','raw_leap_fuel_name','presence_status','in_leap_combined_esto','in_leap_combined_ninth'])}<h3>Source-coverage audit summary</h3>{_table_html(coverage_summary, ['coverage_status','mapping_status','rows'])}{cardinality_sections}</div></details>
 <footer><strong>Artifact provenance</strong><br>{artifact_notes}<br>{escape(_artifact_note(anchor_child_values_path))}<br>{escape(_artifact_note(anchor_child_context_values_path))}<br>{escape(_artifact_note(anchor_mapped_component_context_values_path))}<br>{escape(_artifact_note(leaf_reconciliation_candidates_path))}</footer></div><script>const ROLLUP_GRAPH={transformation_graph_json},ROLLUP_VALUES={rollup_value_json};const rs=document.querySelector('#rollup-source'),rc=document.querySelector('#rollup-scenario'),ry=document.querySelector('#rollup-year');const unique=a=>[...new Set(a)].sort();const fill=(el,items,selected)=>{{el.innerHTML='';items.forEach(x=>el.add(new Option(x,x,false,String(x)===String(selected)));}};function esc(s){{return String(s).replace(/[&<>]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;'}}[c]));}}function drawGraph(){{let h=230+ROLLUP_GRAPH.boundaries.length*150,w=1300,kids=ROLLUP_GRAPH.children;let childX=i=>70+i*(1160/Math.max(kids.length-1,1));let svg=`<svg viewBox="0 0 ${{w}} ${{h}}" width="100%" height="${{h}}"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#53718f"/></marker></defs>`;svg+=`<g class="node rollup-check" data-rollup-target="${{esc(ROLLUP_GRAPH.parent)}}" data-rollup-inputs="${{esc(kids.join('|'))}}"><rect x="510" y="20" width="280" height="48"/><text x="525" y="43">${{esc(ROLLUP_GRAPH.parent)}}</text><text class="value" data-rollup-flow="${{esc(ROLLUP_GRAPH.parent)}}" x="525" y="59">—</text></g>`;kids.forEach((x,i)=>{{let cx=childX(i);svg+=`<line class="edge" x1="650" y1="68" x2="${{cx}}" y2="118"/><g class="node"><rect x="${{cx-62}}" y="118" width="124" height="48"/><text x="${{cx-54}}" y="140">${{esc(x).replace(' plants','')}}</text><text class="value" data-rollup-flow="${{esc(x)}}" x="${{cx-54}}" y="157">—</text></g>`;}});ROLLUP_GRAPH.boundaries.forEach((b,i)=>{{let y=210+i*150,targetX=850;svg+=`<g class="node boundary ${{b.mode==='DETACHED'?'detached':''}} rollup-check" data-rollup-target="${{esc(b.label)}}" data-rollup-inputs="${{esc(b.inputs.join('|'))}}"><rect x="${{targetX}}" y="${{y}}" width="350" height="58"/><text class="mode" x="${{targetX+12}}" y="${{y+18}}">${{esc(b.mode)}}</text><text x="${{targetX+12}}" y="${{y+35}}">${{esc(b.label)}}</text><text class="value" data-rollup-flow="${{esc(b.label)}}" x="${{targetX+12}}" y="${{y+51}}">—</text></g>`;b.inputs.forEach((x,j)=>{{let iy=y+j*28,ix=110+j*250;svg+=`<line class="edge dashed" x1="${{ix+175}}" y1="${{iy+12}}" x2="${{targetX}}" y2="${{y+29}}"/><g class="node"><rect x="${{ix}}" y="${{iy}}" width="175" height="25"/><text x="${{ix+7}}" y="${{iy+12}}">${{esc(x)}}</text><text class="value" data-rollup-flow="${{esc(x)}}" x="${{ix+7}}" y="${{iy+22}}">—</text></g>`;}});}});document.querySelector('#rollup-graph').innerHTML=svg+'</svg>';}}function refreshScenarios(){{let rows=ROLLUP_VALUES.filter(r=>r.source_system===rs.value);fill(rc,unique(rows.map(r=>r.scenario)),rc.value||unique(rows.map(r=>r.scenario))[0]);refreshYears();}}function refreshYears(){{let rows=ROLLUP_VALUES.filter(r=>r.source_system===rs.value&&r.scenario===rc.value);let years=unique(rows.map(r=>r.year)).sort((a,b)=>Number(a)-Number(b));fill(ry,years,years.at(-1));paint();}}function paint(){{let rows=ROLLUP_VALUES.filter(r=>r.source_system===rs.value&&r.scenario===rc.value&&String(r.year)===String(ry.value)),values=new Map();rows.forEach(r=>values.set(r.common_flow_label,(values.get(r.common_flow_label)||0)+Number(r.value)));document.querySelectorAll('[data-rollup-flow]').forEach(el=>{{let v=values.get(el.dataset.rollupFlow);el.textContent=v===undefined?'—':v.toLocaleString(undefined,{{maximumFractionDigits:2}});}});document.querySelectorAll('[data-rollup-target]').forEach(el=>{{let target=values.get(el.dataset.rollupTarget),inputs=el.dataset.rollupInputs.split('|').filter(Boolean),sum=inputs.reduce((s,x)=>s+(values.get(x)||0),0),ok=target!==undefined&&Math.abs(target-sum)<=0.01*Math.max(Math.abs(target),1);el.classList.toggle('value-pass',ok);el.classList.toggle('value-fail',target!==undefined&&!ok);}});}}drawGraph();if(ROLLUP_VALUES.length){{fill(rs,unique(ROLLUP_VALUES.map(r=>r.source_system)),unique(ROLLUP_VALUES.map(r=>r.source_system)).includes('ESTO')?'ESTO':unique(ROLLUP_VALUES.map(r=>r.source_system))[0]);refreshScenarios();rs.onchange=refreshScenarios;rc.onchange=refreshYears;ry.onchange=paint;}}else{{document.querySelector('.rollup-controls').innerHTML='<span class="empty-state">No comparison values were supplied for this dashboard render.</span>';}}</script></body></html>"""
+    # The dashboard template predates the graph and emits one compact inline
+    # script. Correct its option-construction parenthesis while it remains
+    # embedded, then move the selectors from the register to the SVG panel.
+    rollup_controls_html = (
+        '<div class="rollup-controls"><label>Dataset<select id="rollup-source"></select></label>'
+        '<label>Scenario<select id="rollup-scenario"></select></label>'
+        '<label>Year<select id="rollup-year"></select></label></div>'
+    )
+    graph_heading_html = '<section class="panel"><h2>All sector rollup structure</h2>'
+    html = html.replace('String(x)===String(selected)));', 'String(x)===String(selected))));')
+    html = html.replace(rollup_controls_html, "", 1)
+    html = html.replace(graph_heading_html, graph_heading_html + rollup_controls_html, 1)
+
     # Replace the early 09-only SVG with the complete sector/rollup graph after
     # the shared selector and value-painting code has initialised.
-    html += """
+    all_sector_graph_script = """
 <script>
 (() => {
   function escGraph(value) {
@@ -1056,6 +1110,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 })();
 </script>
 """
+    html = html.replace("</body></html>", all_sector_graph_script + "</body></html>")
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME
     output_path.write_text(html, encoding="utf-8")
     return {"page": str(output_path), "summary": str(layout["supporting"] / "mapping_diagnostics_summary.csv")}

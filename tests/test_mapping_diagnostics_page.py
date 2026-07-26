@@ -6,6 +6,7 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     _mapping_cardinality_diagnostics,
     _mapped_target_structure_html,
     _paired_anchor_aggregate_summary,
+    _rollup_boundary_details_html,
     _rollup_graph_data,
     _transformation_rollup_diagram_html,
     write_mapping_diagnostics_page,
@@ -90,6 +91,27 @@ def test_rollup_graph_data_includes_every_flow_root_and_mode() -> None:
 
     assert {sector["root"] for sector in graph["sectors"]} == {"09 Total transformation sector", "14 Industry sector"}
     assert {boundary["mode"] for boundary in graph["all_boundaries"]} == {"NON_EXPANDING", "EXPANDING", "DETACHED"}
+
+
+def test_rollup_boundary_details_show_parent_children_components_and_mode_meaning() -> None:
+    rollups = pd.DataFrame([
+        {
+            "source_system": "ESTO", "rollup_mode": "DETACHED", "rollup_id": "coal",
+            "rolled_flow_label": "09.08 Coal transformation (including own use)",
+            "input_flow": "10.01.05 Coke ovens", "parent_flow_label": "09 Total transformation sector",
+            "child_flow_labels": "09.08.01 Coke ovens; 09.08.02 Blast furnaces",
+            "note": "Separate comparison boundary.",
+        },
+    ])
+
+    html = _rollup_boundary_details_html(rollups)
+
+    assert "Ordinary hierarchy" in html
+    assert "Composition components" in html
+    assert "09 Total transformation sector" in html
+    assert "09.08.01 Coke ovens" in html
+    assert "10.01.05 Coke ovens" in html
+    assert "deliberately not folded into an ordinary ancestor total" in html
 
 
 def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Path) -> None:
