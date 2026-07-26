@@ -663,7 +663,7 @@ def _transformation_rollup_diagram_html(
     rollup_catalogue: pd.DataFrame,
 ) -> str:
     """Render mapping-owned 09 transformation tree and rollup boundaries."""
-    required = {"source_system", "rollup_mode", "non_expanding_rollup_id", "rolled_flow_label", "input_flow"}
+    required = {"source_system", "rollup_mode", "rolled_flow_label", "input_flow"}
     if common_esto_tree.empty or rollup_catalogue.empty or not required.issubset(rollup_catalogue.columns):
         return '<p class="empty-state">Current transformation-tree or rollup-catalogue artifacts are unavailable.</p>'
 
@@ -684,7 +684,8 @@ def _transformation_rollup_diagram_html(
         for row in ordinary_children.itertuples(index=False)
     ) or '<li class="empty-state">No ordinary children found.</li>'
     boundary_cards: list[str] = []
-    for boundary_id, group in catalogue.groupby("non_expanding_rollup_id", dropna=False, sort=True):
+    boundary_id_column = "rollup_id" if "rollup_id" in catalogue.columns else "non_expanding_rollup_id"
+    for boundary_id, group in catalogue.groupby(boundary_id_column, dropna=False, sort=True):
         first = group.iloc[0]
         label = str(first["rolled_flow_label"])
         mode = str(first["rollup_mode"])
@@ -782,7 +783,9 @@ def write_mapping_diagnostics_page(
     coverage_path = results_root / "source_coverage" / "all_demand_aggregated_coverage_gaps.csv"
     source_to_common_path = results_root / "common_esto" / "structural_artifacts" / "source_pair_to_common_row.csv"
     many_to_many_path = results_root / "maintenance" / "many_to_many_conflicts.csv"
-    rollup_catalogue_path = results_root / "mapping_relationships" / "non_expanding_rollups.csv"
+    rollup_catalogue_path = results_root / "mapping_relationships" / "rollup_edges.csv"
+    if not rollup_catalogue_path.exists():
+        rollup_catalogue_path = results_root / "mapping_relationships" / "non_expanding_rollups.csv"
 
     anchor = _read_csv(anchor_path)
     anchor_child_values = _read_csv(anchor_child_values_path)
