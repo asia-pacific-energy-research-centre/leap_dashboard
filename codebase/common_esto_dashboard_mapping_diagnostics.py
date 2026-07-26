@@ -69,8 +69,9 @@ def _failure_summary(frame: pd.DataFrame, group_columns: list[str]) -> pd.DataFr
 def _mapping_cardinality_diagnostics(
     source_to_common: pd.DataFrame,
     target_tree: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Return real many-to-many mappings and same-pair target ancestor overlaps.
+    source_tree: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Return mapping cardinality and both directions of hierarchy overlap.
 
     Both checks use the structural source-to-Common-ESTO map rather than the
     explanatory parent/child routes shown in an anchor card.  That avoids
@@ -80,7 +81,7 @@ def _mapping_cardinality_diagnostics(
     source_columns = ["source_system", "original_source_flow", "original_source_product"]
     required = set(source_columns + ["common_row_id", "common_flow_label", "common_product_label"])
     if source_to_common.empty or not required.issubset(source_to_common.columns):
-        return pd.DataFrame(), pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     relations = source_to_common.drop_duplicates(source_columns + ["common_row_id"]).copy()
     source_counts = (
@@ -88,16 +89,12 @@ def _mapping_cardinality_diagnostics(
         .rename("mapped_target_count").reset_index()
     )
     fanout_keys = source_counts[source_counts["mapped_target_count"].gt(1)]
-    if fanout_keys.empty:
-        return pd.DataFrame(), pd.DataFrame()
     fanout_relations = relations.merge(fanout_keys, on=source_columns, how="inner")
     target_counts = (
         relations.groupby(["source_system", "common_row_id"], dropna=False).size()
         .rename("mapped_source_count").reset_index()
     )
-    cardinality = fanout_relations.merge(
-        target_counts, on=["source_system", "common_row_id"],
-    )
+    cardinality = fanout_relations.merge(target_counts, on=["source_system", "common_row_id"])
     many_to_many = cardinality[
         cardinality["mapped_target_count"].gt(1) & cardinality["mapped_source_count"].gt(1)
     ].copy()
@@ -132,7 +129,41 @@ def _mapping_cardinality_diagnostics(
                     break
                 ancestor = parent_by_flow.get(ancestor, "")
     overlaps = pd.DataFrame(overlap_rows).drop_duplicates() if overlap_rows else pd.DataFrame()
-    return many_to_many, overlaps
+
+    source_parent_by_system: dict[str, dict[str, str]] = {}
+    if {"dataset", "code", "parent_code"}.issubset(source_tree.columns):
+        for system, group in source_tree.groupby(source_tree["dataset"].astype(str).str.upper(), sort=False):
+            source_parent_by_system[str(system)] = (
+                group.set_index("code")["parent_code"].fillna("").astype(str).to_dict()
+            )
+    reverse_rows: list[dict[str, object]] = []
+    target_fanin = relations.merge(
+        target_counts[target_counts["mapped_source_count"].gt(1)],
+        on=["source_system", "common_row_id"], how="inner",
+    )
+    for key, group in target_fanin.groupby(
+        ["source_system", "common_row_id", "original_source_product"], dropna=False, sort=False,
+    ):
+        system, common_row_id, source_product = key
+        parent_by_source_flow = source_parent_by_system.get(str(system), {})
+        source_flows = set(group["original_source_flow"].astype(str))
+        for source_flow in source_flows:
+            ancestor = parent_by_source_flow.get(source_flow, "")
+            while ancestor:
+                if ancestor in source_flows:
+                    first = group.iloc[0]
+                    reverse_rows.append({
+                        "source_system": system,
+                        "common_target": f"{first.common_flow_label} / {first.common_product_label}",
+                        "common_row_id": common_row_id,
+                        "source_product": source_product,
+                        "source_parent": ancestor,
+                        "source_descendant": source_flow,
+                    })
+                    break
+                ancestor = parent_by_source_flow.get(ancestor, "")
+    source_overlaps = pd.DataFrame(reverse_rows).drop_duplicates() if reverse_rows else pd.DataFrame()
+    return many_to_many, overlaps, source_overlaps
 
 
 def _three_significant_figures(value: float) -> str:
@@ -698,6 +729,7 @@ def write_mapping_diagnostics_page(
     ninth_tree = _read_csv(tree_root / "ninth_tree.csv")
     leap_tree = _read_csv(tree_root / "leap_tree.csv")
     common_esto_tree = _read_csv(tree_root / "common_esto_tree.csv")
+    source_tree = _read_csv(tree_root / "all_dataset_trees.csv")
     partial = _read_csv(partial_path)
     unmapped = _read_csv(unmapped_path)
     conflicts = _read_csv(conflicts_path)
@@ -724,8 +756,8 @@ def write_mapping_diagnostics_page(
         .size().reset_index(name="rows").sort_values("rows", ascending=False, kind="mergesort")
         if not coverage.empty else pd.DataFrame(columns=["coverage_status", "mapping_status", "rows"])
     )
-    many_to_many, target_ancestor_overlaps = _mapping_cardinality_diagnostics(
-        source_to_common, common_esto_tree,
+    many_to_many, target_ancestor_overlaps, source_ancestor_overlaps = _mapping_cardinality_diagnostics(
+        source_to_common, common_esto_tree, source_tree,
     )
     cardinality_sections = ""
     if not target_ancestor_overlaps.empty:
@@ -735,6 +767,15 @@ def write_mapping_diagnostics_page(
             'descendants. Review these as potential double-counting routes.</p>'
             + _table_html(target_ancestor_overlaps, [
                 "source_system", "source_flow", "source_product", "ancestor_target", "descendant_target",
+            ])
+        )
+    if not source_ancestor_overlaps.empty:
+        cardinality_sections += (
+            '<h3>Source parent and child mapped to one target</h3>'
+            '<p class="subtle">One Common ESTO target is reached by both a source parent and its descendant. '
+            'This can be intentional aggregation, but review it before treating both routes as additive.</p>'
+            + _table_html(source_ancestor_overlaps, [
+                "source_system", "common_target", "source_product", "source_parent", "source_descendant",
             ])
         )
     if not many_to_many.empty:

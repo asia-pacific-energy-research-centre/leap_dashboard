@@ -22,11 +22,20 @@ def test_mapping_cardinality_diagnostics_detects_only_real_overlap_and_many_to_m
         {"code": "14.03.01 Iron and steel", "parent_code": "14.03 Manufacturing"},
     ])
 
-    many_to_many, overlaps = _mapping_cardinality_diagnostics(source_to_common, target_tree)
+    source_tree = pd.DataFrame([
+        {"dataset": "ninth", "code": "source_a", "parent_code": ""},
+        {"dataset": "ninth", "code": "source_b", "parent_code": "source_a"},
+    ])
+
+    many_to_many, overlaps, source_overlaps = _mapping_cardinality_diagnostics(
+        source_to_common, target_tree, source_tree,
+    )
 
     assert len(many_to_many) == 4
     assert len(overlaps) == 2
     assert set(overlaps["ancestor_target"]) == {"14.03 Manufacturing / 08.01 Natural gas"}
+    assert len(source_overlaps) == 2
+    assert set(source_overlaps["source_parent"]) == {"source_a"}
 
 
 def test_paired_tree_summary_only_traverses_flow_axis() -> None:
