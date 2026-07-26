@@ -105,7 +105,8 @@ def _mapped_target_structure_html(
     target_tree: pd.DataFrame,
     source_parent_label: str,
     formatter: callable,
-) -> tuple[str, str]:
+    expected_total: float,
+) -> tuple[str, str, bool]:
     """Show a real target hierarchy or an honest direct fan-out.
 
     The target hierarchy is only drawn when mapped rows themselves have a real
@@ -120,6 +121,7 @@ def _mapped_target_structure_html(
         return (
             '<li><span>No mapped Common ESTO rows are available.</span><strong>—</strong></li>',
             "",
+            expected_total == 0,
         )
 
     identity_columns = [
@@ -139,37 +141,64 @@ def _mapped_target_structure_html(
         target_tree.set_index("code")["parent_code"].fillna("").astype(str).to_dict()
         if {"code", "parent_code"}.issubset(target_tree.columns) else {}
     )
-    hierarchy_children: dict[tuple[str, str], list[tuple[str, str]]] = {}
+    has_mapped_ancestor = False
     for flow, product in target_keys:
+        ancestor = parent_by_flow.get(flow, "")
+        while ancestor:
+            if (ancestor, product) in target_keys:
+                has_mapped_ancestor = True
+                break
+            ancestor = parent_by_flow.get(ancestor, "")
+    display_keys = set(target_keys)
+    structural_keys: set[tuple[str, str]] = set()
+    if has_mapped_ancestor:
+        for flow, product in target_keys:
+            ancestor = parent_by_flow.get(flow, "")
+            while ancestor and (ancestor, product) not in display_keys:
+                display_keys.add((ancestor, product))
+                structural_keys.add((ancestor, product))
+                ancestor = parent_by_flow.get(ancestor, "")
+    hierarchy_children: dict[tuple[str, str], list[tuple[str, str]]] = {}
+    for flow, product in display_keys:
         parent = parent_by_flow.get(flow, "")
-        if (parent, product) in target_keys:
+        if (parent, product) in display_keys:
             hierarchy_children.setdefault((parent, product), []).append((flow, product))
-    has_hierarchy = bool(hierarchy_children)
+    has_hierarchy = has_mapped_ancestor
     target_values = (
         targets.groupby(["component_esto_flow", "component_esto_product"], dropna=False)["mapped_value"]
         .sum().to_dict()
     )
+    detail_matches_total = abs(sum(target_values.values()) - expected_total) <= 1e-6 * max(abs(expected_total), 1.0)
 
     def target_item(key: tuple[str, str], *, child: bool = False) -> str:
         flow, product = key
         prefix = "└─ " if child else ""
+        if key in structural_keys:
+            return (
+                f'<li class="tree-structural"><span>{escape(prefix + flow + " / " + product + " (structure only)")}</span>'
+                '<strong>—</strong></li>'
+            )
         return (
             f'<li><span>{escape(prefix + flow + " / " + product)}</span>'
             f'<strong>{formatter(float(target_values[key]))}</strong></li>'
         )
 
     if has_hierarchy:
-        roots = sorted(key for key in target_keys if key not in {child for children in hierarchy_children.values() for child in children})
+        roots = sorted(key for key in display_keys if key not in {child for children in hierarchy_children.values() for child in children})
         body = '<li class="tree-category"><span>Mapped Common ESTO hierarchy</span></li>'
+        def render_node(key: tuple[str, str], depth: int = 0) -> str:
+            item = target_item(key, child=depth > 0)
+            return item + "".join(
+                render_node(child, depth + 1)
+                for child in sorted(hierarchy_children.get(key, []))
+            )
         for root in roots:
-            body += target_item(root)
-            for child in sorted(hierarchy_children.get(root, [])):
-                body += target_item(child, child=True)
+            body += render_node(root)
         note = (
             '<p class="helper-note">Mapped target hierarchy: only Common ESTO parent/child relationships '
-            'between the rows above are shown.</p>'
+            'are shown. “Structure only” nodes provide context and are not included in the mapped total.</p>'
         )
-        return body, note
+        return body, note, detail_matches_total
 
     body = '<li class="tree-category"><span>Direct mapping fan-out</span></li>'
     for key in sorted(target_keys):
@@ -178,7 +207,7 @@ def _mapped_target_structure_html(
         '<p class="helper-note">No mapped Common ESTO parent/child roll-up exists for this source parent. '
         f'{escape(source_parent_label)} maps directly to these target rows.</p>'
     )
-    return body, note
+    return body, note, detail_matches_total
 
 
 def _anchor_value_summary(anchor: pd.DataFrame) -> pd.DataFrame:
@@ -441,12 +470,13 @@ def _paired_tree_html(
             ].drop(columns="_scope_priority")
         if not component_rows.empty:
             component_rows["mapped_value"] = pd.to_numeric(component_rows["mapped_value"], errors="coerce").fillna(0.0)
-            mapped_branch_html, mapped_structure_note = _mapped_target_structure_html(
-                component_rows, target_tree, parent_label, format_value,
+            mapped_branch_html, mapped_structure_note, detail_matches_total = _mapped_target_structure_html(
+                component_rows, target_tree, parent_label, format_value, float(row.mapped_frontier_total),
             )
         else:
             mapped_branch_html = '<li><span>No resolved component detail is available.</span><strong>—</strong></li>'
             mapped_structure_note = ""
+            detail_matches_total = float(row.mapped_frontier_total) == 0
         raw_rollup_note = (
             '<p class="helper-note">Manual LEAP roll-up: this constructed subtotal is compared with its immediate source-tree children.</p>'
             if str(row.parent_code) in manual_rollup_codes else ""
@@ -471,9 +501,9 @@ def _paired_tree_html(
             f'</ul>{raw_rollup_note}{source_warning}</section>'
             '<section><h4>Mapped Common ESTO representation</h4><ul class="value-tree">'
             f'{mapped_branch_html}'
-            f'<li class="tree-total"><span>Unique mapped comparison total</span><strong>{format_value(float(row.mapped_frontier_total))}</strong></li>'
+            f'<li class="tree-total"><span>{"Unique mapped comparison total" if detail_matches_total else "Validator mapped total (detail incomplete)"}</span><strong>{format_value(float(row.mapped_frontier_total))}</strong></li>'
             f'<li class="tree-residual"><span>Anchor difference (parent − mapped total)</span><strong>{format_value(float(row.mapped_difference))}</strong></li>'
-            f'</ul>{mapped_structure_note}</section></div></article>'
+            f'</ul>{mapped_structure_note}{"" if detail_matches_total else "<p class=\"source-warning\">The displayed mapped rows do not yet reproduce the validator total, so this total is not an inspectable breakdown.</p>"}</section></div></article>'
         )
     return "".join(cards)
 
@@ -583,7 +613,7 @@ def write_mapping_diagnostics_page(
     stage = _read_csv(stage_path)
     ninth_tree = _read_csv(tree_root / "ninth_tree.csv")
     leap_tree = _read_csv(tree_root / "leap_tree.csv")
-    esto_tree = _read_csv(tree_root / "esto_tree.csv")
+    common_esto_tree = _read_csv(tree_root / "common_esto_tree.csv")
     partial = _read_csv(partial_path)
     unmapped = _read_csv(unmapped_path)
     conflicts = _read_csv(conflicts_path)
@@ -634,7 +664,7 @@ body {{ font-family: Inter,Segoe UI,Arial,sans-serif; margin:0; background:#f4f6
 h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b7a; }} .metrics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:16px 0; }}
 .metric-card,.panel {{ background:white; border:1px solid #d9e1ea; border-radius:10px; padding:14px; }} .metric-card span {{ display:block; color:#5f6b7a; font-size:13px; }} .metric-card strong {{ font-size:28px; }} .collapsed-panel summary {{ cursor:pointer; display:flex; align-items:center; justify-content:space-between; }} .collapsed-panel summary h2 {{ margin:0; }} .collapsed-panel summary span {{ color:#1b5e9a; font-size:0; }} .collapsed-panel[open] summary span::after {{ content:'Hide'; font-size:13px; }} .collapsed-panel:not([open]) summary span::after {{ content:'Show'; font-size:13px; }} .collapsed-panel > div {{ margin-top:14px; }}
 .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:16px; }} .guide-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; }} .guide-card {{ border-radius:8px; padding:10px; font-size:13px; line-height:1.4; }} .guide-card strong {{ display:block; margin-bottom:3px; }} .guide-good {{ background:#e8f5e9; color:#176b35; }} .guide-warning {{ background:#fff4e5; color:#8a4b08; }} .guide-neutral {{ background:#e8f0fa; color:#294f78; }} .flow {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }} .flow div {{ background:#e8f0fa; border:1px solid #adc4df; border-radius:8px; padding:10px; font-size:13px; }} .arrow {{ color:#53718f; font-size:22px; }}
-.paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .value-tree li.tree-category {{ display:block; border-bottom:0; color:#5f6b7a; font-size:12px; font-weight:600; padding-top:10px; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .helper-note,.source-warning {{ font-size:12px; line-height:1.4; margin:10px 0 0; padding:8px; border-radius:6px; }} .helper-note {{ background:#e8f5e9; color:#176b35; }} .source-warning {{ background:#fff4e5; color:#8a4b08; }} .value-tree li.optional-zero {{ display:none; }} body.show-zero-children .value-tree li.optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
+.paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .value-tree li.tree-category {{ display:block; border-bottom:0; color:#5f6b7a; font-size:12px; font-weight:600; padding-top:10px; }} .value-tree li.tree-structural {{ color:#5f6b7a; font-style:italic; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .helper-note,.source-warning {{ font-size:12px; line-height:1.4; margin:10px 0 0; padding:8px; border-radius:6px; }} .helper-note {{ background:#e8f5e9; color:#176b35; }} .source-warning {{ background:#fff4e5; color:#8a4b08; }} .value-tree li.optional-zero {{ display:none; }} body.show-zero-children .value-tree li.optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
 </style></head><body><div class="shell"><header><a href="index.html">← Dashboard overview</a><h1>Mapping diagnostics</h1><p class="subtle">Read-only inspection of hierarchy/anchor validation and direct mapping coverage. Updated: {escape(dashboard_updated_label)}</p></header>
 <section class="panel"><h2>How to read a hierarchy case</h2><div class="guide-grid"><div class="guide-card guide-good"><strong>Manual LEAP roll-up</strong>Only constructed LEAP subtotal branches receive this label; they are compared with their immediate source-tree children.</div><div class="guide-card guide-good"><strong>One-to-many fan-out</strong>One raw parent can reach several ESTO components. Those routes are not additional source-tree parents.</div><div class="guide-card guide-neutral"><strong>De-duplicated frontier</strong>Mapped component rows can overlap. The frontier counts each Common ESTO row once, so do not add the displayed component rows.</div><div class="guide-card guide-warning"><strong>Raw source contradiction</strong>If a raw parent is 0 while its children are non-zero, the original source hierarchy disagrees with itself. It is not, by itself, a missing mapping.</div></div></section>
@@ -644,8 +674,8 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 <details class="panel collapsed-panel"><summary><h2>Largest summed anchor mismatches</h2><span></span></summary><div><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</div></details>
 <details class="panel collapsed-panel"><summary><h2>Reviewed source-hierarchy exceptions</h2><span></span></summary><div><p class="subtle">These are known source-data conditions from the exception workbook. They are skipped from actionable anchor failures but remain visible here with their review notes.</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','reason','exception_resolution','data_quality_exception_notes'])}<h3>Leaf-reconciliation candidates awaiting review</h3><p class="subtle">These are not exceptions yet. Their immediate children do not reconcile, while their descendant leaves do; review before copying an enabled row into <code>source_mismatch_allowed</code>.</p>{_table_html(leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>
 <label class="zero-toggle"><input id="show-zero-children" type="checkbox" autocomplete="off" onchange="document.body.classList.toggle('show-zero-children', this.checked)"> Show zero-value children and mapped components</label>
-<section class="panel"><h2>NINTH flow tree: original vs mapped representation</h2><p class="subtle">The right side shows only genuine Common ESTO hierarchy edges between mapped rows; otherwise it shows a direct fan-out.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, esto_tree, 'NINTH', anchor_mapped_component_context_values, dashboard_economy)}</section>
-<section class="panel"><h2>LEAP flow tree: original vs mapped representation</h2><p class="subtle">The right side shows only genuine Common ESTO hierarchy edges between mapped rows; otherwise it shows a direct fan-out.</p>{_paired_tree_html(leap_paired_summary, leap_tree, esto_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy)}</section>
+<section class="panel"><h2>NINTH flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, common_esto_tree, 'NINTH', anchor_mapped_component_context_values, dashboard_economy)}</section>
+<section class="panel"><h2>LEAP flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(leap_paired_summary, leap_tree, common_esto_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy)}</section>
 <details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2><span></span></summary><div><h3>Actionable partial coverage</h3>{_table_html(partial, ['source_system','comparison_scope','common_row_id','missing_component_pairs','relevance_evidence','mapping_action','mapping_sheet_to_review'])}<h3>Non-zero unmapped LEAP branches</h3>{_table_html(unmapped, ['leap_flow','leap_product','indirect_esto_flow','indirect_esto_product','qa_status'])}<h3>LEAP source-presence conflicts</h3>{_table_html(conflicts, ['leap_sector_name_full_path','raw_leap_fuel_name','presence_status','in_leap_combined_esto','in_leap_combined_ninth'])}<h3>Source-coverage audit summary</h3>{_table_html(coverage_summary, ['coverage_status','mapping_status','rows'])}</div></details>
 <footer><strong>Artifact provenance</strong><br>{artifact_notes}<br>{escape(_artifact_note(anchor_child_values_path))}<br>{escape(_artifact_note(anchor_child_context_values_path))}<br>{escape(_artifact_note(anchor_mapped_component_context_values_path))}<br>{escape(_artifact_note(leaf_reconciliation_candidates_path))}</footer></div></body></html>"""
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME

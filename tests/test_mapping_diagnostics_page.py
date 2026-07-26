@@ -39,7 +39,7 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
         {"axis": "flow", "code": "09 Total", "label": "09 Total", "level": 1, "parent_code": ""},
         {"axis": "flow", "code": "09.00 Total", "label": "09.00 Total", "level": 2, "parent_code": "09 Total"},
         {"axis": "flow", "code": "09 Extra", "label": "09 Extra", "level": 1, "parent_code": ""},
-    ]).to_csv(tree_root / "esto_tree.csv", index=False)
+    ]).to_csv(tree_root / "common_esto_tree.csv", index=False)
     pd.DataFrame([
         {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "parent_code": "09_total"},
     ]).to_csv(tree_root / "common_esto_validation.csv", index=False)
@@ -94,7 +94,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "NINTH flow tree: original vs mapped representation" in html
     assert "LEAP flow tree: original vs mapped representation" in html
     assert "Original raw tree" in html
-    assert "Unique mapped comparison total" in html
+    assert "Validator mapped total (detail incomplete)" in html
+    assert "The displayed mapped rows do not yet reproduce the validator total" in html
     assert "Mapped Common ESTO representation" in html
     assert "Mapped Common ESTO hierarchy" in html
     assert "09 Total / 08.01 Gas" in html
@@ -138,7 +139,10 @@ def test_mapped_target_structure_uses_direct_fanout_without_target_edge() -> Non
         {"code": "10.01.12 Oil and gas extraction", "parent_code": "10.01 Own Use"},
     ])
 
-    html, note = _mapped_target_structure_html(components, target_tree, "Other loss and own use", str)
+    html, note, matches = _mapped_target_structure_html(
+        components, target_tree, "Other loss and own use", str, -24500.0,
+    )
 
     assert "Direct mapping fan-out" in html
     assert "Other loss and own use maps directly to these target rows." in note
+    assert matches
