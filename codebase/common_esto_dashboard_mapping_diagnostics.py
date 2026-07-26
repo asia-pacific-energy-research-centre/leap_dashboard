@@ -761,22 +761,23 @@ def _rollup_boundary_register_html(rollup_catalogue: pd.DataFrame) -> str:
     return '<div class="rollup-register">' + "".join(cards) + "</div>"
 
 
-def _transformation_rollup_graph_data(
+def _rollup_graph_data(
     common_esto_tree: pd.DataFrame,
     rollup_catalogue: pd.DataFrame,
 ) -> dict[str, object]:
-    """Return only mapping-owned inputs needed by the interactive 09 SVG."""
+    """Return mapping-owned all-sector hierarchy and ESTO rollup inputs for the SVG."""
     if common_esto_tree.empty or "axis" not in common_esto_tree.columns:
-        return {"parent": "09 Total transformation sector", "children": [], "boundaries": []}
+        return {"sectors": [], "boundaries": [], "parent": "", "children": []}
     tree = common_esto_tree[common_esto_tree["axis"].astype(str).eq("flow")].copy()
-    parent = "09 Total transformation sector"
-    children = tree[tree["parent_code"].fillna("").astype(str).eq(parent)]["code"].astype(str).tolist()
+    roots = tree[tree["parent_code"].fillna("").astype(str).eq("")]["code"].astype(str).tolist()
+    sectors = []
+    for root in roots:
+        children = tree[tree["parent_code"].fillna("").astype(str).eq(root)]["code"].astype(str).tolist()
+        sectors.append({"root": root, "children": children})
+    legacy_sector = next((sector for sector in sectors if sector["root"] == "09 Total transformation sector"), {"root": "", "children": []})
     if rollup_catalogue.empty or not {"source_system", "rolled_flow_label"}.issubset(rollup_catalogue.columns):
-        return {"parent": parent, "children": children, "boundaries": []}
-    catalogue = rollup_catalogue[
-        rollup_catalogue["source_system"].astype(str).eq("ESTO")
-        & rollup_catalogue["rolled_flow_label"].astype(str).str.startswith("09")
-    ].copy()
+        return {"sectors": sectors, "boundaries": [], "all_boundaries": [], "parent": legacy_sector["root"], "children": legacy_sector["children"]}
+    catalogue = rollup_catalogue[rollup_catalogue["source_system"].astype(str).eq("ESTO")].copy()
     id_column = "rollup_id" if "rollup_id" in catalogue.columns else "non_expanding_rollup_id"
     boundaries = []
     for _, group in catalogue.groupby(id_column, dropna=False, sort=True):
@@ -786,7 +787,15 @@ def _transformation_rollup_graph_data(
             "mode": str(first["rollup_mode"]),
             "inputs": sorted(set(group["input_flow"].dropna().astype(str)) - {"", "nan"}),
         })
-    return {"parent": parent, "children": children, "boundaries": boundaries}
+    legacy_boundaries = [boundary for boundary in boundaries if boundary["label"].startswith("09")]
+    return {
+        "sectors": sectors,
+        "all_boundaries": boundaries,
+        "boundaries": legacy_boundaries,
+        # Retained while the older inline renderer remains in the generated page.
+        "parent": legacy_sector["root"],
+        "children": legacy_sector["children"],
+    }
 
 
 def _issue_tree_section(
@@ -871,7 +880,7 @@ def write_mapping_diagnostics_page(
     rollup_catalogue = _read_csv(rollup_catalogue_path)
     rollup_boundary_register = _rollup_boundary_register_html(rollup_catalogue)
     transformation_graph_json = json.dumps(
-        _transformation_rollup_graph_data(common_esto_tree, rollup_catalogue), ensure_ascii=False
+        _rollup_graph_data(common_esto_tree, rollup_catalogue), ensure_ascii=False
     ).replace("</", "<\\/")
     rollup_value_records: list[dict[str, object]] = []
     if comparison_data is not None and not comparison_data.empty:
@@ -963,14 +972,14 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:16px; }} .guide-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; }} .guide-card {{ border-radius:8px; padding:10px; font-size:13px; line-height:1.4; }} .guide-card strong {{ display:block; margin-bottom:3px; }} .guide-good {{ background:#e8f5e9; color:#176b35; }} .guide-warning {{ background:#fff4e5; color:#8a4b08; }} .guide-neutral {{ background:#e8f0fa; color:#294f78; }} .flow {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }} .flow div {{ background:#e8f0fa; border:1px solid #adc4df; border-radius:8px; padding:10px; font-size:13px; }} .arrow {{ color:#53718f; font-size:22px; }}
 .paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .value-tree li.tree-category {{ display:block; border-bottom:0; color:#5f6b7a; font-size:12px; font-weight:600; padding-top:10px; }} .value-tree li.tree-structural {{ color:#5f6b7a; font-style:italic; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .helper-note,.source-warning {{ font-size:12px; line-height:1.4; margin:10px 0 0; padding:8px; border-radius:6px; }} .helper-note {{ background:#e8f5e9; color:#176b35; }} .source-warning {{ background:#fff4e5; color:#8a4b08; }} .value-tree li.optional-zero {{ display:none; }} body.show-zero-children .value-tree li.optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
 .transformation-diagram {{ display:grid; grid-template-columns:minmax(260px,0.8fr) minmax(520px,2fr); gap:16px; }} .ordinary-hierarchy,.rollup-boundaries {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .ordinary-hierarchy h3,.rollup-boundaries h3,.rollup-boundary h3,.rollup-boundary h4 {{ margin:0 0 8px; }} .tree-root {{ background:#dceaf8; border:1px solid #8eb2d4; border-radius:6px; font-weight:600; padding:8px; }} .ordinary-hierarchy ul,.rollup-boundary ul {{ list-style:none; padding-left:12px; margin:8px 0; }} .ordinary-hierarchy li,.rollup-boundary li {{ margin:5px 0; }} .solid-edge {{ color:#2d6a9f; font-weight:700; margin-right:4px; }} .dashed-edge {{ color:#7c5b00; font-weight:700; margin-left:6px; }} .rollup-boundary {{ border:1px solid #d9e1ea; border-left:5px solid #3d7fb1; border-radius:8px; padding:10px; margin-top:10px; background:#fff; }} .rollup-boundary.detached {{ border-left-color:#9b5c00; background:#fffaf0; }} .mode-pill {{ display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#dceaf8; color:#174b73; }} .detached .mode-pill {{ background:#ffe7ba; color:#754300; }} .boundary-columns {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px; }} .artifact-id {{ margin:8px 0 0; color:#5f6b7a; font-family:ui-monospace,monospace; font-size:11px; }} .rollup-controls {{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:12px 0; }} .rollup-controls label {{ display:grid; gap:3px; color:#5f6b7a; font-size:12px; }} .rollup-controls select {{ min-width:140px; padding:6px; }} .rollup-value {{ float:right; font-variant-numeric:tabular-nums; color:#5f6b7a; }} .rollup-check.value-pass,.rollup-boundary.value-pass {{ background:#ecf8ef; border-color:#5dae70; }} .rollup-check.value-fail,.rollup-boundary.value-fail {{ background:#fff0f0; border-color:#c95d5d; }} .rollup-check.value-pass .rollup-value,.rollup-boundary.value-pass .rollup-value {{ color:#176b35; }} .rollup-check.value-fail .rollup-value,.rollup-boundary.value-fail .rollup-value {{ color:#9b1c1c; }} @media (max-width:760px) {{ .paired-trees,.transformation-diagram,.boundary-columns {{ grid-template-columns:1fr; }} }}
-.rollup-graph-wrap {{ overflow:auto; border:1px solid #d9e1ea; border-radius:8px; background:#fbfdff; }} #rollup-graph {{ min-width:1100px; }} #rollup-graph text {{ font-family:Inter,Segoe UI,Arial,sans-serif; font-size:12px; fill:#172033; }} #rollup-graph .node rect {{ fill:#fff; stroke:#8eb2d4; stroke-width:1.5; rx:8; }} #rollup-graph .node.boundary rect {{ fill:#edf5fc; }} #rollup-graph .node.detached rect {{ fill:#fff5df; stroke:#b77b13; }} #rollup-graph .node.value-pass rect {{ fill:#ecf8ef; stroke:#5dae70; }} #rollup-graph .node.value-fail rect {{ fill:#fff0f0; stroke:#c95d5d; }} #rollup-graph .edge {{ stroke:#53718f; stroke-width:1.6; marker-end:url(#arrow); }} #rollup-graph .edge.dashed {{ stroke:#987216; stroke-dasharray:6 5; }} #rollup-graph .mode {{ font-size:10px; font-weight:700; fill:#335b7d; }} #rollup-graph .value {{ font-size:11px; font-weight:700; fill:#5f6b7a; }}
+.rollup-graph-wrap {{ overflow:auto; border:1px solid #d9e1ea; border-radius:8px; background:#fbfdff; }} #rollup-graph {{ min-width:1320px; }} #rollup-graph text {{ font-family:Inter,Segoe UI,Arial,sans-serif; font-size:12px; fill:#172033; }} #rollup-graph .node rect {{ fill:#fff; stroke:#8eb2d4; stroke-width:1.5; rx:8; }} #rollup-graph .node.boundary rect {{ fill:#edf5fc; }} #rollup-graph .node.expanding rect {{ fill:#e9f6ee; stroke:#438a5b; }} #rollup-graph .node.detached rect {{ fill:#fff5df; stroke:#b77b13; }} #rollup-graph .node.value-pass rect {{ fill:#ecf8ef; stroke:#5dae70; }} #rollup-graph .node.value-fail rect {{ fill:#fff0f0; stroke:#c95d5d; }} #rollup-graph .edge {{ stroke:#53718f; stroke-width:1.6; marker-end:url(#arrow); }} #rollup-graph .edge.dashed {{ stroke:#987216; stroke-dasharray:6 5; }} #rollup-graph .mode {{ font-size:10px; font-weight:700; fill:#335b7d; }} #rollup-graph .value {{ font-size:11px; font-weight:700; fill:#5f6b7a; }}
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
 </style></head><body><div class="shell"><header><a href="index.html">← Dashboard overview</a><h1>Mapping diagnostics</h1><p class="subtle">Read-only inspection of hierarchy/anchor validation and direct mapping coverage. Updated: {escape(dashboard_updated_label)}</p></header>
 <section class="panel"><h2>How to read a hierarchy case</h2><div class="guide-grid"><div class="guide-card guide-good"><strong>Manual LEAP roll-up</strong>Only constructed LEAP subtotal branches receive this label; they are compared with their immediate source-tree children.</div><div class="guide-card guide-good"><strong>One-to-many fan-out</strong>One raw parent can reach several ESTO components. Those routes are not additional source-tree parents.</div><div class="guide-card guide-neutral"><strong>De-duplicated frontier</strong>Mapped component rows can overlap. The frontier counts each Common ESTO row once, so do not add the displayed component rows.</div><div class="guide-card guide-warning"><strong>Raw source contradiction</strong>If a raw parent is 0 while its children are non-zero, the original source hierarchy disagrees with itself. It is not, by itself, a missing mapping.</div></div></section>
 <div class="metrics">{cards}</div>
 <section class="panel"><h2>How the anchor validator connects the hierarchies</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">The tables below match each raw parent/children context to its branch-level summed absolute mismatch and rank. This makes the materiality ranking and the exact source evidence visible together.</p></section>
 <details class="panel collapsed-panel"><summary><h2>All rollup boundaries</h2><span></span></summary><div><p class="subtle">Mapping-owned rollup edges across every ESTO flow. Green means a rolled value equals its contributors within tolerance; red means it does not. Values aggregate all products for the chosen source, scenario, and year.</p><div class="rollup-controls"><label>Dataset<select id="rollup-source"></select></label><label>Scenario<select id="rollup-scenario"></select></label><label>Year<select id="rollup-year"></select></label></div>{rollup_boundary_register}</div></details>
-<section class="panel"><h2>09 transformation structure</h2><p class="subtle">Solid arrows are ordinary hierarchy. Dotted arrows are rollup composition. The same source, scenario, and year selection above controls node values and green/red reconciliation status.</p><div class="rollup-graph-wrap"><div id="rollup-graph"></div></div></section>
+<section class="panel"><h2>All sector rollup structure</h2><p class="subtle">Every top-level ESTO flow sector and its direct ordinary children are shown. Dotted arrows are every registered ESTO rollup composition. The same source, scenario, and year selection above controls node values and green/red reconciliation status.</p><div class="rollup-graph-wrap"><div id="rollup-graph"></div></div></section>
 <details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2><span></span></summary><div>{_table_html(stage_summary, ['source_system','validation_axis','parent_code','rows'])}</div></details>
 <details class="panel collapsed-panel"><summary><h2>Largest summed anchor mismatches</h2><span></span></summary><div><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</div></details>
 <details class="panel collapsed-panel"><summary><h2>Reviewed source-hierarchy exceptions</h2><span></span></summary><div><p class="subtle">These are known source-data conditions from the exception workbook. They are skipped from actionable anchor failures but remain visible here with their review notes.</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','reason','exception_resolution','data_quality_exception_notes'])}<h3>Leaf-reconciliation candidates awaiting review</h3><p class="subtle">These are not exceptions yet. Their immediate children do not reconcile, while their descendant leaves do; review before copying an enabled row into <code>source_mismatch_allowed</code>.</p>{_table_html(leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>
@@ -979,6 +988,74 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 <section class="panel"><h2>LEAP flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(leap_paired_summary, leap_tree, common_esto_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy)}</section>
 <details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2><span></span></summary><div><h3>Actionable partial coverage</h3>{_table_html(partial, ['source_system','comparison_scope','common_row_id','missing_component_pairs','relevance_evidence','mapping_action','mapping_sheet_to_review'])}<h3>Non-zero unmapped LEAP branches</h3>{_table_html(unmapped, ['leap_flow','leap_product','indirect_esto_flow','indirect_esto_product','qa_status'])}<h3>LEAP source-presence conflicts</h3>{_table_html(conflicts, ['leap_sector_name_full_path','raw_leap_fuel_name','presence_status','in_leap_combined_esto','in_leap_combined_ninth'])}<h3>Source-coverage audit summary</h3>{_table_html(coverage_summary, ['coverage_status','mapping_status','rows'])}{cardinality_sections}</div></details>
 <footer><strong>Artifact provenance</strong><br>{artifact_notes}<br>{escape(_artifact_note(anchor_child_values_path))}<br>{escape(_artifact_note(anchor_child_context_values_path))}<br>{escape(_artifact_note(anchor_mapped_component_context_values_path))}<br>{escape(_artifact_note(leaf_reconciliation_candidates_path))}</footer></div><script>const ROLLUP_GRAPH={transformation_graph_json},ROLLUP_VALUES={rollup_value_json};const rs=document.querySelector('#rollup-source'),rc=document.querySelector('#rollup-scenario'),ry=document.querySelector('#rollup-year');const unique=a=>[...new Set(a)].sort();const fill=(el,items,selected)=>{{el.innerHTML='';items.forEach(x=>el.add(new Option(x,x,false,String(x)===String(selected)));}};function esc(s){{return String(s).replace(/[&<>]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;'}}[c]));}}function drawGraph(){{let h=230+ROLLUP_GRAPH.boundaries.length*150,w=1300,kids=ROLLUP_GRAPH.children;let childX=i=>70+i*(1160/Math.max(kids.length-1,1));let svg=`<svg viewBox="0 0 ${{w}} ${{h}}" width="100%" height="${{h}}"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#53718f"/></marker></defs>`;svg+=`<g class="node rollup-check" data-rollup-target="${{esc(ROLLUP_GRAPH.parent)}}" data-rollup-inputs="${{esc(kids.join('|'))}}"><rect x="510" y="20" width="280" height="48"/><text x="525" y="43">${{esc(ROLLUP_GRAPH.parent)}}</text><text class="value" data-rollup-flow="${{esc(ROLLUP_GRAPH.parent)}}" x="525" y="59">—</text></g>`;kids.forEach((x,i)=>{{let cx=childX(i);svg+=`<line class="edge" x1="650" y1="68" x2="${{cx}}" y2="118"/><g class="node"><rect x="${{cx-62}}" y="118" width="124" height="48"/><text x="${{cx-54}}" y="140">${{esc(x).replace(' plants','')}}</text><text class="value" data-rollup-flow="${{esc(x)}}" x="${{cx-54}}" y="157">—</text></g>`;}});ROLLUP_GRAPH.boundaries.forEach((b,i)=>{{let y=210+i*150,targetX=850;svg+=`<g class="node boundary ${{b.mode==='DETACHED'?'detached':''}} rollup-check" data-rollup-target="${{esc(b.label)}}" data-rollup-inputs="${{esc(b.inputs.join('|'))}}"><rect x="${{targetX}}" y="${{y}}" width="350" height="58"/><text class="mode" x="${{targetX+12}}" y="${{y+18}}">${{esc(b.mode)}}</text><text x="${{targetX+12}}" y="${{y+35}}">${{esc(b.label)}}</text><text class="value" data-rollup-flow="${{esc(b.label)}}" x="${{targetX+12}}" y="${{y+51}}">—</text></g>`;b.inputs.forEach((x,j)=>{{let iy=y+j*28,ix=110+j*250;svg+=`<line class="edge dashed" x1="${{ix+175}}" y1="${{iy+12}}" x2="${{targetX}}" y2="${{y+29}}"/><g class="node"><rect x="${{ix}}" y="${{iy}}" width="175" height="25"/><text x="${{ix+7}}" y="${{iy+12}}">${{esc(x)}}</text><text class="value" data-rollup-flow="${{esc(x)}}" x="${{ix+7}}" y="${{iy+22}}">—</text></g>`;}});}});document.querySelector('#rollup-graph').innerHTML=svg+'</svg>';}}function refreshScenarios(){{let rows=ROLLUP_VALUES.filter(r=>r.source_system===rs.value);fill(rc,unique(rows.map(r=>r.scenario)),rc.value||unique(rows.map(r=>r.scenario))[0]);refreshYears();}}function refreshYears(){{let rows=ROLLUP_VALUES.filter(r=>r.source_system===rs.value&&r.scenario===rc.value);let years=unique(rows.map(r=>r.year)).sort((a,b)=>Number(a)-Number(b));fill(ry,years,years.at(-1));paint();}}function paint(){{let rows=ROLLUP_VALUES.filter(r=>r.source_system===rs.value&&r.scenario===rc.value&&String(r.year)===String(ry.value)),values=new Map();rows.forEach(r=>values.set(r.common_flow_label,(values.get(r.common_flow_label)||0)+Number(r.value)));document.querySelectorAll('[data-rollup-flow]').forEach(el=>{{let v=values.get(el.dataset.rollupFlow);el.textContent=v===undefined?'—':v.toLocaleString(undefined,{{maximumFractionDigits:2}});}});document.querySelectorAll('[data-rollup-target]').forEach(el=>{{let target=values.get(el.dataset.rollupTarget),inputs=el.dataset.rollupInputs.split('|').filter(Boolean),sum=inputs.reduce((s,x)=>s+(values.get(x)||0),0),ok=target!==undefined&&Math.abs(target-sum)<=0.01*Math.max(Math.abs(target),1);el.classList.toggle('value-pass',ok);el.classList.toggle('value-fail',target!==undefined&&!ok);}});}}drawGraph();if(ROLLUP_VALUES.length){{fill(rs,unique(ROLLUP_VALUES.map(r=>r.source_system)),unique(ROLLUP_VALUES.map(r=>r.source_system)).includes('ESTO')?'ESTO':unique(ROLLUP_VALUES.map(r=>r.source_system))[0]);refreshScenarios();rs.onchange=refreshScenarios;rc.onchange=refreshYears;ry.onchange=paint;}}else{{document.querySelector('.rollup-controls').innerHTML='<span class="empty-state">No comparison values were supplied for this dashboard render.</span>';}}</script></body></html>"""
+    # Replace the early 09-only SVG with the complete sector/rollup graph after
+    # the shared selector and value-painting code has initialised.
+    html += """
+<script>
+(() => {
+  function escGraph(value) {
+    return String(value).replace(/[&<>]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[char]));
+  }
+  function shortLabel(value, limit = 34) {
+    const label = String(value);
+    return label.length > limit ? `${label.slice(0, limit - 1)}…` : label;
+  }
+  function drawAllSectorGraph() {
+    const graph = ROLLUP_GRAPH;
+    const sectors = graph.sectors || [];
+    const boundaries = graph.all_boundaries || graph.boundaries || [];
+    const width = 1320;
+    let cursorY = 24;
+    let svg = `<svg viewBox="0 0 ${width} 100" width="100%" height="100"><defs><marker id="all-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#53718f"/></marker></defs>`;
+    const edge = (x1, y1, x2, y2, dashed = false) => `<line class="edge${dashed ? ' dashed' : ''}" marker-end="url(#all-arrow)" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    const node = (x, y, widthValue, height, label, extraClass = '', mode = '') => `<g class="node ${extraClass}"><rect x="${x}" y="${y}" width="${widthValue}" height="${height}"/><text${mode ? ' class="mode"' : ''} x="${x + 10}" y="${y + (mode ? 16 : 21)}">${escGraph(mode || shortLabel(label))}</text><text x="${x + 10}" y="${y + (mode ? 34 : 37)}">${mode ? escGraph(shortLabel(label)) : ''}</text><text class="value" data-rollup-flow="${escGraph(label)}" x="${x + 10}" y="${y + height - 8}">—</text></g>`;
+    svg += `<text class="mode" x="30" y="${cursorY}">ORDINARY ESTO FLOW HIERARCHY — ALL ROOT SECTORS</text>`;
+    cursorY += 14;
+    sectors.forEach(sector => {
+      const children = sector.children || [];
+      const rows = Math.max(1, Math.ceil(children.length / 4));
+      const blockHeight = Math.max(66, rows * 56 + 18);
+      const rootY = cursorY + blockHeight / 2 - 24;
+      svg += `<g class="node rollup-check" data-rollup-target="${escGraph(sector.root)}" data-rollup-inputs="${escGraph(children.join('|'))}"><rect x="30" y="${rootY}" width="265" height="48"/><text x="40" y="${rootY + 20}">${escGraph(shortLabel(sector.root, 42))}</text><text class="value" data-rollup-flow="${escGraph(sector.root)}" x="40" y="${rootY + 40}">—</text></g>`;
+      children.forEach((child, index) => {
+        const column = index % 4;
+        const row = Math.floor(index / 4);
+        const x = 345 + column * 230;
+        const y = cursorY + row * 56;
+        svg += edge(295, rootY + 24, x, y + 24);
+        svg += node(x, y, 205, 48, child);
+      });
+      cursorY += blockHeight + 14;
+    });
+    cursorY += 12;
+    svg += `<text class="mode" x="30" y="${cursorY}">REGISTERED ESTO ROLLUP BOUNDARIES — ALL MODES</text>`;
+    cursorY += 16;
+    boundaries.forEach(boundary => {
+      const inputs = boundary.inputs || [];
+      const inputRows = Math.max(1, Math.ceil(inputs.length / 3));
+      const blockHeight = Math.max(72, inputRows * 48 + 20);
+      const targetY = cursorY + blockHeight / 2 - 29;
+      const modeClass = String(boundary.mode || '').toLowerCase();
+      svg += `<g class="node boundary ${modeClass} rollup-check" data-rollup-target="${escGraph(boundary.label)}" data-rollup-inputs="${escGraph(inputs.join('|'))}"><rect x="980" y="${targetY}" width="300" height="58"/><text class="mode" x="992" y="${targetY + 16}">${escGraph(boundary.mode)}</text><text x="992" y="${targetY + 34}">${escGraph(shortLabel(boundary.label, 42))}</text><text class="value" data-rollup-flow="${escGraph(boundary.label)}" x="992" y="${targetY + 51}">—</text></g>`;
+      inputs.forEach((input, index) => {
+        const column = index % 3;
+        const row = Math.floor(index / 3);
+        const x = 45 + column * 285;
+        const y = cursorY + row * 48;
+        svg += edge(x + 230, y + 22, 980, targetY + 29, true);
+        svg += node(x, y, 230, 44, input);
+      });
+      cursorY += blockHeight + 14;
+    });
+    const height = cursorY + 20;
+    svg = svg.replace('0 0 1320 100', `0 0 ${width} ${height}`).replace('height="100"', `height="${height}"`);
+    document.querySelector('#rollup-graph').innerHTML = svg + '</svg>';
+    paint();
+  }
+  drawAllSectorGraph();
+})();
+</script>
+"""
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME
     output_path.write_text(html, encoding="utf-8")
     return {"page": str(output_path), "summary": str(layout["supporting"] / "mapping_diagnostics_summary.csv")}

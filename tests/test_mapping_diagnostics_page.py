@@ -6,6 +6,7 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     _mapping_cardinality_diagnostics,
     _mapped_target_structure_html,
     _paired_anchor_aggregate_summary,
+    _rollup_graph_data,
     _transformation_rollup_diagram_html,
     write_mapping_diagnostics_page,
 )
@@ -70,6 +71,25 @@ def test_transformation_rollup_diagram_keeps_boundary_modes_distinct() -> None:
     assert "This boundary can support ordinary ancestor/frontier resolution." in html
     assert "This boundary is not folded back into an ordinary ancestor total." in html
     assert "10.01.02 Gas works plants" in html
+
+
+def test_rollup_graph_data_includes_every_flow_root_and_mode() -> None:
+    tree = pd.DataFrame([
+        {"axis": "flow", "code": "09 Total transformation sector", "parent_code": ""},
+        {"axis": "flow", "code": "09.06 Gas processing plants", "parent_code": "09 Total transformation sector"},
+        {"axis": "flow", "code": "14 Industry sector", "parent_code": ""},
+        {"axis": "flow", "code": "14.03 Manufacturing", "parent_code": "14 Industry sector"},
+    ])
+    rollups = pd.DataFrame([
+        {"source_system": "ESTO", "rollup_mode": "NON_EXPANDING", "rollup_id": "gas", "rolled_flow_label": "09.06 inclusive", "input_flow": "09.06 Gas processing plants"},
+        {"source_system": "ESTO", "rollup_mode": "EXPANDING", "rollup_id": "industry", "rolled_flow_label": "14 Industry inclusive", "input_flow": "14 Industry sector"},
+        {"source_system": "ESTO", "rollup_mode": "DETACHED", "rollup_id": "coal", "rolled_flow_label": "09.08 inclusive", "input_flow": "09.08 Coal transformation"},
+    ])
+
+    graph = _rollup_graph_data(tree, rollups)
+
+    assert {sector["root"] for sector in graph["sectors"]} == {"09 Total transformation sector", "14 Industry sector"}
+    assert {boundary["mode"] for boundary in graph["all_boundaries"]} == {"NON_EXPANDING", "EXPANDING", "DETACHED"}
 
 
 def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Path) -> None:
