@@ -3,10 +3,30 @@ from pathlib import Path
 import pandas as pd
 
 from codebase.common_esto_dashboard_mapping_diagnostics import (
+    _mapping_cardinality_diagnostics,
     _mapped_target_structure_html,
     _paired_anchor_aggregate_summary,
     write_mapping_diagnostics_page,
 )
+
+
+def test_mapping_cardinality_diagnostics_detects_only_real_overlap_and_many_to_many() -> None:
+    source_to_common = pd.DataFrame([
+        {"source_system": "NINTH", "original_source_flow": "source_a", "original_source_product": "Gas", "common_row_id": "parent", "common_flow_label": "14.03 Manufacturing", "common_product_label": "08.01 Natural gas"},
+        {"source_system": "NINTH", "original_source_flow": "source_a", "original_source_product": "Gas", "common_row_id": "child", "common_flow_label": "14.03.01 Iron and steel", "common_product_label": "08.01 Natural gas"},
+        {"source_system": "NINTH", "original_source_flow": "source_b", "original_source_product": "Gas", "common_row_id": "parent", "common_flow_label": "14.03 Manufacturing", "common_product_label": "08.01 Natural gas"},
+        {"source_system": "NINTH", "original_source_flow": "source_b", "original_source_product": "Gas", "common_row_id": "child", "common_flow_label": "14.03.01 Iron and steel", "common_product_label": "08.01 Natural gas"},
+    ])
+    target_tree = pd.DataFrame([
+        {"code": "14.03 Manufacturing", "parent_code": "14 Industry sector"},
+        {"code": "14.03.01 Iron and steel", "parent_code": "14.03 Manufacturing"},
+    ])
+
+    many_to_many, overlaps = _mapping_cardinality_diagnostics(source_to_common, target_tree)
+
+    assert len(many_to_many) == 4
+    assert len(overlaps) == 2
+    assert set(overlaps["ancestor_target"]) == {"14.03 Manufacturing / 08.01 Natural gas"}
 
 
 def test_paired_tree_summary_only_traverses_flow_axis() -> None:

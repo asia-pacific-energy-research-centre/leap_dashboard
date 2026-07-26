@@ -66,6 +66,75 @@ def _failure_summary(frame: pd.DataFrame, group_columns: list[str]) -> pd.DataFr
     )
 
 
+def _mapping_cardinality_diagnostics(
+    source_to_common: pd.DataFrame,
+    target_tree: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Return real many-to-many mappings and same-pair target ancestor overlaps.
+
+    Both checks use the structural source-to-Common-ESTO map rather than the
+    explanatory parent/child routes shown in an anchor card.  That avoids
+    labelling a legitimate raw parent and raw child as a duplicate merely
+    because each maps to its corresponding target hierarchy level.
+    """
+    source_columns = ["source_system", "original_source_flow", "original_source_product"]
+    required = set(source_columns + ["common_row_id", "common_flow_label", "common_product_label"])
+    if source_to_common.empty or not required.issubset(source_to_common.columns):
+        return pd.DataFrame(), pd.DataFrame()
+
+    relations = source_to_common.drop_duplicates(source_columns + ["common_row_id"]).copy()
+    source_counts = (
+        relations.groupby(source_columns, dropna=False)["common_row_id"].nunique()
+        .rename("mapped_target_count").reset_index()
+    )
+    fanout_keys = source_counts[source_counts["mapped_target_count"].gt(1)]
+    if fanout_keys.empty:
+        return pd.DataFrame(), pd.DataFrame()
+    fanout_relations = relations.merge(fanout_keys, on=source_columns, how="inner")
+    target_counts = (
+        relations.groupby(["source_system", "common_row_id"], dropna=False).size()
+        .rename("mapped_source_count").reset_index()
+    )
+    cardinality = fanout_relations.merge(
+        target_counts, on=["source_system", "common_row_id"],
+    )
+    many_to_many = cardinality[
+        cardinality["mapped_target_count"].gt(1) & cardinality["mapped_source_count"].gt(1)
+    ].copy()
+
+    parent_by_flow = (
+        target_tree.set_index("code")["parent_code"].fillna("").astype(str).to_dict()
+        if {"code", "parent_code"}.issubset(target_tree.columns) else {}
+    )
+    overlap_rows: list[dict[str, object]] = []
+    for key, group in fanout_relations.groupby(source_columns, dropna=False, sort=False):
+        targets = {
+            (str(row.common_flow_label), str(row.common_product_label), str(row.common_row_id))
+            for row in group.itertuples(index=False)
+        }
+        for flow, product, row_id in targets:
+            ancestor = parent_by_flow.get(flow, "")
+            while ancestor:
+                ancestor_match = next(
+                    (candidate for candidate in targets if candidate[0] == ancestor and candidate[1] == product),
+                    None,
+                )
+                if ancestor_match is not None:
+                    overlap_rows.append({
+                        "source_system": key[0],
+                        "source_flow": key[1],
+                        "source_product": key[2],
+                        "ancestor_target": f"{ancestor_match[0]} / {ancestor_match[1]}",
+                        "descendant_target": f"{flow} / {product}",
+                        "ancestor_common_row_id": ancestor_match[2],
+                        "descendant_common_row_id": row_id,
+                    })
+                    break
+                ancestor = parent_by_flow.get(ancestor, "")
+    overlaps = pd.DataFrame(overlap_rows).drop_duplicates() if overlap_rows else pd.DataFrame()
+    return many_to_many, overlaps
+
+
 def _three_significant_figures(value: float) -> str:
     """Format a number to three significant figures without unnecessary scientific notation."""
     if pd.isna(value) or value == 0:
@@ -618,6 +687,7 @@ def write_mapping_diagnostics_page(
     unmapped_path = results_root / "common_esto" / "qa_nonzero_unmapped_leap_branches.csv"
     conflicts_path = results_root / "maintenance" / "leap_source_presence_conflicts.csv"
     coverage_path = results_root / "source_coverage" / "all_demand_aggregated_coverage_gaps.csv"
+    source_to_common_path = results_root / "common_esto" / "structural_artifacts" / "source_pair_to_common_row.csv"
 
     anchor = _read_csv(anchor_path)
     anchor_child_values = _read_csv(anchor_child_values_path)
@@ -632,6 +702,7 @@ def write_mapping_diagnostics_page(
     unmapped = _read_csv(unmapped_path)
     conflicts = _read_csv(conflicts_path)
     coverage = _read_csv(coverage_path)
+    source_to_common = _read_csv(source_to_common_path)
 
     stage_summary = _failure_summary(stage, ["source_system", "validation_axis", "parent_code"])
     anchor_summary = _failure_summary(anchor, ["source_system", "validation_axis", "reason", "parent_code"])
@@ -653,6 +724,29 @@ def write_mapping_diagnostics_page(
         .size().reset_index(name="rows").sort_values("rows", ascending=False, kind="mergesort")
         if not coverage.empty else pd.DataFrame(columns=["coverage_status", "mapping_status", "rows"])
     )
+    many_to_many, target_ancestor_overlaps = _mapping_cardinality_diagnostics(
+        source_to_common, common_esto_tree,
+    )
+    cardinality_sections = ""
+    if not target_ancestor_overlaps.empty:
+        cardinality_sections += (
+            '<h3>Mapped target ancestor overlaps</h3>'
+            '<p class="subtle">A single source pair reaches both a Common ESTO target row and one of its '
+            'descendants. Review these as potential double-counting routes.</p>'
+            + _table_html(target_ancestor_overlaps, [
+                "source_system", "source_flow", "source_product", "ancestor_target", "descendant_target",
+            ])
+        )
+    if not many_to_many.empty:
+        cardinality_sections += (
+            '<h3>Active many-to-many mappings</h3>'
+            '<p class="subtle">These source pairs map to multiple Common ESTO rows, and each target row is '
+            'also reached by multiple source pairs.</p>'
+            + _table_html(many_to_many, [
+                "source_system", "original_source_flow", "original_source_product", "common_row_id",
+                "mapped_target_count", "mapped_source_count",
+            ])
+        )
     summary = pd.DataFrame([
         {"metric": "Stage 3 failed hierarchy checks", "rows": int(len(stage[stage.get("status", "").astype(str).eq("failed")])) if not stage.empty else 0},
         {"metric": "Failed anchor checks", "rows": int(len(anchor[anchor.get("status", "").astype(str).eq("failed")])) if not anchor.empty else 0},
@@ -669,7 +763,7 @@ def write_mapping_diagnostics_page(
         f'<div class="metric-card"><span>{escape(str(row.metric))}</span><strong>{int(row.rows):,}</strong></div>'
         for row in summary.itertuples(index=False)
     )
-    artifact_notes = "<br>".join(escape(_artifact_note(path)) for path in [anchor_path, stage_path, partial_path, unmapped_path, conflicts_path, coverage_path])
+    artifact_notes = "<br>".join(escape(_artifact_note(path)) for path in [anchor_path, stage_path, partial_path, unmapped_path, conflicts_path, coverage_path, source_to_common_path])
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mapping diagnostics</title><style>
@@ -690,7 +784,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 <label class="zero-toggle"><input id="show-zero-children" type="checkbox" autocomplete="off" onchange="document.body.classList.toggle('show-zero-children', this.checked)"> Show zero-value children and mapped components</label>
 <section class="panel"><h2>NINTH flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, common_esto_tree, 'NINTH', anchor_mapped_component_context_values, dashboard_economy)}</section>
 <section class="panel"><h2>LEAP flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(leap_paired_summary, leap_tree, common_esto_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy)}</section>
-<details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2><span></span></summary><div><h3>Actionable partial coverage</h3>{_table_html(partial, ['source_system','comparison_scope','common_row_id','missing_component_pairs','relevance_evidence','mapping_action','mapping_sheet_to_review'])}<h3>Non-zero unmapped LEAP branches</h3>{_table_html(unmapped, ['leap_flow','leap_product','indirect_esto_flow','indirect_esto_product','qa_status'])}<h3>LEAP source-presence conflicts</h3>{_table_html(conflicts, ['leap_sector_name_full_path','raw_leap_fuel_name','presence_status','in_leap_combined_esto','in_leap_combined_ninth'])}<h3>Source-coverage audit summary</h3>{_table_html(coverage_summary, ['coverage_status','mapping_status','rows'])}</div></details>
+<details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2><span></span></summary><div><h3>Actionable partial coverage</h3>{_table_html(partial, ['source_system','comparison_scope','common_row_id','missing_component_pairs','relevance_evidence','mapping_action','mapping_sheet_to_review'])}<h3>Non-zero unmapped LEAP branches</h3>{_table_html(unmapped, ['leap_flow','leap_product','indirect_esto_flow','indirect_esto_product','qa_status'])}<h3>LEAP source-presence conflicts</h3>{_table_html(conflicts, ['leap_sector_name_full_path','raw_leap_fuel_name','presence_status','in_leap_combined_esto','in_leap_combined_ninth'])}<h3>Source-coverage audit summary</h3>{_table_html(coverage_summary, ['coverage_status','mapping_status','rows'])}{cardinality_sections}</div></details>
 <footer><strong>Artifact provenance</strong><br>{artifact_notes}<br>{escape(_artifact_note(anchor_child_values_path))}<br>{escape(_artifact_note(anchor_child_context_values_path))}<br>{escape(_artifact_note(anchor_mapped_component_context_values_path))}<br>{escape(_artifact_note(leaf_reconciliation_candidates_path))}</footer></div></body></html>"""
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME
     output_path.write_text(html, encoding="utf-8")
