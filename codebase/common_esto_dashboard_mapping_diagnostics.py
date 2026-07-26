@@ -733,6 +733,34 @@ def _transformation_rollup_diagram_html(
     )
 
 
+def _rollup_boundary_register_html(rollup_catalogue: pd.DataFrame) -> str:
+    """Render every ESTO rollup as a collapsible diagnostic register."""
+    required = {"source_system", "rollup_mode", "rolled_flow_label", "input_flow"}
+    if rollup_catalogue.empty or not required.issubset(rollup_catalogue.columns):
+        return '<p class="empty-state">No compiled rollup-edge catalogue is available.</p>'
+    catalogue = rollup_catalogue[rollup_catalogue["source_system"].astype(str).eq("ESTO")].copy()
+    id_column = "rollup_id" if "rollup_id" in catalogue.columns else "non_expanding_rollup_id"
+    cards: list[str] = []
+    for rollup_id, group in catalogue.groupby(id_column, dropna=False, sort=True):
+        first = group.iloc[0]
+        label = str(first["rolled_flow_label"])
+        mode = str(first["rollup_mode"])
+        contributors = sorted(set(group["input_flow"].dropna().astype(str)) - {"", "nan"})
+        inputs_html = "".join(
+            f'<li>{escape(flow)} <span class="dashed-edge">⋯→</span> '
+            f'<strong class="rollup-value" data-rollup-flow="{escape(flow)}">—</strong></li>'
+            for flow in contributors
+        )
+        cards.append(
+            f'<article class="rollup-boundary {escape(mode.lower())}" '
+            f'data-rollup-target="{escape(label)}" data-rollup-inputs="{escape("|".join(contributors))}">'
+            f'<h3><span class="mode-pill">{escape(mode)}</span> {escape(label)} '
+            f'<strong class="rollup-value" data-rollup-flow="{escape(label)}">—</strong></h3>'
+            f'<ul>{inputs_html}</ul><p class="artifact-id">{escape(str(rollup_id))}</p></article>'
+        )
+    return '<div class="rollup-register">' + "".join(cards) + "</div>"
+
+
 def _issue_tree_section(
     tree: pd.DataFrame,
     value_summary: pd.DataFrame,
@@ -816,12 +844,12 @@ def write_mapping_diagnostics_page(
     transformation_rollup_diagram = _transformation_rollup_diagram_html(
         common_esto_tree, rollup_catalogue
     )
+    rollup_boundary_register = _rollup_boundary_register_html(rollup_catalogue)
     rollup_value_records: list[dict[str, object]] = []
     if comparison_data is not None and not comparison_data.empty:
         required_value_columns = {"source_system", "scenario", "year", "common_flow_label", "value"}
         if required_value_columns.issubset(comparison_data.columns):
             value_rows = comparison_data.copy()
-            value_rows = value_rows[value_rows["common_flow_label"].astype(str).str.startswith("09")]
             value_rows["value"] = pd.to_numeric(value_rows["value"], errors="coerce").fillna(0.0)
             rollup_value_records = value_rows.groupby(
                 ["source_system", "scenario", "year", "common_flow_label"], dropna=False
@@ -912,7 +940,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 <section class="panel"><h2>How to read a hierarchy case</h2><div class="guide-grid"><div class="guide-card guide-good"><strong>Manual LEAP roll-up</strong>Only constructed LEAP subtotal branches receive this label; they are compared with their immediate source-tree children.</div><div class="guide-card guide-good"><strong>One-to-many fan-out</strong>One raw parent can reach several ESTO components. Those routes are not additional source-tree parents.</div><div class="guide-card guide-neutral"><strong>De-duplicated frontier</strong>Mapped component rows can overlap. The frontier counts each Common ESTO row once, so do not add the displayed component rows.</div><div class="guide-card guide-warning"><strong>Raw source contradiction</strong>If a raw parent is 0 while its children are non-zero, the original source hierarchy disagrees with itself. It is not, by itself, a missing mapping.</div></div></section>
 <div class="metrics">{cards}</div>
 <section class="panel"><h2>How the anchor validator connects the hierarchies</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">The tables below match each raw parent/children context to its branch-level summed absolute mismatch and rank. This makes the materiality ranking and the exact source evidence visible together.</p></section>
-<section class="panel"><h2>09 transformation rollup boundaries</h2><p class="subtle">Automatically rendered from the Common ESTO tree and mapping-owned rollup edges. Green means the displayed parent/boundary equals its displayed contributors within tolerance; red means it does not. Values aggregate all products for the chosen source, scenario, and year.</p><div class="rollup-controls"><label>Dataset<select id="rollup-source"></select></label><label>Scenario<select id="rollup-scenario"></select></label><label>Year<select id="rollup-year"></select></label></div>{transformation_rollup_diagram}</section>
+<details class="panel collapsed-panel"><summary><h2>All rollup boundaries</h2><span></span></summary><div><p class="subtle">Mapping-owned rollup edges across every ESTO flow. Green means a rolled value equals its contributors within tolerance; red means it does not. Values aggregate all products for the chosen source, scenario, and year.</p><div class="rollup-controls"><label>Dataset<select id="rollup-source"></select></label><label>Scenario<select id="rollup-scenario"></select></label><label>Year<select id="rollup-year"></select></label></div>{rollup_boundary_register}</div></details>
 <details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2><span></span></summary><div>{_table_html(stage_summary, ['source_system','validation_axis','parent_code','rows'])}</div></details>
 <details class="panel collapsed-panel"><summary><h2>Largest summed anchor mismatches</h2><span></span></summary><div><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</div></details>
 <details class="panel collapsed-panel"><summary><h2>Reviewed source-hierarchy exceptions</h2><span></span></summary><div><p class="subtle">These are known source-data conditions from the exception workbook. They are skipped from actionable anchor failures but remain visible here with their review notes.</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','reason','exception_resolution','data_quality_exception_notes'])}<h3>Leaf-reconciliation candidates awaiting review</h3><p class="subtle">These are not exceptions yet. Their immediate children do not reconcile, while their descendant leaves do; review before copying an enabled row into <code>source_mismatch_allowed</code>.</p>{_table_html(leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>
