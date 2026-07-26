@@ -40,6 +40,8 @@ REPO_ROOT = CURRENT_FILE.parents[1]
 MODULE_ROOT = CURRENT_FILE.parent
 if str(MODULE_ROOT) not in sys.path:
     sys.path.insert(0, str(MODULE_ROOT))
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from common_esto_dashboard_data import (  # noqa: E402
     apply_sign_semantics,
@@ -55,6 +57,7 @@ from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: 
 from common_esto_dashboard_output_layout import build_output_layout, publish_to_docs  # noqa: E402
 from common_esto_dashboard_convergence import write_capacity_unmet_convergence_page  # noqa: E402
 from common_esto_dashboard_mapping_diagnostics import write_mapping_diagnostics_page  # noqa: E402
+from scripts.render_full_mapping_tree_explorer import render_full_tree_explorer  # noqa: E402
 
 
 #%%
@@ -337,7 +340,12 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
                 "page_key": "mapping_diagnostics",
                 "page_label": "Mapping diagnostics",
                 "file": "mapping_diagnostics.html",
-            }
+            },
+            {
+                "page_key": "mapping_tree_explorer",
+                "page_label": "Full mapping tree explorer",
+                "file": "mapping_tree_explorer.html",
+            },
         ],
     )
     mapping_diagnostics = write_mapping_diagnostics_page(
@@ -345,6 +353,10 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         _LEAP_MAPPINGS_REPO,
         dashboard_updated_label=dashboard_updated_label,
         economy=economy,
+    )
+    mapping_tree_explorer = render_full_tree_explorer(
+        output_path=layout["dashboards"] / "mapping_tree_explorer.html",
+        comparison_data=raw_df,
     )
     convergence_result = write_capacity_unmet_convergence_page(
         CAPACITY_UNMET_CONVERGENCE_PATH,
@@ -383,6 +395,7 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         "sign_semantics_summary": str(layout["supporting"] / "sign_semantics_summary.csv"),
         "chart_count": len(manifest_df),
         "mapping_diagnostics": mapping_diagnostics,
+        "mapping_tree_explorer": str(mapping_tree_explorer),
     }
     if convergence_result:
         result["capacity_unmet_convergence"] = convergence_result
