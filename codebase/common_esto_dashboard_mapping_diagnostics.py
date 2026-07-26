@@ -477,6 +477,20 @@ def _paired_tree_html(
             mapped_branch_html = '<li><span>No resolved component detail is available.</span><strong>—</strong></li>'
             mapped_structure_note = ""
             detail_matches_total = float(row.mapped_frontier_total) == 0
+        displayed_mapped_total = 0.0
+        if not component_rows.empty:
+            displayed_rows = component_rows[
+                component_rows["mapping_status"].astype(str).str.startswith("mapped")
+                & component_rows["common_row_id"].astype(str).ne("")
+            ].copy()
+            if not displayed_rows.empty:
+                identity_columns = [
+                    "comparison_scope", "economy", "scenario", "year", "common_row_id",
+                    "component_esto_flow", "component_esto_product",
+                ]
+                displayed_mapped_total = float(
+                    displayed_rows.drop_duplicates(identity_columns)["mapped_value"].sum()
+                )
         raw_rollup_note = (
             '<p class="helper-note">Manual LEAP roll-up: this constructed subtotal is compared with its immediate source-tree children.</p>'
             if str(row.parent_code) in manual_rollup_codes else ""
@@ -491,10 +505,10 @@ def _paired_tree_html(
             f'{escape(str(row.other_axis_value))}</h3><p class="subtle">{escape(str(row.scenarios))}; checked years: '
             f'{escape(str(row.years))}. {escape(scale_label)}. Calculations use unrounded values.</p>'
             '<div class="paired-trees">'
-            '<section><h4>Original raw tree</h4><ul class="value-tree">'
-            '<li class="tree-category"><span>Parent</span></li>'
+            '<section><h4>Original raw source tree</h4><ul class="value-tree">'
+            '<li class="tree-category"><span>Original source parent</span></li>'
             f'<li><span>{escape(parent_label)}</span><strong>{format_value(float(row.parent_total))}</strong></li>'
-            '<li class="tree-category"><span>Children</span></li>'
+            '<li class="tree-category"><span>Original source children</span></li>'
             f'{raw_children}'
             f'<li class="tree-total"><span>Children sum</span><strong>{format_value(float(row.children_total))}</strong></li>'
             f'<li class="tree-residual"><span>Raw residual (parent − children)</span><strong>{format_value(float(row.raw_residual))}</strong></li>'
@@ -503,7 +517,7 @@ def _paired_tree_html(
             f'{mapped_branch_html}'
             f'<li class="tree-total"><span>{"Unique mapped comparison total" if detail_matches_total else "Validator mapped total (detail incomplete)"}</span><strong>{format_value(float(row.mapped_frontier_total))}</strong></li>'
             f'<li class="tree-residual"><span>Anchor difference (parent − mapped total)</span><strong>{format_value(float(row.mapped_difference))}</strong></li>'
-            f'</ul>{mapped_structure_note}{"" if detail_matches_total else "<p class=\"source-warning\">The displayed mapped rows do not yet reproduce the validator total, so this total is not an inspectable breakdown.</p>"}</section></div></article>'
+            f'</ul>{mapped_structure_note}{"" if detail_matches_total else f"<p class=\"source-warning\">The mapped rows shown above add to {format_value(displayed_mapped_total)}, but the validator used {format_value(float(row.mapped_frontier_total))}. The unshown contribution is {format_value(float(row.mapped_frontier_total) - displayed_mapped_total)}. Do not use this card to diagnose the anchor difference until that contribution is listed.</p>"}</section></div></article>'
         )
     return "".join(cards)
 

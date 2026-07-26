@@ -93,9 +93,10 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert ">7<" in html
     assert "NINTH flow tree: original vs mapped representation" in html
     assert "LEAP flow tree: original vs mapped representation" in html
-    assert "Original raw tree" in html
+    assert "Original raw source tree" in html
+    assert "Original source parent" in html
     assert "Validator mapped total (detail incomplete)" in html
-    assert "The displayed mapped rows do not yet reproduce the validator total" in html
+    assert "The mapped rows shown above add to" in html
     assert "Mapped Common ESTO representation" in html
     assert "Mapped Common ESTO hierarchy" in html
     assert "09 Total / 08.01 Gas" in html
@@ -105,7 +106,7 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Raw roll-up: this source parent" not in html
     assert "Mapped target hierarchy" in html
     assert "Direct mapping fan-out" not in html
-    assert '<li class="tree-category"><span>Children</span></li>' in html
+    assert '<li class="tree-category"><span>Original source children</span></li>' in html
     assert "Show zero-value children and mapped components" in html
     assert "optional-zero" in html
     assert "onchange=\"document.body.classList.toggle('show-zero-children', this.checked)\"" in html
