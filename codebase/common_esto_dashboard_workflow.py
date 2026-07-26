@@ -357,6 +357,7 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         _LEAP_MAPPINGS_REPO,
         dashboard_updated_label=dashboard_updated_label,
         economy=economy,
+        comparison_data=scope_filtered_df,
     )
     mapping_tree_explorer = render_full_tree_explorer(
         output_path=layout["dashboards"] / "mapping_tree_explorer.html",
