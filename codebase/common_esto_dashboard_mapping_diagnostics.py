@@ -37,6 +37,31 @@ def _read_csv(path: Path) -> pd.DataFrame:
     return pd.read_csv(path, low_memory=False).fillna("")
 
 
+def load_esto_exact_values_for_economy(
+    esto_exact_rows_path: Path,
+    economy: str,
+    min_year: int | None = None,
+    max_year: int | None = None,
+) -> pd.DataFrame:
+    """Read the raw-ESTO slice needed to explain rollup components."""
+    columns = ["economy", "esto_flow", "year", "value", "scenario"]
+    economy_key = str(economy).replace("_", "")
+    selected_chunks: list[pd.DataFrame] = []
+    for chunk in pd.read_csv(esto_exact_rows_path, usecols=columns, chunksize=250_000):
+        selected = chunk[chunk["economy"].astype(str).str.replace("_", "", regex=False).eq(economy_key)].copy()
+        if min_year is not None:
+            selected = selected[selected["year"] >= min_year]
+        if max_year is not None:
+            selected = selected[selected["year"] <= max_year]
+        if not selected.empty:
+            selected_chunks.append(selected)
+    if not selected_chunks:
+        return pd.DataFrame(columns=["source_system", "scenario", "year", "common_flow_label", "value"])
+    result = pd.concat(selected_chunks, ignore_index=True).rename(columns={"esto_flow": "common_flow_label"})
+    result["source_system"] = "ESTO_RAW"
+    return result[["source_system", "scenario", "year", "common_flow_label", "value"]]
+
+
 def _table_html(frame: pd.DataFrame, columns: list[str], *, limit: int = MAX_TABLE_ROWS) -> str:
     """Return a compact, escaped HTML table for available columns only."""
     available = [column for column in columns if column in frame.columns]
@@ -818,11 +843,11 @@ def _rollup_boundary_details_html(
         note = str(first.get("note", "")).strip()
         cards.append(
             f'<article class="rollup-boundary {escape(mode.lower())}" data-rollup-target="{escape(label)}" data-rollup-inputs="{escape("|".join(contributors))}">'
-            f'<h3><span class="mode-pill">{escape(mode)}</span> {escape(label)} <strong class="rollup-value" data-rollup-flow="{escape(label)}">â€”</strong></h3>'
+            f'<h3>{escape(label)} <strong class="rollup-value" data-rollup-flow="{escape(label)}">â€”</strong></h3>'
             '<div class="boundary-columns"><div><h4>Ordinary hierarchy</h4><strong>Parent</strong>'
             f'<ul>{parent_html}</ul><strong>Children</strong><ul>{child_html}</ul><strong>Siblings</strong><ul>{sibling_html}</ul></div>'
             f'<div><h4>Composition components</h4><ul>{component_html}</ul></div></div>'
-            f'<p class="helper-note">{escape(explanations.get(mode, "Defined by the mapping workbook."))}</p>'
+            f'<p class="helper-note"><span class="mode-pill">{escape(mode)}</span> {escape(explanations.get(mode, "Defined by the mapping workbook."))}</p>'
             f'<p class="artifact-id">{escape(note)}<br>{escape(str(rollup_id))}</p></article>'
         )
     return '<div class="rollup-register">' + "".join(cards) + "</div>"
@@ -916,6 +941,7 @@ def write_mapping_diagnostics_page(
     dashboard_updated_label: str,
     economy: str = "",
     comparison_data: pd.DataFrame | None = None,
+    esto_exact_values: pd.DataFrame | None = None,
 ) -> dict[str, str]:
     """Write one self-contained mapping diagnostics page and summary CSV."""
     results_root = mappings_root / "results"
@@ -966,6 +992,14 @@ def write_mapping_diagnostics_page(
             rollup_value_records = value_rows.groupby(
                 ["source_system", "scenario", "year", "common_flow_label"], dropna=False
             )["value"].sum().reset_index().to_dict("records")
+    if esto_exact_values is not None and not esto_exact_values.empty:
+        required_value_columns = {"source_system", "scenario", "year", "common_flow_label", "value"}
+        if required_value_columns.issubset(esto_exact_values.columns):
+            exact_rows = esto_exact_values.copy()
+            exact_rows["value"] = pd.to_numeric(exact_rows["value"], errors="coerce").fillna(0.0)
+            rollup_value_records.extend(exact_rows.groupby(
+                ["source_system", "scenario", "year", "common_flow_label"], dropna=False
+            )["value"].sum().reset_index().to_dict("records"))
     rollup_value_json = json.dumps(rollup_value_records, ensure_ascii=False).replace("</", "<\\/")
 
     stage_summary = _failure_summary(stage, ["source_system", "validation_axis", "parent_code"])
@@ -1073,6 +1107,10 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     )
     graph_heading_html = '<section class="panel"><h2>All sector rollup structure</h2>'
     html = html.replace('String(x)===String(selected)));', 'String(x)===String(selected))));')
+    html = html.replace(
+        'unique(ROLLUP_VALUES.map(r=>r.source_system))',
+        "unique(ROLLUP_VALUES.filter(r=>r.source_system!=='ESTO_RAW').map(r=>r.source_system))",
+    )
     html = html.replace(rollup_controls_html, "", 1)
     html = html.replace(graph_heading_html, graph_heading_html + rollup_controls_html, 1)
 
@@ -1228,7 +1266,43 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
         '    svg += `<text class="mode" x="30" y="${cursorY}">ORDINARY ESTO FLOW HIERARCHY',
         '    renderFullHierarchy();\n    svg += `<text class="mode" x="30" y="${cursorY}">ORDINARY ESTO FLOW HIERARCHY',
     )
-    html = html.replace("</body></html>", all_sector_graph_script + "</body></html>")
+    raw_esto_context_script = """
+<script>
+(() => {
+  const paintWithRawEsto = () => {
+    const commonRows = ROLLUP_VALUES.filter(row => row.source_system === rs.value && row.scenario === rc.value && String(row.year) === String(ry.value));
+    const rawRows = rs.value === 'ESTO'
+      ? ROLLUP_VALUES.filter(row => row.source_system === 'ESTO_RAW' && row.scenario === rc.value && String(row.year) === String(ry.value))
+      : [];
+    const commonValues = new Map();
+    const rawValues = new Map();
+    commonRows.forEach(row => commonValues.set(row.common_flow_label, (commonValues.get(row.common_flow_label) || 0) + Number(row.value)));
+    rawRows.forEach(row => rawValues.set(row.common_flow_label, (rawValues.get(row.common_flow_label) || 0) + Number(row.value)));
+    const valueFor = flow => commonValues.has(flow) ? commonValues.get(flow) : rawValues.get(flow);
+    document.querySelectorAll('[data-rollup-flow]').forEach(element => {
+      const value = valueFor(element.dataset.rollupFlow);
+      element.textContent = value === undefined ? '—' : value.toLocaleString(undefined, {maximumFractionDigits:2});
+    });
+    document.querySelectorAll('[data-rollup-target]').forEach(element => {
+      const target = valueFor(element.dataset.rollupTarget);
+      const inputs = element.dataset.rollupInputs.split('|').filter(Boolean);
+      const inputValues = inputs.map(valueFor);
+      const unavailable = inputValues.some(value => value === undefined);
+      const sum = inputValues.reduce((total, value) => total + (value || 0), 0);
+      const ok = !unavailable && target !== undefined && Math.abs(target - sum) <= 0.01 * Math.max(Math.abs(target), 1);
+      element.classList.toggle('value-pass', ok);
+      element.classList.toggle('value-fail', !unavailable && target !== undefined && !ok);
+      element.classList.toggle('value-unavailable', unavailable);
+    });
+  };
+  ry.addEventListener('change', paintWithRawEsto);
+  rc.addEventListener('change', paintWithRawEsto);
+  rs.addEventListener('change', paintWithRawEsto);
+  paintWithRawEsto();
+})();
+</script>
+"""
+    html = html.replace("</body></html>", all_sector_graph_script + raw_esto_context_script + "</body></html>")
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME
     output_path.write_text(html, encoding="utf-8")
     return {"page": str(output_path), "summary": str(layout["supporting"] / "mapping_diagnostics_summary.csv")}

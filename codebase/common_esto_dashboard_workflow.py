@@ -56,7 +56,10 @@ from common_esto_dashboard_data import (  # noqa: E402
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
 from common_esto_dashboard_output_layout import build_output_layout, publish_to_docs  # noqa: E402
 from common_esto_dashboard_convergence import write_capacity_unmet_convergence_page  # noqa: E402
-from common_esto_dashboard_mapping_diagnostics import write_mapping_diagnostics_page  # noqa: E402
+from common_esto_dashboard_mapping_diagnostics import (  # noqa: E402
+    load_esto_exact_values_for_economy,
+    write_mapping_diagnostics_page,
+)
 from scripts.render_full_mapping_tree_explorer import render_full_tree_explorer  # noqa: E402
 
 
@@ -129,6 +132,7 @@ def _log_to_file(log_path):
 _DEFAULT_LEAP_MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
 _LEAP_MAPPINGS_REPO = _resolve(os.getenv("LEAP_MAPPINGS_ROOT", str(_DEFAULT_LEAP_MAPPINGS_ROOT)))
 _LEAP_MAPPINGS_RESULTS = _LEAP_MAPPINGS_REPO / "results" / "common_esto"
+ESTO_EXACT_ROWS_PATH = _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_results_exact_rows.csv"
 # The long-form file only contains rows a source system actually reported, so
 # years a source has no data for are simply absent instead of zero-filled
 # (unlike the wide CSV, which pads every year column with 0).
@@ -352,12 +356,19 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
             },
         ],
     )
+    esto_exact_values = load_esto_exact_values_for_economy(
+        ESTO_EXACT_ROWS_PATH,
+        economy,
+        min_year=MIN_YEAR,
+        max_year=MAX_YEAR,
+    )
     mapping_diagnostics = write_mapping_diagnostics_page(
         layout,
         _LEAP_MAPPINGS_REPO,
         dashboard_updated_label=dashboard_updated_label,
         economy=economy,
         comparison_data=scope_filtered_df,
+        esto_exact_values=esto_exact_values,
     )
     mapping_tree_explorer = render_full_tree_explorer(
         output_path=layout["dashboards"] / "mapping_tree_explorer.html",

@@ -191,6 +191,9 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
             {"source_system": "ESTO", "scenario": "historical", "year": 2023, "common_flow_label": "09 Total", "value": 10.0},
             {"source_system": "ESTO", "scenario": "historical", "year": 2023, "common_flow_label": "09.00 Total", "value": 10.0},
         ]),
+        esto_exact_values=pd.DataFrame([
+            {"source_system": "ESTO_RAW", "scenario": "historical", "year": 2023, "common_flow_label": "09 raw component", "value": 4.0},
+        ]),
     )
     html = Path(result["page"]).read_text(encoding="utf-8")
 
@@ -230,6 +233,7 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Direct mapping coverage review" in html
     assert "Dataset<select id=\"rollup-source\"" in html
     assert "ROLLUP_VALUES=" in html
+    assert "ESTO_RAW" in html
     assert "value-pass" in html
     assert '<details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2>' in html
     assert '<details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2>' in html

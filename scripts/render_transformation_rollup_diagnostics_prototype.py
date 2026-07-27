@@ -18,7 +18,10 @@ CHUNK_SIZE = 250_000
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from codebase.common_esto_dashboard_mapping_diagnostics import write_mapping_diagnostics_page
+from codebase.common_esto_dashboard_mapping_diagnostics import (
+    load_esto_exact_values_for_economy,
+    write_mapping_diagnostics_page,
+)
 
 
 #%%
@@ -50,6 +53,10 @@ def _read_prototype_values() -> pd.DataFrame:
 def render_prototype() -> dict[str, str]:
     """Write a compact, current prototype at the path open in the dashboard."""
     comparison_data = _read_prototype_values()
+    esto_exact_values = load_esto_exact_values_for_economy(
+        MAPPINGS_ROOT / "results" / "mapping_relationships" / "esto_results_exact_rows.csv",
+        ECONOMY,
+    )
     layout = {
         "dashboards": OUTPUT_ROOT / "dashboards",
         "supporting": OUTPUT_ROOT / "supporting",
@@ -62,6 +69,7 @@ def render_prototype() -> dict[str, str]:
         dashboard_updated_label="20_USA prototype — ESTO Extended excluded",
         economy=ECONOMY,
         comparison_data=comparison_data,
+        esto_exact_values=esto_exact_values,
     )
     print(f"Rows supplied to diagnostics: {len(comparison_data):,}")
     print(result["page"])
