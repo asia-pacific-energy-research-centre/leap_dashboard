@@ -164,14 +164,177 @@ parallel Extended pipeline artifacts/scopes. Do not make a control merely
 relabel ordinary ESTO values. The global workbook-integrity sections above stay
 visible for both bases.
 
+## Additive update: pipeline health report and a confirmed upstream defect (2026-07-27, later session)
+
+Do not replace the sections above. This records a second 2026-07-27 session that
+re-ran the latest mapping results through the dashboard.
+
+### New tool: mapping pipeline health report
+
+```text
+scripts/render_mapping_pipeline_health_report.py
+outputs/prototypes/mapping_pipeline_health/mapping_pipeline_health.html
+tests/test_mapping_pipeline_health_report.py
+```
+
+A fast, standalone investigation page built only from the small summary and QA
+artifacts, so it never loads the 887 MB comparison file. It is complementary to
+the Mapping diagnostics page: that page explains one economy's rollup
+arithmetic, this one answers whether the latest pipeline run can be trusted at
+all. It renders in a few seconds.
+
+Its reporting rules, which the diagnostics page should adopt:
+
+- `skipped` is rendered as "not validated", never as a pass. The product-axis
+  hierarchy check is skipped in the current run and is shown as such.
+- A QA file is called clean only when the file exists and is empty. A missing
+  file is "unknown".
+- Anchor counts are never summed across overlapping comparison scopes. Subtotals
+  are shown per scope, under an explicit ordinary/Extended basis label.
+- Material mapping gaps are ranked by absolute magnitude, with an explicit note
+  that LEAP aggregate branches are expected to have no direct ESTO pair.
+- **Pipeline code versus artifacts**: the report runs `git log` over
+  `leap_mappings/codebase/` and fails loudly when any pipeline-code commit is
+  newer than the artifacts on disk. Artifact mtimes are read as local time
+  (`pd.Timestamp.fromtimestamp`) so they compare correctly with local git dates.
+
+The second `*_body.html` output is the same content as a body fragment, for
+publishing without re-rendering.
+
+### Publishable page fragments and shared provenance
+
+```text
+codebase/dashboard_page_fragment.py
+codebase/mapping_pipeline_provenance.py
+tests/test_dashboard_page_fragment.py
+```
+
+`write_body_fragment()` converts a rendered standalone page into a body fragment
+(no doctype/`<html>`/`<head>`/`<body>`, styles inlined, relative links to sibling
+pages neutralized because a published fragment has no siblings). External links
+and in-page anchors are preserved. The diagnostics prototype renderer now emits
+`mapping_diagnostics_body.html` automatically beside its normal output, so
+publishing a snapshot is no longer a hand conversion.
+
+`mapping_pipeline_provenance.py` is the single source of truth for "were these
+artifacts built by current code?". It reads the Stage 3 manifest and compares
+artifact write times against `leap_mappings` `codebase/` commit dates. Both the
+health report and the prototype renderer import it, so they cannot disagree.
+The prototype's snapshot banner is generated from it rather than hand-written:
+with the current artifacts it reads "Snapshot, and the source artifacts were
+produced by superseded code", naming run
+`common_esto_20260727T034511926826Z` and commit `eb3a293`. After a clean rebuild
+the same code path produces an informational banner instead.
+
+Timestamps must stay local (`artifact_mtime()` uses
+`pd.Timestamp.fromtimestamp`). Reading them as UTC silently shifts them by the
+local offset and produces false "superseded code" positives.
+
+### Confirmed: current artifacts double every ordinary-ESTO rollup value
+
+The 2026-07-27 prototype re-render reproduced the electricity-plants doubling
+described earlier in this handover. It is not fixed, and it is not a dashboard
+bug. Verified directly against the artifacts:
+
+- Commit `eb3a293` landed at 14:14 local. The artifacts were written at 12:39
+  and Stage 3 finished at 13:38. The run predates its own fix by ~35 minutes.
+- `results/mapping_relationships/esto_extended_results_exact_rows.csv` contains
+  840,378 rows carrying `source_system = ESTO` instead of `ESTO_EXTENDED`, across
+  exactly 15 generated rollup flows (all with a `non_expanding_rollup_id`).
+- Ordinary ESTO therefore counts those flows twice. For 2023,
+  `09.01.01,09.02.01 Electricity plants`, the Common ESTO value is exactly
+  `2.0x` the raw contributor sum in **all 21 economies**.
+
+Until `leap_mappings/docs/prompts/rebuild_esto_rollup_source_identity_prompt.md`
+is executed, treat every ordinary-ESTO value for those 15 flows in both the
+diagnostics page and the health report as doubled. Re-render both pages after
+the rebuild; the health report's code-versus-artifacts section is the completion
+check.
+
+### Queued work
+
+| Prompt | Repo | Scope |
+| --- | --- | --- |
+| `docs/prompts/rebuild_esto_rollup_source_identity_prompt.md` | `leap_mappings` | **DONE 2026-07-27.** Run `common_esto_20260727T113042584213Z` removed the doubling (ratio 1.0 in all 21 economies) and added a guard that fails the run rather than writing a doubled artifact. |
+| `docs/prompts/anchor_validation_section_rebuild_prompt.md` | `leap_dashboard` | Rebuild the anchor section: one parent boundary is one check, fuels/years nested as evidence, full filters, defensive skipped-run handling. |
+
+### Deferred: ESTO Extended coverage findings
+
+The 2026-07-27 rebuild also showed that the workbook's 730 Extended mapping rows
+target 56 extended-only flows while `common_esto_tree.csv` defines Common ESTO
+rows for only 5, so the diagnostics page shows exactly one Extended detail flow
+(`09.01.02.01 Coal CHP`). That is parked as probable work-in-progress — the ESTO
+Extended dataset was still being built — and is scheduled for a re-measure in
+`leap_mappings/docs/revisit_mapping_diagnostics_20260817.md` rather than treated
+as a defect now.
+
+Do not read the current Extended views as evidence that Extended coverage is
+broken, and equally do not read them as evidence it is complete. Until that
+re-measure, the honest statement is that Extended detail is largely not yet
+represented in Common ESTO.
+
 ## How to render and test
 
 Use the Windows Miniconda interpreter:
 
 ```powershell
-C:\Users\Work\miniconda3\python.exe -m pytest tests\test_mapping_diagnostics_page.py -q
+C:\Users\Work\miniconda3\python.exe -m pytest tests\test_mapping_diagnostics_page.py tests\test_mapping_pipeline_health_report.py -q
 C:\Users\Work\miniconda3\python.exe scripts\render_transformation_rollup_diagnostics_prototype.py
+C:\Users\Work\miniconda3\python.exe scripts\render_mapping_pipeline_health_report.py
 ```
+
+Browser automation is still blocked for `file:///` outputs. Serving the outputs
+directory over localhost works and is the quickest way to inspect a rendered
+page:
+
+```powershell
+C:\Users\Work\miniconda3\python.exe -m http.server 8731 --bind 127.0.0.1
+```
+
+### Rendering from a mapping-pipeline worktree
+
+The mapping pipeline can be run from a `leap_mappings` git worktree so the main
+checkout stays free for other work. A worktree writes its own `results/`, so
+point the dashboard at it explicitly:
+
+```powershell
+$env:LEAP_MAPPINGS_ROOT = "C:\Users\Work\github\leap_mappings\.claude\worktrees\<name>"
+C:\Users\Work\miniconda3\python.exe scripts\render_mapping_pipeline_health_report.py
+```
+
+Both renderers honour `LEAP_MAPPINGS_ROOT`. It fails loudly when the path has no
+`results/` directory, rather than silently reporting the main checkout's
+artifacts while appearing to describe the worktree run. Unset it to go back to
+the main checkout.
+
+Setting up a runnable worktree (`data/` and `results/` are gitignored, so a fresh
+worktree has only stubs; `config/` workbooks *are* tracked and need no copy):
+
+1. Hardlink the three pipeline inputs from the main checkout's `data/`
+   (`00APEC_2025_low_with_subtotals.csv`, `esto_extended.csv`,
+   `merged_file_energy_ALL_20251106.csv`, ~331 MB). The pipeline only reads
+   these, so a hardlink costs no disk. Do **not** hardlink anything the pipeline
+   writes — `to_csv` truncates the shared inode and would corrupt the main
+   checkout's copy.
+2. Copy (do not hardlink) the Stage 1/2 outputs a `data_convert`/Stage 3 run
+   reads, ~120 MB: `mapping_relationships/energy_balance_relationships.csv`,
+   `raw_leap_results.csv`, `non_expanding_rollups.csv`, `rollup_edges.csv`,
+   `common_esto/common_esto_rows.csv`, `common_esto_row_components.csv`,
+   `esto_to_common_esto_map.csv`, `common_esto/structural_artifacts/`, and the
+   small `tree_structure/*_tree.csv` / hierarchy-edge files.
+3. Set `LEAP_BALANCE_EXPORTS_ROOT`. `run_mapping_pipeline.py` resolves the raw
+   LEAP exports relative to the repo root's parent at *import* time, which in a
+   worktree resolves to `.claude/worktrees/leap_initialisation` and raises
+   `FileNotFoundError` before any stage runs — even for stages that never touch
+   LEAP exports:
+
+   ```powershell
+   $env:LEAP_BALANCE_EXPORTS_ROOT = "C:\Users\Work\github\leap_initialisation\data\leap balances exports"
+   ```
+
+A full `data_convert` plus Stage 3 in a worktree generates roughly 4 GB of its
+own artifacts, duplicating the main checkout's large outputs. Clean the worktree
+`results/` when the run is no longer needed.
 
 The prototype renderer chunk-reads large files. It is safe for a focused page
 render, but it is not a replacement for rebuilding Common ESTO artifacts.
