@@ -24,6 +24,14 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     load_esto_exact_values_for_economy,
     write_mapping_diagnostics_page,
 )
+from codebase.dashboard_page_fragment import provenance_banner_html, write_body_fragment
+from codebase.mapping_pipeline_provenance import provenance_message
+
+
+def _provenance_banner() -> str:
+    """State which pipeline run this snapshot came from, and whether it is current."""
+    message, tone = provenance_message(MAPPINGS_ROOT, page_label="This prototype")
+    return provenance_banner_html(message, tone=tone)
 
 
 #%%
@@ -80,8 +88,15 @@ def render_prototype() -> dict[str, str]:
         comparison_data=comparison_data,
         esto_exact_values=pd.concat([esto_exact_values, esto_extended_exact_values], ignore_index=True),
     )
+    fragment_path = write_body_fragment(
+        result["page"],
+        title=f"Mapping diagnostics ({ECONOMY} prototype)",
+        banner_html=_provenance_banner(),
+    )
+    result["body"] = str(fragment_path)
     print(f"Rows supplied to diagnostics: {len(comparison_data):,}")
     print(result["page"])
+    print(fragment_path)
     return result
 
 
