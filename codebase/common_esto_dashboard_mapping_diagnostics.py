@@ -761,12 +761,21 @@ def _rollup_boundary_register_html(rollup_catalogue: pd.DataFrame) -> str:
     return '<div class="rollup-register">' + "".join(cards) + "</div>"
 
 
-def _rollup_boundary_details_html(rollup_catalogue: pd.DataFrame) -> str:
+def _rollup_boundary_details_html(
+    rollup_catalogue: pd.DataFrame,
+    common_esto_tree: pd.DataFrame | None = None,
+) -> str:
     """Render each ESTO rollup with its ordinary and composition relationships."""
     required = {"source_system", "rollup_mode", "rolled_flow_label", "input_flow"}
     if rollup_catalogue.empty or not required.issubset(rollup_catalogue.columns):
         return '<p class="empty-state">No compiled rollup-edge catalogue is available.</p>'
     catalogue = rollup_catalogue[rollup_catalogue["source_system"].astype(str).eq("ESTO")].copy()
+    flow_tree = pd.DataFrame(columns=["code", "parent_code"])
+    if common_esto_tree is not None and {"axis", "code", "parent_code"}.issubset(common_esto_tree.columns):
+        flow_tree = common_esto_tree[common_esto_tree["axis"].astype(str).eq("flow")][["code", "parent_code"]].copy()
+        flow_tree["code"] = flow_tree["code"].astype(str)
+        flow_tree["parent_code"] = flow_tree["parent_code"].fillna("").astype(str)
+    parent_by_code = dict(zip(flow_tree["code"], flow_tree["parent_code"]))
     id_column = "rollup_id" if "rollup_id" in catalogue.columns else "non_expanding_rollup_id"
     explanations = {
         "EXPANDING": "An ordinary combined category: its registered children remain part of the hierarchy, so this boundary may expand through them.",
@@ -780,6 +789,16 @@ def _rollup_boundary_details_html(rollup_catalogue: pd.DataFrame) -> str:
         mode = str(first["rollup_mode"])
         contributors = sorted(set(group["input_flow"].dropna().astype(str)) - {"", "nan"})
         parents = sorted(set(group.get("parent_flow_label", pd.Series(dtype=str)).dropna().astype(str)) - {"", "nan"})
+        ordinary_base = label.replace(" (including own use)", "")
+        if ordinary_base not in parent_by_code:
+            ordinary_base = next((flow for flow in contributors if flow in parent_by_code), "")
+        if not parents and ordinary_base:
+            inferred_parent = parent_by_code.get(ordinary_base, "")
+            if inferred_parent:
+                parents = [inferred_parent]
+        siblings = sorted(
+            set(flow_tree[flow_tree["parent_code"].isin(parents)]["code"].astype(str)) - {ordinary_base, label}
+        )
         children = sorted({
             child.strip()
             for value in group.get("child_flow_labels", pd.Series(dtype=str)).dropna().astype(str)
@@ -794,13 +813,14 @@ def _rollup_boundary_details_html(rollup_catalogue: pd.DataFrame) -> str:
 
         parent_html = _value_items(parents, "No ordinary parent.")
         child_html = _value_items(children, "No ordinary children.")
+        sibling_html = _value_items(siblings, "No ordinary siblings.")
         component_html = _value_items(contributors, "No composition components.")
         note = str(first.get("note", "")).strip()
         cards.append(
             f'<article class="rollup-boundary {escape(mode.lower())}" data-rollup-target="{escape(label)}" data-rollup-inputs="{escape("|".join(contributors))}">'
             f'<h3><span class="mode-pill">{escape(mode)}</span> {escape(label)} <strong class="rollup-value" data-rollup-flow="{escape(label)}">â€”</strong></h3>'
             '<div class="boundary-columns"><div><h4>Ordinary hierarchy</h4><strong>Parent</strong>'
-            f'<ul>{parent_html}</ul><strong>Children</strong><ul>{child_html}</ul></div>'
+            f'<ul>{parent_html}</ul><strong>Children</strong><ul>{child_html}</ul><strong>Siblings</strong><ul>{sibling_html}</ul></div>'
             f'<div><h4>Composition components</h4><ul>{component_html}</ul></div></div>'
             f'<p class="helper-note">{escape(explanations.get(mode, "Defined by the mapping workbook."))}</p>'
             f'<p class="artifact-id">{escape(note)}<br>{escape(str(rollup_id))}</p></article>'
@@ -816,6 +836,13 @@ def _rollup_graph_data(
     if common_esto_tree.empty or "axis" not in common_esto_tree.columns:
         return {"sectors": [], "boundaries": [], "parent": "", "children": []}
     tree = common_esto_tree[common_esto_tree["axis"].astype(str).eq("flow")].copy()
+    if "level" not in tree.columns:
+        tree["level"] = 0
+    tree["level"] = pd.to_numeric(tree["level"], errors="coerce").fillna(0).astype(int)
+    nodes = tree.sort_values(["level", "code"], kind="mergesort")[["code", "parent_code", "level"]].assign(
+        parent_code=lambda frame: frame["parent_code"].fillna("").astype(str),
+        code=lambda frame: frame["code"].astype(str),
+    ).to_dict("records")
     roots = tree[tree["parent_code"].fillna("").astype(str).eq("")]["code"].astype(str).tolist()
     sectors = []
     for root in roots:
@@ -823,7 +850,7 @@ def _rollup_graph_data(
         sectors.append({"root": root, "children": children})
     legacy_sector = next((sector for sector in sectors if sector["root"] == "09 Total transformation sector"), {"root": "", "children": []})
     if rollup_catalogue.empty or not {"source_system", "rolled_flow_label"}.issubset(rollup_catalogue.columns):
-        return {"sectors": sectors, "boundaries": [], "all_boundaries": [], "parent": legacy_sector["root"], "children": legacy_sector["children"]}
+        return {"sectors": sectors, "nodes": nodes, "boundaries": [], "all_boundaries": [], "parent": legacy_sector["root"], "children": legacy_sector["children"]}
     catalogue = rollup_catalogue[rollup_catalogue["source_system"].astype(str).eq("ESTO")].copy()
     id_column = "rollup_id" if "rollup_id" in catalogue.columns else "non_expanding_rollup_id"
     boundaries = []
@@ -837,6 +864,7 @@ def _rollup_graph_data(
     legacy_boundaries = [boundary for boundary in boundaries if boundary["label"].startswith("09")]
     return {
         "sectors": sectors,
+        "nodes": nodes,
         "all_boundaries": boundaries,
         "boundaries": legacy_boundaries,
         # Retained while the older inline renderer remains in the generated page.
@@ -925,7 +953,7 @@ def write_mapping_diagnostics_page(
     source_to_common = _read_csv(source_to_common_path)
     many_to_many = _read_csv(many_to_many_path)
     rollup_catalogue = _read_csv(rollup_catalogue_path)
-    rollup_boundary_register = _rollup_boundary_details_html(rollup_catalogue)
+    rollup_boundary_register = _rollup_boundary_details_html(rollup_catalogue, common_esto_tree)
     transformation_graph_json = json.dumps(
         _rollup_graph_data(common_esto_tree, rollup_catalogue), ensure_ascii=False
     ).replace("</", "<\\/")
@@ -1062,14 +1090,43 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
   }
   function drawAllSectorGraph() {
     const graph = ROLLUP_GRAPH;
-    const sectors = graph.sectors || [];
+    const sectors = [];
+    const nodes = graph.nodes || [];
+    const nodesByLevel = new Map();
+    nodes.forEach(node => {
+      const level = Number(node.level || 0);
+      nodesByLevel.set(level, [...(nodesByLevel.get(level) || []), node]);
+    });
+    const hierarchyLevels = [...nodesByLevel.keys()].sort((a, b) => a - b);
     const boundaries = graph.all_boundaries || graph.boundaries || [];
-    const maxOrdinaryChildren = Math.max(1, ...sectors.map(sector => (sector.children || []).length));
+    const maxOrdinaryChildren = Math.max(1, ...[...nodesByLevel.values()].map(levelNodes => levelNodes.length));
     const maxBoundaryInputs = Math.max(1, ...boundaries.map(boundary => (boundary.inputs || []).length));
     const width = Math.max(1660, 405 + maxOrdinaryChildren * 230, 380 + maxBoundaryInputs * 260 + 360);
     let cursorY = 24;
     let svg = `<svg viewBox="0 0 ${width} 100" width="${width}" height="100"><defs><marker id="all-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#53718f"/></marker></defs>`;
     const edge = (x1, y1, x2, y2, dashed = false) => `<line class="edge${dashed ? ' dashed' : ''}" marker-end="url(#all-arrow)" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    const renderFullHierarchy = () => {
+      const positions = new Map();
+      hierarchyLevels.forEach((level, levelIndex) => {
+        (nodesByLevel.get(level) || []).forEach((node, index) => {
+          positions.set(node.code, {x: 30 + index * 230, y: cursorY + 18 + levelIndex * 82});
+        });
+      });
+      svg += `<text class="mode" x="30" y="${cursorY}">FULL ESTO FLOW HIERARCHY — EVERY LEVEL</text>`;
+      positions.forEach((position, code) => {
+        const parentCode = nodes.find(node => node.code === code)?.parent_code || '';
+        const parentPosition = positions.get(parentCode);
+        if (parentPosition) svg += edge(parentPosition.x + 102, parentPosition.y + 48, position.x + 102, position.y);
+      });
+      positions.forEach((position, code) => {
+        const childCodes = nodes.filter(node => node.parent_code === code).map(node => node.code);
+        const checkAttributes = childCodes.length
+          ? ` rollup-check" data-rollup-target="${escGraph(code)}" data-rollup-inputs="${escGraph(childCodes.join('|'))}`
+          : '';
+        svg += `<g class="node${checkAttributes}"><rect x="${position.x}" y="${position.y}" width="205" height="48"/><text x="${position.x + 10}" y="${position.y + 21}">${escGraph(shortLabel(code, 34))}</text><text class="value" data-rollup-flow="${escGraph(code)}" x="${position.x + 10}" y="${position.y + 40}">—</text></g>`;
+      });
+      cursorY += hierarchyLevels.length * 82 + 42;
+    };
     const node = (x, y, widthValue, height, label, extraClass = '', mode = '') => `<g class="node ${extraClass}"><rect x="${x}" y="${y}" width="${widthValue}" height="${height}"/><text${mode ? ' class="mode"' : ''} x="${x + 10}" y="${y + (mode ? 16 : 21)}">${escGraph(mode || shortLabel(label))}</text><text x="${x + 10}" y="${y + (mode ? 34 : 37)}">${mode ? escGraph(shortLabel(label)) : ''}</text><text class="value" data-rollup-flow="${escGraph(label)}" x="${x + 10}" y="${y + height - 8}">—</text></g>`;
     svg += `<text class="mode" x="30" y="${cursorY}">ORDINARY ESTO FLOW HIERARCHY — ALL ROOT SECTORS</text>`;
     cursorY += 14;
@@ -1167,6 +1224,9 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
         'x="992" y="${targetY + 34}"', 'x="${targetX + 12}" y="${targetY + 34}"'
     ).replace(
         'x="992" y="${targetY + 51}"', 'x="${targetX + 12}" y="${targetY + 51}"'
+    ).replace(
+        '    svg += `<text class="mode" x="30" y="${cursorY}">ORDINARY ESTO FLOW HIERARCHY',
+        '    renderFullHierarchy();\n    svg += `<text class="mode" x="30" y="${cursorY}">ORDINARY ESTO FLOW HIERARCHY',
     )
     html = html.replace("</body></html>", all_sector_graph_script + "</body></html>")
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME

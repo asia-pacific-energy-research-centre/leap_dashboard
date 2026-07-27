@@ -90,6 +90,10 @@ def test_rollup_graph_data_includes_every_flow_root_and_mode() -> None:
     graph = _rollup_graph_data(tree, rollups)
 
     assert {sector["root"] for sector in graph["sectors"]} == {"09 Total transformation sector", "14 Industry sector"}
+    assert {node["code"] for node in graph["nodes"]} == {
+        "09 Total transformation sector", "09.06 Gas processing plants",
+        "14 Industry sector", "14.03 Manufacturing",
+    }
     assert {boundary["mode"] for boundary in graph["all_boundaries"]} == {"NON_EXPANDING", "EXPANDING", "DETACHED"}
 
 
@@ -104,13 +108,21 @@ def test_rollup_boundary_details_show_parent_children_components_and_mode_meanin
         },
     ])
 
-    html = _rollup_boundary_details_html(rollups)
+    tree = pd.DataFrame([
+        {"axis": "flow", "code": "09 Total transformation sector", "parent_code": ""},
+        {"axis": "flow", "code": "09.07 Oil refineries", "parent_code": "09 Total transformation sector"},
+        {"axis": "flow", "code": "09.08 Coal transformation", "parent_code": "09 Total transformation sector"},
+        {"axis": "flow", "code": "09.09 Petrochemical industry", "parent_code": "09 Total transformation sector"},
+    ])
+    html = _rollup_boundary_details_html(rollups, tree)
 
     assert "Ordinary hierarchy" in html
     assert "Composition components" in html
     assert "09 Total transformation sector" in html
     assert "09.08.01 Coke ovens" in html
     assert "10.01.05 Coke ovens" in html
+    assert "09.07 Oil refineries" in html
+    assert "09.09 Petrochemical industry" in html
     assert "deliberately not folded into an ordinary ancestor total" in html
     assert html.count('data-rollup-flow="09 Total transformation sector"') == 1
     assert html.count('data-rollup-flow="09.08.01 Coke ovens"') == 1
