@@ -246,3 +246,52 @@ The next agent should make its relationship to the diagnostics page clearer:
   `leap_mappings` Stage 3 rebuild after commit `eb3a293`. The current mapping
   outputs have been rebuilt, but each dashboard economy must be rerendered to
   consume them.
+
+## Additive review: full-tree explorer implementation (2026-07-27)
+
+The handover correctly identifies the explorer as a separate structural tool.
+The following implementation exists in a distinct sequence of dashboard
+commits and should be retained alongside the diagnostics-page work:
+
+| Commit | Explorer addition |
+| --- | --- |
+| `a090166` | Full source / ESTO component / Common ESTO tree explorer and normal workflow output. |
+| `abff12a`, `c472af0`, `91cb39e` | Numeric route overlay; fixed context years (2022, 2030, 2040, 2060); scenario and magnitude controls. |
+| `55de945` | Separate positive output, negative input, and net values for transformation inspection. |
+| `a1b2020` | Optional abbreviated node labels for original ESTO-component or Common ESTO targets. |
+| `0841214`, `0a1daff` | Conditional ESTO Extended readiness and explicit checkbox control. |
+
+### Explorer behaviour that must remain clear
+
+- `scripts/render_full_mapping_tree_explorer.py` is the active full-tree
+  renderer. The older `render_mapping_tree_explorer_prototype.py` is the
+  earlier three-case prototype and should not be extended for new work.
+- `common_esto_dashboard_workflow.py` writes the explorer to each economy's
+  `dashboards/mapping_tree_explorer.html` and adds it to the dashboard
+  navigation. The prototype output is only for manual inspection.
+- Explorer numeric values are summed over all economies for the selected
+  source system, comparison scope, selected year, and selected scenario. They
+  are not a new validator calculation. Repeated `common_row_id` values are
+  counted once in its selected-node summary.
+- The middle panel is the actual ESTO component hierarchy used to establish
+  real parent/child target edges. The right panel is the Common ESTO flow
+  hierarchy. Do not collapse those into one tree or imply that a mapping route
+  is a hierarchy edge.
+- The **Use ESTO Extended instead of ESTO** checkbox appears only when the
+  generated comparison input contains `source_system = ESTO_EXTENDED`.
+  `COMMON_ESTO_PREFER_EXTENDED_ESTO=true` checks it by default. It is
+  intentionally hidden with the current ordinary-ESTO-only artifact, rather
+  than pretending ordinary ESTO values are Extended values.
+
+### Review recommendations before further explorer work
+
+1. Add focused tests for the full-tree renderer before changing its embedded
+   JavaScript again. Existing diagnostics tests do not exercise its selectors.
+2. After an Extended pipeline run, render once with a real `ESTO_EXTENDED`
+   payload and verify the checkbox, source tree, mapping routes, and values
+   together. The current conditional branch has a small synthetic render check
+   but not an end-to-end Extended artifact test.
+3. Consider replacing the tree renderer's large embedded JSON/JavaScript
+   template only as a planned refactor. For now, make surgical changes and
+   retain the distinction between source, ESTO-component, and Common ESTO
+   structures.
