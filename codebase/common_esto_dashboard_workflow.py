@@ -35,6 +35,8 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pandas as pd
+
 CURRENT_FILE = Path(__file__).resolve()
 REPO_ROOT = CURRENT_FILE.parents[1]
 MODULE_ROOT = CURRENT_FILE.parent
@@ -133,6 +135,7 @@ _DEFAULT_LEAP_MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
 _LEAP_MAPPINGS_REPO = _resolve(os.getenv("LEAP_MAPPINGS_ROOT", str(_DEFAULT_LEAP_MAPPINGS_ROOT)))
 _LEAP_MAPPINGS_RESULTS = _LEAP_MAPPINGS_REPO / "results" / "common_esto"
 ESTO_EXACT_ROWS_PATH = _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_results_exact_rows.csv"
+ESTO_EXTENDED_EXACT_ROWS_PATH = _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_extended_results_exact_rows.csv"
 # The long-form file only contains rows a source system actually reported, so
 # years a source has no data for are simply absent instead of zero-filled
 # (unlike the wide CSV, which pads every year column with 0).
@@ -362,13 +365,20 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         min_year=MIN_YEAR,
         max_year=MAX_YEAR,
     )
+    esto_extended_exact_values = load_esto_exact_values_for_economy(
+        ESTO_EXTENDED_EXACT_ROWS_PATH,
+        economy,
+        min_year=MIN_YEAR,
+        max_year=MAX_YEAR,
+        source_system="ESTO_EXTENDED_RAW",
+    )
     mapping_diagnostics = write_mapping_diagnostics_page(
         layout,
         _LEAP_MAPPINGS_REPO,
         dashboard_updated_label=dashboard_updated_label,
         economy=economy,
         comparison_data=scope_filtered_df,
-        esto_exact_values=esto_exact_values,
+        esto_exact_values=pd.concat([esto_exact_values, esto_extended_exact_values], ignore_index=True),
     )
     mapping_tree_explorer = render_full_tree_explorer(
         output_path=layout["dashboards"] / "mapping_tree_explorer.html",

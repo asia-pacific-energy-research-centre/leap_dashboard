@@ -21,6 +21,15 @@ outputs/common_esto_dashboard/<economy>/dashboards/index.html
 
 The default sample economy is `20_USA`.
 
+## Mapping diagnostics: ESTO Extended
+
+The Mapping diagnostics page uses ordinary ESTO by default. If the supplied
+comparison data contains `ESTO_EXTENDED`, select **Include ESTO Extended**
+above the sector SVG to make that source available in the Dataset selector.
+The control applies to both the rollup-boundary cards and the full-sector SVG.
+Turning it off removes Extended from the selector; ordinary and Extended ESTO
+values are never added together in a single reconciliation check.
+
 ## Inputs
 
 Focused tests use the tracked weekly sample fixture:

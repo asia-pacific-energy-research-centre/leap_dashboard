@@ -42,8 +42,9 @@ def load_esto_exact_values_for_economy(
     economy: str,
     min_year: int | None = None,
     max_year: int | None = None,
+    source_system: str = "ESTO_RAW",
 ) -> pd.DataFrame:
-    """Read the raw-ESTO slice needed to explain rollup components."""
+    """Read one raw ESTO slice needed to explain rollup components."""
     columns = ["economy", "esto_flow", "year", "value", "scenario"]
     economy_key = str(economy).replace("_", "")
     selected_chunks: list[pd.DataFrame] = []
@@ -58,7 +59,7 @@ def load_esto_exact_values_for_economy(
     if not selected_chunks:
         return pd.DataFrame(columns=["source_system", "scenario", "year", "common_flow_label", "value"])
     result = pd.concat(selected_chunks, ignore_index=True).rename(columns={"esto_flow": "common_flow_label"})
-    result["source_system"] = "ESTO_RAW"
+    result["source_system"] = source_system
     return result[["source_system", "scenario", "year", "common_flow_label", "value"]]
 
 
@@ -980,15 +981,29 @@ def write_mapping_diagnostics_page(
     many_to_many = _read_csv(many_to_many_path)
     rollup_catalogue = _read_csv(rollup_catalogue_path)
     rollup_boundary_register = _rollup_boundary_details_html(rollup_catalogue, common_esto_tree)
-    transformation_graph_json = json.dumps(
-        _rollup_graph_data(common_esto_tree, rollup_catalogue), ensure_ascii=False
-    ).replace("</", "<\\/")
+    rollup_graph_data = _rollup_graph_data(common_esto_tree, rollup_catalogue)
+    transformation_graph_json = json.dumps(rollup_graph_data, ensure_ascii=False).replace("</", "<\\/")
+    displayed_rollup_flows = {
+        str(node.get("code", "")).strip()
+        for node in rollup_graph_data.get("nodes", [])
+        if str(node.get("code", "")).strip()
+    }
+    for boundary in rollup_graph_data.get("all_boundaries", []):
+        displayed_rollup_flows.add(str(boundary.get("label", "")).strip())
+        displayed_rollup_flows.update(
+            str(value).strip()
+            for value in boundary.get("inputs", [])
+            if str(value).strip()
+        )
     rollup_value_records: list[dict[str, object]] = []
     if comparison_data is not None and not comparison_data.empty:
         required_value_columns = {"source_system", "scenario", "year", "common_flow_label", "value"}
         if required_value_columns.issubset(comparison_data.columns):
             value_rows = comparison_data.copy()
             value_rows["value"] = pd.to_numeric(value_rows["value"], errors="coerce").fillna(0.0)
+            value_rows = value_rows[
+                value_rows["common_flow_label"].astype(str).isin(displayed_rollup_flows)
+            ]
             rollup_value_records = value_rows.groupby(
                 ["source_system", "scenario", "year", "common_flow_label"], dropna=False
             )["value"].sum().reset_index().to_dict("records")
@@ -997,6 +1012,9 @@ def write_mapping_diagnostics_page(
         if required_value_columns.issubset(esto_exact_values.columns):
             exact_rows = esto_exact_values.copy()
             exact_rows["value"] = pd.to_numeric(exact_rows["value"], errors="coerce").fillna(0.0)
+            exact_rows = exact_rows[
+                exact_rows["common_flow_label"].astype(str).isin(displayed_rollup_flows)
+            ]
             rollup_value_records.extend(exact_rows.groupby(
                 ["source_system", "scenario", "year", "common_flow_label"], dropna=False
             )["value"].sum().reset_index().to_dict("records"))
@@ -1100,10 +1118,17 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     # The dashboard template predates the graph and emits one compact inline
     # script. Correct its option-construction parenthesis while it remains
     # embedded, then move the selectors from the register to the SVG panel.
-    rollup_controls_html = (
+    existing_rollup_controls_html = (
         '<div class="rollup-controls"><label>Dataset<select id="rollup-source"></select></label>'
         '<label>Scenario<select id="rollup-scenario"></select></label>'
         '<label>Year<select id="rollup-year"></select></label></div>'
+    )
+    rollup_controls_html = (
+        '<div class="rollup-controls"><label>Dataset<select id="rollup-source"></select></label>'
+        '<label>Scenario<select id="rollup-scenario"></select></label>'
+        '<label>Year<select id="rollup-year"></select></label>'
+        '<label id="include-esto-extended-control"><input id="include-esto-extended" type="checkbox"> '
+        'Include ESTO Extended</label></div>'
     )
     graph_heading_html = '<section class="panel"><h2>All sector rollup structure</h2>'
     html = html.replace('String(x)===String(selected)));', 'String(x)===String(selected))));')
@@ -1111,7 +1136,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
         'unique(ROLLUP_VALUES.map(r=>r.source_system))',
         "unique(ROLLUP_VALUES.filter(r=>r.source_system!=='ESTO_RAW').map(r=>r.source_system))",
     )
-    html = html.replace(rollup_controls_html, "", 1)
+    html = html.replace(existing_rollup_controls_html, "", 1)
     html = html.replace(graph_heading_html, graph_heading_html + rollup_controls_html, 1)
 
     # Replace the early 09-only SVG with the complete sector/rollup graph after
@@ -1271,8 +1296,13 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 (() => {
   const paintWithRawEsto = () => {
     const commonRows = ROLLUP_VALUES.filter(row => row.source_system === rs.value && row.scenario === rc.value && String(row.year) === String(ry.value));
-    const rawRows = rs.value === 'ESTO'
-      ? ROLLUP_VALUES.filter(row => row.source_system === 'ESTO_RAW' && row.scenario === rc.value && String(row.year) === String(ry.value))
+    const rawSource = rs.value === 'ESTO'
+      ? 'ESTO_RAW'
+      : rs.value === 'ESTO_EXTENDED'
+        ? 'ESTO_EXTENDED_RAW'
+        : '';
+    const rawRows = rawSource
+      ? ROLLUP_VALUES.filter(row => row.source_system === rawSource && row.scenario === rc.value && String(row.year) === String(ry.value))
       : [];
     const commonValues = new Map();
     const rawValues = new Map();
@@ -1302,7 +1332,40 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 })();
 </script>
 """
-    html = html.replace("</body></html>", all_sector_graph_script + raw_esto_context_script + "</body></html>")
+    extended_source_control_script = """
+<script>
+(() => {
+  const extendedToggle = document.querySelector('#include-esto-extended');
+  const extendedControl = document.querySelector('#include-esto-extended-control');
+  if (!extendedToggle || !extendedControl) return;
+  const sourceOptions = () => unique(
+    ROLLUP_VALUES
+      .filter(row => row.source_system !== 'ESTO_RAW' && row.source_system !== 'ESTO_EXTENDED_RAW')
+      .map(row => row.source_system)
+  );
+  const hasExtended = sourceOptions().includes('ESTO_EXTENDED');
+  if (!hasExtended) {
+    extendedControl.hidden = true;
+    return;
+  }
+  const refreshSourceOptions = () => {
+    const available = sourceOptions().filter(source => extendedToggle.checked || source !== 'ESTO_EXTENDED');
+    const selected = available.includes(rs.value)
+      ? rs.value
+      : (available.includes('ESTO') ? 'ESTO' : available[0]);
+    fill(rs, available, selected);
+    refreshScenarios();
+    rs.dispatchEvent(new Event('change'));
+  };
+  extendedToggle.addEventListener('change', refreshSourceOptions);
+  refreshSourceOptions();
+})();
+</script>
+"""
+    html = html.replace(
+        "</body></html>",
+        all_sector_graph_script + raw_esto_context_script + extended_source_control_script + "</body></html>",
+    )
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME
     output_path.write_text(html, encoding="utf-8")
     return {"page": str(output_path), "summary": str(layout["supporting"] / "mapping_diagnostics_summary.csv")}
