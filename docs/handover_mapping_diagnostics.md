@@ -255,8 +255,23 @@ check.
 
 | Prompt | Repo | Scope |
 | --- | --- | --- |
-| `docs/prompts/rebuild_esto_rollup_source_identity_prompt.md` | `leap_mappings` | Rebuild artifacts with the fix, add a source-identity QA artifact, prove the 2.0x ratio is gone. Highest priority. |
+| `docs/prompts/rebuild_esto_rollup_source_identity_prompt.md` | `leap_mappings` | **DONE 2026-07-27.** Run `common_esto_20260727T113042584213Z` removed the doubling (ratio 1.0 in all 21 economies) and added a guard that fails the run rather than writing a doubled artifact. |
 | `docs/prompts/anchor_validation_section_rebuild_prompt.md` | `leap_dashboard` | Rebuild the anchor section: one parent boundary is one check, fuels/years nested as evidence, full filters, defensive skipped-run handling. |
+
+### Deferred: ESTO Extended coverage findings
+
+The 2026-07-27 rebuild also showed that the workbook's 730 Extended mapping rows
+target 56 extended-only flows while `common_esto_tree.csv` defines Common ESTO
+rows for only 5, so the diagnostics page shows exactly one Extended detail flow
+(`09.01.02.01 Coal CHP`). That is parked as probable work-in-progress — the ESTO
+Extended dataset was still being built — and is scheduled for a re-measure in
+`leap_mappings/docs/revisit_mapping_diagnostics_20260817.md` rather than treated
+as a defect now.
+
+Do not read the current Extended views as evidence that Extended coverage is
+broken, and equally do not read them as evidence it is complete. Until that
+re-measure, the honest statement is that Extended detail is largely not yet
+represented in Common ESTO.
 
 ## How to render and test
 
