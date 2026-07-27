@@ -61,10 +61,13 @@ coverage:
 
 ```text
 leap_mappings/results/mapping_relationships/leap_results_converted_to_esto.csv
-leap_mappings/results/mapping_relationships/ninth_results_converted_to_esto.csv
-leap_mappings/results/mapping_relationships/esto_results_exact_rows.csv
+leap_mappings/results/mapping_relationships/ninth_results_converted_to_esto.csv.gz
+leap_mappings/results/mapping_relationships/esto_results_exact_rows.csv.gz
 leap_mappings/config/all_demand_aggregated_components.json
 ```
+
+Dashboard readers prefer the compressed names and retain a legacy plain-CSV
+fallback for older mapping-output snapshots.
 
 It does not read raw ESTO or 9th Outlook source files, rebuild mapping
 relationships, or maintain dashboard-owned mapping logic. Mapping semantics,

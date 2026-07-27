@@ -9,8 +9,33 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     _rollup_boundary_details_html,
     _rollup_graph_data,
     _transformation_rollup_diagram_html,
+    load_esto_exact_values_for_economy,
+    prefer_compressed_csv_path,
     write_mapping_diagnostics_page,
 )
+
+
+def test_exact_value_loader_prefers_gzip_and_keeps_plain_csv_fallback(tmp_path: Path) -> None:
+    plain_path = tmp_path / "esto_results_exact_rows.csv"
+    compressed_path = tmp_path / "esto_results_exact_rows.csv.gz"
+    frame = pd.DataFrame([
+        {
+            "economy": "20USA",
+            "esto_flow": "09 Total transformation sector",
+            "year": 2023,
+            "value": 12.5,
+            "scenario": "historical",
+        }
+    ])
+    frame.to_csv(compressed_path, index=False)
+
+    assert prefer_compressed_csv_path(plain_path) == compressed_path
+    loaded = load_esto_exact_values_for_economy(plain_path, "20_USA")
+    assert loaded["value"].tolist() == [12.5]
+
+    compressed_path.unlink()
+    frame.to_csv(plain_path, index=False)
+    assert prefer_compressed_csv_path(compressed_path) == plain_path
 
 
 def test_mapping_cardinality_diagnostics_detects_only_real_overlap_and_many_to_many() -> None:

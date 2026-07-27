@@ -238,7 +238,7 @@ bug. Verified directly against the artifacts:
 
 - Commit `eb3a293` landed at 14:14 local. The artifacts were written at 12:39
   and Stage 3 finished at 13:38. The run predates its own fix by ~35 minutes.
-- `results/mapping_relationships/esto_extended_results_exact_rows.csv` contains
+- `results/mapping_relationships/esto_extended_results_exact_rows.csv.gz` contains
   840,378 rows carrying `source_system = ESTO` instead of `ESTO_EXTENDED`, across
   exactly 15 generated rollup flows (all with a `non_expanding_rollup_id`).
 - Ordinary ESTO therefore counts those flows twice. For 2023,

@@ -37,6 +37,22 @@ def _read_csv(path: Path) -> pd.DataFrame:
     return pd.read_csv(path, low_memory=False).fillna("")
 
 
+def prefer_compressed_csv_path(path: Path) -> Path:
+    """Prefer a gzip CSV and fall back to the legacy plain CSV when needed."""
+    candidate = Path(path)
+    if candidate.name.lower().endswith(".csv.gz"):
+        if candidate.exists():
+            return candidate
+        plain_path = candidate.with_suffix("")
+        if plain_path.exists():
+            return plain_path
+    elif candidate.name.lower().endswith(".csv"):
+        compressed_path = candidate.with_name(f"{candidate.name}.gz")
+        if compressed_path.exists():
+            return compressed_path
+    return candidate
+
+
 def load_esto_exact_values_for_economy(
     esto_exact_rows_path: Path,
     economy: str,
@@ -45,6 +61,7 @@ def load_esto_exact_values_for_economy(
     source_system: str = "ESTO_RAW",
 ) -> pd.DataFrame:
     """Read one raw ESTO slice needed to explain rollup components."""
+    esto_exact_rows_path = prefer_compressed_csv_path(esto_exact_rows_path)
     columns = ["economy", "esto_flow", "year", "value", "scenario"]
     economy_key = str(economy).replace("_", "")
     selected_chunks: list[pd.DataFrame] = []

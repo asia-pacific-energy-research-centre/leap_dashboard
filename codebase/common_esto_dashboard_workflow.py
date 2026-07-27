@@ -60,6 +60,7 @@ from common_esto_dashboard_output_layout import build_output_layout, publish_to_
 from common_esto_dashboard_convergence import write_capacity_unmet_convergence_page  # noqa: E402
 from common_esto_dashboard_mapping_diagnostics import (  # noqa: E402
     load_esto_exact_values_for_economy,
+    prefer_compressed_csv_path,
     write_mapping_diagnostics_page,
 )
 from scripts.render_full_mapping_tree_explorer import render_full_tree_explorer  # noqa: E402
@@ -134,8 +135,12 @@ def _log_to_file(log_path):
 _DEFAULT_LEAP_MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
 _LEAP_MAPPINGS_REPO = _resolve(os.getenv("LEAP_MAPPINGS_ROOT", str(_DEFAULT_LEAP_MAPPINGS_ROOT)))
 _LEAP_MAPPINGS_RESULTS = _LEAP_MAPPINGS_REPO / "results" / "common_esto"
-ESTO_EXACT_ROWS_PATH = _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_results_exact_rows.csv"
-ESTO_EXTENDED_EXACT_ROWS_PATH = _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_extended_results_exact_rows.csv"
+ESTO_EXACT_ROWS_PATH = prefer_compressed_csv_path(
+    _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_results_exact_rows.csv.gz"
+)
+ESTO_EXTENDED_EXACT_ROWS_PATH = prefer_compressed_csv_path(
+    _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_extended_results_exact_rows.csv.gz"
+)
 # The long-form file only contains rows a source system actually reported, so
 # years a source has no data for are simply absent instead of zero-filled
 # (unlike the wide CSV, which pads every year column with 0).
@@ -258,8 +263,12 @@ def maybe_regen_common_esto_fast_path() -> None:
     run_common_esto_comparison_fast_path(
         source_paths={
             "LEAP": relationship_dir / "leap_results_converted_to_esto.csv",
-            "NINTH": relationship_dir / "ninth_results_converted_to_esto.csv",
-            "ESTO": relationship_dir / "esto_results_exact_rows.csv",
+            "NINTH": prefer_compressed_csv_path(
+                relationship_dir / "ninth_results_converted_to_esto.csv.gz"
+            ),
+            "ESTO": prefer_compressed_csv_path(
+                relationship_dir / "esto_results_exact_rows.csv.gz"
+            ),
         },
         common_rows_path=_LEAP_MAPPINGS_RESULTS / "common_esto_rows.csv",
         output_dir=_LEAP_MAPPINGS_RESULTS,

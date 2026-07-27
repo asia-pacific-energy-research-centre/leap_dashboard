@@ -28,6 +28,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from codebase.common_esto_dashboard_mapping_diagnostics import (
     load_esto_exact_values_for_economy,
+    prefer_compressed_csv_path,
     write_mapping_diagnostics_page,
 )
 from codebase.dashboard_page_fragment import provenance_banner_html, write_body_fragment
@@ -72,11 +73,18 @@ def render_prototype() -> dict[str, str]:
     """Write a compact, current prototype at the path open in the dashboard."""
     comparison_data = _read_prototype_values()
     esto_exact_values = load_esto_exact_values_for_economy(
-        MAPPINGS_ROOT / "results" / "mapping_relationships" / "esto_results_exact_rows.csv",
+        prefer_compressed_csv_path(
+            MAPPINGS_ROOT / "results" / "mapping_relationships" / "esto_results_exact_rows.csv.gz"
+        ),
         ECONOMY,
     )
     esto_extended_exact_values = load_esto_exact_values_for_economy(
-        MAPPINGS_ROOT / "results" / "mapping_relationships" / "esto_extended_results_exact_rows.csv",
+        prefer_compressed_csv_path(
+            MAPPINGS_ROOT
+            / "results"
+            / "mapping_relationships"
+            / "esto_extended_results_exact_rows.csv.gz"
+        ),
         ECONOMY,
         source_system="ESTO_EXTENDED_RAW",
     ) if INCLUDE_ESTO_EXTENDED_DATA else pd.DataFrame()
