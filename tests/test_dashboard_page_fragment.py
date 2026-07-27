@@ -74,6 +74,29 @@ def test_write_body_fragment_writes_beside_the_page(tmp_path: Path) -> None:
     assert "-34,193.16" in fragment_path.read_text(encoding="utf-8")
 
 
+def test_mappings_root_defaults_when_no_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(provenance.MAPPINGS_ROOT_ENV_VAR, raising=False)
+    default = Path("C:/somewhere/leap_mappings")
+
+    assert provenance.resolve_mappings_root(default) == default
+
+
+def test_mappings_root_override_points_at_a_worktree(tmp_path: Path,
+                                                     monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "results").mkdir()
+    monkeypatch.setenv(provenance.MAPPINGS_ROOT_ENV_VAR, str(tmp_path))
+
+    assert provenance.resolve_mappings_root(Path("C:/somewhere/leap_mappings")) == tmp_path
+
+
+def test_mappings_root_override_without_results_fails_loudly(tmp_path: Path,
+                                                             monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(provenance.MAPPINGS_ROOT_ENV_VAR, str(tmp_path))
+
+    with pytest.raises(ValueError, match="no results/ directory"):
+        provenance.resolve_mappings_root(Path("C:/somewhere/leap_mappings"))
+
+
 def test_superseded_artifacts_produce_a_warning_banner(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(provenance, "stage3_manifest", lambda root: {"run_id": "run_abc"})
     monkeypatch.setattr(provenance, "artifact_mtime", lambda path: pd.Timestamp("2026-07-27 13:00"))

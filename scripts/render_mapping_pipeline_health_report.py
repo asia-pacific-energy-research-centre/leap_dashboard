@@ -40,9 +40,10 @@ if str(REPO_ROOT) not in sys.path:
 from codebase.mapping_pipeline_provenance import (  # noqa: E402 - needs sys.path above
     artifact_mtime as _artifact_mtime,
     pipeline_commits_since as _pipeline_commits_since,
+    resolve_mappings_root,
 )
 
-MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
+MAPPINGS_ROOT = resolve_mappings_root(REPO_ROOT.parent / "leap_mappings")
 RESULTS_ROOT = MAPPINGS_ROOT / "results"
 OUTPUT_ROOT = REPO_ROOT / "outputs" / "prototypes" / "mapping_pipeline_health"
 MANIFEST_PATH = RESULTS_ROOT / "common_esto" / "stage3_run_manifest.json"

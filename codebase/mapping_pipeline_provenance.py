@@ -17,9 +17,33 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import os
 import subprocess
 
 import pandas as pd
+
+
+MAPPINGS_ROOT_ENV_VAR = "LEAP_MAPPINGS_ROOT"
+
+
+def resolve_mappings_root(default: Path) -> Path:
+    """Return the mapping repository to read, honouring ``LEAP_MAPPINGS_ROOT``.
+
+    The pipeline can be run from a git worktree so the main checkout stays free
+    for other work. A worktree writes its own ``results/``, so the dashboard
+    needs to be pointed at it explicitly; otherwise it silently reports the main
+    checkout's artifacts while appearing to describe the worktree run.
+    """
+    override = os.environ.get(MAPPINGS_ROOT_ENV_VAR, "").strip()
+    if not override:
+        return default
+    root = Path(override).expanduser()
+    if not (root / "results").is_dir():
+        raise ValueError(
+            f"{MAPPINGS_ROOT_ENV_VAR}={override!r} has no results/ directory. "
+            "Point it at a mapping repository root or unset it."
+        )
+    return root
 
 
 def stage3_manifest(mappings_root: Path) -> dict:

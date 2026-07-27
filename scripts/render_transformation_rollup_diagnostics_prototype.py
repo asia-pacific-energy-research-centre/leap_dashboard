@@ -8,7 +8,13 @@ import pandas as pd
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
+
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from codebase.mapping_pipeline_provenance import resolve_mappings_root  # noqa: E402
+
+MAPPINGS_ROOT = resolve_mappings_root(REPO_ROOT.parent / "leap_mappings")
 COMPARISON_DATA_PATH = MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_comparison_data.csv"
 OUTPUT_ROOT = REPO_ROOT / "outputs" / "prototypes" / "transformation_rollup_diagnostics"
 ECONOMY = "20_USA"

@@ -276,6 +276,51 @@ page:
 C:\Users\Work\miniconda3\python.exe -m http.server 8731 --bind 127.0.0.1
 ```
 
+### Rendering from a mapping-pipeline worktree
+
+The mapping pipeline can be run from a `leap_mappings` git worktree so the main
+checkout stays free for other work. A worktree writes its own `results/`, so
+point the dashboard at it explicitly:
+
+```powershell
+$env:LEAP_MAPPINGS_ROOT = "C:\Users\Work\github\leap_mappings\.claude\worktrees\<name>"
+C:\Users\Work\miniconda3\python.exe scripts\render_mapping_pipeline_health_report.py
+```
+
+Both renderers honour `LEAP_MAPPINGS_ROOT`. It fails loudly when the path has no
+`results/` directory, rather than silently reporting the main checkout's
+artifacts while appearing to describe the worktree run. Unset it to go back to
+the main checkout.
+
+Setting up a runnable worktree (`data/` and `results/` are gitignored, so a fresh
+worktree has only stubs; `config/` workbooks *are* tracked and need no copy):
+
+1. Hardlink the three pipeline inputs from the main checkout's `data/`
+   (`00APEC_2025_low_with_subtotals.csv`, `esto_extended.csv`,
+   `merged_file_energy_ALL_20251106.csv`, ~331 MB). The pipeline only reads
+   these, so a hardlink costs no disk. Do **not** hardlink anything the pipeline
+   writes — `to_csv` truncates the shared inode and would corrupt the main
+   checkout's copy.
+2. Copy (do not hardlink) the Stage 1/2 outputs a `data_convert`/Stage 3 run
+   reads, ~120 MB: `mapping_relationships/energy_balance_relationships.csv`,
+   `raw_leap_results.csv`, `non_expanding_rollups.csv`, `rollup_edges.csv`,
+   `common_esto/common_esto_rows.csv`, `common_esto_row_components.csv`,
+   `esto_to_common_esto_map.csv`, `common_esto/structural_artifacts/`, and the
+   small `tree_structure/*_tree.csv` / hierarchy-edge files.
+3. Set `LEAP_BALANCE_EXPORTS_ROOT`. `run_mapping_pipeline.py` resolves the raw
+   LEAP exports relative to the repo root's parent at *import* time, which in a
+   worktree resolves to `.claude/worktrees/leap_initialisation` and raises
+   `FileNotFoundError` before any stage runs — even for stages that never touch
+   LEAP exports:
+
+   ```powershell
+   $env:LEAP_BALANCE_EXPORTS_ROOT = "C:\Users\Work\github\leap_initialisation\data\leap balances exports"
+   ```
+
+A full `data_convert` plus Stage 3 in a worktree generates roughly 4 GB of its
+own artifacts, duplicating the main checkout's large outputs. Clean the worktree
+`results/` when the run is no longer needed.
+
 The prototype renderer chunk-reads large files. It is safe for a focused page
 render, but it is not a replacement for rebuilding Common ESTO artifacts.
 
