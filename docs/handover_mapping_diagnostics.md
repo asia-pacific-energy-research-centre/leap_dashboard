@@ -89,6 +89,81 @@ raw contributors totalled `-17,096.58`, while the Common ESTO target was exactly
 double at `-34,193.16`. The dashboard was reporting the underlying Common ESTO
 artifact correctly; it was not double-counting in the browser.
 
+## Additive update: current anchor and mapping-integrity state (2026-07-27)
+
+Do not replace the rollup/Extended work above. This section records additional
+Mapping diagnostics work and the current mapping-pipeline provenance.
+
+### Fresh anchor results are now available
+
+`leap_mappings` has since completed a real source-parent anchor-validation run:
+
+```text
+run_id: common_esto_20260727T034511926826Z
+input: results/common_esto/common_esto_comparison_data.csv
+detail status counts: 183,367 passed; 5,467 failed; 1,156,204 skipped
+```
+
+The summary includes the new Extended scopes:
+
+- `esto_extended_leap` (LEAP: 183 failed);
+- `esto_extended_leap_ninth` (LEAP: 175 failed; NINTH: 2,286 failed);
+- ordinary ESTO scopes remain separately available.
+
+This supersedes the earlier `MemoryError`-skipped anchor run. The older
+dashboard batch was rendered before this result, so regenerate the dashboard
+before interpreting its anchor cards or failure counts as current.
+
+The renderer still needs a defensive status treatment: if a future anchor run
+is skipped, do not render `Failed anchor checks: 0` as though validation passed.
+Read `source_parent_anchor_validation_summary.csv` and show the skipped/error
+reason prominently instead.
+
+### Mapping-integrity sections added to the renderer
+
+`common_esto_dashboard_mapping_diagnostics.py` also now renders the following
+conditional tables inside Direct mapping coverage review:
+
+- **Mapped target ancestor overlaps**: one source pair reaches both a Common
+  ESTO target and its target-tree descendant.
+- **Source parent and child mapped to one target**: one Common ESTO target is
+  reached by both a source-tree parent and its descendant. This is a review
+  signal, not proof that the routes should be added.
+- **Active many-to-many mapping conflicts**: sourced from the canonical
+  `leap_mappings/results/maintenance/many_to_many_conflicts.csv` artifact.
+
+These are mapping-workbook integrity checks. They are global and should remain
+visible with an explicit "mapping-workbook integrity" label when an ESTO
+Extended view is selected; they do not become Extended-specific merely because
+the comparison basis changes.
+
+### Follow-up dashboard backlog
+
+The next diagnostics with the strongest value are separate from the anchor-card
+layout and should be added only from their canonical mapping-pipeline artifacts:
+
+1. **Structural compilation health**: concise counts and conditional tables for
+   `qa_ambiguous_structural.csv` and `qa_unresolved_structural.csv`, while
+   showing conflicting/cyclic/duplicate states as clean only when their files
+   prove that.
+2. **Non-expanding rollup integrity**: expose violations from
+   `qa_common_esto_non_expanding_frontier_check.csv`, not every successful
+   check.
+3. **Material non-zero mapping gaps**: rank
+   `leap_missing_esto_absent_nonzero_pairs_actionable.csv` by absolute value
+   and affected economies/years, rather than showing an unranked coverage list.
+4. **Candidate readiness**: display review-only, non-workbook candidates with
+   evidence and destination sheet. Never add them to the workbook from the
+   dashboard.
+5. **Crosswalk target conflicts and duplicate mappings**: first classify
+   intentional duplicates versus accidental duplicates; do not present all raw
+   duplicate rows as errors.
+
+For a future ESTO Extended checkbox, basis-dependent diagnostics must use real
+parallel Extended pipeline artifacts/scopes. Do not make a control merely
+relabel ordinary ESTO values. The global workbook-integrity sections above stay
+visible for both bases.
+
 ## How to render and test
 
 Use the Windows Miniconda interpreter:
@@ -167,6 +242,7 @@ The next agent should make its relationship to the diagnostics page clearer:
 - Browser automation may be blocked for `file:///` dashboard outputs. Static
   HTML checks, focused tests, and manual refresh in the in-app browser are the
   current verification route.
-- The current rendered artifacts may still contain stale values until the
-  `leap_mappings` Stage 3 outputs are regenerated after commit `eb3a293`.
-
+- The earlier rendered artifacts may contain stale values from before the
+  `leap_mappings` Stage 3 rebuild after commit `eb3a293`. The current mapping
+  outputs have been rebuilt, but each dashboard economy must be rerendered to
+  consume them.
