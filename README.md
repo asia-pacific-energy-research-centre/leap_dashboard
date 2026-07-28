@@ -4,6 +4,13 @@ This repository contains the official static dashboard for Common ESTO
 comparison outputs. It consumes the comparison dataset produced by the sibling
 `leap_mappings` repository and renders one dashboard per economy.
 
+Start with
+[`docs/handover/dashboard_pipeline_guide.md`](docs/handover/dashboard_pipeline_guide.md).
+Agents should also read
+[`docs/handover/dashboard_pipeline_agent_guide.md`](docs/handover/dashboard_pipeline_agent_guide.md).
+The connected three-repository overview is
+`leap_mappings/docs/handover/README.md`.
+
 The production entry point is
 `codebase/common_esto_dashboard_workflow.py`. Supporting modules are flattened
 directly under `codebase/`; configuration is under

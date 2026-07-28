@@ -18,6 +18,27 @@ was built from repository evidence on 2026-07-28: local `master` versus
 commit history, a relative-link check over all tracked Markdown, and direct
 inspection of the current upstream mapping artifacts.
 
+## Post-snapshot completions on 2026-07-28
+
+These later commits supersede the corresponding snapshot rows below:
+
+- **DASHQ-006 is `complete_unpushed`.** The producer and strict opt-in consumer
+  halves of `common_esto_output_contract_v1` are on the two local `master`
+  branches. Dashboard commits `3b4608c`, `e12029b`, `8bac7d5`, and `71826b1`
+  cover loading, provenance, remaining maintained readers, and real-data
+  equivalence. The recorded `20USA`/`02BD` comparison produced 390 charts and
+  3,427 traces with equal manifests, page assignments, sign summaries, and
+  normalized series. Readiness passed with zero page-noise flags.
+- **DASHQ-025 is `complete_unpushed`.** Commit `b125425` suppresses empty area
+  figures and closes the earlier empty-transfers implementation blocker for
+  the verified scope.
+- The `codex/output-contract-phase-2` worktree is now a
+  `superseded_cleanup` candidate, not the authoritative implementation.
+- The next operational gate is DASHQ-007: publish the first QA-successful v1
+  generation from mappings, select it explicitly, and repeat representative
+  and all-economy readiness checks. Existing mapping result files predate the
+  integrated contract.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not
@@ -148,7 +169,7 @@ decisions can be made without review.
 | DASHQ-008 | P1 | 2026-08-03 to 2026-08-07 | `partial` | DASHQ-007 | Adopt the health-report reporting rules on the diagnostics page | Implement in `common_esto_dashboard_mapping_diagnostics.py`: render `skipped` as "not validated" and never as a pass; call a QA file clean only when it exists and is empty; never sum anchor counts across overlapping comparison scopes. Complete when a synthetic all-skipped validation input renders a prominent "not validated" state instead of `Failed anchor checks: 0`, covered by a test. |
 | DASHQ-009 | P1 | 2026-08-05 to 2026-08-12 | `not_started` | DASHQ-008 | Execute the anchor-validation section rebuild | Run `docs/prompts/anchor_validation_section_rebuild_prompt.md`: one source parent boundary is one check, with fuels and years nested as filterable evidence. The prompt states it changes no mapping semantics and no `leap_mappings` artifact — hold it to that. Complete when the prompt's own acceptance criteria are met and the prompt is archived per DASHQ-010. |
 | DASHQ-010 | P1 | 2026-08-05 to 2026-08-12 | `not_started` | — | Create the prompt archive this repo's AGENTS.md already requires | `AGENTS.md` mandates moving completed prompts from `docs/prompts/` to `docs/archive/`, but **`docs/archive/` does not exist** in this repository. Create it, and archive prompts in the same commit that records their completion. Complete when the archive workflow described in `AGENTS.md` is actually followable here. |
-| DASHQ-011 | P1 | 2026-08-05 to 2026-08-12 | `partial` | DASHQ-003 | Write the dashboard handover set | Produce a short start-here guide, a render runbook (fixture render, all-economy render, publication-readiness and page-noise scripts), and a "what the dashboard does not own" note pointing at `leap_mappings`. Prefer links over copying upstream detail. Complete when a colleague can render `20_USA` from a clean checkout using only tracked docs. |
+| DASHQ-011 | P1 | 2026-08-05 to 2026-08-12 | `partial` | DASHQ-003 | Write the dashboard handover set | **Documentation written 2026-07-28:** `docs/handover/dashboard_pipeline_guide.md` and `dashboard_pipeline_agent_guide.md` now cover the upstream boundary, input compatibility, preprocessing, routing/rendering, outputs, destructive toggles, tests, readiness/page-noise gates, and publication. Root README links the set. Remaining gate: render `20_USA` from a clean checkout during DASHQ-017 and correct any undocumented dependency. |
 | DASHQ-012 | P2 | 2026-08-10 to 2026-08-17 | `doc_stale` | DASHQ-007 | Refresh page-status evidence | `docs/common_esto_dashboard_page_status.md` was last touched 2026-06-28 and predates a month of rendering changes. After a reproducible upstream refresh, regenerate the all-economy dashboards, page-noise outputs, and publication checks **together**, then record the render input boundary and review date and separate production from diagnostic pages. Complete when every stated chart count has a corresponding render or manifest source. A successful render alone is not evidence that comparison semantics are correct. |
 | DASHQ-013 | P2 | 2026-08-10 to 2026-08-17 | `not_started` | DASHQ-007 | Improve aggregate-first navigation on dense pages | The all-economy page-noise report flags 23 economy/page pairs: 8 high chart count, 15 high suppressed share, 3 many sparse one-row charts (some pages flagged for more than one reason). Industry is the recurring density problem across economies; Supply is also dense for Canada and the USA. Add aggregate-first navigation and configuration-driven sections to Industry and Supply, then re-run the page-noise report. **Constraint:** detailed charts must remain available and all rows must remain in the manifest. Must not be implemented by dropping coverage or raising the 1 PJ suppression threshold — a high suppressed share is a QA prompt to inspect small-series coverage, not evidence the threshold is wrong. Validate against USA, China, Australia, Korea, Russia, Chinese Taipei, and Canada. |
 | DASHQ-014 | P2 | 2026-08-12 to 2026-08-19 | `superseded_cleanup` | DASHQ-001 | Clean up merged branches and stale worktrees | Delete `claude/mapping-diagnostics-health-report` (fully merged) and remove the `nz-leap-9th-discrepancies-b9c5b1` worktree **only after** DASHQ-001 recovers its uncommitted diff. Complete when every remaining branch and worktree has an explicit disposition and named owner. |
