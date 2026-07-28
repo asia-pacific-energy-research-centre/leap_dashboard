@@ -23,11 +23,34 @@ publication, so the contract is not yet the ordinary production default.
 
 ## Remaining operational gate
 
-The controlling item is DASHQ-007 in [`work_queue.md`](work_queue.md): publish
-the first QA-successful v1 generation from a clean mappings baseline, select it
-explicitly, and repeat representative and all-economy readiness checks. A
-successful representative equivalence run does not prove a later generation is
-publishable.
+The first dated all-economy candidate has passed. DASHQ-026 in
+[`work_queue.md`](work_queue.md) still requires a second independently dated
+candidate before any reviewed change may make v1 the ordinary default or
+retire the legacy comparison. A successful first soak does not prove a later
+generation is publishable.
+
+### Production soak Run 1 — passed 2026-07-28
+
+- Selected strict contract: run ID
+  `common_esto_20260728T035935111268Z`, mappings revision `86b1162`,
+  3,952,646 facts.
+- Result: 21/21 economies `ok`, 6,510 charts, 1,020,120 visible rows, zero
+  stderr, and publication readiness passed.
+- Isolation: output remained under
+  `outputs/common_esto_contract_soak_run_1_20260728`; no tracked serving assets
+  were published.
+- Rollback: the same-generation legacy comparison remains present at
+  975,673,793 bytes.
+- Page-noise result: five `high_suppressed_share` rows were retained for
+  `04CHL`, `12NZ`, `14PE`, and `18CT`. A same-generation legacy control for
+  those economies produced byte-identical chart manifests and sign summaries,
+  equal chart and visible-row counts, and exactly equal page-noise output.
+  These flags are producer-generation structure, not contract-format changes.
+- Reversible fix: the preserved first attempt exposed a Python package-name
+  collision between dashboard and mappings `codebase` packages. The retry
+  loads mappings' self-contained source-branch preflight module by configured
+  file path under a unique name. The failure logs and failed summary remain
+  available beside the successful run.
 
 ## Phase 2 disposition
 

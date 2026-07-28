@@ -28,6 +28,7 @@
 #   year. Default is False because ESTO is the preferred historical source.
 
 #%%
+import importlib.util
 import json
 import os
 import sys
@@ -133,7 +134,12 @@ def _log_to_file(log_path):
 #%%
 # Stable paths.
 _DEFAULT_LEAP_MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
-_LEAP_MAPPINGS_REPO = _resolve(os.getenv("LEAP_MAPPINGS_ROOT", str(_DEFAULT_LEAP_MAPPINGS_ROOT)))
+_LEAP_MAPPINGS_REPO = _resolve(
+    os.getenv(
+        "COMMON_ESTO_MAPPINGS_ROOT",
+        os.getenv("LEAP_MAPPINGS_ROOT", str(_DEFAULT_LEAP_MAPPINGS_ROOT)),
+    )
+)
 _LEAP_MAPPINGS_RESULTS = _LEAP_MAPPINGS_REPO / "results" / "common_esto"
 ESTO_EXACT_ROWS_PATH = prefer_compressed_csv_path(
     _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_results_exact_rows.csv.gz"
@@ -292,16 +298,24 @@ def _missing_leap_demand_branches(economy: str) -> list[str]:
     still only available via 'All demand aggregated'
     (config/all_demand_aggregated_components.json), resolved per economy.
     """
-    if str(_LEAP_MAPPINGS_REPO) not in sys.path:
-        sys.path.insert(0, str(_LEAP_MAPPINGS_REPO))
-    from codebase.mapping_tools.source_branch_preflight import (  # noqa: E402
-        get_demand_sectors_without_detail,
-        load_all_demand_aggregated_components,
+    module_path = (
+        _LEAP_MAPPINGS_REPO
+        / "codebase"
+        / "mapping_tools"
+        / "source_branch_preflight.py"
     )
+    module_spec = importlib.util.spec_from_file_location(
+        "_leap_mappings_source_branch_preflight",
+        module_path,
+    )
+    if module_spec is None or module_spec.loader is None:
+        raise ImportError(f"Could not load LEAP mappings preflight module: {module_path}")
+    preflight = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(preflight)
 
     components_path = _LEAP_MAPPINGS_REPO / "config" / "all_demand_aggregated_components.json"
-    components_df = load_all_demand_aggregated_components(components_path)
-    return get_demand_sectors_without_detail(components_df, economy)
+    components_df = preflight.load_all_demand_aggregated_components(components_path)
+    return preflight.get_demand_sectors_without_detail(components_df, economy)
 
 
 def run_dashboard_for_economy(economy: str) -> dict[str, object]:
