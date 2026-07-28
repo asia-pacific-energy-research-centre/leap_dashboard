@@ -4,6 +4,13 @@
 
 **Audience:** analysts, dashboard maintainers, and reviewers
 
+**Authority:** Level 1 operating guide for Common ESTO dashboard ingestion,
+rendering, diagnostics, and publication
+
+**Use this when:** rendering or reviewing dashboard outputs. For
+cross-repository ownership and execution order, start at
+[`leap_mappings/docs/start_here.md`](../../../leap_mappings/docs/start_here.md).
+
 This repository presents Common ESTO comparison outputs. Mapping semantics
 belong to `leap_mappings`; LEAP preparation belongs to `leap_initialisation`.
 
