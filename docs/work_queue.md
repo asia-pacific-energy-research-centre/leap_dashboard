@@ -1,0 +1,208 @@
+# LEAP dashboard work queue and handover plan
+
+**Snapshot date:** 2026-07-28
+
+**Planning horizon:** four weeks, through 2026-08-24
+
+**Owner repository:** `leap_dashboard`
+
+**Related repositories:** `leap_mappings` (upstream mapping owner),
+`leap_initialisation` (sibling consumer), `leap_dashboard_legacy` (frozen
+reference)
+
+**Cross-repository index:** `leap_mappings/docs/cross_repository_handover_index.md`
+
+This is the controlling queue for dashboard work and handover preparation. It
+was built from repository evidence on 2026-07-28: local `master` versus
+`origin/master`, the dirty checkout, every local branch and worktree, recent
+commit history, a relative-link check over all tracked Markdown, and direct
+inspection of the current upstream mapping artifacts.
+
+Do not mark an item complete because a handover note or prompt says it is
+complete. Several statements in `docs/handover_mapping_diagnostics.md` were
+checked against git and the artifacts on disk during this audit and did not
+hold. Completion requires the change to be committed on the intended branch,
+verified, and either present on `master` or explicitly recorded as a clean,
+ready-to-integrate worktree.
+
+## Status definitions
+
+Shared vocabulary with `leap_mappings/docs/work_queue.md`, plus `doc_stale`.
+
+| Status | Meaning |
+|---|---|
+| `complete_on_master` | Implemented, verified, committed, and reachable from local `master`. |
+| `complete_unpushed` | Complete on local `master`, but not yet present on `origin/master`. |
+| `complete_in_worktree` | Clean, committed work exists on another branch and still needs integration or an explicit decision not to integrate. |
+| `partial_uncommitted` | Material work exists only as uncommitted changes or an unfinished draft. |
+| `partial` | Some committed implementation exists, but the acceptance criteria are not complete. |
+| `doc_stale` | The code or data is in a good state, but tracked documentation still describes a superseded state and will mislead a new owner. |
+| `paused` | Work is intentionally preserved but should not resume until its stated gate is met. |
+| `not_started` | No implementation evidence was found. |
+| `human_decision` | Progress depends on a semantic or policy choice that should not be guessed. |
+| `superseded_cleanup` | The work is complete or superseded; only archival or branch/worktree cleanup remains. |
+
+## Repository state at the snapshot
+
+- Local `master` is at `3327764` and is **55 commits ahead of `origin/master`**,
+  zero behind. `.git/FETCH_HEAD` is dated 2026-07-24, so the remote comparison
+  is itself four days stale and should be re-fetched before any push decision.
+- The main checkout was modified **during this audit** by a concurrent working
+  session. At 12:06 it held one modified file
+  (`codebase/common_esto_dashboard_mapping_diagnostics.py`, +69/-9); by 12:19 it
+  held two (+681/-21, adding `tests/test_mapping_diagnostics_page.py`). Treat the
+  dirty-checkout figures here as a 2026-07-28 12:19 reading and re-verify before
+  acting. See "Concurrent session" below.
+- **No Python process was running** when this snapshot was taken (only two
+  `conda-script.py shell.powershell activate base` shims).
+- Three local branches and three worktrees exist. Two branches are already fully
+  merged into `master`; one worktree holds uncommitted work that exists nowhere
+  else.
+- `leap_mappings` local `master` is 4 commits ahead of its remote;
+  `leap_initialisation` local `master` is 142 commits ahead of its remote. Those
+  gaps are cross-repository handover risks. This queue does not authorize
+  pushing any repository.
+
+## Concurrent session (2026-07-28)
+
+A second working session operated across all three repositories while this audit
+ran. It committed `leap_mappings` `5bb66f0` ("docs: verify handover audit and add
+cross-repository index") at 12:13, created
+`leap_initialisation/docs/documentation_audit_20260728.md`, and is actively
+implementing in this repository's diagnostics renderer and its tests.
+
+Its output is **complementary to, not a duplicate of, this queue**: it produced
+the cross-repository index and a deep `leap_initialisation` documentation audit;
+this queue and audit cover `leap_dashboard`, which previously had neither, plus
+git/worktree state and the schedule. Before acting on any item here, re-read
+`git status` — the dirty-checkout readings in this file are timestamped, and one
+of them moved during the audit itself.
+
+The cross-repository index is canonical at
+`leap_mappings/docs/cross_repository_handover_index.md`. Do not create a second
+one here. Two verified risks recorded below are **not** in that index and should
+be folded into it: the at-risk uncommitted worktree diff (DASHQ-001) and the
+absent off-machine copy of `leap_dashboard_legacy` (DASHQ-015).
+
+## Branch and worktree reconciliation
+
+| Branch / worktree | Evidence on 2026-07-28 | Classification | Required action |
+|---|---|---|---|
+| `master` (main checkout) | 55 commits ahead of `origin/master`; one modified file wired into its caller but untested | `complete_unpushed` plus `partial_uncommitted` | Separate the 55 completed commits from the uncommitted diagnostics draft. Review and push only through the user's normal repository process. |
+| `codex/output-contract-phase-2` at `C:\Users\Work\github\worktrees\leap_dashboard_output_contract` | Clean; 3 commits ahead, 0 behind `master` (`fac436d`, `71d9971`, `4207d9b`) | `complete_in_worktree` | Integrate with the matching `leap_mappings` branch of the same name. See DASHQ-006 — these are two halves of one contract and must not be landed independently. |
+| `claude/nz-leap-9th-discrepancies-b9c5b1` at `.claude/worktrees/nz-leap-9th-discrepancies-b9c5b1` | Branch is **fully merged** into `master`, but the worktree is 53 commits behind and holds **26 lines of uncommitted work** in `common_esto_dashboard_renderer.py` and `tests/test_common_esto_dashboard.py` | `partial_uncommitted` (at risk) | Highest-risk item in this repo. Recover the diff before touching the worktree — see DASHQ-001. |
+| `claude/mapping-diagnostics-health-report` (`e73e94b`) | No worktree; `git merge-base --is-ancestor` confirms it is fully contained in `master` | `superseded_cleanup` | Delete the stale branch through the normal safe cleanup process. No content is lost. |
+
+## Documentation claims checked against evidence
+
+These were verified during this audit. Each is a correction to tracked
+documentation, not a new opinion.
+
+1. **The ordinary-ESTO doubling is fixed; the handover note says it is not.**
+   `docs/handover_mapping_diagnostics.md` states under "Confirmed: current
+   artifacts double every ordinary-ESTO rollup value" that the defect "is not
+   fixed" and that
+   `esto_extended_results_exact_rows.csv.gz` "contains 840,378 rows carrying
+   `source_system = ESTO`". Read directly on 2026-07-28, that artifact contains
+   **5,320,932 rows, 100% `ESTO_EXTENDED`, and zero rows carrying `ESTO`**;
+   `esto_results_exact_rows.csv.gz` is **100% `ESTO`** across 5,445,678 rows.
+   The artifacts were rebuilt at 2026-07-27 21:52–22:02, roughly 7.5 hours
+   *after* fix commit `eb3a293` (14:14). The section is stale. See DASHQ-003.
+2. **A cross-repository link in the handover note points at a file that does not
+   exist on `leap_mappings` `master`.** The note instructs readers to execute
+   `leap_mappings/docs/prompts/rebuild_esto_rollup_source_identity_prompt.md`.
+   That file is tracked **only** on the unmerged branch
+   `claude/mapping-diagnostics-dashboard-a55009`. A colleague working from a
+   clean `leap_mappings` checkout cannot find it. See DASHQ-004.
+3. **The "superseded code" provenance banner is still correct, but for a new
+   reason.** The newest mapping artifact is dated 2026-07-27 22:02, while
+   `leap_mappings` `master` has two later commits touching `codebase/`:
+   `2e39cca` (2026-07-27 23:04) and `34858fe` (2026-07-28 00:55). The banner no
+   longer indicates the doubling defect; it indicates the artifacts predate the
+   compressed-output and branch-tab-reading changes. See DASHQ-007.
+4. **The defensive skipped-anchor rendering is still not implemented on the
+   diagnostics page.** The note records it as a required follow-up. In
+   `common_esto_dashboard_mapping_diagnostics.py:1156` the "Failed anchor checks"
+   tile still counts only `status == "failed"`, so a fully skipped validation run
+   would render as `0` failures. The rule exists in the health report but was not
+   adopted by the diagnostics page. See DASHQ-008.
+5. **`eb3a293` is genuinely on `leap_mappings` `master`.** This part of the note
+   is accurate and needs no change.
+6. **No broken relative Markdown links were found** in this repository's 14
+   tracked Markdown files.
+
+## Prioritized queue
+
+Dates are target windows for handover planning, not promises that semantic
+decisions can be made without review.
+
+| ID | Priority | Target | Status | Depends on | Work item | Evidence and completion test |
+|---|---|---|---|---|---|---|
+| DASHQ-001 | P0 | 2026-07-28 to 2026-07-29 | `partial_uncommitted` | — | Recover at-risk uncommitted renderer work | `.claude/worktrees/nz-leap-9th-discrepancies-b9c5b1` holds an uncommitted fix to `_apply_total_series_chrome` (match comparison lines by source-name substring rather than a `" total"` suffix) plus a new test `test_supply_demand_comparison_lines_keep_stable_source_colour`. Its branch is already merged, so nothing protects this diff. Complete when the change is replayed onto current `master`, its focused test passes, and it is committed — or when a written note records a decision to discard it. Do not remove the worktree first. |
+| DASHQ-002 | P0 | 2026-07-28 to 2026-07-30 | `partial_uncommitted` | — | Land or park the diagnostics structural-flag overlay | **Under active development by another session — coordinate before touching.** As first read, the change added `structural_flags` (`DUPLICATE_FLOW_CODE`, `ORPHAN_PARENT`) and per-node anchor-validation counts to `_rollup_graph_data`, with the caller at line 1058 passing `validation=stage` and `economy=economy`. It has since grown to +681/-21 across the renderer and `tests/test_mapping_diagnostics_page.py`, so test coverage is now being added. Complete when it is committed with its tests passing, or moved to a named branch. Do not combine it with DASHQ-001 in one commit. |
+| DASHQ-003 | P0 | 2026-07-28 to 2026-07-30 | `doc_stale` | DASHQ-007 | Correct the stale doubling section in the handover note | Rewrite the "Confirmed: current artifacts double every ordinary-ESTO rollup value" section to record it as resolved, dated 2026-07-28, citing the measured identity counts above and the rebuild time. Keep the original diagnosis as clearly labelled history — it is the best worked example in the repo of the dashboard correctly reporting an upstream defect. Complete when no tracked file instructs a reader to treat current ordinary-ESTO rollup values as doubled. |
+| DASHQ-004 | P0 | 2026-07-28 to 2026-07-30 | `doc_stale` | `leap_mappings` MAPQ-001 | Fix the broken cross-repository prompt reference | Either have `leap_mappings` land `rebuild_esto_rollup_source_identity_prompt.md` on its `master`, or replace the pointer with one that resolves from a clean checkout. Complete when every cross-repository path named in this repository's tracked docs resolves in a fresh clone of the named repository. |
+| DASHQ-005 | P0 | 2026-07-29 to 2026-08-03 | `complete_unpushed` | — | Reconcile local `master` with `origin/master` | 55 local commits are absent from the remote and the last fetch was 2026-07-24. Re-fetch, confirm zero divergence, then review and push through the user's normal process. Complete when the intended remote contains them or the handover explicitly records why it does not. This is the single largest "work exists only on one laptop" risk in this repository. |
+| DASHQ-006 | P0 | 2026-07-30 to 2026-08-03 | `complete_in_worktree` | `leap_mappings` MAPQ-003 | Integrate the Common ESTO output contract, both halves together | `codex/output-contract-phase-2` exists as a separate branch **in both repositories**. The `leap_mappings` side publishes the contract; the dashboard side migrates the Common ESTO QA readers to it. Landing one without the other changes the producer/consumer boundary asymmetrically. Complete when both are integrated, focused tests pass in both repos, and a rendered economy is confirmed unchanged or intentionally changed. |
+| DASHQ-007 | P1 | 2026-08-03 to 2026-08-07 | `partial` | `leap_mappings` MAPQ-005 | Re-render from a clean mapping baseline | Artifacts on disk predate two `leap_mappings` `codebase/` commits. Once the upstream clean baseline exists, re-render the diagnostics page and the all-economy batch, and confirm the provenance banner drops to informational. Complete when a dated render references a mapping run ID whose code and artifacts agree. |
+| DASHQ-008 | P1 | 2026-08-03 to 2026-08-07 | `partial` | DASHQ-007 | Adopt the health-report reporting rules on the diagnostics page | Implement in `common_esto_dashboard_mapping_diagnostics.py`: render `skipped` as "not validated" and never as a pass; call a QA file clean only when it exists and is empty; never sum anchor counts across overlapping comparison scopes. Complete when a synthetic all-skipped validation input renders a prominent "not validated" state instead of `Failed anchor checks: 0`, covered by a test. |
+| DASHQ-009 | P1 | 2026-08-05 to 2026-08-12 | `not_started` | DASHQ-008 | Execute the anchor-validation section rebuild | Run `docs/prompts/anchor_validation_section_rebuild_prompt.md`: one source parent boundary is one check, with fuels and years nested as filterable evidence. The prompt states it changes no mapping semantics and no `leap_mappings` artifact — hold it to that. Complete when the prompt's own acceptance criteria are met and the prompt is archived per DASHQ-010. |
+| DASHQ-010 | P1 | 2026-08-05 to 2026-08-12 | `not_started` | — | Create the prompt archive this repo's AGENTS.md already requires | `AGENTS.md` mandates moving completed prompts from `docs/prompts/` to `docs/archive/`, but **`docs/archive/` does not exist** in this repository. Create it, and archive prompts in the same commit that records their completion. Complete when the archive workflow described in `AGENTS.md` is actually followable here. |
+| DASHQ-011 | P1 | 2026-08-05 to 2026-08-12 | `partial` | DASHQ-003 | Write the dashboard handover set | Produce a short start-here guide, a render runbook (fixture render, all-economy render, publication-readiness and page-noise scripts), and a "what the dashboard does not own" note pointing at `leap_mappings`. Prefer links over copying upstream detail. Complete when a colleague can render `20_USA` from a clean checkout using only tracked docs. |
+| DASHQ-012 | P2 | 2026-08-10 to 2026-08-17 | `doc_stale` | DASHQ-007 | Refresh page-status evidence | `docs/common_esto_dashboard_page_status.md` was last touched 2026-06-28 and predates a month of rendering changes. Execute backlog item 4 of `docs/future_dashboard_backlog.md`: record the render input boundary and review date, refresh counts from the current dataset, and separate production from diagnostic pages. Complete when every stated chart count has a corresponding render or manifest source. |
+| DASHQ-013 | P2 | 2026-08-10 to 2026-08-17 | `not_started` | DASHQ-007 | Work the deferred dashboard backlog | Items 1–3 of `docs/future_dashboard_backlog.md`: aggregate-first navigation for dense Industry/Supply pages, the diagnostic comparison-scope page enable/disable decision, and chart-manifest metric extensions. Each has its own acceptance criteria in that file. Complete when each item is either delivered or explicitly deferred with a dated reason. |
+| DASHQ-014 | P2 | 2026-08-12 to 2026-08-19 | `superseded_cleanup` | DASHQ-001 | Clean up merged branches and stale worktrees | Delete `claude/mapping-diagnostics-health-report` (fully merged) and remove the `nz-leap-9th-discrepancies-b9c5b1` worktree **only after** DASHQ-001 recovers its uncommitted diff. Complete when every remaining branch and worktree has an explicit disposition and named owner. |
+| DASHQ-015 | P2 | 2026-08-12 to 2026-08-19 | `human_decision` | — | Decide the fate of the frozen legacy repository | `leap_dashboard_legacy` has **no GitHub remote** — its `origin` is the local path `C:\Users\Work\github\leap_dashboard`, and its `legacy-reference` branch is 2 commits ahead of that local origin. The frozen visual-comparison reference this repo's `AGENTS.md` depends on therefore exists on one machine only. Decide: publish it, fold the needed comparison evidence into this repo's docs, or accept and record the loss risk. |
+| DASHQ-016 | P2 | 2026-08-12 to 2026-08-19 | `partial` | — | Normalize document placement | `zip_extraction_plan.md` (521 lines) sits at the repository root while every other narrative document lives under `docs/`. Move it to `docs/` and update inbound references, or record why the root location is deliberate. |
+| DASHQ-017 | P0 | 2026-08-18 to 2026-08-24 | `not_started` | all above | Run the clean-checkout handover rehearsal | A colleague or clean agent session follows the runbook from a fresh checkout of all three repositories, records every missing assumption, and renders one economy end to end. Complete when the rehearsal succeeds without undocumented local knowledge and the queue is frozen with owner, risk, next action, and last-verified date on every remaining item. |
+
+## Four-week handover sequence
+
+### Week 1: 2026-07-28 to 2026-08-03
+
+- Recover the at-risk uncommitted renderer diff (DASHQ-001) before anything else.
+- Resolve the dirty checkout (DASHQ-002).
+- Correct the two misleading documentation claims (DASHQ-003, DASHQ-004).
+- Re-fetch and reconcile the 55-commit remote gap (DASHQ-005).
+- Land the output contract jointly with `leap_mappings` (DASHQ-006).
+
+### Week 2: 2026-08-04 to 2026-08-10
+
+- Re-render from the upstream clean baseline (DASHQ-007).
+- Adopt the health-report reporting rules on the diagnostics page (DASHQ-008).
+- Start the anchor-validation section rebuild (DASHQ-009).
+- Create `docs/archive/` and begin prompt archival (DASHQ-010).
+- Draft the dashboard handover set (DASHQ-011).
+
+### Week 3: 2026-08-11 to 2026-08-17
+
+- Finish the handover set and page-status refresh (DASHQ-011, DASHQ-012).
+- Work or explicitly defer the feature backlog (DASHQ-013).
+- Clean up merged branches and stale worktrees (DASHQ-014).
+- Make the legacy-repository decision (DASHQ-015) and normalize doc placement
+  (DASHQ-016).
+
+### Week 4: 2026-08-18 to 2026-08-24
+
+- Perform the clean-checkout handover rehearsal (DASHQ-017).
+- Fix the documentation gaps the rehearsal exposes.
+- Freeze a final dated queue and known-risks list.
+- Ensure every unmerged branch, stale worktree, and unpushed commit has an
+  explicit disposition and named owner.
+
+## Queue maintenance rules
+
+1. Update the evidence column whenever a status changes, and re-date the
+   snapshot header.
+2. Cite the commit, worktree, run ID, artifact measurement, or human decision
+   that supports each status.
+3. Never carry an old prompt's row counts or failure counts forward into a new
+   baseline without re-measuring. This audit found two documented counts that no
+   longer held.
+4. Move completed prompts to `docs/archive/`; keep `docs/prompts/` limited to
+   active or pending work.
+5. Keep cross-repository items here only when the dependency affects dashboard
+   presentation or handover. Mapping semantics belong in
+   `leap_mappings/docs/work_queue.md`.
+6. At the end of each week, record what moved to `complete_on_master`, what is
+   blocked, and what must be descoped before handover.
