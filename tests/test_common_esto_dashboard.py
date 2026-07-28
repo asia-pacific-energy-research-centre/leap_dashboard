@@ -459,6 +459,39 @@ def test_stacked_traces_take_their_code_colour_and_totals_keep_theirs() -> None:
     assert fig.data[1].line.color == "#0072B2"
 
 
+def test_supply_demand_comparison_lines_keep_stable_source_colour() -> None:
+    import plotly.graph_objects as go
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=[2020], y=[1.0], stackgroup="s", name="17 Electricity"))
+    fig.add_trace(go.Scatter(x=[2020], y=[2.0], mode="lines", name="LEAP Target supply (01–03)"))
+    fig.add_trace(go.Scatter(x=[2020], y=[3.0], mode="lines", name="9th Target supply (01–03)"))
+    fig.add_trace(go.Scatter(x=[2020], y=[4.0], mode="lines+markers", name="ESTO Historical (TFC)"))
+    apply_chart_chrome(fig, base_year=None, code_axis="product")
+
+    # Comparison lines named with a suffix other than "total" (supply/(TFC)/...)
+    # must still resolve to their source's stable colour, not Plotly's default
+    # auto-colourway, so they stay visually distinct on crowded charts.
+    assert fig.data[1].line.color == "#D55E00"  # LEAP
+    assert fig.data[2].line.color == "#009E73"  # 9th / NINTH
+    assert fig.data[3].line.color == "#0072B2"  # ESTO
+    assert len({fig.data[1].line.color, fig.data[2].line.color, fig.data[3].line.color}) == 3
+
+
+def test_stacked_trace_keeps_code_colour_even_if_named_like_a_source() -> None:
+    import plotly.graph_objects as go
+
+    # Guards the invariant the source-substring match relies on: a stacked
+    # trace takes its colour from the code map, never from _TOTAL_SERIES_COLORS,
+    # even if a future label were to contain a source name.
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=[2020], y=[1.0], stackgroup="s", name="17 Electricity"))
+    fig.add_trace(go.Scatter(x=[2020], y=[1.0], stackgroup="s", name="99 LEAP-like label"))
+    apply_chart_chrome(fig, base_year=None, code_axis="product")
+
+    assert fig.data[1].line.color != "#D55E00"
+
+
 def test_aggregate_flow_rows_drop_nested_refinery_categories_per_source() -> None:
     rows = pd.DataFrame([
         {"common_flow_code": "09.07", "common_flow_label": "09.07 Oil refineries", "source_system": "ESTO", "scenario": "historical"},

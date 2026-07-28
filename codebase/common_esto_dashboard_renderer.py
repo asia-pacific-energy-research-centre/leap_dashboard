@@ -761,10 +761,23 @@ _TOTAL_SERIES_COLORS: dict[str, str] = {
 
 
 def _apply_total_series_chrome(fig: go.Figure) -> None:
-    """Give ESTO, LEAP, and 9th comparison total traces stable visual roles."""
+    """Give ESTO, LEAP, and 9th comparison lines stable visual roles.
+
+    Matches on source-name substring alone, not a fixed suffix: comparison
+    lines are named "{label} <suffix>" with suffixes that vary by chart
+    ("total", "supply total", "supply (01-03)", "demand (TFC)"), so a
+    " total" test silently missed most of them and left them on the
+    positional colorway.
+
+    Stacked traces are skipped explicitly. They are named for a product,
+    sector, or flow rather than a source, so they do not collide today --
+    no label in the current 104 flow / 75 product universe contains a
+    source name -- but they take their colour from the code map and must
+    keep it if a future label ever does.
+    """
     for trace in fig.data:
         trace_name = str(getattr(trace, "name", ""))
-        if not trace_name.casefold().endswith(" total"):
+        if getattr(trace, "stackgroup", None):
             continue
         source = next((key for key in _TOTAL_SERIES_COLORS if key.casefold() in trace_name.casefold()), None)
         if source is None:
