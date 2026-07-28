@@ -19,7 +19,9 @@ Default output:
 outputs/common_esto_dashboard/<economy>/dashboards/index.html
 ```
 
-The default sample economy is `20_USA`.
+The workflow currently renders `20_USA` and `02_BD` by default. Set
+`COMMON_ESTO_ECONOMIES` for a different reviewed economy set. Focused tests
+continue to use the tracked `20_USA` sample fixture.
 
 ## Mapping diagnostics: ESTO Extended
 

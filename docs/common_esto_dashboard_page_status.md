@@ -1,7 +1,12 @@
 # Common ESTO Dashboard Page Status
 
-Last reviewed: 2026-06-28 using the upstream `20_USA` output and the existing
-21-economy page-noise report.
+Last evidence review: 2026-06-28 using the upstream `20_USA` output and the
+existing 21-economy page-noise report.
+
+> **Dated evidence:** renderer, diagnostics, and input-contract work continued
+> after this review. The counts below describe that 2026-06-28 generation, not
+> a permanent or current baseline. DASHQ-012 requires a reproducible refresh
+> before these counts are replaced.
 
 ## Summary
 
@@ -13,7 +18,7 @@ hidden by default until their rows are reviewed with more complete economy data.
 
 These pages are enabled by default and are suitable for normal dashboard review:
 
-| Page key | Status | Current chart count | Notes |
+| Page key | Status | 2026-06-28 chart count | Notes |
 |---|---:|---:|---|
 | `total_demand` | Production-facing | 2 | High-level demand/supply aggregate checks. |
 | `supply` | Production-facing | 211 | Broad supply review; requires aggregate-first navigation because of its density. |

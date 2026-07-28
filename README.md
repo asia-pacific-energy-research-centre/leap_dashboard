@@ -10,6 +10,10 @@ Agents should also read
 [`docs/handover/dashboard_pipeline_agent_guide.md`](docs/handover/dashboard_pipeline_agent_guide.md).
 The connected three-repository overview is
 `leap_mappings/docs/handover/README.md`.
+Current and deferred dashboard work is tracked only in
+[`docs/work_queue.md`](docs/work_queue.md). The dated
+[`documentation audit`](docs/documentation_audit_20260728.md) records the
+disposition of every tracked Markdown document.
 
 The production entry point is
 `codebase/common_esto_dashboard_workflow.py`. Supporting modules are flattened
@@ -42,7 +46,9 @@ The main artifacts are `dashboards/index.html`, page-level Plotly bundles under
 `chart_bundles/`, and audit files under `supporting_files/`, including
 `chart_manifest.csv` and `page_assignment_summary.csv`.
 
-Focused tests use the tracked `20_USA` fixture. Set
+Focused tests use the tracked `20_USA` fixture. The workflow currently renders
+`20_USA` and `02_BD` by default; set `COMMON_ESTO_ECONOMIES` to select a
+different reviewed set. Set
 `COMMON_ESTO_INPUT_DATA_PATH` and `COMMON_ESTO_ROWS_PATH` for an explicit
 fixture render. Refreshing upstream inputs and publishing into tracked
 `docs/` are opt-in via `COMMON_ESTO_UPDATE_DATA=1` and

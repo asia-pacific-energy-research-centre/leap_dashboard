@@ -20,6 +20,10 @@ config/.archive/
 # Old/archived config files
 config/archive/
 **/archive
+!docs/archive/
+docs/archive/**
+!docs/archive/**/
+!docs/archive/**/*.md
 
 # Jupyter / Spyder
 .ipynb_checkpoints/

@@ -1,6 +1,10 @@
 # Common ESTO Comparison Dashboard: Current State and Backlog
 
-Last reconciled: 2026-06-28.
+Last documentation reconciliation: 2026-07-28.
+
+Page counts and the all-economy presentation review below remain dated
+2026-06-28 evidence until DASHQ-012 produces a reproducible replacement
+render. They are not permanent output expectations.
 
 ## Purpose
 
@@ -24,6 +28,8 @@ codebase/common_esto_dashboard_workflow.py
 codebase/common_esto_dashboard_data.py
 codebase/common_esto_dashboard_renderer.py
 codebase/common_esto_dashboard_output_layout.py
+codebase/common_esto_dashboard_mapping_diagnostics.py
+codebase/mapping_pipeline_provenance.py
 config/common_esto_dashboard/
 tests/
 scripts/
@@ -49,6 +55,8 @@ Configuration defines interpretation and presentation.
 
 The production workflow currently supports:
 
+- strict opt-in `common_esto_output_contract_v1` loading, with manifest,
+  schema, hash, key, numeric-value, and fact/metadata membership validation;
 - long-form Common ESTO comparison data;
 - wide-form data with year columns;
 - combined source/scenario labels, split into `source_system` and `scenario`;
@@ -59,6 +67,10 @@ The production workflow currently supports:
 - a fallback page so unassigned rows are visible rather than silently lost;
 - optional enrichment from `common_esto_rows.csv` for component-level audit
   detail.
+
+Legacy long/wide loading remains the production default during the contract
+transition. Selecting the v1 contract is explicit and fail-closed: an invalid
+selected contract does not fall back to legacy inputs.
 
 Generated category membership is determined upstream. The dashboard parses
 component codes and respects `comparison_scope`; it does not split or merge
@@ -185,7 +197,13 @@ Supporting scripts provide:
 - all-economy rendering;
 - page-noise analysis;
 - publication-readiness checks;
-- disabled Sankey routing QA.
+- disabled Sankey routing QA;
+- a mapping-pipeline health report;
+- the production full-tree explorer and retained investigation prototypes.
+
+The per-economy output also includes a Mapping diagnostics page and mapping
+tree explorer. These surfaces report upstream evidence and provenance; they do
+not own mapping semantics or mutate upstream artifacts.
 
 ### Publishing policy
 
@@ -210,7 +228,9 @@ currently served dashboard.
 > **Merged into [`work_queue.md`](work_queue.md) on 2026-07-28.**
 >
 > Sections 2.1-2.4 and section 3 previously duplicated
-> [`future_dashboard_backlog.md`](future_dashboard_backlog.md). Both are now
+> the now-archived
+> [`future_dashboard_backlog_20260628.md`](archive/future_dashboard_backlog_20260628.md).
+> Both are now
 > represented once, in the queue:
 >
 > | Former section | Now |

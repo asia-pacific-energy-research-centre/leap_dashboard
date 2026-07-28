@@ -1,6 +1,6 @@
 # Workflow Inventory
 
-Last reviewed: 2026-07-07
+Last reviewed: 2026-07-28
 
 This repo centers on the Common ESTO dashboard. The inventory below groups the
 production dashboard workflow, batch render helpers, and QA/fixture maintenance
@@ -16,6 +16,9 @@ scripts so it is clear what is part of the active surface.
 | `scripts/analyze_common_esto_dashboard_page_noise.py` | QA / diagnostics | Analyzes page noise and writes summary diagnostics for the rendered dashboard output. |
 | `scripts/check_common_esto_sankey_routing.py` | QA / diagnostics | Checks the draft Sankey routing table against dashboard data. |
 | `scripts/update_common_esto_dashboard_fixture.py` | Fixture maintenance | Refreshes the test fixture set used by `tests/test_common_esto_dashboard.py`. |
+| `scripts/render_mapping_pipeline_health_report.py` | QA / diagnostics | Summarizes upstream Stage 3 provenance, validation status, and mapping-pipeline health without loading the full comparison dataset. |
+| `scripts/render_full_mapping_tree_explorer.py` | Structural diagnostics | Renders the maintained source / ESTO-component / Common ESTO tree explorer. |
+| `scripts/render_transformation_rollup_diagnostics_prototype.py` | Maintained investigation helper | Renders the focused mapping-diagnostics prototype and body fragment used to review rollup arithmetic. |
 
 ## Supporting Modules
 
@@ -25,11 +28,32 @@ behind the dashboard entrypoint:
 - `codebase/common_esto_dashboard_data.py`
 - `codebase/common_esto_dashboard_renderer.py`
 - `codebase/common_esto_dashboard_output_layout.py`
+- `codebase/common_esto_dashboard_convergence.py`
+- `codebase/common_esto_dashboard_mapping_diagnostics.py`
+- `codebase/mapping_pipeline_provenance.py`
+- `codebase/dashboard_page_fragment.py`
+
+## Retained investigation prototypes
+
+These are direct-artifact readers retained for comparison or focused
+investigation. They are not production data-loading entry points and should not
+be extended as though they own the dashboard contract:
+
+| Script | Status | Use |
+|---|---|---|
+| `scripts/render_mapping_tree_explorer_prototype.py` | Superseded prototype, retained | Earlier three-case explorer used for historical comparison; new explorer work belongs in `render_full_mapping_tree_explorer.py`. |
+
+The transformation rollup prototype remains actively useful because it renders
+the same diagnostics surface used for focused review. Its fixed investigation
+inputs are intentionally outside the v1 contract migration until the prototype
+is promoted into a separate maintained production workflow.
 
 ## Notes
 
 - The production workflow is notebook-safe and is the main entry point for
   dashboard rendering.
 - The scripts under `scripts/` are operational helpers around the same
-  dashboard surface, mostly for batch rendering and publish checks.
-
+  dashboard surface, mostly for batch rendering, diagnostics, and publish
+  checks.
+- Legacy long/wide readers remain the default. The v1 output contract is
+  selected explicitly and fails closed when invalid.

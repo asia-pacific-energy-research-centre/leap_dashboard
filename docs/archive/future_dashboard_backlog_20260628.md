@@ -1,9 +1,11 @@
 # Future Common ESTO Dashboard Backlog
 
-> **Merged into the work queue on 2026-07-28. This file is no longer maintained.**
+> **Archived 2026-07-28.** This file is no longer maintained. Its live items
+> were merged into [`../work_queue.md`](../work_queue.md); it is preserved here
+> to retain the original prioritization and checklist.
 >
 > Its four prioritized items and its deferred-feature list are now in
-> [`work_queue.md`](work_queue.md), which is the single controlling backlog for
+> [`../work_queue.md`](../work_queue.md), which is the single controlling backlog for
 > this repository:
 >
 > | Former item | Now |
@@ -15,7 +17,7 @@
 > | Deferred feature work (Sankey, bespoke scope pages, automatic publication, dashboard-owned mapping logic) | "Deferred by decision — not queue items" |
 >
 > This file duplicated §2 and §3 of
-> [`common_esto_dashboard_plan.md`](common_esto_dashboard_plan.md). Maintaining
+> [`../common_esto_dashboard_plan.md`](../common_esto_dashboard_plan.md). Maintaining
 > three parallel backlogs is what the 2026-07-28 documentation audit flagged;
 > the queue now carries the acceptance criteria and the constraints that were
 > unique to each source.
@@ -24,9 +26,9 @@
 
 This checklist is still current and still applies.
 
-1. Read [`common_esto_dashboard_plan.md`](common_esto_dashboard_plan.md) §1 for
+1. Read [`../common_esto_dashboard_plan.md`](../common_esto_dashboard_plan.md) §1 for
    the current implemented state, and
-   [`special_rules_and_design_decisions.md`](special_rules_and_design_decisions.md)
+   [`../special_rules_and_design_decisions.md`](../special_rules_and_design_decisions.md)
    for decisions that cannot be re-derived from the data.
 2. Read the current `leap_mappings` mapping-system documentation when the work
    touches comparison scopes, hierarchy, components, or rollups.

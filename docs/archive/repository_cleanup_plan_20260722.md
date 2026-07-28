@@ -2,6 +2,13 @@
 
 Last reconciled: 2026-07-22.
 
+> **Archived 2026-07-28.** This is the completed repository-cleanup record that
+> replaced the original zip-extraction plan. It is preserved for its audit
+> evidence and checkpoint history, but it is not the current implementation
+> plan. Use [`../work_queue.md`](../work_queue.md) for live work and
+> [`../handover/dashboard_pipeline_agent_guide.md`](../handover/dashboard_pipeline_agent_guide.md)
+> for current operating instructions.
+
 This document replaces the former `config data outputs leap_dashbaord.zip`
 extraction plan. That plan described an older LEAP-results dashboard workflow
 and is no longer an accurate description of this repository.
@@ -272,15 +279,18 @@ remove only confirmed unwanted tracked artifacts.
 
 ### Phase 5 — implement the dashboard backlog
 
-Feature work follows `docs/common_esto_dashboard_plan.md`, not the obsolete
-zip assumptions. The current sequence is:
+At the time of this record, feature work followed
+`docs/common_esto_dashboard_plan.md`, not the obsolete zip assumptions. The
+then-current sequence was:
 
 1. Improve aggregate-first navigation on dense Industry and Supply pages.
 2. Complete representative-economy review of diagnostic scope pages.
 3. Add remaining ranking and warning metrics to the chart manifest.
 4. Keep page-status evidence synchronized with reproducible renders.
 
-The deferred work is tracked in `docs/future_dashboard_backlog.md`.
+That backlog was later consolidated into `docs/work_queue.md`; the former
+backlog is preserved beside this file as
+`future_dashboard_backlog_20260628.md`.
 
 Sankey diagrams, new bespoke scope pages, automatic publishing after ordinary
 runs, and dashboard-owned mapping logic remain deferred unless explicitly

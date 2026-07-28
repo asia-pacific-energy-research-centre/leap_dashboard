@@ -87,10 +87,15 @@ presents the largest available count with no unit and no scope, which reads as
 4. State the grouped check count and the raw detail-row count side by side in the
    completion report, so the change in headline meaning is explicit.
 
-## Prerequisite worth knowing
+## Historical prerequisite worth knowing
 
-As of 2026-07-27 the underlying artifacts double every ordinary-ESTO value for 15
-generated rollup flows (see
-`leap_mappings/docs/prompts/rebuild_esto_rollup_source_identity_prompt.md`).
-That does not block this layout work, but do not use current anchor failure
-counts as a fixed baseline: they will move after the rebuild.
+The 2026-07-27 artifact generation originally used while drafting this prompt
+doubled ordinary-ESTO values for 15 generated rollup flows. That upstream defect
+was fixed in `leap_mappings` commit `eb3a293`; run
+`common_esto_20260727T113042584213Z` removed the doubling and added a guard.
+The completed mappings prompt is no longer present on mappings `master`.
+`docs/handover_mapping_diagnostics.md` preserves the incident evidence.
+
+This does not change the layout objective. Do not use any historical anchor
+failure count as a permanent test baseline: report grouped-check and raw-detail
+counts from the same selected run.
