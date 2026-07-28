@@ -15,11 +15,13 @@ from codebase.common_esto_dashboard_output_layout import build_output_layout, pu
 from codebase.common_esto_dashboard_renderer import (
     apply_chart_chrome,
     assign_pages,
+    build_area_chart,
     color_for_code,
     color_for_plotting_name,
     drop_excluded_flow_rows,
     render_dashboard,
     select_transformation_total_rows,
+    _non_overlapping_common_row_frontier,
     _non_overlapping_flow_rows,
 )
 
@@ -508,6 +510,109 @@ def test_aggregate_flow_rows_drop_nested_refinery_categories_per_source() -> Non
     assert set(filtered.loc[filtered["source_system"] == "LEAP", "common_flow_label"]) == {
         "09.07 Oil refineries (including own use)"
     }
+
+
+def test_non_expanding_subtotal_is_selected_once_for_dashboard_aggregates() -> None:
+    subtotal_value = 30.0
+    detail_frontier_value = 10.0 + 20.0
+    common_values = {
+        "comparison_scope": "esto_leap_ninth",
+        "source_system": "ESTO",
+        "economy": "20_USA",
+        "scenario": "historical",
+        "year": 2022,
+        "common_flow_code": "16.03-16.04",
+        "common_flow_label": "16.03-16.04 Agriculture and fishing",
+        "common_product_code": "07.07",
+        "common_product_label": "07.07 Gas/diesel oil",
+        "source_aggregate_group_ids": "rollup_agriculture_gas_diesel",
+    }
+    rows = pd.DataFrame([
+        {
+            **common_values,
+            "common_row_id": "row_subtotal",
+            "is_non_expanding_rollup": True,
+            "non_expanding_rollup_id": "nonexp_agriculture_and_fishing",
+            "value": subtotal_value,
+        },
+        {
+            **common_values,
+            "common_row_id": "row_detail_frontier",
+            "is_non_expanding_rollup": False,
+            "non_expanding_rollup_id": "",
+            "value": detail_frontier_value,
+        },
+        {
+            **common_values,
+            "source_system": "NINTH",
+            "scenario": "Target",
+            "year": 2024,
+            "common_row_id": "row_detail_frontier",
+            "is_non_expanding_rollup": False,
+            "non_expanding_rollup_id": "",
+            "value": detail_frontier_value,
+        },
+    ])
+
+    selected = _non_overlapping_common_row_frontier(rows)
+
+    assert list(selected["common_row_id"]) == ["row_subtotal", "row_detail_frontier"]
+    assert selected.groupby("source_system")["value"].sum().to_dict() == {
+        "ESTO": 30.0,
+        "NINTH": 30.0,
+    }
+
+    figure = build_area_chart(
+        rows,
+        {
+            "aggregate_flow_label": "16.03-16.04 Agriculture and fishing",
+            "source_flow_labels": ["16.03-16.04 Agriculture and fishing"],
+            "source_flow_labels_by_system": {},
+        },
+        {
+            "ESTO|historical": "ESTO historical",
+            "NINTH|Target": "NINTH Target",
+        },
+        {
+            "chart_generation": {
+                "comparison_source_system": "ESTO",
+                "base_year": 2023,
+                "primary_area_source_system": "LEAP",
+                "primary_area_scenario": "Target",
+            }
+        },
+    )
+    total_traces = {
+        trace.name: list(trace.y)
+        for trace in figure.data
+        if str(trace.name).endswith(" total")
+    }
+    assert total_traces == {
+        "ESTO historical total": [30.0],
+        "NINTH Target total": [30.0],
+    }
+
+
+def test_non_expanding_frontier_uses_shared_aggregate_id_when_axis_codes_differ() -> None:
+    rows = pd.DataFrame([
+        {
+            "source_system": "ESTO", "scenario": "historical", "year": 2022,
+            "common_flow_code": "16.03-16.04", "common_product_code": "07.07",
+            "source_aggregate_group_ids": "shared-rollup",
+            "is_non_expanding_rollup": True, "value": 30.0,
+        },
+        {
+            "source_system": "ESTO", "scenario": "historical", "year": 2022,
+            "common_flow_code": "16.03|16.04", "common_product_code": "07.07",
+            "source_aggregate_group_ids": "shared-rollup",
+            "is_non_expanding_rollup": False, "value": 30.0,
+        },
+    ])
+
+    selected = _non_overlapping_common_row_frontier(rows)
+
+    assert list(selected["value"]) == [30.0]
+    assert bool(selected.iloc[0]["is_non_expanding_rollup"])
 
 
 def test_chart_chrome_resolves_duplicate_configured_category_colours() -> None:

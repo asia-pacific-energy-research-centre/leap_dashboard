@@ -526,6 +526,94 @@ def area_spec_rows(df: pd.DataFrame, area_spec: dict[str, object]) -> pd.DataFra
     return df[df["common_flow_label"].isin(source_flow_labels)]
 
 
+def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
+    """Prefer an observed NON_EXPANDING subtotal over its detail alternative.
+
+    The canonical all-rows contract deliberately preserves both a named
+    subtotal and the additive detail frontier that represents the same energy.
+    Dashboard aggregates must choose one of those alternatives.  For each
+    source/economy/scenario/year, retain the explicitly flagged subtotal and
+    remove unflagged rows that either share its compressed flow/product
+    coordinates or its source-aggregate membership.
+
+    Selection is observation-specific: if a source does not publish the
+    subtotal row, its detail frontier remains available.
+    """
+    required = {"is_non_expanding_rollup", "source_system", "scenario", "year"}
+    if df.empty or not required.issubset(df.columns):
+        return df
+
+    work = df.copy()
+    work["_frontier_row_number"] = range(len(work))
+    subtotal_mask = _metadata_bool(work["is_non_expanding_rollup"])
+    if not subtotal_mask.any():
+        return df
+
+    context_columns = [
+        column
+        for column in ["comparison_scope", "source_system", "economy", "scenario", "year"]
+        if column in work.columns
+    ]
+    drop_row_numbers: set[int] = set()
+
+    # The split parent and detail rows normally retain the same compressed
+    # hierarchy coordinates even though their common_row_id values differ.
+    axis_columns = [
+        column for column in ["common_flow_code", "common_product_code"] if column in work.columns
+    ]
+    if len(axis_columns) == 2:
+        key_columns = context_columns + axis_columns
+        subtotal_keys = work.loc[subtotal_mask, key_columns].drop_duplicates()
+        detail_keys = work.loc[~subtotal_mask, ["_frontier_row_number", *key_columns]]
+        axis_matches = detail_keys.merge(subtotal_keys, on=key_columns, how="inner")
+        drop_row_numbers.update(axis_matches["_frontier_row_number"].astype(int))
+
+    # Source aggregate membership is the explicit link when display/hierarchy
+    # coordinates differ between the parent and detail common rows.
+    membership_column = "source_aggregate_group_ids"
+    if membership_column in work.columns:
+        membership_text = work[membership_column].fillna("").astype(str).str.strip()
+        subtotal_memberships = work.loc[
+            subtotal_mask & membership_text.ne(""),
+            [*context_columns, membership_column],
+        ].copy()
+        detail_memberships = work.loc[
+            ~subtotal_mask & membership_text.ne(""),
+            ["_frontier_row_number", *context_columns, membership_column],
+        ].copy()
+        if not subtotal_memberships.empty and not detail_memberships.empty:
+            subtotal_memberships["_aggregate_group_id"] = (
+                subtotal_memberships.pop(membership_column).str.split(";")
+            )
+            detail_memberships["_aggregate_group_id"] = (
+                detail_memberships.pop(membership_column).str.split(";")
+            )
+            subtotal_memberships = subtotal_memberships.explode("_aggregate_group_id")
+            detail_memberships = detail_memberships.explode("_aggregate_group_id")
+            subtotal_memberships["_aggregate_group_id"] = (
+                subtotal_memberships["_aggregate_group_id"].astype(str).str.strip()
+            )
+            detail_memberships["_aggregate_group_id"] = (
+                detail_memberships["_aggregate_group_id"].astype(str).str.strip()
+            )
+            subtotal_memberships = subtotal_memberships[
+                subtotal_memberships["_aggregate_group_id"].ne("")
+            ].drop_duplicates()
+            membership_matches = detail_memberships.merge(
+                subtotal_memberships,
+                on=[*context_columns, "_aggregate_group_id"],
+                how="inner",
+            )
+            drop_row_numbers.update(
+                membership_matches["_frontier_row_number"].astype(int)
+            )
+
+    if not drop_row_numbers:
+        return df
+    selected = work[~work["_frontier_row_number"].isin(drop_row_numbers)].copy()
+    return selected.drop(columns="_frontier_row_number")
+
+
 def _non_overlapping_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
     """Keep one non-overlapping flow frontier for each source/scenario.
 
@@ -853,7 +941,7 @@ def build_area_chart(
     only one is visible at a time and the client-side REF/TGT toggle can swap
     between them.
     """
-    chart_df = area_spec_rows(df, area_spec).copy()
+    chart_df = _non_overlapping_common_row_frontier(area_spec_rows(df, area_spec))
     if "flow" in group_col:
         chart_df = _non_overlapping_flow_rows(chart_df)
     chart_config = template.get("chart_generation", {})
@@ -1216,6 +1304,7 @@ def build_product_chart(
     ("Reference"/"Target") to a diff series, so both scenarios' diff lines can
     be built and left for the client-side REF/TGT toggle to show/hide.
     """
+    chart_df = _non_overlapping_common_row_frontier(chart_df)
     fig = go.Figure()
     trace_meta: list[dict] = []
     for (source_system, scenario), group in chart_df.groupby(["source_system", "scenario"], dropna=False):
@@ -3280,9 +3369,11 @@ def render_dashboard(
     excluded_flow_code_prefixes = template.get("excluded_flow_code_prefixes", [])
     df = drop_esto_post_base_year_rows(df, comparison_source, base_year)
     df = drop_excluded_flow_rows(df, excluded_flow_code_prefixes)
+    df = _non_overlapping_common_row_frontier(df)
     if scope_df is not None:
         scope_df = drop_esto_post_base_year_rows(scope_df, comparison_source, base_year)
         scope_df = drop_excluded_flow_rows(scope_df, excluded_flow_code_prefixes)
+        scope_df = _non_overlapping_common_row_frontier(scope_df)
     assigned_df = assign_pages(df, page_rules)
     overview_flow_codes = {
         str(code) for code in template.get("total_demand_page", {}).get("overview_flow_codes", [])
