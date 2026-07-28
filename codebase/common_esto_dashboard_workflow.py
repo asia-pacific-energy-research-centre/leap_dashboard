@@ -146,6 +146,10 @@ ESTO_EXTENDED_EXACT_ROWS_PATH = prefer_compressed_csv_path(
 # (unlike the wide CSV, which pads every year column with 0).
 DEFAULT_INPUT_PATH = _LEAP_MAPPINGS_RESULTS / "common_esto_comparison_data.csv"
 INPUT_DATA_PATH = _resolve(os.getenv("COMMON_ESTO_INPUT_DATA_PATH", str(DEFAULT_INPUT_PATH)))
+DEFAULT_OUTPUT_CONTRACT_PATH = _LEAP_MAPPINGS_RESULTS / "common_esto_output_contract.json"
+OUTPUT_CONTRACT_PATH = _resolve(
+    os.getenv("COMMON_ESTO_OUTPUT_CONTRACT_PATH", str(DEFAULT_OUTPUT_CONTRACT_PATH))
+)
 COMMON_ROWS_PATH = _resolve(os.getenv("COMMON_ESTO_ROWS_PATH", str(_LEAP_MAPPINGS_RESULTS / "common_esto_rows.csv")))
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
@@ -159,6 +163,7 @@ COMPARISON_SCOPE = os.getenv("COMMON_ESTO_COMPARISON_SCOPE", "esto_leap_ninth")
 # ``common_esto_dashboard_data.DEFAULT_WIDE_FILE_SCOPE``). Use "esto_leap" to
 # read the 2-way LEAP/ESTO comparison instead.
 WIDE_FILE_SCOPE = os.getenv("COMMON_ESTO_WIDE_FILE_SCOPE", "esto_leap_ninth")
+USE_OUTPUT_CONTRACT = _env_bool("COMMON_ESTO_USE_OUTPUT_CONTRACT", default=False)
 ECONOMIES: str | list[str] = os.getenv("COMMON_ESTO_ECONOMIES", ["20_USA", "02_BD"])
 MIN_YEAR = 2010
 MAX_YEAR = 2060
@@ -309,7 +314,11 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
     missing_leap_branches = _missing_leap_demand_branches(economy)
     template = filter_template_for_leap_demand_coverage(template, missing_leap_branches)
     series_config = json.loads(SERIES_CONFIG_PATH.read_text(encoding="utf-8"))
-    raw_df = load_common_esto_data(INPUT_DATA_PATH, wide_file_scope=WIDE_FILE_SCOPE)
+    raw_df = load_common_esto_data(
+        INPUT_DATA_PATH,
+        wide_file_scope=WIDE_FILE_SCOPE,
+        output_contract_path=OUTPUT_CONTRACT_PATH if USE_OUTPUT_CONTRACT else None,
+    )
     raw_df["economy"] = raw_df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
     base_year = int(template.get("chart_generation", {}).get("base_year", 2022))

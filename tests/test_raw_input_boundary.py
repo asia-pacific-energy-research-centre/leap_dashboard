@@ -34,6 +34,7 @@ def test_workflow_defaults_are_non_mutating() -> None:
         "COMMON_ESTO_UPDATE_DATA",
         "COMMON_ESTO_PUBLISH_TO_DOCS",
         "COMMON_ESTO_INCLUDE_CAPACITY_UNMET_CONVERGENCE",
+        "COMMON_ESTO_USE_OUTPUT_CONTRACT",
     ):
         environment.pop(variable, None)
     environment["COMMON_ESTO_RUN_DASHBOARD_WORKFLOW"] = "0"
@@ -45,7 +46,8 @@ def test_workflow_defaults_are_non_mutating() -> None:
                 "import sys; sys.path.insert(0, 'codebase'); "
                 "import common_esto_dashboard_workflow as workflow; "
                 "print(workflow.UPDATE_DATA, workflow.PUBLISH_TO_DOCS, "
-                "workflow.INCLUDE_CAPACITY_UNMET_CONVERGENCE)"
+                "workflow.INCLUDE_CAPACITY_UNMET_CONVERGENCE, "
+                "workflow.USE_OUTPUT_CONTRACT)"
             ),
         ],
         cwd=REPO_ROOT,
@@ -54,4 +56,4 @@ def test_workflow_defaults_are_non_mutating() -> None:
         text=True,
         check=True,
     )
-    assert "False False False" in result.stdout
+    assert "False False False False" in result.stdout

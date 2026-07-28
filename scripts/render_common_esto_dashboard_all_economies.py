@@ -51,6 +51,12 @@ def _resolve(path: str | Path) -> Path:
 # User-tuned constants.
 LEAP_MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
 INPUT_DATA_PATH = _resolve(LEAP_MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_comparison_data.csv")
+OUTPUT_CONTRACT_PATH = _resolve(
+    os.getenv(
+        "COMMON_ESTO_OUTPUT_CONTRACT_PATH",
+        LEAP_MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_output_contract.json",
+    )
+)
 COMMON_ROWS_PATH = _resolve(LEAP_MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_rows.csv")
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
@@ -59,6 +65,7 @@ SUMMARY_PATH = OUTPUT_ROOT / "render_summary.csv"
 
 COMPARISON_SCOPE = os.getenv("COMMON_ESTO_COMPARISON_SCOPE", "esto_leap_ninth")
 WIDE_FILE_SCOPE = os.getenv("COMMON_ESTO_WIDE_FILE_SCOPE", "esto_leap_ninth")
+USE_OUTPUT_CONTRACT = os.getenv("COMMON_ESTO_USE_OUTPUT_CONTRACT", "0") != "0"
 MIN_YEAR = 2010
 MAX_YEAR = 2060
 ECONOMIES_TO_RENDER: list[str] = [
@@ -240,7 +247,11 @@ def render_all_economies() -> pd.DataFrame:
     """Load data once, render selected economies, and write render_summary.csv."""
     template = load_json(TEMPLATE_PATH)
     series_config = json.loads(SERIES_CONFIG_PATH.read_text(encoding="utf-8"))
-    raw_df = load_common_esto_data(INPUT_DATA_PATH, wide_file_scope=WIDE_FILE_SCOPE)
+    raw_df = load_common_esto_data(
+        INPUT_DATA_PATH,
+        wide_file_scope=WIDE_FILE_SCOPE,
+        output_contract_path=OUTPUT_CONTRACT_PATH if USE_OUTPUT_CONTRACT else None,
+    )
     raw_df = _normalise_economy_column(raw_df)
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
 

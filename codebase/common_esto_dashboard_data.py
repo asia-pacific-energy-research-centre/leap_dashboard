@@ -2,6 +2,9 @@
 """Load and prepare common ESTO comparison data for dashboard rendering."""
 
 #%%
+import hashlib
+import json
+import math
 import re
 from pathlib import Path
 
@@ -28,6 +31,38 @@ DEFAULT_WIDE_FILE_SCOPE = "esto_leap_ninth"
 # frame double-counts them (see DEFAULT_WIDE_FILE_SCOPE above).
 ALL_SCOPES = "__all_scopes__"
 ID_COLUMNS_WIDE = ["economy", "scenario", "product", "flow"]
+OUTPUT_CONTRACT_VERSION = "common_esto_output_contract_v1"
+
+CONTRACT_FACT_COLUMNS = [
+    "comparison_scope",
+    "source_system",
+    "economy",
+    "scenario",
+    "year",
+    "common_row_id",
+    "value",
+]
+CONTRACT_FACT_KEY_COLUMNS = CONTRACT_FACT_COLUMNS[:6]
+
+CONTRACT_METADATA_COLUMNS = [
+    "comparison_scope",
+    "common_row_id",
+    "common_flow_code",
+    "common_flow_name",
+    "common_flow_label",
+    "common_product_code",
+    "common_product_name",
+    "common_product_label",
+    "common_row_basis",
+    "is_exact_row",
+    "requires_rollup",
+    "is_non_expanding_rollup",
+    "non_expanding_rollup_id",
+    "rollup_mode",
+    "source_aggregate_labels",
+    "source_aggregate_group_ids",
+]
+CONTRACT_METADATA_KEY_COLUMNS = CONTRACT_METADATA_COLUMNS[:2]
 
 REQUIRED_COLUMNS = [
     "comparison_scope",
@@ -41,6 +76,30 @@ REQUIRED_COLUMNS = [
     "common_product_code",
     "common_product_name",
     "common_product_label",
+    "value",
+]
+
+CONTRACT_JOINED_COLUMNS = [
+    "comparison_scope",
+    "source_system",
+    "economy",
+    "scenario",
+    "year",
+    "common_flow_code",
+    "common_flow_name",
+    "common_flow_label",
+    "common_product_code",
+    "common_product_name",
+    "common_product_label",
+    "common_row_id",
+    "common_row_basis",
+    "is_exact_row",
+    "requires_rollup",
+    "is_non_expanding_rollup",
+    "non_expanding_rollup_id",
+    "rollup_mode",
+    "source_aggregate_labels",
+    "source_aggregate_group_ids",
     "value",
 ]
 
@@ -262,15 +321,311 @@ def load_long_common_esto_data(path: Path) -> pd.DataFrame:
     return df
 
 
+def _contract_member_path(manifest_path: Path, declared_path: object, member_name: str) -> Path:
+    """Resolve one manifest member without permitting absolute or escaping paths."""
+    path_text = str(declared_path or "").strip()
+    if not path_text:
+        raise ValueError(f"Output contract {member_name} is missing a declared path.")
+    relative_path = Path(path_text.replace("\\", "/"))
+    if relative_path.is_absolute():
+        raise ValueError(
+            f"Output contract {member_name} path must be relative to the manifest: {path_text!r}"
+        )
+    manifest_root = manifest_path.resolve().parent
+    member_path = (manifest_root / relative_path).resolve()
+    try:
+        member_path.relative_to(manifest_root)
+    except ValueError as error:
+        raise ValueError(
+            f"Output contract {member_name} path escapes the manifest directory: {path_text!r}"
+        ) from error
+    return member_path
+
+
+def _sha256(path: Path) -> str:
+    """Return a lowercase SHA-256 digest without loading a whole member into memory."""
+    digest = hashlib.sha256()
+    with path.open("rb") as file_handle:
+        for block in iter(lambda: file_handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _validate_contract_member_declaration(
+    declaration: object,
+    *,
+    member_name: str,
+    expected_columns: list[str],
+    expected_key_columns: list[str],
+) -> dict:
+    """Validate the strict v1 declaration for one tabular contract member."""
+    if not isinstance(declaration, dict):
+        raise ValueError(f"Output contract {member_name} declaration must be an object.")
+    required_fields = {
+        "path",
+        "format",
+        "columns",
+        "key_columns",
+        "row_count",
+        "size_bytes",
+        "sha256",
+    }
+    missing_fields = sorted(required_fields - set(declaration))
+    if missing_fields:
+        raise ValueError(
+            f"Output contract {member_name} declaration is missing fields: {missing_fields}"
+        )
+    if declaration["format"] not in {"csv", "csv.gz"}:
+        raise ValueError(
+            f"Output contract {member_name} has unsupported format "
+            f"{declaration['format']!r}; expected 'csv' or 'csv.gz'."
+        )
+    declared_name = str(declaration["path"]).strip().lower()
+    suffix_matches = (
+        declaration["format"] == "csv"
+        and declared_name.endswith(".csv")
+        and not declared_name.endswith(".csv.gz")
+    ) or (
+        declaration["format"] == "csv.gz"
+        and declared_name.endswith(".csv.gz")
+    )
+    if not suffix_matches:
+        raise ValueError(
+            f"Output contract {member_name} format {declaration['format']!r} "
+            f"does not match path {declaration['path']!r}."
+        )
+    if declaration["columns"] != expected_columns:
+        raise ValueError(
+            f"Output contract {member_name} columns must exactly equal {expected_columns}; "
+            f"found {declaration['columns']!r}."
+        )
+    if declaration["key_columns"] != expected_key_columns:
+        raise ValueError(
+            f"Output contract {member_name} key_columns must exactly equal "
+            f"{expected_key_columns}; found {declaration['key_columns']!r}."
+        )
+    for field in ["row_count", "size_bytes"]:
+        value = declaration[field]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(
+                f"Output contract {member_name} {field} must be a non-negative integer."
+            )
+    checksum = str(declaration["sha256"] or "").strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", checksum):
+        raise ValueError(
+            f"Output contract {member_name} sha256 must be a 64-character hex digest."
+        )
+    return declaration
+
+
+def _read_contract_member(
+    manifest_path: Path,
+    declaration: dict,
+    *,
+    member_name: str,
+    expected_columns: list[str],
+) -> pd.DataFrame:
+    """Validate file identity and read one exactly declared contract member."""
+    member_path = _contract_member_path(manifest_path, declaration["path"], member_name)
+    if not member_path.is_file():
+        raise FileNotFoundError(
+            f"Output contract {member_name} member does not exist: {member_path}"
+        )
+    actual_size = member_path.stat().st_size
+    if actual_size != declaration["size_bytes"]:
+        raise ValueError(
+            f"Output contract {member_name} size mismatch for {member_path}: "
+            f"declared {declaration['size_bytes']}, found {actual_size}."
+        )
+    actual_checksum = _sha256(member_path)
+    if actual_checksum != str(declaration["sha256"]).lower():
+        raise ValueError(
+            f"Output contract {member_name} SHA-256 mismatch for {member_path}."
+        )
+    frame = pd.read_csv(member_path, dtype=str, keep_default_na=False, low_memory=False)
+    if list(frame.columns) != expected_columns:
+        raise ValueError(
+            f"Output contract {member_name} file columns must exactly equal "
+            f"{expected_columns}; found {list(frame.columns)}."
+        )
+    if len(frame) != declaration["row_count"]:
+        raise ValueError(
+            f"Output contract {member_name} row count mismatch for {member_path}: "
+            f"declared {declaration['row_count']}, found {len(frame)}."
+        )
+    return frame
+
+
+def _duplicate_metadata_error(metadata: pd.DataFrame) -> ValueError:
+    """Describe whether repeated metadata keys are identical or contradictory."""
+    duplicate_rows = metadata[
+        metadata.duplicated(CONTRACT_METADATA_KEY_COLUMNS, keep=False)
+    ]
+    conflicting_keys = 0
+    for _, group in duplicate_rows.groupby(CONTRACT_METADATA_KEY_COLUMNS, dropna=False):
+        if len(group.drop_duplicates()) > 1:
+            conflicting_keys += 1
+    if conflicting_keys:
+        return ValueError(
+            "Output contract metadata has conflicting rows for "
+            f"{conflicting_keys} compound key(s) {CONTRACT_METADATA_KEY_COLUMNS}."
+        )
+    return ValueError(
+        "Output contract metadata compound key is not unique: "
+        f"{CONTRACT_METADATA_KEY_COLUMNS}."
+    )
+
+
+def load_common_esto_output_contract(manifest_path: Path) -> pd.DataFrame:
+    """Load and strictly validate the opt-in Common ESTO v1 output contract."""
+    manifest_path = Path(manifest_path)
+    if not manifest_path.is_file():
+        raise FileNotFoundError(f"Common ESTO output contract not found: {manifest_path}")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(
+            f"Could not read Common ESTO output contract {manifest_path}: {error}"
+        ) from error
+    if not isinstance(manifest, dict):
+        raise ValueError("Common ESTO output contract must contain a JSON object.")
+    if manifest.get("contract_version") != OUTPUT_CONTRACT_VERSION:
+        raise ValueError(
+            f"Unsupported Common ESTO output contract version "
+            f"{manifest.get('contract_version')!r}; expected {OUTPUT_CONTRACT_VERSION!r}."
+        )
+    if not str(manifest.get("run_id", "")).strip():
+        raise ValueError("Common ESTO output contract is missing a non-empty run_id.")
+    run_timestamp = str(manifest.get("run_timestamp_utc", "")).strip()
+    try:
+        parsed_timestamp = pd.Timestamp(run_timestamp)
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "Common ESTO output contract run_timestamp_utc is not a valid timestamp."
+        ) from error
+    if parsed_timestamp.tzinfo is None:
+        raise ValueError("Common ESTO output contract run_timestamp_utc must include a timezone.")
+    if manifest.get("observed_rows_only") is not True:
+        raise ValueError(
+            "Common ESTO output contract observed_rows_only must be exactly true."
+        )
+
+    fact_declaration = _validate_contract_member_declaration(
+        manifest.get("fact"),
+        member_name="fact",
+        expected_columns=CONTRACT_FACT_COLUMNS,
+        expected_key_columns=CONTRACT_FACT_KEY_COLUMNS,
+    )
+    metadata_declaration = _validate_contract_member_declaration(
+        manifest.get("metadata"),
+        member_name="metadata",
+        expected_columns=CONTRACT_METADATA_COLUMNS,
+        expected_key_columns=CONTRACT_METADATA_KEY_COLUMNS,
+    )
+    fact = _read_contract_member(
+        manifest_path,
+        fact_declaration,
+        member_name="fact",
+        expected_columns=CONTRACT_FACT_COLUMNS,
+    )
+    metadata = _read_contract_member(
+        manifest_path,
+        metadata_declaration,
+        member_name="metadata",
+        expected_columns=CONTRACT_METADATA_COLUMNS,
+    )
+
+    if fact[CONTRACT_FACT_KEY_COLUMNS].eq("").any(axis=None):
+        raise ValueError("Output contract fact key columns must not contain empty values.")
+    if metadata[CONTRACT_METADATA_KEY_COLUMNS].eq("").any(axis=None):
+        raise ValueError("Output contract metadata key columns must not contain empty values.")
+    if fact.duplicated(CONTRACT_FACT_KEY_COLUMNS).any():
+        raise ValueError(
+            f"Output contract fact key is not unique: {CONTRACT_FACT_KEY_COLUMNS}."
+        )
+    if metadata.duplicated(CONTRACT_METADATA_KEY_COLUMNS).any():
+        raise _duplicate_metadata_error(metadata)
+
+    numeric_years = pd.to_numeric(fact["year"], errors="coerce")
+    valid_years = (
+        numeric_years.notna()
+        & np.isfinite(numeric_years)
+        & numeric_years.eq(numeric_years.round())
+        & numeric_years.between(1000, 9999)
+    )
+    if not valid_years.all():
+        invalid_years = sorted(set(fact.loc[~valid_years, "year"].astype(str)))
+        raise ValueError(f"Output contract fact contains invalid years: {invalid_years[:10]}")
+    numeric_values = pd.to_numeric(fact["value"], errors="coerce")
+    valid_values = numeric_values.notna() & numeric_values.map(math.isfinite)
+    if not valid_values.all():
+        invalid_values = sorted(set(fact.loc[~valid_values, "value"].astype(str)))
+        raise ValueError(
+            f"Output contract fact contains invalid numeric values: {invalid_values[:10]}"
+        )
+
+    fact_keys = fact[CONTRACT_METADATA_KEY_COLUMNS].drop_duplicates()
+    metadata_keys = metadata[CONTRACT_METADATA_KEY_COLUMNS].drop_duplicates()
+    missing_metadata = fact_keys.merge(
+        metadata_keys,
+        on=CONTRACT_METADATA_KEY_COLUMNS,
+        how="left",
+        indicator=True,
+    )
+    missing_metadata = missing_metadata[missing_metadata["_merge"] == "left_only"]
+    if not missing_metadata.empty:
+        raise ValueError(
+            "Output contract fact contains compound keys with no metadata row: "
+            f"{missing_metadata[CONTRACT_METADATA_KEY_COLUMNS].head(10).to_dict('records')}"
+        )
+    orphan_metadata = metadata_keys.merge(
+        fact_keys,
+        on=CONTRACT_METADATA_KEY_COLUMNS,
+        how="left",
+        indicator=True,
+    )
+    orphan_metadata = orphan_metadata[orphan_metadata["_merge"] == "left_only"]
+    if not orphan_metadata.empty:
+        raise ValueError(
+            "Output contract metadata contains orphan compound keys with no fact row: "
+            f"{orphan_metadata[CONTRACT_METADATA_KEY_COLUMNS].head(10).to_dict('records')}"
+        )
+
+    for column in ["is_exact_row", "requires_rollup", "is_non_expanding_rollup"]:
+        normalized = metadata[column].str.strip().str.casefold()
+        if not normalized.isin({"true", "false"}).all():
+            invalid = sorted(set(metadata.loc[~normalized.isin({"true", "false"}), column]))
+            raise ValueError(
+                f"Output contract metadata column {column!r} contains invalid booleans: "
+                f"{invalid[:10]}"
+            )
+        metadata[column] = normalized.eq("true")
+
+    fact["year"] = numeric_years.astype(int)
+    fact["value"] = numeric_values.astype(float)
+    joined = fact.merge(
+        metadata,
+        on=CONTRACT_METADATA_KEY_COLUMNS,
+        how="left",
+        validate="many_to_one",
+    )
+    return joined[CONTRACT_JOINED_COLUMNS].copy()
+
+
 def load_common_esto_data(
     path: Path,
     wide_file_scope: str = DEFAULT_WIDE_FILE_SCOPE,
+    output_contract_path: Path | None = None,
 ) -> pd.DataFrame:
-    """Load either long or wide common ESTO comparison data.
+    """Load an explicit output contract, or retain the legacy long/wide adapters.
 
     ``wide_file_scope`` is only consulted for wide-format inputs; long-format
-    files already carry a resolved ``comparison_scope`` column.
+    files already carry a resolved ``comparison_scope`` column. Supplying
+    ``output_contract_path`` is an explicit opt-in and never falls back to
+    ``path`` when the selected contract is invalid.
     """
+    if output_contract_path is not None:
+        return load_common_esto_output_contract(output_contract_path)
     sample_df = pd.read_csv(path, nrows=5, low_memory=False)
     if all(column in sample_df.columns for column in REQUIRED_COLUMNS):
         return load_long_common_esto_data(path)
@@ -367,7 +722,9 @@ def filter_common_esto_data(
     Pass ``ALL_SCOPES`` to keep every scope; see the sentinel's note on why that
     frame must not be charted directly.
     """
-    out = df[(df["economy"].astype(str) == str(economy))].copy()
+    economy_key = str(economy).replace("_", "").strip()
+    economy_values = df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
+    out = df[economy_values.eq(economy_key)].copy()
     if "comparison_scope" not in out.columns:
         raise ValueError(
             "Common ESTO data is missing the required 'comparison_scope' column."
