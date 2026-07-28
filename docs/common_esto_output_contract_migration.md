@@ -27,3 +27,20 @@ Completed:
   when a failed or different latest Stage 3 attempt preserved an older contract.
 - The mapping-pipeline health report shows selected contract identity, declared
   fact/metadata freshness, and the same preserved-contract divergence warning.
+- Sankey routing QA and fixture refresh use the shared comparison-data loader,
+  retain legacy defaults, and fail without fallback when a contract is selected.
+- Production mapping diagnostics and the full-tree explorer already receive the
+  workflow's normalized comparison frame, so they need no separate reader.
+
+Deferred one-off readers:
+
+- `render_transformation_rollup_diagnostics_prototype.py`
+- `render_mapping_tree_explorer_prototype.py`
+
+These investigation prototypes still read fixed artifacts directly. Migrating
+them is deferred until they are promoted into a maintained production workflow.
+
+The fixture updater still copies `common_esto_rows.csv` as a supplemental
+component-membership fixture. V1 contract metadata is deliberately one row per
+compound key and does not contain the component-grain fields used by mapping
+diagnostics; replacing that file would require a future metadata contract.

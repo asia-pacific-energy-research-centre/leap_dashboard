@@ -2,6 +2,7 @@
 """Validate draft Sankey routing rules against Common ESTO comparison rows."""
 
 #%%
+import os
 import sys
 from pathlib import Path
 
@@ -27,9 +28,28 @@ def _resolve(path: str | Path) -> Path:
     return REPO_ROOT / path_obj
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    """Read a simple boolean environment toggle."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().casefold() in {"1", "true", "yes", "y"}
+
+
 #%%
 # User-tuned constants.
 INPUT_DATA_PATH = _resolve("tests/fixtures/common_esto_dashboard/common_esto_comparison_data_sample.csv")
+DEFAULT_OUTPUT_CONTRACT_PATH = (
+    REPO_ROOT.parent
+    / "leap_mappings"
+    / "results"
+    / "common_esto"
+    / "common_esto_output_contract.json"
+)
+OUTPUT_CONTRACT_PATH = _resolve(
+    os.getenv("COMMON_ESTO_OUTPUT_CONTRACT_PATH", DEFAULT_OUTPUT_CONTRACT_PATH)
+)
+USE_OUTPUT_CONTRACT = _env_bool("COMMON_ESTO_USE_OUTPUT_CONTRACT", default=False)
 ROUTING_TABLE_PATH = _resolve("config/common_esto_dashboard/sankey_routing_table_draft.csv")
 OUTPUT_DIR = _resolve("outputs/common_esto_dashboard/sankey_routing_qa")
 
@@ -37,7 +57,7 @@ ECONOMY = "20_USA"
 COMPARISON_SCOPE = "esto_leap_ninth"
 MIN_YEAR = 1990
 MAX_YEAR = 2060
-RUN_SANKEY_ROUTING_QA = True
+RUN_SANKEY_ROUTING_QA = _env_bool("COMMON_ESTO_RUN_SANKEY_ROUTING_QA", default=True)
 
 REQUIRED_ROUTING_COLUMNS = [
     "route_id",
@@ -106,9 +126,18 @@ def load_routing_table(path: Path) -> pd.DataFrame:
     return routes
 
 
-def load_candidate_rows(path: Path, economy: str, comparison_scope: str) -> pd.DataFrame:
+def load_candidate_rows(
+    path: Path,
+    economy: str,
+    comparison_scope: str,
+    *,
+    output_contract_path: Path | None = None,
+) -> pd.DataFrame:
     """Load candidate row totals to validate against routing rules."""
-    raw_df = load_common_esto_data(path)
+    raw_df = load_common_esto_data(
+        path,
+        output_contract_path=output_contract_path,
+    )
     filtered = filter_common_esto_data(
         raw_df,
         comparison_scope=comparison_scope,
@@ -187,7 +216,12 @@ def build_sankey_routing_qa(candidate_rows: pd.DataFrame, routes: pd.DataFrame) 
 def write_sankey_routing_qa() -> dict[str, object]:
     """Run draft Sankey routing QA and write route coverage outputs."""
     routes = load_routing_table(ROUTING_TABLE_PATH)
-    candidates = load_candidate_rows(INPUT_DATA_PATH, ECONOMY, COMPARISON_SCOPE)
+    candidates = load_candidate_rows(
+        INPUT_DATA_PATH,
+        ECONOMY,
+        COMPARISON_SCOPE,
+        output_contract_path=OUTPUT_CONTRACT_PATH if USE_OUTPUT_CONTRACT else None,
+    )
     qa_df = build_sankey_routing_qa(candidates, routes)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     route_summary = (
