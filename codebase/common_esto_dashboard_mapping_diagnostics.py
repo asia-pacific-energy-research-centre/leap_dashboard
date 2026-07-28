@@ -14,6 +14,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from codebase.mapping_diagnostics_contract import (
+    load_mapping_diagnostics_contract,
+)
+
 
 #%%
 DIAGNOSTIC_PAGE_NAME = "mapping_diagnostics.html"
@@ -989,6 +993,15 @@ def write_mapping_diagnostics_page(
     ninth_tree = _read_csv(tree_root / "ninth_tree.csv")
     leap_tree = _read_csv(tree_root / "leap_tree.csv")
     common_esto_tree = _read_csv(tree_root / "common_esto_tree.csv")
+    contract_selection = load_mapping_diagnostics_contract(mappings_root)
+    contract_note = "Legacy tree artifacts (no canonical contract selected)"
+    if contract_selection is not None:
+        common_esto_tree = contract_selection["tree"]
+        stage = contract_selection["validation"]
+        contract_note = (
+            "Canonical hierarchy contract build: "
+            f"{str(contract_selection['build_id'])[:16]}"
+        )
     source_tree = _read_csv(tree_root / "all_dataset_trees.csv")
     partial = _read_csv(partial_path)
     unmapped = _read_csv(unmapped_path)
@@ -997,6 +1010,11 @@ def write_mapping_diagnostics_page(
     source_to_common = _read_csv(source_to_common_path)
     many_to_many = _read_csv(many_to_many_path)
     rollup_catalogue = _read_csv(rollup_catalogue_path)
+    if (
+        contract_selection is not None
+        and not contract_selection["rollups"].empty
+    ):
+        rollup_catalogue = contract_selection["rollups"]
     rollup_boundary_register = _rollup_boundary_details_html(rollup_catalogue, common_esto_tree)
     rollup_graph_data = _rollup_graph_data(common_esto_tree, rollup_catalogue)
     transformation_graph_json = json.dumps(rollup_graph_data, ensure_ascii=False).replace("</", "<\\/")

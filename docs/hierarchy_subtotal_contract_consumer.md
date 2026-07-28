@@ -19,7 +19,12 @@ Children add to parent in this context: NO
 
 Ordinary hierarchy edges must be shown separately from expanding,
 non-expanding, detached, alias, and synthetic relationships. The active
-Mapping diagnostics implementation had an uncommitted owner diff during the
-loader migration, so wiring the loader into that page remains an explicit
-follow-up rather than overwriting the active work.
+Mapping diagnostics implementation now prefers the selected canonical
+contract when its manifest exists. It adapts `axis_nodes.csv` into the
+read-only tree and filters `value_conformance_diagnostics.csv` to Common ESTO
+rows. A selected but invalid contract fails closed; legacy tree artifacts are
+used only when no contract manifest has been selected.
 
+The page displays the selected build ID. Registered expanding, non-expanding,
+and detached relationships continue to come from the rollup catalogue and
+remain separate from the contract's ordinary parent edges.
