@@ -41,7 +41,7 @@ Default inputs come from the sibling mappings repository:
 | `results/common_esto/common_esto_rows.csv` | component membership and generated-row metadata |
 | exact ESTO and ESTO Extended compressed rows | diagnostics/raw-value overlays |
 | mapping QA/tree/anchor files | diagnostics page and tree explorer |
-| `config/all_demand_aggregated_components.json` plus mapping helper | per-economy demand-detail availability |
+| `leap_mappings/config/all_demand_aggregated_components.json` plus the upstream mapping helper | per-economy demand-detail availability |
 
 The loader accepts:
 

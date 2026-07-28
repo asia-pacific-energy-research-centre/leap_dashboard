@@ -55,11 +55,13 @@ C:\Users\Work\miniconda3\python.exe codebase\common_esto_dashboard_workflow.py
 C:\Users\Work\miniconda3\python.exe -m pytest tests\test_common_esto_dashboard.py
 ```
 
-The default workflow renders the tracked `20_USA` fixture to
-`outputs/common_esto_dashboard/20USA/`. Before completing code or config work:
+The workflow defaults to `20_USA` and `02_BD` and reads the configured upstream
+Common ESTO outputs. Focused tests use the tracked `20_USA` fixture. Before
+completing code or config work:
 
 1. Run the focused tests.
-2. Render the sample fixture.
+2. Render the intended input explicitly; use the tracked USA fixture for a
+   focused regression check.
 3. Confirm dashboard HTML, Plotly bundles, `chart_manifest.csv`, and
    `page_assignment_summary.csv` exist.
 4. Run the publication-readiness and page-noise scripts.

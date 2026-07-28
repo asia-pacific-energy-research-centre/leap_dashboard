@@ -23,8 +23,8 @@ No document met the deletion standard.
 
 | Disposition | Count | Meaning |
 |---|---:|---|
-| Keep as-is | 8 | Distinct role and no high-confidence correction required. |
-| Keep and update | 10 | Distinct role retained; current-state, status, or navigation corrections applied. |
+| Keep as-is | 7 | Distinct role and no high-confidence correction required. |
+| Keep and update | 11 | Distinct role retained; current-state, status, or navigation corrections applied. |
 | Archive | 2 | No longer live guidance, but preserved for historical evidence and unique checklists. |
 | Merge | 0 | Earlier backlog consolidation was already complete. |
 | Delete | 0 | Nothing lacked evidence or unique information strongly enough to remove. |
@@ -60,14 +60,18 @@ added an archive index. The live backlog remains only in `docs/work_queue.md`.
    stale status cells for DASHQ-003, DASHQ-004, DASHQ-006, and DASHQ-025. Those
    cells now agree with the evidence. DASHQ-010 and DASHQ-016 record the archive
    and document-placement work completed by this audit.
+8. A second editorial pass corrected `AGENTS.md` so the two-economy production
+   default is not confused with the USA-only test fixture, and replaced the
+   unsupported singular `COMMON_ESTO_ECONOMY` example with
+   `COMMON_ESTO_ECONOMIES`.
 
 ## Document-by-document disposition
 
 | File | Role/status | Evidence and unique information | Decision and action |
 |---|---|---|---|
-| `AGENTS.md` | Canonical repository instructions | Defines production boundary, upstream ownership, prompt archival, validation, and safety rules. Current paths exist. | **Keep as-is.** |
+| `AGENTS.md` | Canonical repository instructions | Defines production boundary, upstream ownership, prompt archival, validation, and safety rules. Its run section incorrectly described the two-economy production default as a USA-fixture render. | **Keep/update:** distinguish the production default from the focused USA test fixture. |
 | `README.md` | Repository entry point | Shortest route to run, artifacts, tests, layout, and handover. | **Keep/update:** corrected default economies; linked queue and audit. |
-| `docs/common_esto_dashboard_guide.md` | Canonical operating guide | Detailed inputs, fixture refresh, batch render, config, publication, and smoke tests. Commands and paths exist. | **Keep/update:** corrected default economies while preserving USA fixture guidance. |
+| `docs/common_esto_dashboard_guide.md` | Canonical operating guide | Detailed inputs, fixture refresh, batch render, config, publication, and smoke tests. Commands and paths exist. | **Keep/update:** corrected default economies and environment-variable name while preserving USA fixture guidance. |
 | `docs/common_esto_dashboard_page_status.md` | Dated render evidence | Unique June page counts, noise findings, and diagnostic-page review. A reproducible replacement render does not yet exist. | **Keep/update:** label counts as 2026-06-28 evidence; refresh remains DASHQ-012. |
 | `docs/common_esto_dashboard_plan.md` | Current-state summary plus build history | Unique production-state narrative and historical build rationale; backlog sections already consolidated. | **Keep/update:** add contract/diagnostics/provenance surfaces and route old backlog link to archive. |
 | `docs/common_esto_dashboard_visual_review.md` | Presentation review record | Unique colour, legend, responsive-layout findings and acceptance criteria; planned items remain valid. | **Keep as-is.** |
