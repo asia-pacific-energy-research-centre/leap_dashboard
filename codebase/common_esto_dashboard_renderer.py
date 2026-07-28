@@ -1108,7 +1108,18 @@ def _build_section_aggregate_charts(
             })
             if suppressed:
                 continue
-            charts[chart_key] = build_area_chart(page_df, area_spec, series_labels, template, group_col=group_col, title_prefix=title_prefix)
+            figure = build_area_chart(
+                page_df,
+                area_spec,
+                series_labels,
+                template,
+                group_col=group_col,
+                title_prefix=title_prefix,
+            )
+            if not figure.data:
+                manifest_rows[-1]["suppressed"] = True
+                continue
+            charts[chart_key] = figure
             chart_rows.append({
                 "chart_key": chart_key,
                 "chart_type": "stacked_area",
@@ -1213,7 +1224,18 @@ def _build_flow_group_aggregate_charts(
             })
             if suppressed:
                 continue
-            charts[chart_key] = build_area_chart(page_df, area_spec, series_labels, template, group_col=group_col, title_prefix=title_prefix)
+            figure = build_area_chart(
+                page_df,
+                area_spec,
+                series_labels,
+                template,
+                group_col=group_col,
+                title_prefix=title_prefix,
+            )
+            if not figure.data:
+                manifest_rows[-1]["suppressed"] = True
+                continue
+            charts[chart_key] = figure
             chart_rows.append({
                 "chart_key": chart_key,
                 "chart_type": "stacked_area",
@@ -3480,7 +3502,11 @@ def render_dashboard(
             })
             if suppressed:
                 continue
-            charts[chart_key] = build_area_chart(page_df, area_spec, series_labels, template)
+            figure = build_area_chart(page_df, area_spec, series_labels, template)
+            if not figure.data:
+                manifest_rows[-1]["suppressed"] = True
+                continue
+            charts[chart_key] = figure
             chart_rows.append({
                 "chart_key": chart_key,
                 "chart_type": "stacked_area",

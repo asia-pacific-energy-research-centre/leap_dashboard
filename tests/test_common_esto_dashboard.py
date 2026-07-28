@@ -21,6 +21,7 @@ from codebase.common_esto_dashboard_renderer import (
     drop_excluded_flow_rows,
     render_dashboard,
     select_transformation_total_rows,
+    _build_section_aggregate_charts,
     _non_overlapping_common_row_frontier,
     _non_overlapping_flow_rows,
 )
@@ -673,6 +674,45 @@ def test_non_expanding_frontier_uses_shared_aggregate_id_when_axis_codes_differ(
 
     assert list(selected["value"]) == [30.0]
     assert bool(selected.iloc[0]["is_non_expanding_rollup"])
+
+
+def test_section_aggregate_suppresses_chart_with_no_renderable_series() -> None:
+    rows = pd.DataFrame([
+        {
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2023,
+            "common_flow_code": "08",
+            "common_flow_label": "08 Transfers",
+            "common_product_label": "07.01 Motor gasoline",
+            "_section_label": "Transfers",
+            "value": 30.0,
+        }
+    ])
+    template = {
+        "chart_generation": {
+            "primary_area_source_system": "LEAP",
+            "primary_area_scenario": "Target",
+            "comparison_source_system": "ESTO",
+            "ninth_source_system": "NINTH",
+            "base_year": 2023,
+            "suppression_threshold": 1.0,
+        }
+    }
+
+    charts, chart_rows, manifest_rows = _build_section_aggregate_charts(
+        rows,
+        page_key="other_transformation",
+        page_label="Other transformation",
+        parent_flow_labels=set(),
+        template=template,
+        series_labels={},
+    )
+
+    assert charts == {}
+    assert chart_rows == []
+    assert len(manifest_rows) == 2
+    assert all(row["suppressed"] for row in manifest_rows)
 
 
 def test_chart_chrome_resolves_duplicate_configured_category_colours() -> None:
