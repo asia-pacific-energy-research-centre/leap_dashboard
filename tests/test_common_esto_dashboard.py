@@ -340,6 +340,66 @@ def test_wide_loader_can_select_alternate_scope(tmp_path: Path) -> None:
     assert len(df[df["source_system"] == "ESTO"]) == 1
 
 
+def test_wide_loader_preserves_numeric_looking_flow_and_product_codes(tmp_path: Path) -> None:
+    wide_path = tmp_path / "wide_numeric_codes.csv"
+    pd.DataFrame([
+        {
+            "comparison_scope": "esto_leap_ninth",
+            "economy": "02_BD",
+            "scenario": "ESTO historical",
+            "product": "08.02",
+            "flow": "09.01",
+            "2022": 12.5,
+        }
+    ]).to_csv(wide_path, index=False)
+
+    loaded = load_common_esto_data(wide_path)
+    row = loaded.iloc[0]
+
+    assert row["common_product_code"] == "08.02"
+    assert row["common_product_label"] == "08.02"
+    assert row["common_flow_code"] == "09.01"
+    assert row["common_flow_label"] == "09.01"
+    assert row["year"] == 2022
+    assert row["value"] == 12.5
+
+
+def test_long_loader_preserves_identifier_code_and_label_strings(tmp_path: Path) -> None:
+    long_path = tmp_path / "long_numeric_codes.csv"
+    pd.DataFrame([
+        {
+            "comparison_scope": "esto_leap_ninth",
+            "source_system": "ESTO",
+            "economy": "02_BD",
+            "scenario": "historical",
+            "year": 2022,
+            "common_flow_code": "09.01",
+            "common_flow_name": "",
+            "common_flow_label": "09.01",
+            "common_product_code": "08.02",
+            "common_product_name": "",
+            "common_product_label": "08.02",
+            "common_row_id": "000123",
+            "is_exact_row": True,
+            "requires_rollup": False,
+            "value": 12.5,
+        }
+    ]).to_csv(long_path, index=False)
+
+    loaded = load_common_esto_data(long_path)
+    row = loaded.iloc[0]
+
+    assert row["common_row_id"] == "000123"
+    assert row["common_product_code"] == "08.02"
+    assert row["common_product_label"] == "08.02"
+    assert row["common_flow_code"] == "09.01"
+    assert row["common_flow_label"] == "09.01"
+    assert row["year"] == 2022
+    assert row["value"] == 12.5
+    assert bool(row["is_exact_row"])
+    assert not bool(row["requires_rollup"])
+
+
 def test_common_esto_scope_filter_rejects_unavailable_scope() -> None:
     df = pd.DataFrame(
         [

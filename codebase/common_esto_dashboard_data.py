@@ -33,6 +33,22 @@ ALL_SCOPES = "__all_scopes__"
 ID_COLUMNS_WIDE = ["economy", "scenario", "product", "flow"]
 OUTPUT_CONTRACT_VERSION = "common_esto_output_contract_v1"
 
+LEGACY_TEXT_COLUMNS = {
+    "comparison_scope",
+    "source_system",
+    "economy",
+    "scenario",
+    "product",
+    "flow",
+    "component_esto_flow",
+    "component_esto_product",
+    "common_row_basis",
+    "rollup_mode",
+    "aggregate_group_source",
+    "aggregation_reason",
+    "notes",
+}
+
 CONTRACT_FACT_COLUMNS = [
     "comparison_scope",
     "source_system",
@@ -168,6 +184,17 @@ def parse_combined_scenario(value: object) -> tuple[str, str]:
     return source_system, scenario
 
 
+def _legacy_csv_text_dtypes(path: Path) -> dict[str, type[str]]:
+    """Preserve identifier and display columns while leaving facts numeric."""
+    columns = pd.read_csv(path, nrows=0).columns
+    text_suffixes = ("_code", "_name", "_label", "_labels", "_id", "_ids")
+    return {
+        column: str
+        for column in columns
+        if column in LEGACY_TEXT_COLUMNS or column.endswith(text_suffixes)
+    }
+
+
 def apply_sign_semantics(df: pd.DataFrame, sign_rules: list[dict]) -> pd.DataFrame:
     """Attach sign-convention metadata based on common ESTO flow/sector."""
     if not sign_rules:
@@ -269,7 +296,11 @@ def load_wide_common_esto_data(
     ``comparison_scope`` column (see ``DEFAULT_WIDE_FILE_SCOPE``). This prevents
     double-counting scenarios that appear identically under more than one scope.
     """
-    wide_df = pd.read_csv(path, low_memory=False).fillna(0)
+    wide_df = pd.read_csv(
+        path,
+        dtype=_legacy_csv_text_dtypes(path),
+        low_memory=False,
+    ).fillna(0)
     missing_columns = [column for column in ID_COLUMNS_WIDE if column not in wide_df.columns]
     if missing_columns:
         raise ValueError(f"Wide common ESTO file is missing columns: {missing_columns}")
@@ -312,7 +343,11 @@ def load_wide_common_esto_data(
 
 def load_long_common_esto_data(path: Path) -> pd.DataFrame:
     """Load already-long common ESTO comparison data."""
-    df = pd.read_csv(path, low_memory=False).fillna("")
+    df = pd.read_csv(
+        path,
+        dtype=_legacy_csv_text_dtypes(path),
+        low_memory=False,
+    ).fillna("")
     missing_columns = [column for column in REQUIRED_COLUMNS if column not in df.columns]
     if missing_columns:
         raise ValueError(f"Common ESTO data is missing required columns: {missing_columns}")
@@ -626,7 +661,7 @@ def load_common_esto_data(
     """
     if output_contract_path is not None:
         return load_common_esto_output_contract(output_contract_path)
-    sample_df = pd.read_csv(path, nrows=5, low_memory=False)
+    sample_df = pd.read_csv(path, nrows=0, low_memory=False)
     if all(column in sample_df.columns for column in REQUIRED_COLUMNS):
         return load_long_common_esto_data(path)
     if all(column in sample_df.columns for column in ID_COLUMNS_WIDE) and get_year_columns(sample_df):
