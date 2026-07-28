@@ -17,8 +17,13 @@ contract fails without falling back to legacy data.
 ## Phase 2 work queue
 
 - Make mapping diagnostics use manifest-declared compressed artifacts.
-- Make pipeline provenance use contract run identity and member checksums.
-- Make the mapping-pipeline health report contract-aware.
 - Migrate standalone mapping and transformation prototypes to shared loaders.
 - Add optional economy-partition discovery and selective partition loading.
 - Add full rendered-chart, publication-readiness, and all-economy equivalence gates.
+
+Completed:
+
+- Pipeline provenance identifies the explicitly selected contract run and warns
+  when a failed or different latest Stage 3 attempt preserved an older contract.
+- The mapping-pipeline health report shows selected contract identity, declared
+  fact/metadata freshness, and the same preserved-contract divergence warning.

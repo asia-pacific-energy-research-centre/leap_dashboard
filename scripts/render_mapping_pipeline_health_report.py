@@ -27,7 +27,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from html import escape
 from pathlib import Path
-import json
 import sys
 
 import pandas as pd
@@ -39,8 +38,10 @@ if str(REPO_ROOT) not in sys.path:
 
 from codebase.mapping_pipeline_provenance import (  # noqa: E402 - needs sys.path above
     artifact_mtime as _artifact_mtime,
+    manifest_artifact_paths,
     pipeline_commits_since as _pipeline_commits_since,
     resolve_mappings_root,
+    selected_run_manifest,
 )
 
 MAPPINGS_ROOT = resolve_mappings_root(REPO_ROOT.parent / "leap_mappings")
@@ -126,13 +127,8 @@ def load_artifacts() -> dict[str, Artifact]:
 
 
 def load_manifest() -> dict:
-    """Read the Stage 3 run manifest, or return an explicit failure marker."""
-    if not MANIFEST_PATH.exists():
-        return {"_missing": True}
-    try:
-        return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    except Exception as error:  # noqa: BLE001
-        return {"_missing": True, "_error": f"{type(error).__name__}: {error}"}
+    """Read the selected output-contract identity or legacy Stage 3 manifest."""
+    return selected_run_manifest(MAPPINGS_ROOT)
 
 
 #%%
@@ -226,18 +222,36 @@ def _missing_note(artifact: Artifact) -> str:
 #%%
 def _run_header(manifest: dict, artifacts: dict[str, Artifact]) -> tuple[str, str]:
     """Build the run identity block and the freshness table."""
+    is_contract = manifest.get("_manifest_kind") == "output_contract"
+    manifest_label = "Common ESTO output contract" if is_contract else "Stage 3 run manifest"
     if manifest.get("_missing"):
+        error = (
+            f"<br>{escape(str(manifest.get('_error')))}"
+            if manifest.get("_error")
+            else ""
+        )
         header = (
-            '<p class="empty empty--warn">Stage 3 run manifest not found at '
-            f"<code>{escape(str(MANIFEST_PATH))}</code>.</p>"
+            f'<p class="empty empty--warn">Selected {manifest_label} unavailable at '
+            f"<code>{escape(str(manifest.get('_path', MANIFEST_PATH)))}</code>.{error}</p>"
         )
         return header, ""
     run_id = str(manifest.get("run_id", "unknown"))
     run_time = str(manifest.get("run_timestamp_utc", "unknown"))
-    status = str(manifest.get("status", "unknown"))
+    status = str(manifest.get("status", "declared" if is_contract else "unknown"))
     timings = manifest.get("timings_seconds", {})
     scopes = manifest.get("comparison_scopes", [])
-    datasets = manifest.get("datasets", {})
+    if is_contract:
+        declared_member_paths = manifest_artifact_paths(manifest, MAPPINGS_ROOT)
+        datasets = {
+            name: {
+                "exists": path.is_file(),
+                "size_bytes": manifest[name].get("size_bytes", 0),
+            }
+            for name, path in zip(["fact", "metadata"], declared_member_paths)
+            if isinstance(manifest.get(name), dict)
+        }
+    else:
+        datasets = manifest.get("datasets", {})
     dataset_rows = "".join(
         f"<tr><td>{escape(name)}</td><td>{_chip('present' if info.get('exists') else 'missing')}</td>"
         f"<td class=\"num\">{_number(info.get('size_bytes', 0) / 1_000_000, 1)} MB</td></tr>"
@@ -250,11 +264,11 @@ def _run_header(manifest: dict, artifacts: dict[str, Artifact]) -> tuple[str, st
     )
     header = (
         '<div class="run-grid">'
-        f'<div class="run-cell"><span class="run-label">Run</span>'
+        f'<div class="run-cell"><span class="run-label">{escape(manifest_label)}</span>'
         f'<span class="run-value mono">{escape(run_id)}</span></div>'
-        f'<div class="run-cell"><span class="run-label">Stage 3 finished</span>'
+        f'<div class="run-cell"><span class="run-label">Run timestamp</span>'
         f'<span class="run-value">{escape(run_time)}</span></div>'
-        f'<div class="run-cell"><span class="run-label">Stage 3 status</span>'
+        f'<div class="run-cell"><span class="run-label">Run status</span>'
         f'<span class="run-value">{_chip(status)}</span></div>'
         f'<div class="run-cell"><span class="run-label">Comparison scopes</span>'
         f'<span class="run-value mono">{escape(", ".join(scopes)) or "—"}</span></div>'
@@ -268,16 +282,57 @@ def _run_header(manifest: dict, artifacts: dict[str, Artifact]) -> tuple[str, st
         "</tbody></table></div></div>"
         "</div>"
     )
-
-    comparison_path = Path(
-        str(manifest.get("validation", {}).get("common_esto_status", [{}])[0]
-            .get("input_path", RESULTS_ROOT / "common_esto" / "common_esto_comparison_data.csv"))
+    latest_stage3 = manifest.get("_latest_stage3_manifest", {})
+    latest_run_id = str(latest_stage3.get("run_id", "")).strip()
+    latest_status = str(latest_stage3.get("status", "unknown")).strip()
+    failed_latest_attempt = any(
+        marker in latest_status.casefold()
+        for marker in ["fail", "error", "incomplete", "review", "not_published"]
     )
-    comparison_mtime = _artifact_mtime(comparison_path)
+    if is_contract and latest_run_id and (
+        latest_run_id != run_id or failed_latest_attempt
+    ):
+        if failed_latest_attempt:
+            divergence = (
+                f"Latest Stage 3 attempt <code>{escape(latest_run_id)}</code> has status "
+                f"<strong>{escape(latest_status)}</strong>. Selected contract "
+                f"<code>{escape(run_id)}</code> is the preserved last successful snapshot."
+            )
+        else:
+            divergence = (
+                f"Latest Stage 3 run <code>{escape(latest_run_id)}</code> has status "
+                f"<strong>{escape(latest_status)}</strong>, but the selected contract is "
+                f"<code>{escape(run_id)}</code>."
+            )
+        header += (
+            '<p class="empty empty--warn"><strong>Selected contract is not the latest '
+            f"pipeline attempt.</strong> {divergence}</p>"
+        )
+
+    if is_contract:
+        input_paths = manifest_artifact_paths(manifest, MAPPINGS_ROOT)
+    else:
+        input_paths = [
+            Path(
+                str(manifest.get("validation", {}).get("common_esto_status", [{}])[0]
+                    .get(
+                        "input_path",
+                        RESULTS_ROOT / "common_esto" / "common_esto_comparison_data.csv",
+                    ))
+            )
+        ]
+    input_mtimes = [
+        mtime
+        for mtime in (_artifact_mtime(path) for path in input_paths)
+        if mtime is not None
+    ]
+    comparison_mtime = max(input_mtimes) if input_mtimes else None
     freshness_rows: list[str] = []
     for artifact in artifacts.values():
         if not artifact.exists:
             state = _chip("missing")
+        elif comparison_mtime is None:
+            state = _chip("input time unknown", "unknown")
         elif comparison_mtime is not None and artifact.mtime is not None and artifact.mtime < comparison_mtime:
             state = _chip("older than input", "unknown")
         else:
@@ -289,8 +344,8 @@ def _run_header(manifest: dict, artifacts: dict[str, Artifact]) -> tuple[str, st
             f"<td class=\"num\">{_number(artifact.rows)}</td><td>{state}</td></tr>"
         )
     freshness = (
-        f'<p class="source">Compared against the Stage 3 comparison input '
-        f"<code>{escape(comparison_path.name)}</code> "
+        f'<p class="source">Compared against the selected {escape(manifest_label)} input '
+        f"<code>{escape(', '.join(path.name for path in input_paths))}</code> "
         f"(written {escape(_timestamp(comparison_mtime))}).</p>"
         '<div class="table-wrap"><table><thead><tr><th>Artifact</th><th>File</th>'
         "<th>Written</th><th>Rows</th><th>State</th></tr></thead><tbody>"

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import sys
 
@@ -9,6 +10,7 @@ if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
 import render_mapping_pipeline_health_report as report  # noqa: E402
+from codebase import mapping_pipeline_provenance as provenance
 
 
 def _artifact(key: str, name: str, frame: pd.DataFrame, *, exists: bool = True) -> report.Artifact:
@@ -20,6 +22,91 @@ def _artifact(key: str, name: str, frame: pd.DataFrame, *, exists: bool = True) 
         exists=exists,
         mtime=pd.Timestamp("2026-07-27 13:38"),
     )
+
+
+def _write_output_contract(root: Path) -> Path:
+    fact_path = root / "common_esto_fact.csv"
+    metadata_path = root / "common_esto_metadata.csv"
+    fact_path.write_text("value\n1\n", encoding="utf-8")
+    metadata_path.write_text("label\nrow\n", encoding="utf-8")
+    manifest = {
+        "contract_version": provenance.OUTPUT_CONTRACT_VERSION,
+        "run_id": "health_contract_run",
+        "run_timestamp_utc": "2026-07-28T00:00:00+00:00",
+        "observed_rows_only": True,
+        "fact": {"path": fact_path.name, "size_bytes": fact_path.stat().st_size},
+        "metadata": {"path": metadata_path.name, "size_bytes": metadata_path.stat().st_size},
+    }
+    manifest_path = root / "common_esto_output_contract.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return manifest_path
+
+
+def test_health_report_uses_selected_contract_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = _write_output_contract(tmp_path)
+    monkeypatch.setenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, "1")
+    monkeypatch.setenv(provenance.OUTPUT_CONTRACT_PATH_ENV_VAR, str(manifest_path))
+
+    manifest = report.load_manifest()
+    header, freshness = report._run_header(manifest, {})
+
+    assert manifest["_manifest_kind"] == "output_contract"
+    assert "Common ESTO output contract" in header
+    assert "health_contract_run" in header
+    assert "fact" in header
+    assert "metadata" in header
+    assert "common_esto_fact.csv" in freshness
+    assert "common_esto_metadata.csv" in freshness
+
+
+def test_health_report_marks_invalid_selected_contract_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selected_path = tmp_path / "missing.json"
+    monkeypatch.setenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, "yes")
+    monkeypatch.setenv(provenance.OUTPUT_CONTRACT_PATH_ENV_VAR, str(selected_path))
+
+    manifest = report.load_manifest()
+    header, freshness = report._run_header(manifest, {})
+
+    assert manifest["_missing"] is True
+    assert "Common ESTO output contract" in header
+    assert "unavailable" in header
+    assert freshness == ""
+
+
+def test_health_report_distinguishes_failed_latest_attempt_from_preserved_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = _write_output_contract(tmp_path)
+    stage3_path = tmp_path / "results" / "common_esto" / "stage3_run_manifest.json"
+    stage3_path.parent.mkdir(parents=True)
+    stage3_path.write_text(
+        json.dumps(
+            {
+                "run_id": "review_health_attempt",
+                "status": "needs_mapping_review",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(report, "MAPPINGS_ROOT", tmp_path)
+    monkeypatch.setenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, "1")
+    monkeypatch.setenv(provenance.OUTPUT_CONTRACT_PATH_ENV_VAR, str(manifest_path))
+
+    manifest = report.load_manifest()
+    header, _ = report._run_header(manifest, {})
+
+    assert "not the latest pipeline attempt" in header
+    assert "review_health_attempt" in header
+    assert "needs_mapping_review" in header
+    assert "health_contract_run" in header
+    assert "preserved last successful snapshot" in header
 
 
 def test_skipped_hierarchy_check_is_reported_as_not_validated() -> None:

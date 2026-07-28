@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -28,6 +29,25 @@ DOCUMENT = """<!doctype html>
 </body>
 </html>
 """
+
+
+def _write_output_contract(root: Path, run_id: str = "contract_run") -> Path:
+    """Write the identity fields needed by lightweight provenance checks."""
+    fact_path = root / "fact.csv"
+    metadata_path = root / "metadata.csv"
+    fact_path.write_text("value\n1\n", encoding="utf-8")
+    metadata_path.write_text("label\nrow\n", encoding="utf-8")
+    manifest = {
+        "contract_version": provenance.OUTPUT_CONTRACT_VERSION,
+        "run_id": run_id,
+        "run_timestamp_utc": "2026-07-28T00:00:00+00:00",
+        "observed_rows_only": True,
+        "fact": {"path": fact_path.name},
+        "metadata": {"path": metadata_path.name},
+    }
+    manifest_path = root / "common_esto_output_contract.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return manifest_path
 
 
 def test_fragment_drops_the_document_wrapper_but_keeps_styles_and_scripts() -> None:
@@ -95,6 +115,85 @@ def test_mappings_root_override_without_results_fails_loudly(tmp_path: Path,
 
     with pytest.raises(ValueError, match="no results/ directory"):
         provenance.resolve_mappings_root(Path("C:/somewhere/leap_mappings"))
+
+
+def test_selected_output_contract_supplies_provenance_run_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = _write_output_contract(tmp_path, run_id="contract_123")
+    monkeypatch.setenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, "1")
+    monkeypatch.setenv(provenance.OUTPUT_CONTRACT_PATH_ENV_VAR, str(manifest_path))
+    monkeypatch.setattr(provenance, "pipeline_commits_since", lambda root, cutoff: ([], ""))
+
+    manifest = provenance.selected_run_manifest(tmp_path)
+    message, tone = provenance.provenance_message(tmp_path)
+
+    assert manifest["_manifest_kind"] == "output_contract"
+    assert manifest["run_id"] == "contract_123"
+    assert tone == "info"
+    assert "Common ESTO output contract" in message
+    assert "contract_123" in message
+
+
+def test_legacy_stage3_identity_remains_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stage3_path = tmp_path / "results" / "common_esto" / "stage3_run_manifest.json"
+    stage3_path.parent.mkdir(parents=True)
+    stage3_path.write_text(json.dumps({"run_id": "legacy_run"}), encoding="utf-8")
+    monkeypatch.delenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, raising=False)
+    monkeypatch.delenv(provenance.OUTPUT_CONTRACT_PATH_ENV_VAR, raising=False)
+
+    manifest = provenance.selected_run_manifest(tmp_path)
+
+    assert manifest["_manifest_kind"] == "stage3"
+    assert manifest["run_id"] == "legacy_run"
+
+
+def test_invalid_selected_contract_does_not_fall_back_to_stage3(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stage3_path = tmp_path / "results" / "common_esto" / "stage3_run_manifest.json"
+    stage3_path.parent.mkdir(parents=True)
+    stage3_path.write_text(json.dumps({"run_id": "legacy_run"}), encoding="utf-8")
+    selected_path = tmp_path / "missing_contract.json"
+    monkeypatch.setenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, "true")
+    monkeypatch.setenv(provenance.OUTPUT_CONTRACT_PATH_ENV_VAR, str(selected_path))
+
+    manifest = provenance.selected_run_manifest(tmp_path)
+    message, tone = provenance.provenance_message(tmp_path)
+
+    assert manifest["_missing"] is True
+    assert manifest["_manifest_kind"] == "output_contract"
+    assert "legacy_run" not in message
+    assert "selected Common ESTO output contract" in message
+    assert tone == "warning"
+
+
+def test_failed_latest_stage3_attempt_marks_selected_contract_as_preserved(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest_path = _write_output_contract(tmp_path, run_id="last_successful_contract")
+    stage3_path = tmp_path / "results" / "common_esto" / "stage3_run_manifest.json"
+    stage3_path.parent.mkdir(parents=True)
+    stage3_path.write_text(
+        json.dumps({"run_id": "failed_attempt", "status": "failed"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, "1")
+    monkeypatch.setenv(provenance.OUTPUT_CONTRACT_PATH_ENV_VAR, str(manifest_path))
+
+    message, tone = provenance.provenance_message(tmp_path)
+
+    assert tone == "warning"
+    assert "Preserved snapshot, not the latest pipeline attempt" in message
+    assert "last_successful_contract" in message
+    assert "failed_attempt" in message
+    assert "last successful snapshot" in message
 
 
 def test_superseded_artifacts_produce_a_warning_banner(monkeypatch: pytest.MonkeyPatch) -> None:
