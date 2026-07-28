@@ -19,7 +19,7 @@ contract fails without falling back to legacy data.
 - Make mapping diagnostics use manifest-declared compressed artifacts.
 - Migrate standalone mapping and transformation prototypes to shared loaders.
 - Add optional economy-partition discovery and selective partition loading.
-- Add full rendered-chart, publication-readiness, and all-economy equivalence gates.
+- Add an all-economy equivalence gate after the two representative real-data renders.
 
 Completed:
 
@@ -31,6 +31,10 @@ Completed:
   retain legacy defaults, and fail without fallback when a contract is selected.
 - Production mapping diagnostics and the full-tree explorer already receive the
   workflow's normalized comparison frame, so they need no separate reader.
+- Real legacy/contract renders matched exactly for `20USA` and `02BD`: 390 charts,
+  3,427 traces, equal manifests, page assignments, sign summaries, normalized
+  chart series, and zero page-noise flags. Both formats passed publication
+  readiness after suppressing empty area figures.
 
 Deferred one-off readers:
 
