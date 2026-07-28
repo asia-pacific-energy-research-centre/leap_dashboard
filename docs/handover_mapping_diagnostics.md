@@ -223,11 +223,16 @@ Timestamps must stay local (`artifact_mtime()` uses
 `pd.Timestamp.fromtimestamp`). Reading them as UTC silently shifts them by the
 local offset and produces false "superseded code" positives.
 
-### Confirmed: current artifacts double every ordinary-ESTO rollup value
+### Historical incident: ordinary-ESTO rollup values were doubled (resolved)
 
-The 2026-07-27 prototype re-render reproduced the electricity-plants doubling
-described earlier in this handover. It is not fixed, and it is not a dashboard
-bug. Verified directly against the artifacts:
+The diagnosis below is retained because it is a useful example of the dashboard
+correctly exposing an upstream data defect. It describes the artifact generation
+`common_esto_20260727T034511926826Z`; it does **not** describe the current
+artifacts.
+
+The 2026-07-27 prototype re-render reproduced the electricity-plants doubling.
+It was not a dashboard bug. At the time, the following was verified directly
+against that generation:
 
 - Commit `eb3a293` landed at 14:14 local. The artifacts were written at 12:39
   and Stage 3 finished at 13:38. The run predates its own fix by ~35 minutes.
@@ -238,17 +243,20 @@ bug. Verified directly against the artifacts:
   `09.01.01,09.02.01 Electricity plants`, the Common ESTO value is exactly
   `2.0x` the raw contributor sum in **all 21 economies**.
 
-Until `leap_mappings/docs/prompts/rebuild_esto_rollup_source_identity_prompt.md`
-is executed, treat every ordinary-ESTO value for those 15 flows in both the
-diagnostics page and the health report as doubled. Re-render both pages after
-the rebuild; the health report's code-versus-artifacts section is the completion
-check.
+The fix landed in mappings commit `eb3a293`. Run
+`common_esto_20260727T113042584213Z` removed the doubling (ratio 1.0 in all 21
+economies) and added a guard that fails instead of publishing a doubled
+artifact. A later 2026-07-28 audit measured 5,320,932 rows in
+`esto_extended_results_exact_rows.csv.gz`, all identified as `ESTO_EXTENDED`,
+and zero rows incorrectly identified as `ESTO`. Preserve the historical
+diagnosis, but do not tell reviewers that current ordinary-ESTO values are
+doubled.
 
 ### Queued work
 
 | Prompt | Repo | Scope |
 | --- | --- | --- |
-| `docs/prompts/rebuild_esto_rollup_source_identity_prompt.md` | `leap_mappings` | **DONE 2026-07-27.** Run `common_esto_20260727T113042584213Z` removed the doubling (ratio 1.0 in all 21 economies) and added a guard that fails the run rather than writing a doubled artifact. |
+| `rebuild_esto_rollup_source_identity_prompt.md` (completed prompt; no longer present on mappings `master`) | `leap_mappings` | **DONE 2026-07-27.** Run `common_esto_20260727T113042584213Z` removed the doubling (ratio 1.0 in all 21 economies) and added a guard that fails the run rather than writing a doubled artifact. |
 | `docs/prompts/anchor_validation_section_rebuild_prompt.md` | `leap_dashboard` | Rebuild the anchor section: one parent boundary is one check, fuels/years nested as evidence, full filters, defensive skipped-run handling. |
 
 ### Deferred: ESTO Extended coverage findings

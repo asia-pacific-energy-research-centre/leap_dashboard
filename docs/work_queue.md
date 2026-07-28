@@ -22,6 +22,12 @@ inspection of the current upstream mapping artifacts.
 
 These later commits supersede the corresponding snapshot rows below:
 
+- **DASHQ-003 and DASHQ-004 are complete in the current documentation
+  checkout.** `docs/handover_mapping_diagnostics.md` now retains the original
+  doubling diagnosis as dated incident evidence while clearly recording the
+  fix, verified replacement artifact identity counts, and completed prompt.
+  It no longer instructs readers to execute a prompt absent from mappings
+  `master`.
 - **DASHQ-006 is `complete_unpushed`.** The producer and strict opt-in consumer
   halves of `common_esto_output_contract_v1` are on the two local `master`
   branches. Dashboard commits `3b4608c`, `e12029b`, `8bac7d5`, and `71826b1`

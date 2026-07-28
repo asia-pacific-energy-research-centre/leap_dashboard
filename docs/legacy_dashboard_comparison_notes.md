@@ -1,9 +1,10 @@
 # Legacy Dashboard Reference Notes
 
 The frozen repository at `C:\Users\Work\github\leap_dashboard_legacy` is the
-rendering reference. Its main entry point is
-`codebase/leap_results_dashboard_workflow.py`; do not copy that architecture
-back into the official repository.
+rendering reference. Inside that sibling repository, its main entry point is
+`codebase/leap_results_dashboard_workflow.py`; the path is intentionally not
+present in this official repository. Do not copy that architecture back into
+the official repository.
 
 Reusable ideas:
 
