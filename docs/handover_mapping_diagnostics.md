@@ -57,15 +57,46 @@ tolerance; red means a mismatch; unavailable values are not treated as failures.
 
 ## ESTO Extended behaviour
 
-The diagnostics page now uses ordinary ESTO by default.
+The diagnostics page uses ordinary ESTO by default. The full-tree SVG has an
+**ESTO basis** selector:
 
-- **Include ESTO Extended** is a checkbox above the SVG.
-- When enabled, `ESTO_EXTENDED` becomes available in the Dataset selector.
-- Selecting a source displays that source alone. Ordinary and Extended ESTO are
-  never summed together for a reconciliation check.
+- **Original ESTO only** excludes Extended-only nodes and values.
+- **ESTO + ESTO Extended** makes both datasets available, but the Dataset
+  selector still displays one source at a time.
+- **Compare ESTO vs Extended** locks the Dataset selector and displays the two
+  sources side by side. It does not add their values.
+- Ordinary and Extended ESTO are never summed together for a reconciliation
+  check.
 - The page includes separately labelled raw helper values (`ESTO_RAW` and
   `ESTO_EXTENDED_RAW`) so rollup contributors can be shown even when they do
   not exist as standalone Common ESTO flow labels.
+
+```mermaid
+flowchart TD
+    OPEN["Open Mapping diagnostics"]
+    BASIS{"Choose ESTO basis"}
+    ORDINARY["Original: show ordinary ESTO only"]
+    PLUS["Plus: make ESTO and ESTO_EXTENDED selectable"]
+    COMPARE["Compare: show ESTO and ESTO_EXTENDED side by side"]
+    SELECT["For Original or Plus, select one source system"]
+    FILTER["Apply scenario, year, and diagram-boundary filters"]
+    VALUES["Show separate Common ESTO values plus labelled raw helpers"]
+    CHECK["Compare target with contributors within tolerance"]
+    RESULT["Green match, red mismatch, or unavailable"]
+
+    OPEN --> BASIS
+    BASIS -- "Original" --> ORDINARY
+    BASIS -- "Plus" --> PLUS
+    BASIS -- "Compare" --> COMPARE
+    ORDINARY --> SELECT
+    PLUS --> SELECT
+    SELECT --> FILTER --> VALUES --> CHECK --> RESULT
+    COMPARE --> FILTER
+```
+
+The basis control changes visibility and comparison presentation, not
+aggregation. Raw helper values provide evidence without becoming extra
+contributors to either Common ESTO total.
 
 The page payload is deliberately limited to flow labels that appear in the SVG
 or rollup boundaries. Do not embed all Common ESTO comparison rows in the HTML:
