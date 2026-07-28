@@ -32,13 +32,17 @@ that overlap the unintegrated `codex/output-contract-phase-2` worktree.
    here.** `AGENTS.md` instructs agents to move completed prompts from
    `docs/prompts/` into `docs/archive/`, citing the `leap_mappings` pattern.
    `docs/archive/` does not exist. Queued as DASHQ-010.
-3. **There is no repository-level work queue or handover index.** Backlog
-   material is spread across `docs/future_dashboard_backlog.md`,
-   `docs/common_esto_dashboard_plan.md`, the follow-up list inside
-   `docs/handover_mapping_diagnostics.md`, and `zip_extraction_plan.md`. This
-   audit adds `docs/work_queue.md` as the single controlling queue; the other
-   four remain as source material and must not be maintained as parallel
-   backlogs.
+3. **There was no repository-level work queue, and backlog material lived in
+   three parallel places.** `docs/future_dashboard_backlog.md` duplicated §2 and
+   §3 of `docs/common_esto_dashboard_plan.md` almost item for item, and
+   `docs/handover_mapping_diagnostics.md` carried a fourth, separate follow-up
+   list. **Resolved on 2026-07-28:** all three were merged into
+   `docs/work_queue.md`, which is now the single controlling queue. Each source
+   retains a pointer table mapping its former items to their `DASHQ` IDs, and the
+   detail unique to each — the 23 page-noise flags, the eight manifest fields,
+   the six-step diagnostic-page gate, and the Sankey preconditions — was carried
+   into the queue rather than dropped. `common_esto_dashboard_plan.md` keeps its
+   unique §1 (implemented state) and §4 (historical build record).
 4. **Three planning documents are reconciled to dates that predate a month of
    work.** `common_esto_dashboard_plan.md` and
    `common_esto_dashboard_page_status.md` are both stamped 2026-06-28;
@@ -66,9 +70,9 @@ that overlap the unintegrated `codex/output-contract-phase-2` worktree.
 | `docs/documentation_audit_20260728.md` | **New** this file | Dated classification pass. Supersedes ad-hoc doc status notes. |
 | `docs/handover_mapping_diagnostics.md` | Handover-critical, partly stale | Keep — it is the richest technical handover material in the repo. Correct the two claims in findings 1 under DASHQ-003/DASHQ-004, keeping the original diagnosis as clearly labelled history. Its five-item "Follow-up dashboard backlog" should be represented in the queue rather than maintained separately. |
 | `docs/common_esto_dashboard_guide.md` | Canonical run/usage guide | Keep. Last touched 2026-07-27 and broadly current. Re-verify its run commands during the DASHQ-017 rehearsal. |
-| `docs/common_esto_dashboard_plan.md` | Authoritative plan, stale stamp | Keep, but re-reconcile. "Last reconciled: 2026-06-28" predates the rollup-graph, diagnostics-page, health-report, and compressed-intermediate work. Re-date it or mark the pre-July content as historical under DASHQ-011. |
+| `docs/common_esto_dashboard_plan.md` | Authoritative state record, stale stamp | Keep §1 and §4 — both unique. §2/§3 merged into the queue on 2026-07-28. "Last reconciled: 2026-06-28" still predates the rollup-graph, diagnostics-page, health-report, and compressed-intermediate work, so §1 needs re-reconciling under DASHQ-011. |
 | `docs/common_esto_dashboard_page_status.md` | Evidence document, stale | Keep. Refresh from a reproducible render under DASHQ-012; the current counts describe a 2026-06-28 dataset. Do not let it describe obsolete fixture structure as current. |
-| `docs/future_dashboard_backlog.md` | Deferred feature backlog | Keep as the detailed acceptance criteria for DASHQ-012 and DASHQ-013. Point its header at `docs/work_queue.md` so it is not read as a second controlling queue. |
+| `docs/future_dashboard_backlog.md` | Merged into the queue | Reduced on 2026-07-28 to a pointer table plus its still-current "Before starting a backlog item" checklist. No longer a backlog. Archive it under DASHQ-010 once `docs/archive/` exists, keeping the checklist in the runbook. |
 | `docs/special_rules_and_design_decisions.md` | Canonical decision log | Keep. Add any decision arising from DASHQ-006 (output contract) and DASHQ-015 (legacy repository). Cross-repository entries stay single-owned. |
 | `docs/workflow_inventory.md` | Navigation reference, stale stamp | Keep; re-audit after the output-contract worktree is integrated, since that changes which readers are production surface. |
 | `docs/common_esto_dashboard_visual_review.md` | Presentation-only review method | Keep. Short, scoped, and still accurate. |

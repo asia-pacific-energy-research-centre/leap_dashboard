@@ -207,105 +207,23 @@ currently served dashboard.
 
 ## 2. Confirmed near-term backlog
 
-### 2.1 Improve navigation on dense pages
-
-The all-economy page-noise report contains 23 flagged economy/page pairs:
-
-- 8 have a high chart count;
-- 15 have a high suppressed share;
-- 3 have many sparse one-row charts;
-- some pages have more than one reason.
-
-These flags do not all require the same response. A high suppressed share is a
-QA prompt to inspect small-series coverage; it is not evidence that the 1 PJ
-threshold should increase. Sparse-row flags require a content review. High
-chart counts require a navigation and grouping response.
-
-Industry is the recurring density problem across economies. Supply is also
-dense for Canada and the USA. The next presentation change should therefore
-add aggregate-first navigation and stronger configuration-driven sections to
-Industry and Supply, then re-run the page-noise report. Detailed charts must
-remain available and all rows must remain in the manifest. The change must not
-be implemented by dropping coverage or increasing the suppression threshold.
-
-### 2.2 Complete diagnostic-page review
-
-Before either LEAP-vs-9th page is enabled by default:
-
-1. render it for representative large, medium, and small economies;
-2. check row coverage and source/scenario completeness;
-3. identify sparse or repeated slices;
-4. confirm the page answers a modeller question not already answered by the
-   default three-way pages;
-5. update page-status documentation with economy-specific evidence;
-6. pass publication-readiness checks with the intended default page list.
-
-Until those checks are complete, both pages remain diagnostic and disabled by
-default.
-
-### 2.3 Complete ranking metrics
-
-Current sorting works with `total_abs_value`, `abs_diff`, and `pct_diff`, but
-the audit record is incomplete. Add the following manifest fields without
-changing the correct historical/projection comparison pairing:
-
-```text
-default_order
-model_abs_value
-comparison_abs_value
-max_annual_absolute_difference
-max_annual_percentage_difference
-non_zero_year_count
-unexpected_sign_count
-ranking_warning
-```
-
-Small comparison denominators must be flagged rather than allowed to create
-misleading percentage rankings. Manifest metrics should remain pre-computed so
-the browser only changes display order.
-
-### 2.4 Keep page-status evidence current
-
-After a reproducible upstream refresh, regenerate the all-economy dashboards,
-page-noise outputs, and publication checks together. Update
-`common_esto_dashboard_page_status.md` when chart counts or review decisions
-change. Do not treat a successful render alone as evidence that comparison
-semantics are correct.
-
-## 3. Explicitly deferred work
-
-### Sankey diagrams
-
-Sankey rendering remains deliberately deferred. The repository contains a
-disabled configuration scaffold, a draft routing table, routing QA, and the
-design note `docs/common_esto_sankey_balance_routing_design.md`; it does not
-contain an enabled production Sankey.
-
-Implementation must wait until:
-
-- deterministic source-to-target routes are agreed;
-- signed input, output, loss, and stock-change treatment is explicit;
-- overlap and double-counting checks pass;
-- reconciliation checks define acceptable node imbalances;
-- route coverage is reviewed across representative economies.
-
-The dashboard must not infer physical links dynamically or use AI to invent
-runtime routes. Link widths may use absolute values only if signed values and
-their interpretation remain available in hover text and QA outputs.
-
-### Automatic publishing after ordinary runs
-
-The copy mechanism exists, but automatically invoking it after every render is
-deferred indefinitely in favour of the manual publication gate. Reconsider
-only if publication moves to a CI job with an explicit approval step, a clean
-source revision, artifact review, and rollback.
-
-### Additional bespoke scope pages
-
-New transport, buildings, or other source-specific pages are deferred until
-the two existing diagnostic pages establish a useful and repeatable review
-pattern. A bespoke page must use existing Common ESTO membership and
-configuration rules; it must not introduce dashboard-owned mapping logic.
+> **Merged into [`work_queue.md`](work_queue.md) on 2026-07-28.**
+>
+> Sections 2.1-2.4 and section 3 previously duplicated
+> [`future_dashboard_backlog.md`](future_dashboard_backlog.md). Both are now
+> represented once, in the queue:
+>
+> | Former section | Now |
+> |---|---|
+> | 2.1 Improve navigation on dense pages | `DASHQ-013` (keeps the 23 page-noise flags and the do-not-raise-the-threshold constraint) |
+> | 2.2 Complete diagnostic-page review | `DASHQ-018` (keeps the six-step gate) |
+> | 2.3 Complete ranking metrics | `DASHQ-019` (keeps the eight manifest fields) |
+> | 2.4 Keep page-status evidence current | `DASHQ-012` |
+> | 3. Explicitly deferred work | "Deferred by decision - not queue items" (keeps the Sankey preconditions) |
+>
+> Sections 1 and 4 below are unique to this document and remain current: section
+> 1 is the authoritative description of the implemented production boundary, and
+> section 4 is the historical build record.
 
 ## 4. Historical build record
 

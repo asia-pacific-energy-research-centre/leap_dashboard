@@ -139,25 +139,18 @@ the comparison basis changes.
 
 ### Follow-up dashboard backlog
 
-The next diagnostics with the strongest value are separate from the anchor-card
-layout and should be added only from their canonical mapping-pipeline artifacts:
+> **Merged into [`work_queue.md`](work_queue.md) on 2026-07-28** as `DASHQ-020`
+> through `DASHQ-024`, in the same order: structural compilation health,
+> non-expanding rollup integrity, material non-zero mapping gaps, candidate
+> readiness, and crosswalk target conflicts / duplicate mappings. Each keeps its
+> original constraint — clean means exists-and-empty, expose violations rather
+> than successful checks, rank by magnitude, never write candidates to the
+> workbook, and classify duplicates before presenting them as errors.
+>
+> These diagnostics must still be added only from their canonical
+> mapping-pipeline artifacts.
 
-1. **Structural compilation health**: concise counts and conditional tables for
-   `qa_ambiguous_structural.csv` and `qa_unresolved_structural.csv`, while
-   showing conflicting/cyclic/duplicate states as clean only when their files
-   prove that.
-2. **Non-expanding rollup integrity**: expose violations from
-   `qa_common_esto_non_expanding_frontier_check.csv`, not every successful
-   check.
-3. **Material non-zero mapping gaps**: rank
-   `leap_missing_esto_absent_nonzero_pairs_actionable.csv` by absolute value
-   and affected economies/years, rather than showing an unranked coverage list.
-4. **Candidate readiness**: display review-only, non-workbook candidates with
-   evidence and destination sheet. Never add them to the workbook from the
-   dashboard.
-5. **Crosswalk target conflicts and duplicate mappings**: first classify
-   intentional duplicates versus accidental duplicates; do not present all raw
-   duplicate rows as errors.
+The design rule below is not a backlog item and still applies.
 
 For a future ESTO Extended checkbox, basis-dependent diagnostics must use real
 parallel Extended pipeline artifacts/scopes. Do not make a control merely
