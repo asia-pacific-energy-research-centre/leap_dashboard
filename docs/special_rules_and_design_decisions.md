@@ -196,10 +196,11 @@ share one displayed product rollup and are summed within the chart.
 
 ### Current rule
 
-Show `EXPANDING`, `NON_EXPANDING`, and `DETACHED` relationships in the sector
-hierarchy view without requiring a rollup-mode filter. Place the mode label
-inside the rollup target box and use a dotted edge for display membership that
-is not an ordinary hierarchy edge.
+Show `EXPANDING` relationships in the sector hierarchy view by default. Provide
+one checkbox that adds `NON_EXPANDING` and `DETACHED` targets and display
+relationships when the reviewer needs them. Do not restore the former
+rollup-mode selector. Place the mode label inside the rollup target box and use
+a dotted edge for display membership that is not an ordinary hierarchy edge.
 
 Do not render a second, separate rollup-composition graph below the hierarchy.
 Detailed rule membership and reconciliation evidence remain available in the
@@ -209,13 +210,17 @@ contract or turn rollup inputs into ordinary structural children.
 ### Validation
 
 The Power-sector view must show Electricity plants, CHP plants, and Heat plants
-under the labelled `EXPANDING` target. The page must have no rollup-mode
-selector and no separate `REGISTERED ROLLUP COMPOSITION` graph heading.
+under the labelled `EXPANDING` target. The unchecked view must omit
+`NON_EXPANDING` and `DETACHED` display relationships; checking the special
+rollup control must add them. The page must have no rollup-mode selector and no
+separate `REGISTERED ROLLUP COMPOSITION` graph heading.
 
 ### History
 
 - 2026-07-29: Confirmed during live review of the 20_USA mapping diagnostics
   prototype.
+- 2026-07-29: Refined so NON_EXPANDING and DETACHED display relationships are
+  opt-in through one checkbox.
 
 ## DASH-007: Hierarchy validation uses one explained diagnostic panel
 
@@ -255,6 +260,32 @@ sections.
 ### History
 
 - 2026-07-29: Confirmed during live review of the 20_USA mapping diagnostics
+  prototype.
+
+## DASH-008: Paired hierarchy trees use compact values
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Presentation
+**Affected areas:** Mapping diagnostics; original-versus-mapped hierarchy trees
+
+### Current rule
+
+Use one shared magnitude scale within each original-versus-mapped hierarchy
+case and display no more than two decimal places after scaling. Apply the same
+formatter to parents, children, mapped components, totals, and residuals for
+every source dataset. Continue all validation calculations with the original
+unrounded values.
+
+### Validation
+
+The shared context formatter must scale the whole case consistently and emit
+at most two decimal places. The rendered note must continue to state that
+calculations use unrounded values.
+
+### History
+
+- 2026-07-29: Confirmed during live review of the mapping diagnostics
   prototype.
 
 ## End-to-end run report

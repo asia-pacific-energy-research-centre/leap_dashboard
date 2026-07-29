@@ -224,8 +224,9 @@ def _three_significant_figures(value: float) -> str:
 def _context_value_formatter(values: list[float]) -> tuple[str, callable]:
     """Return one readable scale for a whole anchor case, not per-value rounding.
 
-    A shared scale keeps displayed siblings additive. Six decimal places after
-    scaling preserve useful source precision while avoiding floating-point noise.
+    A shared scale keeps the displayed values comparable. Two decimal places
+    after scaling keep the diagnostic trees readable; calculations continue to
+    use the unrounded values.
     """
     magnitude = max((abs(float(value)) for value in values), default=0.0)
     if magnitude >= 1_000_000:
@@ -239,7 +240,7 @@ def _context_value_formatter(values: list[float]) -> tuple[str, callable]:
         scaled = float(value) / divisor
         if scaled == 0:
             return "0"
-        return f"{scaled:,.6f}".rstrip("0").rstrip(".")
+        return f"{scaled:,.2f}".rstrip("0").rstrip(".")
 
     return label, format_value
 
@@ -1254,7 +1255,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:16px; }} .guide-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; }} .guide-card {{ border-radius:8px; padding:10px; font-size:13px; line-height:1.4; }} .guide-card strong {{ display:block; margin-bottom:3px; }} .guide-good {{ background:#e8f5e9; color:#176b35; }} .guide-warning {{ background:#fff4e5; color:#8a4b08; }} .guide-neutral {{ background:#e8f0fa; color:#294f78; }} .flow {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }} .flow div {{ background:#e8f0fa; border:1px solid #adc4df; border-radius:8px; padding:10px; font-size:13px; }} .arrow {{ color:#53718f; font-size:22px; }}
 .paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .value-tree li.tree-category {{ display:block; border-bottom:0; color:#5f6b7a; font-size:12px; font-weight:600; padding-top:10px; }} .value-tree li.tree-structural {{ color:#5f6b7a; font-style:italic; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .helper-note,.source-warning {{ font-size:12px; line-height:1.4; margin:10px 0 0; padding:8px; border-radius:6px; }} .helper-note {{ background:#e8f5e9; color:#176b35; }} .source-warning {{ background:#fff4e5; color:#8a4b08; }} .value-tree li.optional-zero {{ display:none; }} body.show-zero-children .value-tree li.optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
 .transformation-diagram {{ display:grid; grid-template-columns:minmax(260px,0.8fr) minmax(520px,2fr); gap:16px; }} .ordinary-hierarchy,.rollup-boundaries {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .ordinary-hierarchy h3,.rollup-boundaries h3,.rollup-boundary h3,.rollup-boundary h4 {{ margin:0 0 8px; }} .tree-root {{ background:#dceaf8; border:1px solid #8eb2d4; border-radius:6px; font-weight:600; padding:8px; }} .ordinary-hierarchy ul,.rollup-boundary ul {{ list-style:none; padding-left:12px; margin:8px 0; }} .ordinary-hierarchy li,.rollup-boundary li {{ margin:5px 0; }} .solid-edge {{ color:#2d6a9f; font-weight:700; margin-right:4px; }} .dashed-edge {{ color:#7c5b00; font-weight:700; margin-left:6px; }} .rollup-boundary {{ border:1px solid #d9e1ea; border-left:5px solid #3d7fb1; border-radius:8px; padding:10px; margin-top:10px; background:#fff; }} .rollup-boundary.detached {{ border-left-color:#9b5c00; background:#fffaf0; }} .mode-pill {{ display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#dceaf8; color:#174b73; }} .detached .mode-pill {{ background:#ffe7ba; color:#754300; }} .boundary-columns {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px; }} .artifact-id {{ margin:8px 0 0; color:#5f6b7a; font-family:ui-monospace,monospace; font-size:11px; }} .rollup-controls {{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:12px 0; }} .rollup-controls label {{ display:grid; gap:3px; color:#5f6b7a; font-size:12px; }} .rollup-controls select {{ min-width:140px; padding:6px; }} .rollup-value {{ float:right; font-variant-numeric:tabular-nums; color:#5f6b7a; }} .rollup-check.value-pass,.rollup-boundary.value-pass {{ background:#ecf8ef; border-color:#5dae70; }} .rollup-check.value-fail,.rollup-boundary.value-fail {{ background:#fff0f0; border-color:#c95d5d; }} .rollup-check.value-pass .rollup-value,.rollup-boundary.value-pass .rollup-value {{ color:#176b35; }} .rollup-check.value-fail .rollup-value,.rollup-boundary.value-fail .rollup-value {{ color:#9b1c1c; }} @media (max-width:760px) {{ .paired-trees,.transformation-diagram,.boundary-columns {{ grid-template-columns:1fr; }} }}
-.rollup-explainer {{ display:grid; grid-template-columns:repeat(4,minmax(180px,1fr)); gap:8px; margin:10px 0 14px; }} .rollup-explainer div {{ border:1px solid #d9e1ea; border-radius:7px; padding:9px; font-size:12px; line-height:1.4; }} .rollup-explainer strong {{ display:block; margin-bottom:3px; }} .rollup-filter-grid {{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:8px 0; }} .rollup-filter-grid label {{ display:grid; gap:3px; color:#5f6b7a; font-size:12px; }} .rollup-filter-grid select,.rollup-filter-grid input {{ min-width:150px; padding:6px; }} .rollup-filter-grid input {{ min-width:230px; }} .basis-state {{ align-self:center; border-radius:999px; background:#e8f0fa; color:#174b73; font-size:12px; font-weight:700; padding:6px 10px; }} .rollup-legend {{ display:flex; flex-wrap:wrap; gap:12px; margin:8px 0; color:#445266; font-size:12px; }} .legend-line {{ display:inline-block; width:28px; border-top:3px solid #53718f; margin-right:5px; vertical-align:middle; }} .legend-line.rollup {{ border-color:#987216; border-top-style:dotted; }} .legend-line.detached {{ border-color:#9b5c00; border-top-style:dashed; }} .rollup-graph-toolbar {{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:10px 0 8px; }} .rollup-graph-toolbar button {{ padding:5px 10px; cursor:pointer; }} .rollup-graph-help {{ color:#5f6b7a; font-size:12px; }} .rollup-graph-wrap {{ height:620px; overflow:auto; border:1px solid #d9e1ea; border-radius:8px; background:#fbfdff; }} #rollup-graph {{ min-height:200px; }} #rollup-graph svg {{ display:block; }} #rollup-graph text {{ font-family:Inter,Segoe UI,Arial,sans-serif; font-size:13px; fill:#172033; pointer-events:none; }} #rollup-graph .node {{ cursor:pointer; }} #rollup-graph .node rect {{ fill:#fff; stroke:#8eb2d4; stroke-width:1.6; rx:8; }} #rollup-graph .node.root rect {{ fill:#edf5fc; stroke:#3d7fb1; }} #rollup-graph .node.extended-only rect {{ fill:#f1edff; stroke:#7656b5; }} #rollup-graph .node.boundary rect {{ fill:#edf5fc; stroke-width:2.2; }} #rollup-graph .node.expanding rect {{ fill:#e9f6ee; stroke:#438a5b; }} #rollup-graph .node.non_expanding rect {{ fill:#eaf3ff; stroke:#356c9b; stroke-dasharray:5 3; }} #rollup-graph .node.detached rect {{ fill:#fff5df; stroke:#b77b13; stroke-dasharray:2 3; }} #rollup-graph .node.selected rect {{ stroke:#13233a; stroke-width:4; }} #rollup-graph .node.neighbour rect {{ stroke-width:3; }} #rollup-graph .node.issue rect {{ fill:#fff0f0; stroke:#c95d5d; }} #rollup-graph .node.value-pass rect {{ filter:drop-shadow(0 0 2px #5dae70); }} #rollup-graph .node.value-fail rect {{ fill:#fff0f0; stroke:#c95d5d; }} #rollup-graph .edge {{ fill:none; stroke:#53718f; stroke-width:1.8; marker-end:url(#hierarchy-arrow); }} #rollup-graph .edge.rollup {{ stroke:#987216; stroke-width:2.2; stroke-dasharray:3 5; marker-end:url(#rollup-arrow); }} #rollup-graph .edge.detached {{ stroke:#9b5c00; stroke-dasharray:10 5; }} #rollup-graph .edge.dimmed,.node.dimmed {{ opacity:.16; }} #rollup-graph .mode {{ font-size:10px; font-weight:800; letter-spacing:.4px; fill:#335b7d; }} #rollup-graph .value {{ font-size:11px; font-weight:700; fill:#5f6b7a; }} #rollup-graph .origin {{ font-size:10px; fill:#7656b5; }} .graph-empty {{ padding:34px; color:#5f6b7a; text-align:center; }} .rollup-summary {{ margin-top:14px; }} .rollup-summary h3 {{ margin-bottom:6px; }} .rollup-summary-status {{ color:#5f6b7a; font-size:12px; margin:0 0 8px; }} #rollup-summary-table tr.issue-row td {{ background:#fff4f4; }} #rollup-summary-table tr.detached-row td {{ background:#fffaf0; }} @media (max-width:900px) {{ .rollup-explainer {{ grid-template-columns:1fr 1fr; }} }} @media (max-width:620px) {{ .rollup-explainer {{ grid-template-columns:1fr; }} }}
+.rollup-explainer {{ display:grid; grid-template-columns:repeat(4,minmax(180px,1fr)); gap:8px; margin:10px 0 14px; }} .rollup-explainer div {{ border:1px solid #d9e1ea; border-radius:7px; padding:9px; font-size:12px; line-height:1.4; }} .rollup-explainer strong {{ display:block; margin-bottom:3px; }} .rollup-filter-grid {{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:8px 0; }} .rollup-filter-grid label {{ display:grid; gap:3px; color:#5f6b7a; font-size:12px; }} .rollup-filter-grid select,.rollup-filter-grid input {{ min-width:150px; padding:6px; }} .rollup-filter-grid input {{ min-width:230px; }} .rollup-filter-grid .special-rollup-toggle {{ align-self:center; display:flex; align-items:center; gap:7px; max-width:210px; color:#334155; }} .rollup-filter-grid .special-rollup-toggle input {{ min-width:0; width:auto; padding:0; }} .basis-state {{ align-self:center; border-radius:999px; background:#e8f0fa; color:#174b73; font-size:12px; font-weight:700; padding:6px 10px; }} .rollup-legend {{ display:flex; flex-wrap:wrap; gap:12px; margin:8px 0; color:#445266; font-size:12px; }} .legend-line {{ display:inline-block; width:28px; border-top:3px solid #53718f; margin-right:5px; vertical-align:middle; }} .legend-line.rollup {{ border-color:#987216; border-top-style:dotted; }} .legend-line.detached {{ border-color:#9b5c00; border-top-style:dashed; }} .rollup-graph-toolbar {{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:10px 0 8px; }} .rollup-graph-toolbar button {{ padding:5px 10px; cursor:pointer; }} .rollup-graph-help {{ color:#5f6b7a; font-size:12px; }} .rollup-graph-wrap {{ height:620px; overflow:auto; border:1px solid #d9e1ea; border-radius:8px; background:#fbfdff; }} #rollup-graph {{ min-height:200px; }} #rollup-graph svg {{ display:block; }} #rollup-graph text {{ font-family:Inter,Segoe UI,Arial,sans-serif; font-size:13px; fill:#172033; pointer-events:none; }} #rollup-graph .node {{ cursor:pointer; }} #rollup-graph .node rect {{ fill:#fff; stroke:#8eb2d4; stroke-width:1.6; rx:8; }} #rollup-graph .node.root rect {{ fill:#edf5fc; stroke:#3d7fb1; }} #rollup-graph .node.extended-only rect {{ fill:#f1edff; stroke:#7656b5; }} #rollup-graph .node.boundary rect {{ fill:#edf5fc; stroke-width:2.2; }} #rollup-graph .node.expanding rect {{ fill:#e9f6ee; stroke:#438a5b; }} #rollup-graph .node.non_expanding rect {{ fill:#eaf3ff; stroke:#356c9b; stroke-dasharray:5 3; }} #rollup-graph .node.detached rect {{ fill:#fff5df; stroke:#b77b13; stroke-dasharray:2 3; }} #rollup-graph .node.selected rect {{ stroke:#13233a; stroke-width:4; }} #rollup-graph .node.neighbour rect {{ stroke-width:3; }} #rollup-graph .node.issue rect {{ fill:#fff0f0; stroke:#c95d5d; }} #rollup-graph .node.value-pass rect {{ filter:drop-shadow(0 0 2px #5dae70); }} #rollup-graph .node.value-fail rect {{ fill:#fff0f0; stroke:#c95d5d; }} #rollup-graph .edge {{ fill:none; stroke:#53718f; stroke-width:1.8; marker-end:url(#hierarchy-arrow); }} #rollup-graph .edge.rollup {{ stroke:#987216; stroke-width:2.2; stroke-dasharray:3 5; marker-end:url(#rollup-arrow); }} #rollup-graph .edge.detached {{ stroke:#9b5c00; stroke-dasharray:10 5; }} #rollup-graph .edge.dimmed,.node.dimmed {{ opacity:.16; }} #rollup-graph .mode {{ font-size:10px; font-weight:800; letter-spacing:.4px; fill:#335b7d; }} #rollup-graph .value {{ font-size:11px; font-weight:700; fill:#5f6b7a; }} #rollup-graph .origin {{ font-size:10px; fill:#7656b5; }} .graph-empty {{ padding:34px; color:#5f6b7a; text-align:center; }} .rollup-summary {{ margin-top:14px; }} .rollup-summary h3 {{ margin-bottom:6px; }} .rollup-summary-status {{ color:#5f6b7a; font-size:12px; margin:0 0 8px; }} #rollup-summary-table tr.issue-row td {{ background:#fff4f4; }} #rollup-summary-table tr.detached-row td {{ background:#fffaf0; }} @media (max-width:900px) {{ .rollup-explainer {{ grid-template-columns:1fr 1fr; }} }} @media (max-width:620px) {{ .rollup-explainer {{ grid-template-columns:1fr; }} }}
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
 </style></head><body><div class="shell"><header><a href="index.html">← Dashboard overview</a><h1>Mapping diagnostics</h1><p class="subtle">Read-only inspection of hierarchy/anchor validation and direct mapping coverage. Updated: {escape(dashboard_updated_label)}<br>{escape(contract_note)}</p></header>
 <section class="panel"><h2>How to read a hierarchy case</h2><div class="guide-grid"><div class="guide-card guide-good"><strong>Manual LEAP roll-up</strong>Only constructed LEAP subtotal branches receive this label; they are compared with their immediate source-tree children.</div><div class="guide-card guide-good"><strong>One-to-many fan-out</strong>One raw parent can reach several ESTO components. Those routes are not additional source-tree parents.</div><div class="guide-card guide-neutral"><strong>De-duplicated frontier</strong>Mapped component rows can overlap. The frontier counts each Common ESTO row once, so do not add the displayed component rows.</div><div class="guide-card guide-warning"><strong>Raw source contradiction</strong>If a raw parent is 0 while its children are non-zero, the original source hierarchy disagrees with itself. It is not, by itself, a missing mapping.</div></div></section>
@@ -1291,15 +1292,17 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
         "Start with the collapsed major-sector overview, choose a sector, or search for a flow. "
         "The graph never treats rollup composition as an ordinary hierarchy branch.",
         "Start with the collapsed major-sector overview, choose a sector, or search for a flow. "
-        "All rollup types appear in the hierarchy view with their mode labelled inside the target "
-        "box; detailed rule definitions remain in the tables on this page.",
+        "EXPANDING rollups appear in the hierarchy view by default. Tick the special-rollup "
+        "checkbox to add NON_EXPANDING and DETACHED targets and display relationships; detailed "
+        "rule definitions remain in the tables on this page.",
     )
     html = html.replace(
         '<label>Rollup type<select id="rollup-mode"><option value="NONE" selected>Hierarchy only</option>'
         '<option value="ALL">All rollup types</option><option value="EXPANDING">EXPANDING</option>'
         '<option value="NON_EXPANDING">NON_EXPANDING</option><option value="DETACHED">DETACHED</option>'
         '</select></label>',
-        "",
+        '<label class="special-rollup-toggle"><input id="show-special-rollups" '
+        'type="checkbox" autocomplete="off"> Show NON_EXPANDING and DETACHED rollups</label>',
     )
     html = html.replace(
         "A dotted ochre arrow means the input contributes to a compiled comparison boundary; "
@@ -1485,34 +1488,32 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
   const ordinaryNodes = nodes.filter(node => node.is_ordinary_hierarchy);
   const boundaries = graph.all_boundaries || [];
   const nodeByCode = new Map(nodes.map(node => [node.code, node]));
-  const boundariesByTarget = new Map();
-  boundaries.forEach(boundary => {
-    boundariesByTarget.set(
-      boundary.label,
-      [...(boundariesByTarget.get(boundary.label) || []), boundary]
-    );
-  });
+  const showSpecialRollups = document.querySelector('#show-special-rollups');
+  const activeBoundaries = () => boundaries.filter(
+    boundary => boundary.mode === 'EXPANDING' || showSpecialRollups.checked
+  );
+  const hierarchyBoundaries = () => activeBoundaries().filter(
+    boundary => boundary.mode === 'EXPANDING'
+  );
+  const boundariesForTarget = code => activeBoundaries().filter(
+    boundary => boundary.label === code
+  );
   const rollupModesFor = code => uniqueSorted(
-    (boundariesByTarget.get(code) || []).map(boundary => boundary.mode)
+    boundariesForTarget(code).map(boundary => boundary.mode)
   );
   const displayParentFor = code => {
     const ordinaryParent = nodeByCode.get(code)?.parent_code || '';
     if (ordinaryParent) return ordinaryParent;
-    const inputBoundary = boundaries.find(boundary => boundary.inputs.includes(code));
+    const inputBoundary = hierarchyBoundaries().find(boundary => boundary.inputs.includes(code));
     if (inputBoundary) return inputBoundary.label;
-    const targetBoundary = (boundariesByTarget.get(code) || [])
+    const targetBoundary = boundariesForTarget(code)
+      .filter(boundary => boundary.mode === 'EXPANDING')
       .find(boundary => boundary.parent);
     return targetBoundary?.parent || '';
   };
-  const displayChildrenByCode = new Map();
-  nodes.forEach(node => {
-    const parent = displayParentFor(node.code);
-    if (!parent || parent === node.code) return;
-    displayChildrenByCode.set(
-      parent,
-      [...(displayChildrenByCode.get(parent) || []), node.code]
-    );
-  });
+  const displayChildrenFor = code => nodes
+    .filter(node => displayParentFor(node.code) === code)
+    .map(node => node.code);
   const roots = ordinaryNodes
     .filter(node => !node.parent_code && Number(node.level) === 1)
     .map(node => node.code)
@@ -1658,7 +1659,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     const visit = code => {
       if (result.has(code)) return;
       result.add(code);
-      (displayChildrenByCode.get(code) || []).forEach(visit);
+      displayChildrenFor(code).forEach(visit);
     };
     visit(root);
     return result;
@@ -1672,8 +1673,14 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     }
     return result;
   };
-  const rollupMembership = code => boundaries.filter(
+  const rollupMembership = code => activeBoundaries().filter(
     boundary => boundary.label === code || boundary.inputs.includes(code)
+  );
+  const nodeAllowedByRollupMode = node => (
+    node.is_ordinary_hierarchy
+    || activeBoundaries().some(
+      boundary => boundary.label === node.code || boundary.inputs.includes(node.code)
+    )
   );
   const visibleSets = () => {
     let visibleCodes = sector.value === 'ALL'
@@ -1685,13 +1692,13 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     const query = search.value.trim().toLowerCase();
     if (query) {
       const matches = nodes
-        .filter(node => node.code.toLowerCase().includes(query))
+        .filter(node => nodeAllowedByRollupMode(node) && node.code.toLowerCase().includes(query))
         .map(node => node.code);
       const neighbourhood = new Set();
       matches.forEach(code => {
         neighbourhood.add(code);
         ancestors(code).forEach(parent => neighbourhood.add(parent));
-        (displayChildrenByCode.get(code) || []).forEach(child => neighbourhood.add(child));
+        displayChildrenFor(code).forEach(child => neighbourhood.add(child));
         rollupMembership(code).forEach(boundary => {
           neighbourhood.add(boundary.label);
           boundary.inputs.forEach(input => neighbourhood.add(input));
@@ -1703,8 +1710,11 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
       ));
       if (!selectedCode && matches.length) selectedCode = matches[0];
     }
-    visibleCodes = new Set([...visibleCodes].filter(code => statusMatches(nodeStatus(nodeByCode.get(code)))));
-    const filteredBoundaries = boundaries.filter(boundary => {
+    visibleCodes = new Set([...visibleCodes].filter(code =>
+      nodeAllowedByRollupMode(nodeByCode.get(code))
+      && statusMatches(nodeStatus(nodeByCode.get(code)))
+    ));
+    const filteredBoundaries = activeBoundaries().filter(boundary => {
       if (basis.value === 'original' && originFor(boundary.label) === 'ESTO Extended addition') return false;
       if (!statusMatches(boundaryStatus(boundary))) return false;
       if (query) {
@@ -1714,7 +1724,18 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
       }
       if (sector.value !== 'ALL') {
         const sectorCodes = descendants(sector.value);
-        return sectorCodes.has(boundary.label) || boundary.inputs.some(input => sectorCodes.has(input));
+        const majorCode = String(sector.value).match(/^([0-9]{2})/)?.[1] || '';
+        const belongsToMajor = value => (
+          majorCode
+          && (
+            String(value).startsWith(`${majorCode}.`)
+            || String(value).startsWith(`${majorCode} `)
+            || String(value).startsWith(`${majorCode}-`)
+          )
+        );
+        return sectorCodes.has(boundary.label)
+          || boundary.inputs.some(input => sectorCodes.has(input))
+          || belongsToMajor(boundary.label);
       }
       return true;
     });
@@ -1792,8 +1813,33 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
       });
       hierarchyHeight = 75 + Math.max(1, ...[...byDepth.values()].map(values => values.length)) * 92;
     }
+    const specialBoundaries = filteredBoundaries.filter(
+      boundary => boundary.mode === 'NON_EXPANDING' || boundary.mode === 'DETACHED'
+    );
+    if (specialBoundaries.length) {
+      const ordinaryRight = Math.max(
+        300,
+        ...[...positions.values()].map(position => position.x + 250),
+      );
+      const inputX = ordinaryRight + 70;
+      const targetX = inputX + 310;
+      const specialTargets = new Set(specialBoundaries.map(boundary => boundary.label));
+      let externalInputIndex = 0;
+      specialBoundaries.forEach((boundary, index) => {
+        positions.set(boundary.label, {x:targetX, y:42 + index * 104});
+        boundary.inputs.forEach(input => {
+          if (positions.has(input) || specialTargets.has(input)) return;
+          positions.set(input, {x:inputX, y:42 + externalInputIndex * 92});
+          externalInputIndex += 1;
+        });
+      });
+    }
     let width = Math.max(1260, ...[...positions.values()].map(position => position.x + 280), 1260);
-    const height = Math.max(230, hierarchyHeight + 35);
+    const height = Math.max(
+      230,
+      hierarchyHeight + 35,
+      ...[...positions.values()].map(position => position.y + 110),
+    );
     naturalSize = {width, height};
     let svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
       <defs>
@@ -1808,6 +1854,16 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
         const relationshipClass = nodeByCode.get(code)?.parent_code === parent ? '' : ' rollup';
         svg += `<path class="edge${relationshipClass}" data-a="${escapeHtml(parent)}" data-b="${escapeHtml(code)}" d="M${parentPosition.x + 250} ${parentPosition.y + 36} C${parentPosition.x + 270} ${parentPosition.y + 36},${position.x - 20} ${position.y + 36},${position.x} ${position.y + 36}"/>`;
       }
+    });
+    specialBoundaries.forEach(boundary => {
+      const targetPosition = positions.get(boundary.label);
+      if (!targetPosition) return;
+      boundary.inputs.forEach(input => {
+        const inputPosition = positions.get(input);
+        if (!inputPosition) return;
+        const detachedClass = boundary.mode === 'DETACHED' ? ' detached' : '';
+        svg += `<path class="edge rollup${detachedClass}" data-a="${escapeHtml(input)}" data-b="${escapeHtml(boundary.label)}" d="M${inputPosition.x + 250} ${inputPosition.y + 36} C${inputPosition.x + 270} ${inputPosition.y + 36},${targetPosition.x - 20} ${targetPosition.y + 36},${targetPosition.x} ${targetPosition.y + 36}"/>`;
+      });
     });
     positions.forEach((position, code) => {
       svg += nodeSvg(code, position.x, position.y, '', rollupModesFor(code).join(', '));
@@ -1842,7 +1898,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
           : (displayParentFor(code) ? 'Rollup display child' : 'Hierarchy root'),
         rollupType:uniqueSorted(memberships.map(item => item.mode)).join(', '),
         origin:originFor(code),
-        childCount:(displayChildrenByCode.get(code) || []).length,
+        childCount:displayChildrenFor(code).length,
         membership:memberships.map(item => `${item.id} (${item.label === code ? 'target' : 'input'})`).join('; '),
         validation:result.label,
         kind:result.kind,
@@ -1901,7 +1957,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     const related = new Set([code]);
     const displayedParent = displayParentFor(code);
     if (displayedParent) related.add(displayedParent);
-    (displayChildrenByCode.get(code) || []).forEach(child => related.add(child));
+    displayChildrenFor(code).forEach(child => related.add(child));
     rollupMembership(code).forEach(boundary => {
       related.add(boundary.label);
       boundary.inputs.forEach(input => related.add(input));
@@ -2002,6 +2058,11 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
   sector.addEventListener('change', () => { selectedCode = ''; renderGraph(); });
   status.addEventListener('change', renderGraph);
   search.addEventListener('input', renderGraph);
+  showSpecialRollups.addEventListener('change', () => {
+    selectedCode = '';
+    renderGraph();
+    fitWidth();
+  });
   document.querySelector('#rollup-clear-selection').onclick = () => {
     selectedCode = '';
     search.value = '';

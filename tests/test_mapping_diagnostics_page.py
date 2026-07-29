@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from codebase.common_esto_dashboard_mapping_diagnostics import (
+    _context_value_formatter,
     _mapping_cardinality_diagnostics,
     _mapped_target_structure_html,
     _paired_anchor_aggregate_summary,
@@ -13,6 +14,15 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     prefer_compressed_csv_path,
     write_mapping_diagnostics_page,
 )
+
+
+def test_context_value_formatter_uses_at_most_two_decimal_places() -> None:
+    scale_label, format_value = _context_value_formatter([12_345.6789, 1_234.5678])
+
+    assert scale_label.startswith("Values in thousands")
+    assert format_value(12_345.6789) == "12.35"
+    assert format_value(1_234.5678) == "1.23"
+    assert format_value(0) == "0"
 
 
 def test_exact_value_loader_prefers_gzip_and_keeps_plain_csv_fallback(tmp_path: Path) -> None:
@@ -290,11 +300,17 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Compare ESTO vs Extended" in html
     assert 'id="rollup-sector"' in html
     assert 'id="rollup-mode"' not in html
+    assert 'id="show-special-rollups"' in html
+    assert "Show NON_EXPANDING and DETACHED rollups" in html
+    assert "boundary.mode === 'EXPANDING' || showSpecialRollups.checked" in html
+    assert "const specialBoundaries = filteredBoundaries.filter" in html
+    assert 'class="edge rollup${detachedClass}"' in html
+    assert "belongsToMajor(boundary.label)" in html
     assert 'id="rollup-status"' in html
     assert 'id="rollup-search"' in html
     assert 'id="rollup-summary-table"' not in html
     assert "Rows in the current graph" not in html
-    assert "All rollup types appear in the hierarchy view" in html
+    assert "EXPANDING rollups appear in the hierarchy view by default" in html
     assert "Rollup display child" in html
     assert "REGISTERED ROLLUP COMPOSITION" not in html
     assert "Normal hierarchy child" in html
