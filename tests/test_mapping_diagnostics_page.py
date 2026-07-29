@@ -101,10 +101,12 @@ def test_transformation_rollup_diagram_keeps_boundary_modes_distinct() -> None:
 
 def test_rollup_graph_data_includes_every_flow_root_and_mode() -> None:
     tree = pd.DataFrame([
-        {"axis": "flow", "code": "09 Total transformation sector", "parent_code": ""},
-        {"axis": "flow", "code": "09.06 Gas processing plants", "parent_code": "09 Total transformation sector"},
-        {"axis": "flow", "code": "14 Industry sector", "parent_code": ""},
-        {"axis": "flow", "code": "14.03 Manufacturing", "parent_code": "14 Industry sector"},
+        {"axis": "flow", "code": "09 Total transformation sector", "label": "09 Total transformation sector", "level": 1, "parent_code": ""},
+        {"axis": "flow", "code": "09.06 Gas processing plants", "label": "09.06 Gas processing plants", "level": 2, "parent_code": "09 Total transformation sector"},
+        {"axis": "flow", "code": "14 Industry sector", "label": "14 Industry sector", "level": 1, "parent_code": ""},
+        {"axis": "flow", "code": "14.03 Manufacturing", "label": "14.03 Manufacturing", "level": 2, "parent_code": "14 Industry sector"},
+        {"axis": "flow", "code": "10.01.06 Coal mines", "label": "10.01.06 Coal mines", "level": 3, "parent_code": ""},
+        {"axis": "flow", "code": "09.06 inclusive", "label": "09.06 inclusive", "level": 0, "parent_code": ""},
     ])
     rollups = pd.DataFrame([
         {"source_system": "ESTO", "rollup_mode": "NON_EXPANDING", "rollup_id": "gas", "rolled_flow_label": "09.06 inclusive", "input_flow": "09.06 Gas processing plants"},
@@ -112,14 +114,31 @@ def test_rollup_graph_data_includes_every_flow_root_and_mode() -> None:
         {"source_system": "ESTO", "rollup_mode": "DETACHED", "rollup_id": "coal", "rolled_flow_label": "09.08 inclusive", "input_flow": "09.08 Coal transformation"},
     ])
 
-    graph = _rollup_graph_data(tree, rollups)
+    validation = pd.DataFrame([
+        {
+            "validation_axis": "flow", "source_system": "ESTO", "economy": "20USA",
+            "parent_code": "14 Industry sector", "status": "failed",
+            "reason": "difference_exceeds_tolerance",
+        },
+    ])
+    graph = _rollup_graph_data(tree, rollups, validation=validation, economy="20_USA")
 
     assert {sector["root"] for sector in graph["sectors"]} == {"09 Total transformation sector", "14 Industry sector"}
     assert {node["code"] for node in graph["nodes"]} == {
         "09 Total transformation sector", "09.06 Gas processing plants",
-        "14 Industry sector", "14.03 Manufacturing",
+        "14 Industry sector", "14.03 Manufacturing", "10.01.06 Coal mines",
+        "09.06 inclusive",
     }
     assert {boundary["mode"] for boundary in graph["all_boundaries"]} == {"NON_EXPANDING", "EXPANDING", "DETACHED"}
+    industry = next(node for node in graph["nodes"] if node["code"] == "14 Industry sector")
+    assert industry["validation"]["ESTO"]["failed"] == 1
+    assert industry["validation"]["ESTO"]["reasons"] == ["difference_exceeds_tolerance"]
+    assert all("id" in boundary for boundary in graph["all_boundaries"])
+    node_by_code = {node["code"]: node for node in graph["nodes"]}
+    assert node_by_code["14.03 Manufacturing"]["flow_code"] == "14.03"
+    assert node_by_code["14.03 Manufacturing"]["flow_label"] == "Manufacturing"
+    assert node_by_code["09.06 inclusive"]["is_ordinary_hierarchy"] is False
+    assert node_by_code["10.01.06 Coal mines"]["structural_flags"] == ["ORPHANED_HIERARCHY_ROW"]
 
 
 def test_rollup_boundary_details_show_parent_children_components_and_mode_meaning() -> None:
@@ -172,7 +191,7 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     pd.DataFrame([
         {"axis": "flow", "code": "09 Total", "label": "09 Total", "level": 1, "parent_code": ""},
         {"axis": "flow", "code": "09.00 Total", "label": "09.00 Total", "level": 2, "parent_code": "09 Total"},
-        {"axis": "flow", "code": "09 Extra", "label": "09 Extra", "level": 1, "parent_code": ""},
+        {"axis": "flow", "code": "09 Extra", "label": "09 Extra", "level": 3, "parent_code": ""},
     ]).to_csv(tree_root / "common_esto_tree.csv", index=False)
     pd.DataFrame([
         {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "parent_code": "09_total"},
@@ -262,8 +281,23 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "ROLLUP_VALUES=" in html
     assert "ESTO_RAW" in html
     assert "ESTO_EXTENDED_RAW" in html
-    assert 'id="include-esto-extended"' in html
-    assert "Include ESTO Extended" in html
+    assert 'id="rollup-basis"' in html
+    assert "Original ESTO only" in html
+    assert "ESTO + ESTO Extended" in html
+    assert "Compare ESTO vs Extended" in html
+    assert 'id="rollup-sector"' in html
+    assert 'id="rollup-mode"' not in html
+    assert 'id="rollup-status"' in html
+    assert 'id="rollup-search"' in html
+    assert 'id="rollup-summary-table"' in html
+    assert "All rollup types appear in the hierarchy view" in html
+    assert "Rollup display child" in html
+    assert "REGISTERED ROLLUP COMPOSITION" not in html
+    assert "Normal hierarchy child" in html
+    assert "Registered rollup composition target" in html
+    assert "Registered rollup input" in html
+    assert "ORPHANED_HIERARCHY_ROW" in html
+    assert "intentional DETACHED" in html
     assert "value-pass" in html
     assert '<details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2>' in html
     assert '<details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2>' in html

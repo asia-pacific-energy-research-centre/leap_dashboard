@@ -187,6 +187,36 @@ share one displayed product rollup and are summed within the chart.
 - 2026-06-29: Added the configured no-transfers transformation comparison to
   the aggregate overview and renamed its navigation label.
 
+## DASH-006: Rollup modes appear inside the hierarchy tree
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Presentation
+**Affected areas:** Mapping diagnostics; All sector rollup structure
+
+### Current rule
+
+Show `EXPANDING`, `NON_EXPANDING`, and `DETACHED` relationships in the sector
+hierarchy view without requiring a rollup-mode filter. Place the mode label
+inside the rollup target box and use a dotted edge for display membership that
+is not an ordinary hierarchy edge.
+
+Do not render a second, separate rollup-composition graph below the hierarchy.
+Detailed rule membership and reconciliation evidence remain available in the
+page tables. This display rule does not change the canonical hierarchy
+contract or turn rollup inputs into ordinary structural children.
+
+### Validation
+
+The Power-sector view must show Electricity plants, CHP plants, and Heat plants
+under the labelled `EXPANDING` target. The page must have no rollup-mode
+selector and no separate `REGISTERED ROLLUP COMPOSITION` graph heading.
+
+### History
+
+- 2026-07-29: Confirmed during live review of the 20_USA mapping diagnostics
+  prototype.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
