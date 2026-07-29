@@ -31,6 +31,10 @@ from common_esto_dashboard_data import (  # noqa: E402
 )
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
 from common_esto_dashboard_output_layout import build_output_layout  # noqa: E402
+from common_esto_dashboard_mapping_diagnostics import (  # noqa: E402
+    load_esto_exact_values_for_economy,
+    write_mapping_diagnostics_page,
+)
 from mapping_pipeline_provenance import selected_run_metadata  # noqa: E402
 
 # The workflow module runs its full render (plus upstream data refresh and docs
@@ -61,6 +65,15 @@ OUTPUT_CONTRACT_PATH = _resolve(
     )
 )
 COMMON_ROWS_PATH = _resolve(LEAP_MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_rows.csv")
+ESTO_EXACT_ROWS_PATH = _resolve(
+    LEAP_MAPPINGS_ROOT / "results" / "mapping_relationships" / "esto_results_exact_rows.csv.gz"
+)
+ESTO_EXTENDED_EXACT_ROWS_PATH = _resolve(
+    LEAP_MAPPINGS_ROOT
+    / "results"
+    / "mapping_relationships"
+    / "esto_extended_results_exact_rows.csv.gz"
+)
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
 OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
@@ -200,6 +213,37 @@ def _render_one_economy(
             layout,
             scope_df=scope_visible_df,
             dashboard_updated_label=dashboard_updated_label,
+            additional_pages=[
+                {
+                    "page_key": "mapping_diagnostics",
+                    "page_label": "Mapping diagnostics",
+                    "file": "mapping_diagnostics.html",
+                },
+            ],
+        )
+        esto_exact_values = load_esto_exact_values_for_economy(
+            ESTO_EXACT_ROWS_PATH,
+            economy,
+            min_year=MIN_YEAR,
+            max_year=MAX_YEAR,
+        )
+        esto_extended_exact_values = load_esto_exact_values_for_economy(
+            ESTO_EXTENDED_EXACT_ROWS_PATH,
+            economy,
+            min_year=MIN_YEAR,
+            max_year=MAX_YEAR,
+            source_system="ESTO_EXTENDED_RAW",
+        )
+        write_mapping_diagnostics_page(
+            layout,
+            LEAP_MAPPINGS_ROOT,
+            dashboard_updated_label=dashboard_updated_label,
+            economy=economy,
+            comparison_data=scope_filtered_df,
+            esto_exact_values=pd.concat(
+                [esto_exact_values, esto_extended_exact_values],
+                ignore_index=True,
+            ),
         )
         _write_dashboard_metadata(
             layout,
