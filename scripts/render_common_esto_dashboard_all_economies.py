@@ -16,6 +16,8 @@ import pandas as pd
 # Stable paths.
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MODULE_ROOT = REPO_ROOT / "codebase"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 if str(MODULE_ROOT) not in sys.path:
     sys.path.insert(0, str(MODULE_ROOT))
 
