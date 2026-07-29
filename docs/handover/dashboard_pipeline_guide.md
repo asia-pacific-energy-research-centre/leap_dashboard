@@ -156,6 +156,13 @@ The manifest retains suppressed charts with `suppressed=true`, so display
 suppression is auditable. The mapping diagnostics page and full tree explorer
 are diagnostic presentation; they do not modify mapping artifacts.
 
+`dashboard_metadata.json` is the per-economy provenance boundary. It records
+the selected Common ESTO mapping run ID and timestamp, output-contract kind and
+path, and the Stage 3 status only when that status belongs to the same run.
+All-economy production checks must confirm every rendered economy carries the
+same selected upstream run rather than independently resolving a newer or older
+artifact.
+
 ## Caching, regeneration, and incremental behavior
 
 Ordinary rendering reads existing upstream values and rebuilds the selected

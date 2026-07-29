@@ -1,6 +1,6 @@
 # Handover: Mapping diagnostics development
 
-Updated: 2026-07-27
+Updated: 2026-07-30
 
 ## Purpose
 
@@ -440,12 +440,19 @@ The next agent should make its relationship to the diagnostics page clearer:
 - Browser automation may be blocked for `file:///` dashboard outputs. Static
   HTML checks, focused tests, and manual refresh in the in-app browser are the
   current verification route.
-- The local anchor artifacts currently predate the explicit
-  `exception_review_status` classification. The dashboard therefore labels
-  their failed rows as lacking explicit review fields and does not reinterpret
-  the old boolean exception flag. Rerun the current `leap_mappings` anchor
-  validation before relying on confirmed-versus-unconfirmed counts, then
-  rerender each dashboard economy.
+- The 2026-07-30 production render uses mapping run
+  `common_esto_20260729T175438145911Z`. Its anchor artifacts include
+  `exception_review_status`, `exception_id`, and
+  `source_non_additivity_observed`; diagnostics retain every numerical failure
+  while separating confirmed from unconfirmed review status.
+- Every production economy output now records the selected upstream run ID,
+  timestamp, manifest kind/path, and matching Stage 3 status in
+  `supporting_files/dashboard_metadata.json`. A blank or mismatched upstream
+  status must not be silently replaced with the status of another run.
+- The 2026-07-30 all-economy audit rendered all 21 available economies and
+  passed automated publication readiness. Page-noise review retained one
+  warning for `02BD` “Other transformation” (27 charts, 25.93% suppressed);
+  this remains presentation review, not a mapping failure.
 
 ## Additive review: full-tree explorer implementation (2026-07-27)
 
