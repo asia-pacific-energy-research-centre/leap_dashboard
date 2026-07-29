@@ -154,6 +154,30 @@ def test_selected_run_metadata_is_compact_and_explicit(
     assert metadata["mapping_manifest_path"] == str(manifest_path)
 
 
+def test_selected_run_metadata_uses_matching_stage3_status(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    manifest_path = _write_output_contract(tmp_path, run_id="contract_789")
+    stage3_path = (
+        tmp_path / "results" / "common_esto" / "stage3_run_manifest.json"
+    )
+    stage3_path.parent.mkdir(parents=True, exist_ok=True)
+    stage3_path.write_text(
+        json.dumps({"run_id": "contract_789", "status": "completed"}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("COMMON_ESTO_USE_OUTPUT_CONTRACT", "1")
+    monkeypatch.setenv(
+        "COMMON_ESTO_OUTPUT_CONTRACT_PATH",
+        str(manifest_path),
+    )
+
+    metadata = provenance.selected_run_metadata(tmp_path)
+
+    assert metadata["mapping_run_status"] == "completed"
+
+
 def test_legacy_stage3_identity_remains_default(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
