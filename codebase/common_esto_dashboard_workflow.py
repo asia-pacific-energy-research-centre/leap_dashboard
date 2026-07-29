@@ -134,6 +134,7 @@ def _log_to_file(log_path):
 # Stable paths.
 _DEFAULT_LEAP_MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
 _LEAP_MAPPINGS_REPO = _resolve(os.getenv("LEAP_MAPPINGS_ROOT", str(_DEFAULT_LEAP_MAPPINGS_ROOT)))
+_LEAP_MAPPINGS_CODEBASE = _LEAP_MAPPINGS_REPO / "codebase"
 _LEAP_MAPPINGS_RESULTS = _LEAP_MAPPINGS_REPO / "results" / "common_esto"
 ESTO_EXACT_ROWS_PATH = prefer_compressed_csv_path(
     _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_results_exact_rows.csv.gz"
@@ -255,9 +256,9 @@ def maybe_regen_common_esto_fast_path() -> None:
             "(COMMON_ESTO_UPDATE_DATA disabled; input data unchanged)."
         )
         return
-    if str(_LEAP_MAPPINGS_REPO) not in sys.path:
-        sys.path.insert(0, str(_LEAP_MAPPINGS_REPO))
-    from codebase.mapping_tools.apply_common_esto_structure import (  # noqa: E402
+    if str(_LEAP_MAPPINGS_CODEBASE) not in sys.path:
+        sys.path.insert(0, str(_LEAP_MAPPINGS_CODEBASE))
+    from mapping_tools.apply_common_esto_structure import (  # noqa: E402
         NINTH_PROJECTION_START_YEAR,
         run_common_esto_comparison_fast_path,
     )
@@ -292,9 +293,9 @@ def _missing_leap_demand_branches(economy: str) -> list[str]:
     still only available via 'All demand aggregated'
     (config/all_demand_aggregated_components.json), resolved per economy.
     """
-    if str(_LEAP_MAPPINGS_REPO) not in sys.path:
-        sys.path.insert(0, str(_LEAP_MAPPINGS_REPO))
-    from codebase.mapping_tools.source_branch_preflight import (  # noqa: E402
+    if str(_LEAP_MAPPINGS_CODEBASE) not in sys.path:
+        sys.path.insert(0, str(_LEAP_MAPPINGS_CODEBASE))
+    from mapping_tools.source_branch_preflight import (  # noqa: E402
         get_demand_sectors_without_detail,
         load_all_demand_aggregated_components,
     )
