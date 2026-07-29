@@ -245,9 +245,17 @@ Keep the two validation layers visibly distinct:
   mapped frontier used to represent it.
 
 Rank failed checks by absolute mismatch and show the reason alongside the
-values. List reviewed exceptions and exception candidates below that table.
-Do not show a separate table of rows already visible in the current hierarchy
-graph.
+values. Keep every numerical failure in that total. An exact, user-confirmed
+source issue is review metadata attached to a failed row: it does not turn the
+row into a pass, prove the mapping is correct, or prove that the source issue
+caused the mapped-anchor failure. Show confirmed and unconfirmed failures
+separately when the current artifact provides the explicit review fields.
+
+Apply the selected dashboard economy to the failure table, review table,
+exception candidates, and summary cards. If an older artifact lacks the
+explicit confirmation fields, state that clearly instead of treating its
+legacy boolean flag as confirmation. Do not show a separate table of rows
+already visible in the current hierarchy graph.
 
 ### Validation
 
@@ -261,6 +269,9 @@ sections.
 
 - 2026-07-29: Confirmed during live review of the 20_USA mapping diagnostics
   prototype.
+- 2026-07-29: Clarified that source-issue confirmation is a review
+  classification, never a numerical pass, and added strict economy scoping and
+  legacy-artifact handling.
 
 ## DASH-008: Paired hierarchy trees use compact values
 

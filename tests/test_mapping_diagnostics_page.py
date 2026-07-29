@@ -3,10 +3,12 @@ from pathlib import Path
 import pandas as pd
 
 from codebase.common_esto_dashboard_mapping_diagnostics import (
+    _anchor_value_summary,
     _context_value_formatter,
     _mapping_cardinality_diagnostics,
     _mapped_target_structure_html,
     _paired_anchor_aggregate_summary,
+    _reviewed_anchor_exceptions,
     _rollup_boundary_details_html,
     _rollup_graph_data,
     _transformation_rollup_diagram_html,
@@ -14,6 +16,63 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     prefer_compressed_csv_path,
     write_mapping_diagnostics_page,
 )
+
+
+def test_anchor_review_split_keeps_confirmed_failures_and_filters_economy() -> None:
+    anchor = pd.DataFrame([
+        {
+            "status": "failed", "source_system": "NINTH", "validation_axis": "flow",
+            "economy": "20USA", "scenario": "reference", "year": 2030,
+            "other_axis_value": "Gas", "parent_code": "09_total",
+            "parent_value": 10.0, "frontier_sum": 7.0, "difference": 3.0,
+            "abs_error": 3.0, "reason": "difference_exceeds_tolerance",
+            "known_data_quality_exception": True,
+            "exception_review_status": "confirmed", "exception_id": "SRC-001",
+            "source_non_additivity_observed": True,
+        },
+        {
+            "status": "failed", "source_system": "LEAP", "validation_axis": "flow",
+            "economy": "20_USA", "scenario": "reference", "year": 2030,
+            "other_axis_value": "Coal", "parent_code": "Oil Refining",
+            "parent_value": 4.0, "frontier_sum": 0.0, "difference": 4.0,
+            "abs_error": 4.0, "reason": "frontier_rows_absent",
+            "known_data_quality_exception": False,
+            "exception_review_status": "",
+            "source_non_additivity_observed": False,
+        },
+        {
+            "status": "failed", "source_system": "NINTH", "validation_axis": "flow",
+            "economy": "01AUS", "scenario": "reference", "year": 2030,
+            "other_axis_value": "Gas", "parent_code": "other_economy_parent",
+            "parent_value": 99.0, "frontier_sum": 0.0, "difference": 99.0,
+            "abs_error": 99.0, "reason": "difference_exceeds_tolerance",
+            "known_data_quality_exception": True,
+            "exception_review_status": "confirmed", "exception_id": "SRC-002",
+            "source_non_additivity_observed": True,
+        },
+    ])
+
+    summary = _anchor_value_summary(anchor, "20_USA")
+    reviewed = _reviewed_anchor_exceptions(anchor, "20USA")
+
+    assert int(summary["failed_checks"].sum()) == 2
+    assert int(summary["confirmed_issue_failed"].sum()) == 1
+    assert int(summary["unconfirmed_failed"].sum()) == 1
+    assert int(summary["source_non_additivity_observed"].sum()) == 1
+    assert reviewed["exception_id"].tolist() == ["SRC-001"]
+    assert reviewed["status"].tolist() == ["failed"]
+
+
+def test_legacy_anchor_flag_is_not_relabelled_as_an_explicit_confirmation() -> None:
+    legacy = pd.DataFrame([
+        {
+            "status": "skipped",
+            "known_data_quality_exception": True,
+            "economy": "20USA",
+        },
+    ])
+
+    assert _reviewed_anchor_exceptions(legacy, "20USA").empty
 
 
 def test_context_value_formatter_uses_at_most_two_decimal_places() -> None:
@@ -207,8 +266,9 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
         {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "parent_code": "09_total"},
     ]).to_csv(tree_root / "common_esto_validation.csv", index=False)
     pd.DataFrame([
-        {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "reason": "difference_exceeds_tolerance", "parent_code": "09_total", "parent_value": 10.0, "frontier_sum": 7.0, "difference": 3.0, "abs_error": 3.0},
-        {"status": "failed", "source_system": "LEAP", "validation_axis": "flow", "reason": "frontier_rows_absent", "parent_code": "Oil Refining", "parent_value": 4.0, "frontier_sum": 0.0, "difference": 4.0, "abs_error": 4.0},
+        {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "difference_exceeds_tolerance", "parent_code": "09_total", "parent_value": 10.0, "frontier_sum": 7.0, "difference": 3.0, "abs_error": 3.0, "known_data_quality_exception": True, "exception_review_status": "confirmed", "exception_id": "SRC-001", "exception_issue_class": "confirmed_source_non_additivity", "source_non_additivity_observed": True, "data_quality_exception_notes": "Reviewed source total."},
+        {"status": "failed", "source_system": "LEAP", "validation_axis": "flow", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "frontier_rows_absent", "parent_code": "Oil Refining", "parent_value": 4.0, "frontier_sum": 0.0, "difference": 4.0, "abs_error": 4.0, "known_data_quality_exception": False, "exception_review_status": "", "exception_id": "", "exception_issue_class": "", "source_non_additivity_observed": False, "data_quality_exception_notes": ""},
+        {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "economy": "20USA", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "difference_exceeds_tolerance", "parent_code": "other_economy_parent", "parent_value": 999.0, "frontier_sum": 0.0, "difference": 999.0, "abs_error": 999.0, "known_data_quality_exception": True, "exception_review_status": "confirmed", "exception_id": "SRC-OTHER", "exception_issue_class": "confirmed_source_non_additivity", "source_non_additivity_observed": True, "data_quality_exception_notes": "Must not leak."},
     ]).to_csv(tree_root / "source_parent_anchor_validation.csv", index=False)
     pd.DataFrame([
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "parent_code": "09_total", "child_code": "09_child", "raw_child_total": 7.0},
@@ -286,7 +346,13 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "optional-zero" in html
     assert "onchange=\"document.body.classList.toggle('show-zero-children', this.checked)\"" in html
     assert "Missing source mapping" not in html
-    assert "Reviewed source-hierarchy exceptions" in html
+    assert "Confirmed source issues attached to anchor evidence" in html
+    assert "Confirmed source issues among failed anchor rows" in html
+    assert "Unconfirmed failed anchor rows" in html
+    assert "SRC-001" in html
+    assert "other_economy_parent" not in html
+    assert "SRC-OTHER" not in html
+    assert "skipped from actionable failures" not in html
     assert "Exception candidates awaiting review" in html
     assert "direct_children_incomplete_but_leaves_reconcile" in html
     assert "Direct mapping coverage review" in html

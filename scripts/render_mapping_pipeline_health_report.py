@@ -406,7 +406,21 @@ def _anchor_section(artifact: Artifact) -> str:
                         body or '<p class="empty empty--warn">Summary file is empty.</p>',
                         open_by_default=True, source_note=artifact.path.name)
     display = frame.copy()
-    for column in ["eligible", "passed", "failed", "skipped"]:
+    has_review_split = {
+        "confirmed_issue_failed",
+        "unconfirmed_failed",
+    }.issubset(display.columns)
+    if "confirmed_issue_failed" not in display.columns:
+        display["confirmed_issue_failed"] = 0
+    if "unconfirmed_failed" not in display.columns:
+        display["unconfirmed_failed"] = display["failed"]
+    if "source_non_additivity_observed" not in display.columns:
+        display["source_non_additivity_observed"] = 0
+    count_columns = [
+        "eligible", "passed", "failed", "skipped", "confirmed_issue_failed",
+        "unconfirmed_failed", "source_non_additivity_observed",
+    ]
+    for column in count_columns:
         display[column] = display[column].map(_to_float)
     display["failure_rate"] = [
         (failed / eligible) if eligible else float("nan")
@@ -415,10 +429,27 @@ def _anchor_section(artifact: Artifact) -> str:
     failing_rows = int((display["status"].str.lower() == "failed").sum())
     worst_rate = display["failure_rate"].max()
     worst_row = display.loc[display["failure_rate"].idxmax()] if failing_rows else None
+    confirmed_scope_rows = int(display["confirmed_issue_failed"].gt(0).sum())
+    unconfirmed_scope_rows = int(display["unconfirmed_failed"].gt(0).sum())
+    scope_unit = "scope check" if len(display) == 1 else "scope checks"
+    confirmed_scope_unit = "scope check" if confirmed_scope_rows == 1 else "scope checks"
+    unconfirmed_scope_unit = "scope check" if unconfirmed_scope_rows == 1 else "scope checks"
+    confirmed_verb = "includes" if confirmed_scope_rows == 1 else "include"
+    unconfirmed_verb = "includes" if unconfirmed_scope_rows == 1 else "include"
     tone = "critical" if failing_rows else "good"
     headline = " ".join(filter(None, [
-        _chip(f"{failing_rows} of {len(display)} scope checks failing",
+        _chip(f"{failing_rows} of {len(display)} {scope_unit} failing",
               "critical" if failing_rows else "good"),
+        _chip(
+            f"{confirmed_scope_rows} {confirmed_scope_unit} {confirmed_verb} confirmed source issues",
+            "unknown",
+        )
+        if has_review_split else "",
+        _chip(
+            f"{unconfirmed_scope_rows} {unconfirmed_scope_unit} {unconfirmed_verb} unconfirmed failures",
+            "critical",
+        )
+        if has_review_split and unconfirmed_scope_rows else "",
         _chip(f"worst {worst_rate * 100:.1f}% — {worst_row['comparison_scope']} "
               f"{worst_row['source_system']}", "critical") if worst_row is not None else "",
     ]))
@@ -427,7 +458,9 @@ def _anchor_section(artifact: Artifact) -> str:
         "overlap: <code>esto_leap</code> and <code>esto_leap_ninth</code> re-check the same source "
         "data under different scope definitions, and <code>esto_extended_*</code> is a separate "
         "basis entirely. These rows are deliberately not summed into one headline figure. A skipped "
-        "check is an ineligible parent boundary, not a silent pass.</p>"
+        "check is an ineligible parent boundary, not a silent pass. Confirmed source issues remain "
+        "numerical failures; the confirmation is review metadata and does not prove that a mapping "
+        "is correct or that the source issue caused the anchor failure.</p>"
     )
     basis = display.copy()
     basis["basis"] = [
@@ -435,7 +468,7 @@ def _anchor_section(artifact: Artifact) -> str:
         for scope in basis["comparison_scope"]
     ]
     per_scope = (
-        basis.groupby(["basis", "comparison_scope"], dropna=False)[["eligible", "passed", "failed", "skipped"]]
+        basis.groupby(["basis", "comparison_scope"], dropna=False)[count_columns]
         .sum().reset_index().sort_values(["basis", "comparison_scope"], kind="mergesort")
     )
     per_scope["failure_rate"] = [
@@ -446,20 +479,25 @@ def _anchor_section(artifact: Artifact) -> str:
         f"{rate * 100:.1f}%" if rate == rate else "—" for rate in display["failure_rate"]
     ]
     display["status"] = display["status"].map(lambda value: _chip(value))
+    review_columns = (
+        ["confirmed_issue_failed", "unconfirmed_failed", "source_non_additivity_observed"]
+        if has_review_split
+        else []
+    )
+    numeric_renderers = {column: _number for column in count_columns}
     table = (
         "<h3>Totals within one comparison scope</h3>"
         + _table(per_scope, ["basis", "comparison_scope", "eligible", "passed", "failed",
-                             "failure_rate", "skipped"],
-                 renderers={"eligible": _number, "passed": _number, "failed": _number,
-                            "skipped": _number})
+                             *review_columns, "failure_rate", "skipped"],
+                 renderers=numeric_renderers)
         + "<h3>Every scope, system, and validation axis</h3>"
         + _table(
             display,
             ["validation_axis", "comparison_scope", "source_system", "status", "eligible", "passed",
-             "failed", "failure_rate", "skipped"],
+             "failed", *review_columns, "failure_rate", "skipped"],
             renderers={
                 "status": lambda value: str(value),
-                "eligible": _number, "passed": _number, "failed": _number, "skipped": _number,
+                **numeric_renderers,
             },
         )
     )

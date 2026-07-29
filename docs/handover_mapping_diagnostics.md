@@ -393,8 +393,11 @@ next agent should:
    year, validation axis, and status.
 4. Keep raw parent/child values visually distinct from mapped Common ESTO
    frontiers. Do not imply that a source-data contradiction is a missing map.
-5. Preserve the existing reviewed-exception section. Exceptions must remain
-   visible and must not silently disappear from the evidence.
+5. Preserve the reviewed-exception section using the explicit confirmation
+   fields independently of numerical status. Confirmed rows remain failures
+   and remain in numerical totals; show confirmed and unconfirmed failures
+   separately without implying that confirmation proves the mapping correct
+   or proves causation.
 
 Useful current helpers are `_paired_anchor_aggregate_summary()`,
 `_paired_tree_html()`, and the summary functions near the top of
@@ -437,10 +440,12 @@ The next agent should make its relationship to the diagnostics page clearer:
 - Browser automation may be blocked for `file:///` dashboard outputs. Static
   HTML checks, focused tests, and manual refresh in the in-app browser are the
   current verification route.
-- The earlier rendered artifacts may contain stale values from before the
-  `leap_mappings` Stage 3 rebuild after commit `eb3a293`. The current mapping
-  outputs have been rebuilt, but each dashboard economy must be rerendered to
-  consume them.
+- The local anchor artifacts currently predate the explicit
+  `exception_review_status` classification. The dashboard therefore labels
+  their failed rows as lacking explicit review fields and does not reinterpret
+  the old boolean exception flag. Rerun the current `leap_mappings` anchor
+  validation before relying on confirmed-versus-unconfirmed counts, then
+  rerender each dashboard economy.
 
 ## Additive review: full-tree explorer implementation (2026-07-27)
 

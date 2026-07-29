@@ -358,6 +358,8 @@ def _mapped_target_structure_html(
 def _value_failure_summary(
     failures_source: pd.DataFrame,
     comparison_value_column: str,
+    economy: str = "",
+    include_anchor_review_split: bool = False,
 ) -> pd.DataFrame:
     """Rank failed parent/comparison checks without double-counting scopes."""
     required = {
@@ -369,9 +371,8 @@ def _value_failure_summary(
     }
     if failures_source.empty or not required.issubset(failures_source.columns):
         return pd.DataFrame()
-    failures = failures_source[
-        failures_source["status"].astype(str).eq("failed")
-    ].copy()
+    failures = _filter_dashboard_economy(failures_source, economy)
+    failures = failures[failures["status"].astype(str).eq("failed")].copy()
     if failures.empty:
         return pd.DataFrame()
     context_columns = [
@@ -395,49 +396,102 @@ def _value_failure_summary(
     ]
     for column in value_columns:
         failures[column] = pd.to_numeric(failures.get(column, 0), errors="coerce").fillna(0.0)
+    aggregations: dict[str, tuple[str, object]] = {
+        "failed_checks": ("status", "size"),
+        "parent_total": ("parent_value", "sum"),
+        "children_total": (comparison_value_column, "sum"),
+        "net_difference": ("difference", "sum"),
+        "absolute_mismatch_total": ("abs_error", "sum"),
+        "failure_reasons": (
+            "reason",
+            lambda values: "; ".join(
+                sorted(set(values.dropna().astype(str)) - {"", "nan"})
+            ),
+        ),
+    }
+    if include_anchor_review_split and _has_explicit_anchor_review_fields(failures):
+        failures["_confirmed_issue_failed"] = _confirmed_source_issue_mask(failures)
+        failures["_unconfirmed_failed"] = ~failures["_confirmed_issue_failed"]
+        failures["_source_non_additivity_observed"] = (
+            failures.get(
+                "source_non_additivity_observed",
+                pd.Series(False, index=failures.index),
+            )
+            .astype(str)
+            .str.lower()
+            .eq("true")
+        )
+        aggregations.update({
+            "confirmed_issue_failed": ("_confirmed_issue_failed", "sum"),
+            "unconfirmed_failed": ("_unconfirmed_failed", "sum"),
+            "source_non_additivity_observed": (
+                "_source_non_additivity_observed",
+                "sum",
+            ),
+        })
     summary = (
         failures.groupby(["source_system", "validation_axis", "parent_code"], dropna=False)
-        .agg(
-            failed_checks=("status", "size"),
-            parent_total=("parent_value", "sum"),
-            children_total=(comparison_value_column, "sum"),
-            net_difference=("difference", "sum"),
-            absolute_mismatch_total=("abs_error", "sum"),
-            failure_reasons=(
-                "reason",
-                lambda values: "; ".join(
-                    sorted(set(values.dropna().astype(str)) - {"", "nan"})
-                ),
-            ),
-        )
+        .agg(**aggregations)
         .reset_index()
         .sort_values("absolute_mismatch_total", ascending=False, kind="mergesort")
     )
     return summary
 
 
-def _anchor_value_summary(anchor: pd.DataFrame) -> pd.DataFrame:
+def _filter_dashboard_economy(frame: pd.DataFrame, economy: str) -> pd.DataFrame:
+    """Limit an artifact to the dashboard economy when the artifact has that axis."""
+    if frame.empty or not economy or "economy" not in frame.columns:
+        return frame.copy()
+    economy_key = str(economy).replace("_", "").strip()
+    economy_values = (
+        frame["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
+    )
+    return frame[economy_values.eq(economy_key)].copy()
+
+
+def _confirmed_source_issue_mask(frame: pd.DataFrame) -> pd.Series:
+    """Identify explicit user confirmations without reinterpreting check status."""
+    if not _has_explicit_anchor_review_fields(frame):
+        return pd.Series(False, index=frame.index)
+    confirmed = (
+        frame["known_data_quality_exception"].astype(str).str.lower().eq("true")
+    )
+    confirmed &= (
+        frame["exception_review_status"].astype(str).str.lower().eq("confirmed")
+    )
+    return confirmed
+
+
+def _has_explicit_anchor_review_fields(frame: pd.DataFrame) -> bool:
+    """Return whether the artifact can distinguish confirmed review metadata."""
+    return {
+        "known_data_quality_exception",
+        "exception_review_status",
+    }.issubset(frame.columns)
+
+
+def _anchor_value_summary(anchor: pd.DataFrame, economy: str = "") -> pd.DataFrame:
     """Sum failed source-to-mapped-frontier comparisons."""
-    return _value_failure_summary(anchor, "frontier_sum")
+    return _value_failure_summary(
+        anchor,
+        "frontier_sum",
+        economy=economy,
+        include_anchor_review_split=True,
+    )
 
 
 def _reviewed_anchor_exceptions(anchor: pd.DataFrame, economy: str) -> pd.DataFrame:
-    """Show reviewed source-data exceptions that were skipped, not hidden."""
-    required = {"status", "known_data_quality_exception"}
-    if anchor.empty or not required.issubset(anchor.columns):
+    """Show explicit source-issue confirmations independently of check status."""
+    if anchor.empty or "known_data_quality_exception" not in anchor.columns:
         return pd.DataFrame()
-    flagged = anchor[
-        anchor["status"].astype(str).eq("skipped")
-        & anchor["known_data_quality_exception"].astype(str).str.lower().eq("true")
-    ].copy()
-    if economy and "economy" in flagged.columns:
-        flagged = flagged[
-            flagged["economy"].astype(str).str.replace("_", "", regex=False).eq(economy)
-        ]
+    scoped = _filter_dashboard_economy(anchor, economy)
+    flagged = scoped[_confirmed_source_issue_mask(scoped)].copy()
     columns = [
-        "source_system", "validation_axis", "parent_code", "other_axis_value", "economy",
-        "scenario", "year", "parent_value", "reason", "exception_resolution",
-        "data_quality_exception_notes",
+        "source_system", "validation_axis", "parent_code", "other_axis_value",
+        "economy", "scenario", "year", "status", "parent_value", "frontier_sum",
+        "difference", "abs_error", "reason", "source_non_additivity_observed",
+        "exception_id", "exception_review_status", "exception_issue_class",
+        "exception_resolution", "data_quality_exception_notes",
     ]
     return flagged.loc[:, [column for column in columns if column in flagged.columns]]
 
@@ -1161,10 +1215,18 @@ def write_mapping_diagnostics_page(
             )["value"].sum().reset_index().to_dict("records"))
     rollup_value_json = json.dumps(rollup_value_records, ensure_ascii=False).replace("</", "<\\/")
 
-    stage_value_summary = _value_failure_summary(stage, "children_sum")
+    dashboard_economy = str(economy).replace("_", "").strip()
+    scoped_stage = _filter_dashboard_economy(stage, dashboard_economy)
+    scoped_anchor = _filter_dashboard_economy(anchor, dashboard_economy)
+    scoped_leaf_reconciliation_candidates = _filter_dashboard_economy(
+        leaf_reconciliation_candidates,
+        dashboard_economy,
+    )
+
+    stage_value_summary = _value_failure_summary(scoped_stage, "children_sum")
     if not stage_value_summary.empty:
         stage_value_summary.insert(0, "check_layer", "Final output hierarchy")
-    anchor_value_summary = _anchor_value_summary(anchor)
+    anchor_value_summary = _anchor_value_summary(scoped_anchor)
     anchor_failure_summary = anchor_value_summary.copy()
     if not anchor_failure_summary.empty:
         anchor_failure_summary.insert(0, "check_layer", "Source / mapping anchor")
@@ -1178,14 +1240,25 @@ def write_mapping_diagnostics_page(
             ascending=False,
             kind="mergesort",
         )
-    dashboard_economy = str(economy).replace("_", "").strip()
-    reviewed_anchor_exceptions = _reviewed_anchor_exceptions(anchor, dashboard_economy)
+    reviewed_anchor_exceptions = _reviewed_anchor_exceptions(
+        scoped_anchor,
+        dashboard_economy,
+    )
     ninth_paired_summary = _paired_anchor_aggregate_summary(
         anchor_child_context_values, "NINTH", dashboard_economy
     )
     leap_paired_summary = _paired_anchor_aggregate_summary(
         anchor_child_context_values, "LEAP", dashboard_economy
     )
+    for column in [
+        "confirmed_issue_failed",
+        "unconfirmed_failed",
+        "source_non_additivity_observed",
+    ]:
+        if column in hierarchy_failure_display.columns:
+            hierarchy_failure_display[column] = hierarchy_failure_display[column].map(
+                lambda value: "" if pd.isna(value) else int(value)
+            )
     for column in ["parent_total", "children_total", "net_difference", "absolute_mismatch_total"]:
         if column in hierarchy_failure_display.columns:
             hierarchy_failure_display[column] = hierarchy_failure_display[column].map(
@@ -1228,11 +1301,54 @@ def write_mapping_diagnostics_page(
                 "n_targets_for_source", "n_sources_for_target", "cardinality",
             ])
         )
+    stage_failed = (
+        scoped_stage["status"].astype(str).eq("failed")
+        if "status" in scoped_stage.columns
+        else pd.Series(False, index=scoped_stage.index)
+    )
+    anchor_failed = (
+        scoped_anchor["status"].astype(str).eq("failed")
+        if "status" in scoped_anchor.columns
+        else pd.Series(False, index=scoped_anchor.index)
+    )
+    has_anchor_review_fields = _has_explicit_anchor_review_fields(scoped_anchor)
+    anchor_confirmed = _confirmed_source_issue_mask(scoped_anchor)
+    anchor_review_metrics = (
+        [
+            {
+                "metric": "Confirmed source issues among failed anchor rows",
+                "rows": int((anchor_failed & anchor_confirmed).sum()),
+            },
+            {
+                "metric": "Unconfirmed failed anchor rows",
+                "rows": int((anchor_failed & ~anchor_confirmed).sum()),
+            },
+        ]
+        if has_anchor_review_fields
+        else [
+            {
+                "metric": "Failed anchor rows without explicit review fields",
+                "rows": int(anchor_failed.sum()),
+            },
+        ]
+    )
+    reviewed_anchor_note = (
+        "These exact contexts were confirmed by a person in the exception workbook. "
+        "Confirmation records a known source-data condition; it does not turn a failed "
+        "check into a pass, prove the mapping is correct, or prove the source issue "
+        "caused the mapped-anchor failure."
+        if has_anchor_review_fields
+        else (
+            "This anchor artifact predates the explicit confirmation fields, so legacy "
+            "flags are not relabelled as confirmed source issues. Rerun the mapping "
+            "validation to populate the current review classification."
+        )
+    )
     summary = pd.DataFrame([
-        {"metric": "Stage 3 failed hierarchy checks", "rows": int(len(stage[stage.get("status", "").astype(str).eq("failed")])) if not stage.empty else 0},
-        {"metric": "Failed anchor checks", "rows": int(len(anchor[anchor.get("status", "").astype(str).eq("failed")])) if not anchor.empty else 0},
-        {"metric": "Reviewed anchor exceptions (skipped but flagged)", "rows": int(len(reviewed_anchor_exceptions))},
-        {"metric": "Leaf-reconciliation exception candidates", "rows": int(len(leaf_reconciliation_candidates))},
+        {"metric": "Failed final-output hierarchy detail rows", "rows": int(stage_failed.sum())},
+        {"metric": "Failed anchor detail rows", "rows": int(anchor_failed.sum())},
+        *anchor_review_metrics,
+        {"metric": "Leaf-reconciliation exception candidates", "rows": int(len(scoped_leaf_reconciliation_candidates))},
         {"metric": "Actionable partial-coverage rows", "rows": int(len(partial))},
         {"metric": "Non-zero unmapped LEAP branches", "rows": int(len(unmapped))},
         {"metric": "LEAP source-presence conflicts", "rows": int(len(conflicts))},
@@ -1263,7 +1379,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 <section class="panel"><h2>How the anchor validator connects the hierarchies</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">The tables below match each raw parent/children context to its branch-level summed absolute mismatch and rank. This makes the materiality ranking and the exact source evidence visible together.</p></section>
 <details class="panel collapsed-panel"><summary><h2>All rollup boundaries</h2><span></span></summary><div><p class="subtle">Mapping-owned rollup edges across every ESTO flow. Green means a rolled value equals its contributors within tolerance; red means it does not. Values aggregate all products for the chosen source, scenario, and year.</p><div class="rollup-controls"><label>Dataset<select id="rollup-source"></select></label><label>Scenario<select id="rollup-scenario"></select></label><label>Year<select id="rollup-year"></select></label></div>{rollup_boundary_register}</div></details>
 <section class="panel"><h2>All sector rollup structure</h2><p class="subtle">Start with the collapsed major-sector overview, choose a sector, or search for a flow. The graph never treats rollup composition as an ordinary hierarchy branch.</p><div class="rollup-explainer"><div><strong>Normal hierarchy</strong>A solid blue arrow means the child has the displayed parent in the ESTO flow tree.</div><div><strong>Registered rollup</strong>A dotted ochre arrow means the input contributes to a compiled comparison boundary; it is not another parent-child edge.</div><div><strong>NON_EXPANDING vs DETACHED</strong>NON_EXPANDING replaces a comparison frontier without adding another hierarchy branch. DETACHED remains outside ordinary ancestor totals and is intentional, not an orphan.</div><div><strong>ESTO Extended</strong>Extended-only rows are purple. “ESTO + Extended” makes both datasets selectable; “Compare” shows both values side by side without adding them.</div></div><div class="rollup-filter-grid"><label>ESTO basis<select id="rollup-basis"><option value="original">Original ESTO only</option><option value="plus">ESTO + ESTO Extended</option><option value="compare">Compare ESTO vs Extended</option></select></label><label>Major sector<select id="rollup-sector"></select></label><label>Rollup type<select id="rollup-mode"><option value="NONE" selected>Hierarchy only</option><option value="ALL">All rollup types</option><option value="EXPANDING">EXPANDING</option><option value="NON_EXPANDING">NON_EXPANDING</option><option value="DETACHED">DETACHED</option></select></label><label>Validation/status<select id="rollup-status"><option value="ALL">All statuses</option><option value="ISSUES">Issues only</option><option value="PASS">Reconciled only</option><option value="UNAVAILABLE">Unavailable only</option></select></label><label>Search for a flow<input id="rollup-search" type="search" placeholder="Code or label" autocomplete="off"></label><span class="basis-state" id="rollup-basis-state">Showing original ESTO only</span></div><div class="rollup-legend"><span><i class="legend-line"></i>normal hierarchy</span><span><i class="legend-line rollup"></i>rollup composition</span><span><i class="legend-line detached"></i>intentional DETACHED boundary</span><span>Purple node = Extended-only addition; red = orphan, duplicate, inconsistency, or failed validation.</span></div><div class="rollup-graph-toolbar"><button type="button" id="rollup-fit">Fit width</button><button type="button" id="rollup-zoom-out">−</button><button type="button" id="rollup-zoom-reset">100%</button><button type="button" id="rollup-zoom-in">+</button><button type="button" id="rollup-clear-selection">Clear selection</button><span class="rollup-graph-help">Click a node to highlight its parent, children, and rollup relationships. Choose a major sector (or click one) to expand it.</span></div><div class="rollup-graph-wrap"><div id="rollup-graph"></div></div><div class="rollup-summary"><h3>Rows in the current graph</h3><p class="rollup-summary-status" id="rollup-summary-status"></p><div class="table-scroll"><table id="rollup-summary-table"><thead><tr><th>Flow code</th><th>Flow label</th><th>Parent flow</th><th>Relationship type</th><th>Rollup type</th><th>Original / Extended</th><th>Child count</th><th>Rollup membership</th><th>Validation / status</th></tr></thead><tbody></tbody></table></div></div></section>
-<details class="panel collapsed-panel"><summary><h2>Hierarchy validation: failures and reviewed exceptions</h2><span></span></summary><div><p class="subtle">A hierarchy check compares one parent with the rows that should account for it in the same economy, scenario, year, and opposite-axis category. A failure means the difference exceeded tolerance or the comparison frontier was incomplete; it does not automatically mean a mapping is missing.</p><div class="guide-grid"><div class="guide-card guide-neutral"><strong>Final output hierarchy</strong>Checks whether each Common ESTO parent equals the sum of its declared output children. This was previously labelled “Stage 3 hierarchy failures.”</div><div class="guide-card guide-neutral"><strong>Source / mapping anchor</strong>Checks whether a raw ESTO, Ninth, or LEAP parent equals its de-duplicated mapped Common ESTO frontier.</div><div class="guide-card guide-warning"><strong>How to interpret a failure</strong>Review the reason and absolute mismatch together. Causes include incomplete mapped coverage, a raw source contradiction, or a hierarchy rule that needs review.</div></div><h3>Failed checks ranked by materiality</h3><p class="subtle">Totals aggregate failed contexts across economies, scenarios, and years. Net difference can cancel across contexts; absolute mismatch cannot.</p>{_table_html(hierarchy_failure_display, ['check_layer','source_system','validation_axis','parent_code','failure_reasons','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Reviewed source-hierarchy exceptions</h3><p class="subtle">These known source-data conditions matched the exception workbook. They were skipped from actionable failures but remain visible with their review notes.</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','reason','exception_resolution','data_quality_exception_notes'])}<h3>Exception candidates awaiting review</h3><p class="subtle">These are not approved exceptions. Their immediate children fail to reconcile while all descendant leaves reconcile; review the source hierarchy before enabling one.</p>{_table_html(leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>
+<details class="panel collapsed-panel"><summary><h2>Hierarchy validation: failures and reviewed exceptions</h2><span></span></summary><div><p class="subtle">A hierarchy check compares one parent with the rows that should account for it in the same economy, scenario, year, and opposite-axis category. A failure means the difference exceeded tolerance or the comparison frontier was incomplete; it does not automatically mean a mapping is missing.</p><div class="guide-grid"><div class="guide-card guide-neutral"><strong>Final output hierarchy</strong>Checks whether each Common ESTO parent equals the sum of its declared output children. This was previously labelled “Stage 3 hierarchy failures.”</div><div class="guide-card guide-neutral"><strong>Source / mapping anchor</strong>Checks whether a raw ESTO, Ninth, or LEAP parent equals its de-duplicated mapped Common ESTO frontier.</div><div class="guide-card guide-warning"><strong>How to interpret a failure</strong>Review the reason and absolute mismatch together. Causes include incomplete mapped coverage, a raw source contradiction, or a hierarchy rule that needs review.</div></div><h3>Failed checks ranked by materiality</h3><p class="subtle">Totals aggregate failed contexts only for this dashboard economy. Net difference can cancel across contexts; absolute mismatch cannot. Confirmed source issues remain in these numerical failure totals.</p>{_table_html(hierarchy_failure_display, ['check_layer','source_system','validation_axis','parent_code','failure_reasons','failed_checks','confirmed_issue_failed','unconfirmed_failed','source_non_additivity_observed','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Confirmed source issues attached to anchor evidence</h3><p class="subtle">{escape(reviewed_anchor_note)}</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','status','parent_value','frontier_sum','difference','abs_error','reason','source_non_additivity_observed','exception_id','exception_review_status','exception_issue_class','exception_resolution','data_quality_exception_notes'])}<h3>Exception candidates awaiting review</h3><p class="subtle">These are not confirmed issues. Their immediate children fail to reconcile while all descendant leaves reconcile; review the source hierarchy before confirming an exact context.</p>{_table_html(scoped_leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>
 <label class="zero-toggle"><input id="show-zero-children" type="checkbox" autocomplete="off" onchange="document.body.classList.toggle('show-zero-children', this.checked)"> Show zero-value children and mapped components</label>
 <section class="panel"><h2>NINTH flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, common_esto_tree, 'NINTH', anchor_mapped_component_context_values, dashboard_economy)}</section>
 <section class="panel"><h2>LEAP flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(leap_paired_summary, leap_tree, common_esto_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy)}</section>

@@ -146,6 +146,30 @@ def test_anchor_headline_never_sums_across_overlapping_scopes() -> None:
     assert "Ordinary ESTO basis" in html
 
 
+def test_anchor_health_report_keeps_confirmed_issues_in_failed_total() -> None:
+    summary = pd.DataFrame([
+        {
+            "validation_axis": "flow", "comparison_scope": "esto_leap_ninth",
+            "source_system": "NINTH", "eligible": "10", "passed": "4",
+            "failed": "6", "skipped": "2", "confirmed_issue_failed": "4",
+            "unconfirmed_failed": "2", "source_non_additivity_observed": "5",
+            "status": "failed",
+        },
+    ])
+
+    html = report._anchor_section(_artifact("a", "a.csv", summary))
+
+    assert "1 of 1 scope check failing" in html
+    assert "1 scope check includes confirmed source issues" in html
+    assert "1 scope check includes unconfirmed failures" in html
+    assert "confirmed issue failed" in html
+    assert "unconfirmed failed" in html
+    assert "Confirmed source issues remain numerical failures" in html
+    assert ">6<" in html
+    assert ">4<" in html
+    assert ">2<" in html
+
+
 def test_missing_qa_file_is_unknown_rather_than_clean() -> None:
     artifacts = {
         key: _artifact(key, f"{key}.csv", pd.DataFrame(), exists=False)
