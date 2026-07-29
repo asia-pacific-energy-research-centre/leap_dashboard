@@ -250,7 +250,10 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Raw source contradiction" in html
     assert "09_total" in html
     assert "absolute mismatch total" in html
-    assert "Largest summed anchor mismatches" in html
+    assert "Hierarchy validation: failures and reviewed exceptions" in html
+    assert "Final output hierarchy" in html
+    assert "Source / mapping anchor" in html
+    assert "A failure means the difference exceeded tolerance" in html
     assert "09 Child" in html
     assert ">7<" in html
     assert "NINTH flow tree: original vs mapped representation" in html
@@ -274,7 +277,7 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "onchange=\"document.body.classList.toggle('show-zero-children', this.checked)\"" in html
     assert "Missing source mapping" not in html
     assert "Reviewed source-hierarchy exceptions" in html
-    assert "Leaf-reconciliation candidates awaiting review" in html
+    assert "Exception candidates awaiting review" in html
     assert "direct_children_incomplete_but_leaves_reconcile" in html
     assert "Direct mapping coverage review" in html
     assert "Dataset<select id=\"rollup-source\"" in html
@@ -289,7 +292,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert 'id="rollup-mode"' not in html
     assert 'id="rollup-status"' in html
     assert 'id="rollup-search"' in html
-    assert 'id="rollup-summary-table"' in html
+    assert 'id="rollup-summary-table"' not in html
+    assert "Rows in the current graph" not in html
     assert "All rollup types appear in the hierarchy view" in html
     assert "Rollup display child" in html
     assert "REGISTERED ROLLUP COMPOSITION" not in html
@@ -299,10 +303,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "ORPHANED_HIERARCHY_ROW" in html
     assert "intentional DETACHED" in html
     assert "value-pass" in html
-    assert '<details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2>' in html
     assert '<details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2>' in html
-    assert '<details class="panel collapsed-panel"><summary><h2>Largest summed anchor mismatches</h2>' in html
-    assert '<details class="panel collapsed-panel"><summary><h2>Reviewed source-hierarchy exceptions</h2>' in html
+    assert '<details class="panel collapsed-panel"><summary><h2>Hierarchy validation: failures and reviewed exceptions</h2>' in html
     assert Path(result["summary"]).exists()
 
 

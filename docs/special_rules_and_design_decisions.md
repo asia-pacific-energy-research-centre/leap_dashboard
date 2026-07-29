@@ -217,6 +217,46 @@ selector and no separate `REGISTERED ROLLUP COMPOSITION` graph heading.
 - 2026-07-29: Confirmed during live review of the 20_USA mapping diagnostics
   prototype.
 
+## DASH-007: Hierarchy validation uses one explained diagnostic panel
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Presentation
+**Affected areas:** Mapping diagnostics; hierarchy validation
+
+### Current rule
+
+Present final-output hierarchy failures, source/mapping anchor failures,
+failure reasons, materiality, and reviewed exceptions in one hierarchy
+validation panel. Explain that a hierarchy failure means the tested parent
+does not equal its expected accounting frontier within tolerance, or that the
+frontier is incomplete; it does not by itself prove that a mapping is missing.
+
+Keep the two validation layers visibly distinct:
+
+- Final output hierarchy compares a Common ESTO parent with its declared
+  output children.
+- Source/mapping anchor compares a raw source parent with the de-duplicated
+  mapped frontier used to represent it.
+
+Rank failed checks by absolute mismatch and show the reason alongside the
+values. List reviewed exceptions and exception candidates below that table.
+Do not show a separate table of rows already visible in the current hierarchy
+graph.
+
+### Validation
+
+The page must show one hierarchy-validation panel with the two check layers
+explained, one materiality-ranked failure table containing failure reasons,
+and the reviewed exceptions below it. It must not retain the former separate
+Stage 3 failures, anchor mismatches, failure reasons, or current-graph rows
+sections.
+
+### History
+
+- 2026-07-29: Confirmed during live review of the 20_USA mapping diagnostics
+  prototype.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

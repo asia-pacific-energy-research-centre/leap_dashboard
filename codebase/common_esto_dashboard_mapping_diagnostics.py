@@ -354,12 +354,23 @@ def _mapped_target_structure_html(
     return body, note, detail_matches_total
 
 
-def _anchor_value_summary(anchor: pd.DataFrame) -> pd.DataFrame:
-    """Sum failed parent/child comparisons across all economies, scenarios, and years."""
-    required = {"status", "source_system", "validation_axis", "parent_code"}
-    if anchor.empty or not required.issubset(anchor.columns):
+def _value_failure_summary(
+    failures_source: pd.DataFrame,
+    comparison_value_column: str,
+) -> pd.DataFrame:
+    """Rank failed parent/comparison checks without double-counting scopes."""
+    required = {
+        "status",
+        "source_system",
+        "validation_axis",
+        "parent_code",
+        comparison_value_column,
+    }
+    if failures_source.empty or not required.issubset(failures_source.columns):
         return pd.DataFrame()
-    failures = anchor[anchor["status"].astype(str).eq("failed")].copy()
+    failures = failures_source[
+        failures_source["status"].astype(str).eq("failed")
+    ].copy()
     if failures.empty:
         return pd.DataFrame()
     context_columns = [
@@ -373,7 +384,14 @@ def _anchor_value_summary(anchor: pd.DataFrame) -> pd.DataFrame:
             failures.sort_values("_scope_priority", kind="mergesort")
             .drop_duplicates(context_columns, keep="first")
         )
-    value_columns = ["parent_value", "frontier_sum", "difference", "abs_error"]
+    if "reason" not in failures.columns:
+        failures["reason"] = ""
+    value_columns = [
+        "parent_value",
+        comparison_value_column,
+        "difference",
+        "abs_error",
+    ]
     for column in value_columns:
         failures[column] = pd.to_numeric(failures.get(column, 0), errors="coerce").fillna(0.0)
     summary = (
@@ -381,14 +399,25 @@ def _anchor_value_summary(anchor: pd.DataFrame) -> pd.DataFrame:
         .agg(
             failed_checks=("status", "size"),
             parent_total=("parent_value", "sum"),
-            children_total=("frontier_sum", "sum"),
+            children_total=(comparison_value_column, "sum"),
             net_difference=("difference", "sum"),
             absolute_mismatch_total=("abs_error", "sum"),
+            failure_reasons=(
+                "reason",
+                lambda values: "; ".join(
+                    sorted(set(values.dropna().astype(str)) - {"", "nan"})
+                ),
+            ),
         )
         .reset_index()
         .sort_values("absolute_mismatch_total", ascending=False, kind="mergesort")
     )
     return summary
+
+
+def _anchor_value_summary(anchor: pd.DataFrame) -> pd.DataFrame:
+    """Sum failed source-to-mapped-frontier comparisons."""
+    return _value_failure_summary(anchor, "frontier_sum")
 
 
 def _reviewed_anchor_exceptions(anchor: pd.DataFrame, economy: str) -> pd.DataFrame:
@@ -1131,9 +1160,23 @@ def write_mapping_diagnostics_page(
             )["value"].sum().reset_index().to_dict("records"))
     rollup_value_json = json.dumps(rollup_value_records, ensure_ascii=False).replace("</", "<\\/")
 
-    stage_summary = _failure_summary(stage, ["source_system", "validation_axis", "parent_code"])
-    anchor_summary = _failure_summary(anchor, ["source_system", "validation_axis", "reason", "parent_code"])
+    stage_value_summary = _value_failure_summary(stage, "children_sum")
+    if not stage_value_summary.empty:
+        stage_value_summary.insert(0, "check_layer", "Final output hierarchy")
     anchor_value_summary = _anchor_value_summary(anchor)
+    anchor_failure_summary = anchor_value_summary.copy()
+    if not anchor_failure_summary.empty:
+        anchor_failure_summary.insert(0, "check_layer", "Source / mapping anchor")
+    hierarchy_failure_display = pd.concat(
+        [stage_value_summary, anchor_failure_summary],
+        ignore_index=True,
+    )
+    if "absolute_mismatch_total" in hierarchy_failure_display.columns:
+        hierarchy_failure_display = hierarchy_failure_display.sort_values(
+            "absolute_mismatch_total",
+            ascending=False,
+            kind="mergesort",
+        )
     dashboard_economy = str(economy).replace("_", "").strip()
     reviewed_anchor_exceptions = _reviewed_anchor_exceptions(anchor, dashboard_economy)
     ninth_paired_summary = _paired_anchor_aggregate_summary(
@@ -1142,10 +1185,11 @@ def write_mapping_diagnostics_page(
     leap_paired_summary = _paired_anchor_aggregate_summary(
         anchor_child_context_values, "LEAP", dashboard_economy
     )
-    anchor_value_display = anchor_value_summary.copy()
     for column in ["parent_total", "children_total", "net_difference", "absolute_mismatch_total"]:
-        if column in anchor_value_display.columns:
-            anchor_value_display[column] = anchor_value_display[column].map(_three_significant_figures)
+        if column in hierarchy_failure_display.columns:
+            hierarchy_failure_display[column] = hierarchy_failure_display[column].map(
+                _three_significant_figures
+            )
     coverage_summary = (
         coverage.groupby([column for column in ["coverage_status", "mapping_status"] if column in coverage.columns], dropna=False)
         .size().reset_index(name="rows").sort_values("rows", ascending=False, kind="mergesort")
@@ -1218,9 +1262,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 <section class="panel"><h2>How the anchor validator connects the hierarchies</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">The tables below match each raw parent/children context to its branch-level summed absolute mismatch and rank. This makes the materiality ranking and the exact source evidence visible together.</p></section>
 <details class="panel collapsed-panel"><summary><h2>All rollup boundaries</h2><span></span></summary><div><p class="subtle">Mapping-owned rollup edges across every ESTO flow. Green means a rolled value equals its contributors within tolerance; red means it does not. Values aggregate all products for the chosen source, scenario, and year.</p><div class="rollup-controls"><label>Dataset<select id="rollup-source"></select></label><label>Scenario<select id="rollup-scenario"></select></label><label>Year<select id="rollup-year"></select></label></div>{rollup_boundary_register}</div></details>
 <section class="panel"><h2>All sector rollup structure</h2><p class="subtle">Start with the collapsed major-sector overview, choose a sector, or search for a flow. The graph never treats rollup composition as an ordinary hierarchy branch.</p><div class="rollup-explainer"><div><strong>Normal hierarchy</strong>A solid blue arrow means the child has the displayed parent in the ESTO flow tree.</div><div><strong>Registered rollup</strong>A dotted ochre arrow means the input contributes to a compiled comparison boundary; it is not another parent-child edge.</div><div><strong>NON_EXPANDING vs DETACHED</strong>NON_EXPANDING replaces a comparison frontier without adding another hierarchy branch. DETACHED remains outside ordinary ancestor totals and is intentional, not an orphan.</div><div><strong>ESTO Extended</strong>Extended-only rows are purple. “ESTO + Extended” makes both datasets selectable; “Compare” shows both values side by side without adding them.</div></div><div class="rollup-filter-grid"><label>ESTO basis<select id="rollup-basis"><option value="original">Original ESTO only</option><option value="plus">ESTO + ESTO Extended</option><option value="compare">Compare ESTO vs Extended</option></select></label><label>Major sector<select id="rollup-sector"></select></label><label>Rollup type<select id="rollup-mode"><option value="NONE" selected>Hierarchy only</option><option value="ALL">All rollup types</option><option value="EXPANDING">EXPANDING</option><option value="NON_EXPANDING">NON_EXPANDING</option><option value="DETACHED">DETACHED</option></select></label><label>Validation/status<select id="rollup-status"><option value="ALL">All statuses</option><option value="ISSUES">Issues only</option><option value="PASS">Reconciled only</option><option value="UNAVAILABLE">Unavailable only</option></select></label><label>Search for a flow<input id="rollup-search" type="search" placeholder="Code or label" autocomplete="off"></label><span class="basis-state" id="rollup-basis-state">Showing original ESTO only</span></div><div class="rollup-legend"><span><i class="legend-line"></i>normal hierarchy</span><span><i class="legend-line rollup"></i>rollup composition</span><span><i class="legend-line detached"></i>intentional DETACHED boundary</span><span>Purple node = Extended-only addition; red = orphan, duplicate, inconsistency, or failed validation.</span></div><div class="rollup-graph-toolbar"><button type="button" id="rollup-fit">Fit width</button><button type="button" id="rollup-zoom-out">−</button><button type="button" id="rollup-zoom-reset">100%</button><button type="button" id="rollup-zoom-in">+</button><button type="button" id="rollup-clear-selection">Clear selection</button><span class="rollup-graph-help">Click a node to highlight its parent, children, and rollup relationships. Choose a major sector (or click one) to expand it.</span></div><div class="rollup-graph-wrap"><div id="rollup-graph"></div></div><div class="rollup-summary"><h3>Rows in the current graph</h3><p class="rollup-summary-status" id="rollup-summary-status"></p><div class="table-scroll"><table id="rollup-summary-table"><thead><tr><th>Flow code</th><th>Flow label</th><th>Parent flow</th><th>Relationship type</th><th>Rollup type</th><th>Original / Extended</th><th>Child count</th><th>Rollup membership</th><th>Validation / status</th></tr></thead><tbody></tbody></table></div></div></section>
-<details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2><span></span></summary><div>{_table_html(stage_summary, ['source_system','validation_axis','parent_code','rows'])}</div></details>
-<details class="panel collapsed-panel"><summary><h2>Largest summed anchor mismatches</h2><span></span></summary><div><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</div></details>
-<details class="panel collapsed-panel"><summary><h2>Reviewed source-hierarchy exceptions</h2><span></span></summary><div><p class="subtle">These are known source-data conditions from the exception workbook. They are skipped from actionable anchor failures but remain visible here with their review notes.</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','reason','exception_resolution','data_quality_exception_notes'])}<h3>Leaf-reconciliation candidates awaiting review</h3><p class="subtle">These are not exceptions yet. Their immediate children do not reconcile, while their descendant leaves do; review before copying an enabled row into <code>source_mismatch_allowed</code>.</p>{_table_html(leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>
+<details class="panel collapsed-panel"><summary><h2>Hierarchy validation: failures and reviewed exceptions</h2><span></span></summary><div><p class="subtle">A hierarchy check compares one parent with the rows that should account for it in the same economy, scenario, year, and opposite-axis category. A failure means the difference exceeded tolerance or the comparison frontier was incomplete; it does not automatically mean a mapping is missing.</p><div class="guide-grid"><div class="guide-card guide-neutral"><strong>Final output hierarchy</strong>Checks whether each Common ESTO parent equals the sum of its declared output children. This was previously labelled “Stage 3 hierarchy failures.”</div><div class="guide-card guide-neutral"><strong>Source / mapping anchor</strong>Checks whether a raw ESTO, Ninth, or LEAP parent equals its de-duplicated mapped Common ESTO frontier.</div><div class="guide-card guide-warning"><strong>How to interpret a failure</strong>Review the reason and absolute mismatch together. Causes include incomplete mapped coverage, a raw source contradiction, or a hierarchy rule that needs review.</div></div><h3>Failed checks ranked by materiality</h3><p class="subtle">Totals aggregate failed contexts across economies, scenarios, and years. Net difference can cancel across contexts; absolute mismatch cannot.</p>{_table_html(hierarchy_failure_display, ['check_layer','source_system','validation_axis','parent_code','failure_reasons','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Reviewed source-hierarchy exceptions</h3><p class="subtle">These known source-data conditions matched the exception workbook. They were skipped from actionable failures but remain visible with their review notes.</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','reason','exception_resolution','data_quality_exception_notes'])}<h3>Exception candidates awaiting review</h3><p class="subtle">These are not approved exceptions. Their immediate children fail to reconcile while all descendant leaves reconcile; review the source hierarchy before enabling one.</p>{_table_html(leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>
 <label class="zero-toggle"><input id="show-zero-children" type="checkbox" autocomplete="off" onchange="document.body.classList.toggle('show-zero-children', this.checked)"> Show zero-value children and mapped components</label>
 <section class="panel"><h2>NINTH flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, common_esto_tree, 'NINTH', anchor_mapped_component_context_values, dashboard_economy)}</section>
 <section class="panel"><h2>LEAP flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(leap_paired_summary, leap_tree, common_esto_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy)}</section>
@@ -1268,6 +1310,14 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     html = html.replace("rollup composition</span>", "rollup display relationship</span>")
     html = html.replace("<th>Parent flow</th>", "<th>Displayed parent</th>")
     html = html.replace("<th>Child count</th>", "<th>Displayed children</th>")
+    rollup_summary_start = html.find('<div class="rollup-summary">')
+    if rollup_summary_start >= 0:
+        rollup_summary_end = html.find("</section>", rollup_summary_start)
+        if rollup_summary_end >= 0:
+            html = (
+                html[:rollup_summary_start]
+                + html[rollup_summary_end:]
+            )
     html = html.replace(existing_rollup_controls_html, "", 1)
     html = html.replace(graph_heading_html, graph_heading_html + rollup_controls_html, 1)
 
@@ -1777,6 +1827,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     return {code:parts[0] || '', label:parts[1] || ''};
   };
   const renderTable = (visibleCodes, filteredBoundaries) => {
+    if (!tableBody || !tableStatus) return;
     const rows = [];
     [...visibleCodes].sort().forEach(code => {
       const node = nodeByCode.get(code);
