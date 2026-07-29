@@ -31,6 +31,7 @@ from common_esto_dashboard_data import (  # noqa: E402
 )
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
 from common_esto_dashboard_output_layout import build_output_layout  # noqa: E402
+from mapping_pipeline_provenance import selected_run_metadata  # noqa: E402
 
 # The workflow module runs its full render (plus upstream data refresh and docs
 # publish) at import time unless this env override is set first.
@@ -118,12 +119,17 @@ def _metadata_path(economy: str) -> Path:
     return OUTPUT_ROOT / economy / "supporting_files" / "dashboard_metadata.json"
 
 
-def _write_dashboard_metadata(layout: dict[str, Path], updated_label: str) -> None:
+def _write_dashboard_metadata(
+    layout: dict[str, Path],
+    updated_label: str,
+    mapping_metadata: dict[str, object],
+) -> None:
     """Write lightweight render metadata for summary scripts and manual inspection."""
     metadata = {
         "economy": layout["root"].name,
         "dashboard_updated_label": updated_label,
         "rendered_at_local": datetime.now().astimezone().isoformat(timespec="seconds"),
+        **mapping_metadata,
     }
     (layout["supporting"] / "dashboard_metadata.json").write_text(
         json.dumps(metadata, indent=2),
@@ -148,6 +154,7 @@ def _render_one_economy(
     template: dict,
     series_config: dict,
     economy: str,
+    mapping_metadata: dict[str, object],
 ) -> dict[str, object]:
     """Render one economy dashboard and return a summary row."""
     result: dict[str, object] = {
@@ -194,7 +201,11 @@ def _render_one_economy(
             scope_df=scope_visible_df,
             dashboard_updated_label=dashboard_updated_label,
         )
-        _write_dashboard_metadata(layout, dashboard_updated_label)
+        _write_dashboard_metadata(
+            layout,
+            dashboard_updated_label,
+            mapping_metadata,
+        )
 
         result.update({
             "status": "ok",
@@ -256,6 +267,7 @@ def render_all_economies() -> pd.DataFrame:
     )
     raw_df = _normalise_economy_column(raw_df)
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
+    mapping_metadata = selected_run_metadata(LEAP_MAPPINGS_ROOT)
 
     requested_economies = [_dashboard_economy(e) for e in ECONOMIES_TO_RENDER]
     economies = requested_economies or _available_economies(raw_df)
@@ -263,7 +275,13 @@ def render_all_economies() -> pd.DataFrame:
     for economy in economies:
         if RENDER_DASHBOARDS:
             print(f"Rendering {economy}...")
-            row = _render_one_economy(raw_df, template, series_config, economy)
+            row = _render_one_economy(
+                raw_df,
+                template,
+                series_config,
+                economy,
+                mapping_metadata,
+            )
         else:
             print(f"Summarising existing output for {economy}...")
             row = _summarise_existing_economy(raw_df, economy)

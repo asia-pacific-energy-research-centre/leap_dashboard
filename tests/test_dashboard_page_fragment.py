@@ -136,6 +136,24 @@ def test_selected_output_contract_supplies_provenance_run_identity(
     assert "contract_123" in message
 
 
+def test_selected_run_metadata_is_compact_and_explicit(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    manifest_path = _write_output_contract(tmp_path, run_id="contract_456")
+    monkeypatch.setenv("COMMON_ESTO_USE_OUTPUT_CONTRACT", "1")
+    monkeypatch.setenv(
+        "COMMON_ESTO_OUTPUT_CONTRACT_PATH",
+        str(manifest_path),
+    )
+
+    metadata = provenance.selected_run_metadata(tmp_path)
+
+    assert metadata["mapping_run_id"] == "contract_456"
+    assert metadata["mapping_manifest_kind"] == "output_contract"
+    assert metadata["mapping_manifest_path"] == str(manifest_path)
+
+
 def test_legacy_stage3_identity_remains_default(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

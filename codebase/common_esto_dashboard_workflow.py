@@ -63,6 +63,7 @@ from common_esto_dashboard_mapping_diagnostics import (  # noqa: E402
     prefer_compressed_csv_path,
     write_mapping_diagnostics_page,
 )
+from mapping_pipeline_provenance import selected_run_metadata  # noqa: E402
 from scripts.render_full_mapping_tree_explorer import render_full_tree_explorer  # noqa: E402
 
 
@@ -230,12 +231,16 @@ def _dashboard_updated_label() -> str:
     return datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
 
 
-def _write_dashboard_metadata(layout: dict[str, Path], updated_label: str) -> None:
+def _write_dashboard_metadata(
+    layout: dict[str, Path],
+    updated_label: str,
+) -> None:
     """Write lightweight render metadata for summary scripts and manual inspection."""
     metadata = {
         "economy": layout["root"].name,
         "dashboard_updated_label": updated_label,
         "rendered_at_local": datetime.now().astimezone().isoformat(timespec="seconds"),
+        **selected_run_metadata(_LEAP_MAPPINGS_REPO),
     }
     (layout["supporting"] / "dashboard_metadata.json").write_text(
         json.dumps(metadata, indent=2),
