@@ -49,7 +49,9 @@ def _resolve(path: str | Path) -> Path:
 
 #%%
 # User-tuned constants.
-LEAP_MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
+LEAP_MAPPINGS_ROOT = _resolve(
+    os.getenv("LEAP_MAPPINGS_ROOT", REPO_ROOT.parent / "leap_mappings")
+)
 INPUT_DATA_PATH = _resolve(LEAP_MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_comparison_data.csv")
 OUTPUT_CONTRACT_PATH = _resolve(
     os.getenv(
