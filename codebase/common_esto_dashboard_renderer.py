@@ -97,6 +97,26 @@ def stacked_area_dataset_note(sources: set[str], subject: str) -> str:
     return f"Stacked areas: {names} {subject} detail for the selected scenario."
 
 
+def aggregate_only_tfec_note(
+    stacked_sources: set[str],
+    primary_source: object,
+) -> str:
+    """Explain when LEAP's aggregate-only demand prevents a true TFEC split."""
+    if (
+        str(primary_source).strip().casefold() == "leap"
+        and "LEAP" not in {str(source).strip().upper() for source in stacked_sources}
+        and "NINTH" in {str(source).strip().upper() for source in stacked_sources}
+    ):
+        return (
+            " Warning: LEAP demand detail is aggregate-only for this economy, "
+            "so the stacked projection uses the 9th-edition demand frontier. "
+            "The LEAP TFEC line cannot remove non-energy use unless that branch "
+            "is separately modelled and mapped; treat this TFEC comparison as "
+            "including any non-energy demand retained in the aggregate."
+        )
+    return ""
+
+
 def series_label(row: pd.Series, series_labels: dict[str, str]) -> str:
     """Return a display label for a source/scenario series."""
     return series_label_from_values(row["source_system"], row["scenario"], series_labels)
@@ -2742,7 +2762,10 @@ def _build_td_sector_chart(
         }],
         meta={
             "trace_meta": trace_meta,
-            "stacked_area_note": stacked_area_dataset_note(stacked_sources, "demand"),
+            "stacked_area_note": (
+                stacked_area_dataset_note(stacked_sources, "demand")
+                + aggregate_only_tfec_note(stacked_sources, primary_source)
+            ),
         },
     )
     apply_chart_chrome(fig, base_year)

@@ -25,6 +25,7 @@ from codebase.common_esto_dashboard_renderer import (
     render_dashboard,
     select_transformation_total_rows,
     _build_section_aggregate_charts,
+    aggregate_only_tfec_note,
     _select_total_rows_by_source,
     _non_overlapping_common_row_frontier,
     _non_overlapping_flow_rows,
@@ -574,6 +575,14 @@ def test_total_demand_lines_use_visible_frontier_for_esto_and_ninth() -> None:
     totals = selected.groupby("source_system")["value"].sum().to_dict()
 
     assert totals == {"LEAP": 75.0, "NINTH": 100.0}
+
+
+def test_aggregate_only_leap_demand_warns_about_tfec_non_energy() -> None:
+    note = aggregate_only_tfec_note({"NINTH"}, "LEAP")
+
+    assert "aggregate-only" in note
+    assert "cannot remove non-energy use" in note
+    assert aggregate_only_tfec_note({"LEAP"}, "LEAP") == ""
 
 
 def test_aggregate_flow_rows_drop_nested_refinery_categories_per_source() -> None:
