@@ -299,6 +299,41 @@ calculations use unrounded values.
 - 2026-07-29: Confirmed during live review of the mapping diagnostics
   prototype.
 
+## DASH-009: A displayed time-series category has one point per year
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Aggregation / presentation validation
+**Affected areas:** Common ESTO flow-product detail charts; chart-bundle QA
+
+### Current rule
+
+A detail-card label can represent several distinct Common ESTO component rows.
+Before plotting, sum those component values by source system, scenario, and
+year so the displayed category has exactly one signed value per year. Do not
+connect the component rows sequentially: repeated years create misleading
+vertical spikes.
+
+Keep the upstream `common_row_id` contract distinct from this presentation
+aggregation. Multiple component IDs under one displayed category are valid;
+duplicate source/scenario/year rows for the same component remain an upstream
+data-contract issue.
+
+Every emitted line or stacked-line trace must also pass a blocking uniqueness
+check on its x values. A chart bundle is not written when a trace still
+contains a repeated year.
+
+### Validation
+
+Regression tests cover multi-component displayed categories and deliberate
+duplicate-year traces. The 2026-07-30 20USA production render emitted 2,784
+line traces across 311 bundled charts with zero repeated-year traces.
+
+### History
+
+- 2026-07-30: Added after repeated component rows produced vertical spikes in
+  Power detail charts.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

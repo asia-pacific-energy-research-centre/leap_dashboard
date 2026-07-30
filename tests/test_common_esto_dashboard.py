@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from codebase.common_esto_dashboard_data import (
     ALL_SCOPES,
@@ -14,8 +15,10 @@ from codebase.common_esto_dashboard_data import (
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
 from codebase.common_esto_dashboard_renderer import (
     apply_chart_chrome,
+    assert_unique_line_trace_x,
     assign_pages,
     build_area_chart,
+    build_product_chart,
     color_for_code,
     color_for_plotting_name,
     drop_excluded_flow_rows,
@@ -732,6 +735,77 @@ def test_chart_chrome_resolves_duplicate_configured_category_colours() -> None:
     apply_chart_chrome(fig, base_year=None, code_axis="product")
 
     assert fig.data[0].fillcolor != fig.data[1].fillcolor
+
+
+def test_product_chart_sums_component_rows_to_one_point_per_year() -> None:
+    rows = pd.DataFrame([
+        {
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2030,
+            "common_row_id": "coal_a",
+            "value": -10.0,
+            "sign_status": "expected_negative",
+            "sign_interpretation": "transformation input",
+        },
+        {
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2030,
+            "common_row_id": "coal_b",
+            "value": -20.0,
+            "sign_status": "expected_negative",
+            "sign_interpretation": "transformation input",
+        },
+        {
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2031,
+            "common_row_id": "coal_a",
+            "value": -12.0,
+            "sign_status": "expected_negative",
+            "sign_interpretation": "transformation input",
+        },
+        {
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2031,
+            "common_row_id": "coal_b",
+            "value": -21.0,
+            "sign_status": "expected_negative",
+            "sign_interpretation": "transformation input",
+        },
+    ])
+
+    figure = build_product_chart(
+        rows,
+        "09 Electricity plants",
+        "01.02-01.04 Coal",
+        {"LEAP|Target": "LEAP Target"},
+    )
+
+    assert list(figure.data[0].x) == [2030, 2031]
+    assert list(figure.data[0].y) == [-30.0, -33.0]
+    assert_unique_line_trace_x({"coal_chart": figure})
+
+
+def test_line_trace_duplicate_years_are_blocking() -> None:
+    import plotly.graph_objects as go
+
+    figure = go.Figure([
+        go.Scatter(
+            x=[2030, 2030],
+            y=[-10.0, -20.0],
+            mode="lines+markers",
+            name="LEAP Target",
+        )
+    ])
+
+    with pytest.raises(
+        ValueError,
+        match="at most one point per x value",
+    ):
+        assert_unique_line_trace_x({"bad_chart": figure})
 
 
 def test_all_scopes_sentinel_keeps_every_scope_but_still_filters_economy_and_year() -> None:

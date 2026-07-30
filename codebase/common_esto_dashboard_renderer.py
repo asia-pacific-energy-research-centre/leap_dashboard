@@ -1338,8 +1338,21 @@ def build_product_chart(
             group = group[group["year"] > base_year]
         if group.empty:
             continue
-        group = group.sort_values("year")
         label = series_label(group.iloc[0], series_labels)
+        # A displayed product can represent several distinct Common ESTO
+        # component rows. Plotting those component values directly gives
+        # Plotly repeated x values and creates vertical saw-tooth spikes.
+        # The card label is the aggregate category, so emit exactly one
+        # signed sum for each source/scenario/year.
+        aggregation: dict[str, object] = {"value": "sum"}
+        for metadata_column in ["sign_status", "sign_interpretation"]:
+            if metadata_column in group.columns:
+                aggregation[metadata_column] = join_unique_text
+        group = (
+            group.groupby("year", as_index=False, dropna=False)
+            .agg(aggregation)
+            .sort_values("year")
+        )
         customdata = None
         hovertemplate = "%{x}<br>Signed value: %{y:,.2f} PJ<extra>" + escape(label) + "</extra>"
         if {"sign_status", "sign_interpretation"}.issubset(set(group.columns)):
@@ -1803,6 +1816,7 @@ _DASHBOARD_SWITCHER_JS = """
 
 def write_chart_bundle(charts: dict[str, go.Figure], output_path: Path) -> None:
     """Write a page-level Plotly chart bundle as JSON and JS."""
+    assert_unique_line_trace_x(charts)
     payload = {
         "charts": {
             key: json.loads(json.dumps(figure, cls=PlotlyJSONEncoder))
@@ -1815,6 +1829,42 @@ def write_chart_bundle(charts: dict[str, go.Figure], output_path: Path) -> None:
         "window.COMMON_ESTO_CHART_BUNDLE_DATA=" + payload_json.replace("</", "<\\/") + ";\n",
         encoding="utf-8",
     )
+
+
+def assert_unique_line_trace_x(charts: dict[str, go.Figure]) -> None:
+    """Block chart output when a line trace contains repeated x values."""
+    failures: list[dict[str, object]] = []
+    for chart_key, figure in charts.items():
+        for trace_index, trace in enumerate(figure.data):
+            mode = str(getattr(trace, "mode", "") or "")
+            stackgroup = getattr(trace, "stackgroup", None)
+            if "lines" not in mode and not stackgroup:
+                continue
+            x_values = getattr(trace, "x", None)
+            if x_values is None:
+                continue
+            x_series = pd.Series(list(x_values), dtype=object)
+            duplicate_mask = x_series.duplicated(keep=False)
+            if not duplicate_mask.any():
+                continue
+            failures.append(
+                {
+                    "chart_key": chart_key,
+                    "trace_index": trace_index,
+                    "trace_name": str(getattr(trace, "name", "") or ""),
+                    "duplicate_x_values": (
+                        x_series.loc[duplicate_mask]
+                        .drop_duplicates()
+                        .head(10)
+                        .tolist()
+                    ),
+                }
+            )
+    if failures:
+        raise ValueError(
+            "Dashboard line traces must contain at most one point per x "
+            f"value. Examples: {failures[:10]}"
+        )
 
 
 def compute_ranking_metrics(
