@@ -541,6 +541,23 @@ def area_spec_rows(df: pd.DataFrame, area_spec: dict[str, object]) -> pd.DataFra
     return df[df["common_flow_label"].isin(source_flow_labels)]
 
 
+def equivalent_flow_labels_by_source(df: pd.DataFrame, flow_label: str) -> dict[str, list[str]]:
+    """Match a displayed flow name to source-specific equivalent labels."""
+    target_name = flow_name_without_code(flow_label).casefold()
+    target_name = target_name.replace(" (including own use)", "").strip()
+    labels_by_source: dict[str, list[str]] = {}
+    for source, source_df in df.groupby("source_system", dropna=False):
+        labels = []
+        for label in source_df["common_flow_label"].dropna().astype(str).unique():
+            source_name = flow_name_without_code(label).casefold()
+            source_name = source_name.replace(" (including own use)", "").strip()
+            if source_name == target_name:
+                labels.append(label)
+        if labels:
+            labels_by_source[str(source)] = sorted(labels)
+    return labels_by_source
+
+
 def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
     """Prefer an observed NON_EXPANDING subtotal over its detail alternative.
 
@@ -1222,6 +1239,7 @@ def _build_flow_group_aggregate_charts(
             "aggregate_flow_prefix": "",
             "aggregate_flow_label": flow_label,
             "source_flow_labels": [flow_label],
+            "source_flow_labels_by_system": equivalent_flow_labels_by_source(page_df, flow_label),
         }
         group_specs = [("common_product_label", "product", "Aggregate by product", flow_label, "All products")]
         if flow_df["_subflow_label"].nunique(dropna=True) > 1:
@@ -2538,6 +2556,7 @@ def write_index(
 def _build_td_sector_chart(
     demand_df: pd.DataFrame,
     supply_df: pd.DataFrame,
+    overview_flow_df: pd.DataFrame,
     series_labels: dict[str, str],
     primary_source: str,
     primary_scenario: str,
@@ -2599,11 +2618,12 @@ def _build_td_sector_chart(
                 continue
             is_tfec_excluded = page_key in tfec_exclude_keys
             color = sector_colors.get(page_key)
+            group_sign = "neg" if sector_data["value"].sum() < 0 else "pos"
             trace_kw: dict = dict(
                 x=sector_data["year"],
                 y=sector_data["value"],
                 mode="lines",
-                stackgroup=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}",
+                stackgroup=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}_{group_sign}",
                 name=page_label,
                 visible=True if is_default else False,
                 hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(page_label) + "</extra>",
@@ -2616,10 +2636,19 @@ def _build_td_sector_chart(
                 stack_source_name, scenario_name, True, "tfc" if is_tfec_excluded else "both"
             ))
 
+    # Prefer explicit canonical flow 12/13 totals. Summing sector rows is only
+    # a fallback because ESTO and 9th use different hierarchy frontiers.
+    tfc_total_df = overview_flow_df[overview_flow_df["common_flow_code"].astype(str).eq("12")] if not overview_flow_df.empty else pd.DataFrame()
+    tfec_total_df = overview_flow_df[overview_flow_df["common_flow_code"].astype(str).eq("13")] if not overview_flow_df.empty else pd.DataFrame()
+    if tfc_total_df.empty:
+        tfc_total_df = demand_df
+    if tfec_total_df.empty:
+        tfec_total_df = demand_df[~demand_df["_page_key"].isin(tfec_exclude_keys)]
+
     # TFC demand totals, incl. primary LEAP scenarios: the sector stack above
     # is split into pos/neg stackgroups when sectors have mixed signs, so it
     # no longer shows a single net total line on its own.
-    tfc_totals = demand_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
+    tfc_totals = tfc_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in tfc_totals.groupby(["source_system", "scenario"]):
         lbl = series_label_from_values(src, scen, series_labels) + " (TFC)"
         fig.add_trace(go.Scatter(
@@ -2630,8 +2659,7 @@ def _build_td_sector_chart(
         trace_meta.append(trace_meta_entry(src, scen, True, "tfc"))
 
     # TFEC comparison demand totals
-    tfec_demand = demand_df[~demand_df["_page_key"].isin(tfec_exclude_keys)]
-    tfec_totals = tfec_demand.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
+    tfec_totals = tfec_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in tfec_totals.groupby(["source_system", "scenario"]):
         lbl = series_label_from_values(src, scen, series_labels) + " (TFEC)"
         fig.add_trace(go.Scatter(
@@ -2684,6 +2712,7 @@ def _build_td_sector_chart(
 def _build_td_fuel_chart(
     demand_df: pd.DataFrame,
     supply_df: pd.DataFrame,
+    overview_flow_df: pd.DataFrame,
     series_labels: dict[str, str],
     primary_source: str,
     primary_scenario: str,
@@ -2726,19 +2755,26 @@ def _build_td_fuel_chart(
             if grp.empty:
                 continue
             lbl = str(product)
+            group_sign = "neg" if grp["value"].sum() < 0 else "pos"
             fig.add_trace(go.Scatter(
                 x=grp["year"], y=grp["value"],
-                mode="lines", stackgroup=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}", name=lbl,
+                mode="lines", stackgroup=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}_{group_sign}", name=lbl,
                 visible=True if is_default else False,
                 hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
             ))
             stacked_sources.add(stack_source_name)
             trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
 
+    # Prefer the explicit canonical flow 12 total, with the sector/product
+    # sum as a fallback.
+    tfc_total_df = overview_flow_df[overview_flow_df["common_flow_code"].astype(str).eq("12")] if not overview_flow_df.empty else pd.DataFrame()
+    if tfc_total_df.empty:
+        tfc_total_df = demand_df
+
     # Demand total lines, incl. primary LEAP scenarios (see note in
     # _build_td_sector_chart on why the stacked fuel breakdown alone doesn't
     # show a single net total when fuels have mixed signs).
-    comp_totals = demand_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
+    comp_totals = tfc_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in comp_totals.groupby(["source_system", "scenario"]):
         lbl = series_label_from_values(src, scen, series_labels) + " total (TFC)"
         fig.add_trace(go.Scatter(
@@ -2820,9 +2856,10 @@ def _build_supply_stack_chart(
             if grp.empty:
                 continue
             lbl = str(group_value)
+            group_sign = "neg" if grp["value"].sum() < 0 else "pos"
             fig.add_trace(go.Scatter(
                 x=grp["year"], y=grp["value"],
-                mode="lines", stackgroup=f"supply_{scenario_toggle_tag(primary_source, scenario_name)}", name=lbl,
+                mode="lines", stackgroup=f"supply_{scenario_toggle_tag(primary_source, scenario_name)}_{group_sign}", name=lbl,
                 visible=True if is_default else False,
                 hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
             ))
@@ -3076,7 +3113,7 @@ def build_total_demand_page(
         {
             "chart_key": "chart__area__total_demand__sector",
             "title": "Supply vs Demand by sector",
-            "build": lambda: _build_td_sector_chart(demand_df, supply_df, series_labels, primary_source, primary_scenario, tfec_exclude_keys, sector_colors, base_year=base_year),
+            "build": lambda: _build_td_sector_chart(demand_df, supply_df, overview_flow_df, series_labels, primary_source, primary_scenario, tfec_exclude_keys, sector_colors, base_year=base_year),
             "total_abs": demand_total_abs,
             "row_count": len(demand_df),
             "source_flow_labels": "; ".join(demand_page_keys),
@@ -3085,7 +3122,7 @@ def build_total_demand_page(
         {
             "chart_key": "chart__area__total_demand__fuel",
             "title": "Supply vs Demand by fuel",
-            "build": lambda: _build_td_fuel_chart(demand_df, supply_df, series_labels, primary_source, primary_scenario, base_year=base_year),
+            "build": lambda: _build_td_fuel_chart(demand_df, supply_df, overview_flow_df, series_labels, primary_source, primary_scenario, base_year=base_year),
             "total_abs": demand_total_abs,
             "row_count": len(demand_df),
             "source_flow_labels": "; ".join(demand_page_keys),
