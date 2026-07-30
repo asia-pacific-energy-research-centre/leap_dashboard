@@ -2520,25 +2520,33 @@ def _build_td_sector_chart(
     fig = go.Figure()
     trace_meta: list[dict] = []
 
-    # Sector stacking order (largest TFC total first) is computed once from
-    # the default scenario and reused for both scenarios' stacks so switching
-    # REF/TGT doesn't reshuffle the sector layer order.
-    default_mask = (
-        (demand_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
-        & (demand_df["scenario"].astype(str).str.casefold() == primary_scenario.casefold())
-    )
+    def stack_source(scenario_name: str) -> pd.DataFrame:
+        """Return the most detailed available projection source for a scenario."""
+        candidates = [primary_source, "NINTH", "LEAP", "ESTO"]
+        for source_name in candidates:
+            rows = demand_df[
+                (demand_df["source_system"].astype(str).str.casefold() == source_name.casefold())
+                & (demand_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
+            ]
+            if not rows.empty and rows["_page_key"].nunique() > 1:
+                return rows
+        return pd.DataFrame(columns=demand_df.columns)
+
+    # Use the detailed source available for each scenario. LEAP is preferred,
+    # but some economies only have aggregate LEAP demand and therefore need
+    # the 9th-edition detail as the projection fallback.
+    default_rows = stack_source(primary_scenario)
     sector_order = (
-        demand_df[default_mask].groupby(["_page_key", "_page_label"])["value"]
+        default_rows.groupby(["_page_key", "_page_label"])["value"]
         .sum().abs().sort_values(ascending=False).reset_index()
     )
 
     for scenario_name in ("Reference", "Target"):
-        scenario_mask = (
-            (demand_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
-            & (demand_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
-        )
-        scenario_df = demand_df[scenario_mask]
+        scenario_df = stack_source(scenario_name)
         is_default = scenario_name.casefold() == primary_scenario.casefold()
+        if scenario_df.empty or sector_order.empty:
+            continue
+        stack_source_name = str(scenario_df["source_system"].iloc[0])
         for _, sector_row in sector_order.iterrows():
             page_key = str(sector_row["_page_key"])
             page_label = str(sector_row["_page_label"])
@@ -2555,7 +2563,7 @@ def _build_td_sector_chart(
                 x=sector_data["year"],
                 y=sector_data["value"],
                 mode="lines",
-                stackgroup=f"demand_{scenario_toggle_tag(primary_source, scenario_name)}",
+                stackgroup=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}",
                 name=page_label,
                 visible=True if is_default else False,
                 hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(page_label) + "</extra>",
@@ -2564,7 +2572,7 @@ def _build_td_sector_chart(
                 trace_kw["line"] = {"color": color}
             fig.add_trace(go.Scatter(**trace_kw))
             trace_meta.append(trace_meta_entry(
-                primary_source, scenario_name, True, "tfc" if is_tfec_excluded else "both"
+                stack_source_name, scenario_name, True, "tfc" if is_tfec_excluded else "both"
             ))
 
     # TFC demand totals, incl. primary LEAP scenarios: the sector stack above
@@ -2641,24 +2649,32 @@ def _build_td_fuel_chart(
     fig = go.Figure()
     trace_meta: list[dict] = []
 
-    # Product stacking order (largest total first) computed once from the
-    # default scenario and reused for both scenarios' stacks.
-    default_mask = (
-        (demand_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
-        & (demand_df["scenario"].astype(str).str.casefold() == primary_scenario.casefold())
-    )
+    def stack_source(scenario_name: str) -> pd.DataFrame:
+        """Return the most detailed available projection source for a scenario."""
+        candidates = [primary_source, "NINTH", "LEAP", "ESTO"]
+        for source_name in candidates:
+            rows = demand_df[
+                (demand_df["source_system"].astype(str).str.casefold() == source_name.casefold())
+                & (demand_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
+            ]
+            if not rows.empty and rows["common_product_label"].nunique() > 1:
+                return rows
+        return pd.DataFrame(columns=demand_df.columns)
+
+    # Product stacking order is computed from the default scenario and reused
+    # for both scenarios so switching REF/TGT does not reshuffle the layers.
+    default_rows = stack_source(primary_scenario)
     product_totals = (
-        demand_df[default_mask].groupby("common_product_label")["value"].sum().abs()
+        default_rows.groupby("common_product_label")["value"].sum().abs()
         .sort_values(ascending=False).index.tolist()
     )
 
     for scenario_name in ("Reference", "Target"):
-        scenario_mask = (
-            (demand_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
-            & (demand_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
-        )
-        scenario_df = demand_df[scenario_mask]
+        scenario_df = stack_source(scenario_name)
         is_default = scenario_name.casefold() == primary_scenario.casefold()
+        if scenario_df.empty or not product_totals:
+            continue
+        stack_source_name = str(scenario_df["source_system"].iloc[0])
         product_by_year = scenario_df.groupby(["common_product_label", "year"], as_index=False)["value"].sum()
         for product in product_totals:
             grp = product_by_year[product_by_year["common_product_label"] == product].sort_values("year")
@@ -2667,11 +2683,11 @@ def _build_td_fuel_chart(
             lbl = str(product)
             fig.add_trace(go.Scatter(
                 x=grp["year"], y=grp["value"],
-                mode="lines", stackgroup=f"demand_{scenario_toggle_tag(primary_source, scenario_name)}", name=lbl,
+                mode="lines", stackgroup=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}", name=lbl,
                 visible=True if is_default else False,
                 hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
             ))
-            trace_meta.append(trace_meta_entry(primary_source, scenario_name, True))
+            trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
 
     # Demand total lines, incl. primary LEAP scenarios (see note in
     # _build_td_sector_chart on why the stacked fuel breakdown alone doesn't
