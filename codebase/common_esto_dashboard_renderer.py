@@ -82,6 +82,21 @@ def series_label_from_values(source_system: object, scenario: object, series_lab
     return key_casefold_map.get(key.casefold(), key)
 
 
+def dataset_display_name(source_system: object) -> str:
+    """Return the short dataset name used in chart notes."""
+    names = {"ESTO": "ESTO", "LEAP": "LEAP", "NINTH": "9th edition"}
+    source = str(source_system).strip().upper()
+    return names.get(source, source or "unknown dataset")
+
+
+def stacked_area_dataset_note(sources: set[str], subject: str) -> str:
+    """Describe the dataset(s) contributing the stacked traces."""
+    if not sources:
+        return "Stacked areas: no detailed dataset available."
+    names = ", ".join(dataset_display_name(source) for source in sorted(sources))
+    return f"Stacked areas: {names} {subject} detail for the selected scenario."
+
+
 def series_label(row: pd.Series, series_labels: dict[str, str]) -> str:
     """Return a display label for a source/scenario series."""
     return series_label_from_values(row["source_system"], row["scenario"], series_labels)
@@ -1028,7 +1043,13 @@ def build_area_chart(
         # made the legend collide with the title in narrow overview cards.
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
-        meta={"trace_meta": trace_meta},
+        meta={
+            "trace_meta": trace_meta,
+            "stacked_area_note": (
+                f"Stacked areas: {dataset_display_name(comparison_source)} historical through "
+                f"{base_year}; {dataset_display_name(primary_source)} projection after {base_year}."
+            ),
+        },
     )
     apply_chart_chrome(fig, base_year, code_axis=code_axis_for_group_col(group_col))
     return fig
@@ -1127,6 +1148,7 @@ def _build_section_aggregate_charts(
                 "product_label": f"{title_prefix}: {section_label}",
                 "section_label": section_label,
                 "datasets": chart_dataset_tokens(area_df),
+                "stacked_area_note": stacked_area_note_from_figure(figure),
                 **metrics,
             })
     return charts, chart_rows, manifest_rows
@@ -1244,6 +1266,7 @@ def _build_flow_group_aggregate_charts(
                 "section_label": section_label,
                 "flow_group_label": flow_label,
                 "datasets": chart_dataset_tokens(flow_df),
+                "stacked_area_note": stacked_area_note_from_figure(figure),
                 **metrics,
             })
     return charts, chart_rows, manifest_rows
@@ -1566,6 +1589,7 @@ a:hover { text-decoration: underline; }
 .chart-card { margin:0;padding:10px;border:1px solid #d0d7de;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.05); }
 .chart-caption { font-weight:600;margin-bottom:4px; }
 .meta-subline { margin-top:-4px;margin-bottom:8px;color:#4b5563;font-size:12px; }
+.area-data-note { margin:-3px 0 8px 0;color:#64748b;font-size:11px;line-height:1.3;font-style:italic; }
 .chart-load-state { min-height:22px;margin:4px 0 6px 0;color:#64748b;font-size:12px; }
 .chart-load-state[data-loaded="true"] { display:none; }
 .lazy-chart-plot {
@@ -2091,6 +2115,14 @@ def _jump_nav_html(page_label: str, section_tree: list[tuple[str, list[str]]]) -
     )
 
 
+def stacked_area_note_from_figure(figure: go.Figure) -> str:
+    """Read the renderer-supplied stacked-area dataset note from a figure."""
+    meta = figure.layout.meta
+    if isinstance(meta, dict):
+        return str(meta.get("stacked_area_note", ""))
+    return ""
+
+
 def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
     """Build HTML for the page-level overview (area) charts."""
     if not area_rows:
@@ -2104,6 +2136,7 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
             f'<figure class="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
             f'<figcaption class="chart-caption">{caption}</figcaption>'
             f'<div class="meta-subline">{escape(page_label)}</div>'
+            f'<div class="area-data-note">{escape(str(row.get("stacked_area_note", "")))}</div>'
             f'<div class="chart-load-state" data-loaded="false">Chart queued</div>'
             f'<div data-chart-key="{key}" class="lazy-chart-plot is-unloaded" role="img" aria-label="{caption}"></div>'
             f'</figure>'
@@ -2139,10 +2172,16 @@ def _chart_cards_html(rows: list[dict], subline: str) -> str:
     for i, row in enumerate(rows):
         product_name = escape(str(row.get("product_label", row.get("title", ""))))
         key = escape(row["chart_key"])
+        area_note = (
+            f'<div class="area-data-note">{escape(str(row.get("stacked_area_note", "")))}</div>'
+            if row.get("chart_type") == "stacked_area"
+            else ""
+        )
         cards.append(
             f'<figure class="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
             f'<figcaption class="chart-caption">{product_name}</figcaption>'
             f'<div class="meta-subline">{escape(subline)}</div>'
+            f'{area_note}'
             f'<div class="chart-load-state" data-loaded="false">Chart queued</div>'
             f'<div data-chart-key="{key}" class="lazy-chart-plot is-unloaded" role="img" aria-label="{product_name}"></div>'
             f'</figure>'
@@ -2519,6 +2558,7 @@ def _build_td_sector_chart(
     """
     fig = go.Figure()
     trace_meta: list[dict] = []
+    stacked_sources: set[str] = set()
 
     def stack_source(scenario_name: str) -> pd.DataFrame:
         """Return the most detailed available projection source for a scenario."""
@@ -2571,6 +2611,7 @@ def _build_td_sector_chart(
             if color:
                 trace_kw["line"] = {"color": color}
             fig.add_trace(go.Scatter(**trace_kw))
+            stacked_sources.add(stack_source_name)
             trace_meta.append(trace_meta_entry(
                 stack_source_name, scenario_name, True, "tfc" if is_tfec_excluded else "both"
             ))
@@ -2631,7 +2672,10 @@ def _build_td_sector_chart(
             "direction": "down", "showactive": True,
             "x": 0.0, "xanchor": "left", "y": 1.22, "yanchor": "top",
         }],
-        meta={"trace_meta": trace_meta},
+        meta={
+            "trace_meta": trace_meta,
+            "stacked_area_note": stacked_area_dataset_note(stacked_sources, "demand"),
+        },
     )
     apply_chart_chrome(fig, base_year)
     return fig
@@ -2648,6 +2692,7 @@ def _build_td_fuel_chart(
     """Stacked-area chart by fuel across all demand sectors (TFC), with supply line."""
     fig = go.Figure()
     trace_meta: list[dict] = []
+    stacked_sources: set[str] = set()
 
     def stack_source(scenario_name: str) -> pd.DataFrame:
         """Return the most detailed available projection source for a scenario."""
@@ -2687,6 +2732,7 @@ def _build_td_fuel_chart(
                 visible=True if is_default else False,
                 hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
             ))
+            stacked_sources.add(stack_source_name)
             trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
 
     # Demand total lines, incl. primary LEAP scenarios (see note in
@@ -2720,7 +2766,10 @@ def _build_td_fuel_chart(
         yaxis_title="Signed energy (PJ)",
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
-        meta={"trace_meta": trace_meta},
+        meta={
+            "trace_meta": trace_meta,
+            "stacked_area_note": stacked_area_dataset_note(stacked_sources, "fuel"),
+        },
     )
     apply_chart_chrome(fig, base_year, code_axis="product")
     return fig
@@ -2747,6 +2796,7 @@ def _build_supply_stack_chart(
     """
     fig = go.Figure()
     trace_meta: list[dict] = []
+    stacked_sources: set[str] = set()
 
     default_mask = (
         (supply_detail_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
@@ -2776,6 +2826,7 @@ def _build_supply_stack_chart(
                 visible=True if is_default else False,
                 hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
             ))
+            stacked_sources.add(primary_source)
             trace_meta.append(trace_meta_entry(primary_source, scenario_name, True))
 
     # Supply total lines, incl. primary LEAP scenarios (see note in
@@ -2809,7 +2860,13 @@ def _build_supply_stack_chart(
         yaxis_title="Signed energy (PJ)",
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
-        meta={"trace_meta": trace_meta},
+        meta={
+            "trace_meta": trace_meta,
+            "stacked_area_note": (
+                f"Stacked areas: {dataset_display_name(primary_source)} supply detail "
+                "for the selected scenario."
+            ),
+        },
     )
     apply_chart_chrome(fig, base_year, code_axis=code_axis_for_group_col(group_col))
     return fig
@@ -3073,6 +3130,7 @@ def build_total_demand_page(
             "title": title, "product_label": title, "section_label": "Overview",
             "total_abs_value": total_abs, "abs_diff": 0.0, "pct_diff": 0.0,
             "datasets": spec["datasets"],
+            "stacked_area_note": stacked_area_note_from_figure(fig),
         })
         manifest_rows.append({
             "page_key": "total_demand", "page_label": page_label,
@@ -3580,6 +3638,7 @@ def render_dashboard(
                 "product_label": str(area_spec["aggregate_flow_label"]),
                 "section_label": "Overview",
                 "datasets": chart_dataset_tokens(area_df),
+                "stacked_area_note": stacked_area_note_from_figure(figure),
                 **metrics,
             })
 
