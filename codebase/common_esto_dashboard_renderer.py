@@ -2553,6 +2553,40 @@ def write_index(
     output_path.write_text(html, encoding="utf-8")
 
 
+def _select_total_rows_by_source(
+    demand_df: pd.DataFrame,
+    overview_flow_df: pd.DataFrame,
+    flow_code: str,
+) -> pd.DataFrame:
+    """Select chart totals without mixing source-specific accounting frontiers.
+
+    LEAP often has no separately modelled demand-sector rows, so its explicit
+    top-level balance flow is authoritative. ESTO and 9th have visible demand
+    rows, and their total must be summed from the same frontier used by the
+    stacked chart or the total line will not reconcile with the stack.
+    """
+    source_names = set(demand_df.get("source_system", pd.Series(dtype=str)).astype(str))
+    source_names.update(overview_flow_df.get("source_system", pd.Series(dtype=str)).astype(str))
+    selected: list[pd.DataFrame] = []
+    flow_rows = overview_flow_df.iloc[0:0].copy()
+    if not overview_flow_df.empty:
+        flow_rows = overview_flow_df[
+            overview_flow_df["common_flow_code"].astype(str).eq(str(flow_code))
+        ]
+    for source in sorted(source_names):
+        source_demand = demand_df[demand_df["source_system"].astype(str).eq(source)]
+        source_flow = flow_rows[flow_rows["source_system"].astype(str).eq(source)]
+        if source.casefold() == "leap" and not source_flow.empty:
+            selected.append(source_flow)
+        elif not source_demand.empty:
+            selected.append(source_demand)
+        elif not source_flow.empty:
+            selected.append(source_flow)
+    if not selected:
+        return flow_rows if not flow_rows.empty else demand_df
+    return pd.concat(selected, ignore_index=True)
+
+
 def _build_td_sector_chart(
     demand_df: pd.DataFrame,
     supply_df: pd.DataFrame,
@@ -2636,14 +2670,20 @@ def _build_td_sector_chart(
                 stack_source_name, scenario_name, True, "tfc" if is_tfec_excluded else "both"
             ))
 
-    # Prefer explicit canonical flow 12/13 totals. Summing sector rows is only
-    # a fallback because ESTO and 9th use different hierarchy frontiers.
-    tfc_total_df = overview_flow_df[overview_flow_df["common_flow_code"].astype(str).eq("12")] if not overview_flow_df.empty else pd.DataFrame()
-    tfec_total_df = overview_flow_df[overview_flow_df["common_flow_code"].astype(str).eq("13")] if not overview_flow_df.empty else pd.DataFrame()
-    if tfc_total_df.empty:
-        tfc_total_df = demand_df
-    if tfec_total_df.empty:
-        tfec_total_df = demand_df[~demand_df["_page_key"].isin(tfec_exclude_keys)]
+    # LEAP's sector detail can be aggregate-only, so its explicit flow 12/13
+    # rows are the reliable total. ESTO and 9th have the visible sector
+    # frontier used by the stacked area; use that same frontier for their
+    # total line so the line reconciles visually with the stack.
+    tfc_total_df = _select_total_rows_by_source(
+        demand_df,
+        overview_flow_df,
+        flow_code="12",
+    )
+    tfec_total_df = _select_total_rows_by_source(
+        demand_df[~demand_df["_page_key"].isin(tfec_exclude_keys)],
+        overview_flow_df,
+        flow_code="13",
+    )
 
     # TFC demand totals, incl. primary LEAP scenarios: the sector stack above
     # is split into pos/neg stackgroups when sectors have mixed signs, so it
@@ -2765,11 +2805,14 @@ def _build_td_fuel_chart(
             stacked_sources.add(stack_source_name)
             trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
 
-    # Prefer the explicit canonical flow 12 total, with the sector/product
-    # sum as a fallback.
-    tfc_total_df = overview_flow_df[overview_flow_df["common_flow_code"].astype(str).eq("12")] if not overview_flow_df.empty else pd.DataFrame()
-    if tfc_total_df.empty:
-        tfc_total_df = demand_df
+    # Use the same source-specific total policy as the sector chart. This
+    # keeps ESTO/9th fuel stacks and TFC lines on the same accounting frontier,
+    # while retaining LEAP's explicit aggregate flow where needed.
+    tfc_total_df = _select_total_rows_by_source(
+        demand_df,
+        overview_flow_df,
+        flow_code="12",
+    )
 
     # Demand total lines, incl. primary LEAP scenarios (see note in
     # _build_td_sector_chart on why the stacked fuel breakdown alone doesn't

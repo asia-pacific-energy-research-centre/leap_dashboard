@@ -25,6 +25,7 @@ from codebase.common_esto_dashboard_renderer import (
     render_dashboard,
     select_transformation_total_rows,
     _build_section_aggregate_charts,
+    _select_total_rows_by_source,
     _non_overlapping_common_row_frontier,
     _non_overlapping_flow_rows,
 )
@@ -556,6 +557,23 @@ def test_stacked_trace_keeps_code_colour_even_if_named_like_a_source() -> None:
     apply_chart_chrome(fig, base_year=None, code_axis="product")
 
     assert fig.data[1].line.color != "#D55E00"
+
+
+def test_total_demand_lines_use_visible_frontier_for_esto_and_ninth() -> None:
+    demand = pd.DataFrame([
+        {"source_system": "NINTH", "scenario": "target", "year": 2022, "value": 60.0},
+        {"source_system": "NINTH", "scenario": "target", "year": 2022, "value": 40.0},
+        {"source_system": "LEAP", "scenario": "Target", "year": 2022, "value": 5.0},
+    ])
+    overview = pd.DataFrame([
+        {"source_system": "NINTH", "scenario": "target", "year": 2022, "common_flow_code": "12", "value": 50.0},
+        {"source_system": "LEAP", "scenario": "Target", "year": 2022, "common_flow_code": "12", "value": 75.0},
+    ])
+
+    selected = _select_total_rows_by_source(demand, overview, flow_code="12")
+    totals = selected.groupby("source_system")["value"].sum().to_dict()
+
+    assert totals == {"LEAP": 75.0, "NINTH": 100.0}
 
 
 def test_aggregate_flow_rows_drop_nested_refinery_categories_per_source() -> None:
