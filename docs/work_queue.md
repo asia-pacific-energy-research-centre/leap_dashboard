@@ -44,6 +44,10 @@ These later commits supersede the corresponding snapshot rows below:
   generation from mappings, select it explicitly, and repeat representative
   and all-economy readiness checks. Existing mapping result files predate the
   integrated contract.
+- **DASHQ-026 is complete in the current checkout.** Energy-balance TFC/TFEC
+  comparison lines now prefer declared top-level flows instead of summing
+  overlapping hierarchy views. The supply-detail charts also draw LEAP TFC
+  from the aggregate flow when sector detail is unavailable.
 
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were

@@ -2578,12 +2578,12 @@ def _select_total_rows_by_source(
     overview_flow_df: pd.DataFrame,
     flow_code: str,
 ) -> pd.DataFrame:
-    """Select chart totals without mixing source-specific accounting frontiers.
+    """Select authoritative top-level totals, with visible detail as fallback.
 
-    LEAP often has no separately modelled demand-sector rows, so its explicit
-    top-level balance flow is authoritative. ESTO and 9th have visible demand
-    rows, and their total must be summed from the same frontier used by the
-    stacked chart or the total line will not reconcile with the stack.
+    Demand detail can contain overlapping parent, child, exact, and generated
+    rollup views. Summing that detail is not a safe total. Prefer the declared
+    top-level balance flow for every source and use visible detail only when a
+    source does not publish the requested aggregate.
     """
     source_names = set(demand_df.get("source_system", pd.Series(dtype=str)).astype(str))
     source_names.update(overview_flow_df.get("source_system", pd.Series(dtype=str)).astype(str))
@@ -2596,12 +2596,10 @@ def _select_total_rows_by_source(
     for source in sorted(source_names):
         source_demand = demand_df[demand_df["source_system"].astype(str).eq(source)]
         source_flow = flow_rows[flow_rows["source_system"].astype(str).eq(source)]
-        if source.casefold() == "leap" and not source_flow.empty:
+        if not source_flow.empty:
             selected.append(source_flow)
         elif not source_demand.empty:
             selected.append(source_demand)
-        elif not source_flow.empty:
-            selected.append(source_flow)
     if not selected:
         return flow_rows if not flow_rows.empty else demand_df
     return pd.concat(selected, ignore_index=True)
@@ -2690,10 +2688,8 @@ def _build_td_sector_chart(
                 stack_source_name, scenario_name, True, "tfc" if is_tfec_excluded else "both"
             ))
 
-    # LEAP's sector detail can be aggregate-only, so its explicit flow 12/13
-    # rows are the reliable total. ESTO and 9th have the visible sector
-    # frontier used by the stacked area; use that same frontier for their
-    # total line so the line reconciles visually with the stack.
+    # Explicit flow 12/13 rows are the reliable totals. The displayed detail
+    # can contain several valid hierarchy views and must not be added together.
     tfc_total_df = _select_total_rows_by_source(
         demand_df,
         overview_flow_df,
@@ -2828,9 +2824,7 @@ def _build_td_fuel_chart(
             stacked_sources.add(stack_source_name)
             trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
 
-    # Use the same source-specific total policy as the sector chart. This
-    # keeps ESTO/9th fuel stacks and TFC lines on the same accounting frontier,
-    # while retaining LEAP's explicit aggregate flow where needed.
+    # Use the same authoritative aggregate policy as the sector chart.
     tfc_total_df = _select_total_rows_by_source(
         demand_df,
         overview_flow_df,
@@ -2880,6 +2874,7 @@ def _build_td_fuel_chart(
 def _build_supply_stack_chart(
     supply_detail_df: pd.DataFrame,
     demand_df: pd.DataFrame,
+    overview_flow_df: pd.DataFrame,
     series_labels: dict[str, str],
     primary_source: str,
     primary_scenario: str,
@@ -2945,9 +2940,15 @@ def _build_supply_stack_chart(
         ))
         trace_meta.append(trace_meta_entry(src, scen, True))
 
-    # Demand total lines
-    if not demand_df.empty:
-        demand_totals = demand_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
+    # Demand total lines. Explicit flow 12 also carries LEAP demand when an
+    # economy is still modelled through the All demand aggregated placeholder.
+    demand_total_df = _select_total_rows_by_source(
+        demand_df,
+        overview_flow_df,
+        flow_code="12",
+    )
+    if not demand_total_df.empty:
+        demand_totals = demand_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
         for (src, scen), grp in demand_totals.groupby(["source_system", "scenario"]):
             lbl = series_label_from_values(src, scen, series_labels) + " demand (TFC)"
             fig.add_trace(go.Scatter(
@@ -3201,7 +3202,7 @@ def build_total_demand_page(
             "chart_key": "chart__area__total_demand__supply_component",
             "title": "Demand vs Supply by component",
             "build": lambda: _build_supply_stack_chart(
-                supply_detail_df, demand_df, series_labels, primary_source, primary_scenario,
+                supply_detail_df, demand_df, overview_flow_df, series_labels, primary_source, primary_scenario,
                 group_col="common_flow_label", chart_title="Demand vs Supply by component", base_year=base_year,
             ),
             "total_abs": supply_total_abs,
@@ -3213,7 +3214,7 @@ def build_total_demand_page(
             "chart_key": "chart__area__total_demand__supply_fuel",
             "title": "Demand vs Supply by fuel",
             "build": lambda: _build_supply_stack_chart(
-                supply_detail_df, demand_df, series_labels, primary_source, primary_scenario,
+                supply_detail_df, demand_df, overview_flow_df, series_labels, primary_source, primary_scenario,
                 group_col="common_product_label", chart_title="Demand vs Supply by fuel", base_year=base_year,
             ),
             "total_abs": supply_total_abs,

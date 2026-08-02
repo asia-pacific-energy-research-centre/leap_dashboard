@@ -334,6 +334,37 @@ line traces across 311 bundled charts with zero repeated-year traces.
 - 2026-07-30: Added after repeated component rows produced vertical spikes in
   Power detail charts.
 
+## DASH-010: Energy-balance demand lines use declared TFC/TFEC totals
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Aggregation / presentation validation
+**Affected areas:** Energy balance overview; all four demand/supply charts
+
+### Current rule
+
+Use the declared top-level flow `12 Total final consumption` and flow `13 Total
+final energy consumption` for TFC and TFEC comparison lines whenever those rows
+exist for a source. Use visible demand detail only as a fallback when the
+requested aggregate is absent.
+
+Do not calculate a total by adding every displayed demand row. Common ESTO can
+legitimately retain parent, child, exact, and generated rollup views together;
+adding those views double counts the same demand. The two supply-detail charts
+also use flow 12 for their demand comparator, which makes LEAP demand available
+for economies still represented by `All demand aggregated`.
+
+### Validation
+
+Regression tests require declared aggregates to override overlapping visible
+detail, retain the detail fallback, and add a LEAP TFC comparator to the supply
+charts when only the aggregate demand row is available.
+
+### History
+
+- 2026-08-02: Confirmed after China 9th Target TFEC was plotted at 235,190 PJ
+  in 2039 while the declared flow 13 value was 86,774 PJ.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
