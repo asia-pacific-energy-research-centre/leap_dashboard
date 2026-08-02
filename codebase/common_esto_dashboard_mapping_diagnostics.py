@@ -1681,6 +1681,12 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
   const commonRowsForSource = source => {
     const result = new Set();
     rowsForSource(source).forEach(row => result.add(row.common_flow_label));
+    const rawSource = source === 'ESTO'
+      ? 'ESTO_RAW'
+      : source === 'ESTO_EXTENDED' ? 'ESTO_EXTENDED_RAW' : '';
+    if (rawSource) {
+      rowsForSource(rawSource).forEach(row => result.add(row.common_flow_label));
+    }
     return result;
   };
   const formatValue = value => value === undefined
@@ -1780,6 +1786,24 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     visit(root);
     return result;
   };
+  const codeAvailableForBasis = code => {
+    if (basis.value !== 'original') return true;
+    const estoRows = commonRowsForSource('ESTO');
+    if (estoRows.has(code)) return true;
+    // Keep value-less structural ancestors when they lead to an original ESTO
+    // row, but do not let contract-only or Extended-only leaves masquerade as
+    // original ESTO categories.
+    return [...descendants(code)].some(descendant => (
+      descendant !== code && estoRows.has(descendant)
+    ));
+  };
+  const boundaryAvailableForBasis = boundary => (
+    basis.value !== 'original'
+    || (
+      codeAvailableForBasis(boundary.label)
+      && boundary.inputs.every(input => codeAvailableForBasis(input))
+    )
+  );
   const ancestors = code => {
     const result = [];
     let parent = displayParentFor(code);
@@ -1802,9 +1826,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     let visibleCodes = sector.value === 'ALL'
       ? new Set(status.value === 'ALL' ? roots : ordinaryNodes.map(node => node.code))
       : new Set([...descendants(sector.value)].filter(code => nodeByCode.has(code)));
-    if (basis.value === 'original') {
-      visibleCodes = new Set([...visibleCodes].filter(code => originFor(code) !== 'ESTO Extended addition'));
-    }
+    visibleCodes = new Set([...visibleCodes].filter(code => codeAvailableForBasis(code)));
     const query = search.value.trim().toLowerCase();
     if (query) {
       const matches = nodes
@@ -1822,7 +1844,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
       });
       visibleCodes = new Set([...neighbourhood].filter(code =>
         nodeByCode.has(code)
-        && (basis.value !== 'original' || originFor(code) !== 'ESTO Extended addition')
+        && codeAvailableForBasis(code)
       ));
       if (!selectedCode && matches.length) selectedCode = matches[0];
     }
@@ -1831,7 +1853,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
       && statusMatches(nodeStatus(nodeByCode.get(code)))
     ));
     const filteredBoundaries = activeBoundaries().filter(boundary => {
-      if (basis.value === 'original' && originFor(boundary.label) === 'ESTO Extended addition') return false;
+      if (!boundaryAvailableForBasis(boundary)) return false;
       if (!statusMatches(boundaryStatus(boundary))) return false;
       if (query) {
         return boundary.label.toLowerCase().includes(query)

@@ -364,6 +364,10 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Original ESTO only" in html
     assert "ESTO + ESTO Extended" in html
     assert "Compare ESTO vs Extended" in html
+    assert "rowsForSource(rawSource).forEach(row => result.add(row.common_flow_label))" in html
+    assert "const codeAvailableForBasis = code =>" in html
+    assert "descendant !== code && estoRows.has(descendant)" in html
+    assert "boundary.inputs.every(input => codeAvailableForBasis(input))" in html
     assert 'id="rollup-sector"' in html
     assert 'id="rollup-mode"' not in html
     assert 'id="show-special-rollups"' in html
