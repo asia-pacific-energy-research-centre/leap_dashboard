@@ -23,6 +23,7 @@ from codebase.common_esto_dashboard_renderer import (
     color_for_code,
     color_for_plotting_name,
     drop_excluded_flow_rows,
+    pick_area_specs,
     render_dashboard,
     select_transformation_total_rows,
     _build_section_aggregate_charts,
@@ -184,6 +185,52 @@ def test_refinery_own_use_is_only_shown_in_the_inclusive_boundary() -> None:
     assert filtered["common_flow_label"].tolist() == [
         "09.07 Oil refineries (including own use)",
     ]
+
+
+def test_gas_works_own_use_is_not_plotted_as_a_standalone_flow() -> None:
+    template = _load_template()
+    df = pd.DataFrame(
+        [
+            {"common_flow_code": "09.06.01", "common_flow_label": "09.06.01 Gas works plants (including own use)"},
+            {"common_flow_code": "10.01.02", "common_flow_label": "10.01.02 Gas works plants"},
+            {"common_flow_code": "10.01.06", "common_flow_label": "10.01.06 Coal mines"},
+        ]
+    )
+
+    filtered = drop_excluded_flow_rows(df, template["excluded_flow_code_prefixes"])
+
+    assert filtered["common_flow_code"].tolist() == ["09.06.01", "10.01.06"]
+
+
+def test_losses_and_own_use_area_cards_use_parent_hierarchy_labels() -> None:
+    template = _load_template()
+    page_df = pd.DataFrame(
+        [
+            {
+                "common_flow_code": "10.01.06",
+                "common_flow_label": "10.01.06 Coal mines",
+                "source_system": source_system,
+            }
+            for source_system in ["ESTO", "LEAP", "NINTH"]
+        ]
+        + [
+            {
+                "common_flow_code": "10.02",
+                "common_flow_label": "10.02 Transmission and distribution losses",
+                "source_system": source_system,
+            }
+            for source_system in ["ESTO", "LEAP", "NINTH"]
+        ]
+    )
+
+    specs = pick_area_specs(page_df, template)
+    labels_by_prefix = {
+        str(spec["aggregate_flow_prefix"]): str(spec["aggregate_flow_label"])
+        for spec in specs
+    }
+
+    assert labels_by_prefix["10"] == "10 Losses and own use"
+    assert labels_by_prefix["10.01"] == "10.01 Own use"
 
 
 def test_ninth_pre_base_year_rows_are_excluded_by_default() -> None:

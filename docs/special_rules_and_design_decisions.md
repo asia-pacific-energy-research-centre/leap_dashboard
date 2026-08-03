@@ -429,6 +429,39 @@ Other demand, and an exact code-17 row to retain its Non-energy assignment.
 - 2026-08-03: Confirmed while reviewing China, where Industry and Buildings
   had valid LEAP placeholder rows but were hidden, and the combined Other-sector
   placeholder was assigned to the hidden Non-energy page.
+- 2026-08-03: Narrowed the exception after visual review showed that a global
+  aggregate-page override also exposed Bunkers without a usable LEAP projection.
+
+## DASH-013: Gas-works own use is shown only in the shared transformation boundary
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / comparison-boundary filtering
+**Affected areas:** Other transformation overview and detail charts
+
+### Current rule
+
+Do not plot `10.01.02 Gas works plants` as a standalone own-use comparison.
+LEAP does not expose that quantity separately in its balance results; it is
+already part of `09.06.01 Gas works plants (including own use)`, which is the
+valid shared comparison boundary. Keep the other code-10 own-use and loss rows
+available.
+
+Synthetic overview prefixes must use their configured ESTO hierarchy names:
+`10 Losses and own use` and `10.01 Own use`. They must not inherit the name of
+the first available descendant.
+
+### Validation
+
+Regression tests require the standalone `10.01.02` row to be filtered while
+retaining the boundary-adjusted transformation row and unrelated own-use rows.
+They also require the code-10 overview cards to use the hierarchy labels.
+
+### History
+
+- 2026-08-03: Confirmed after the China Other transformation overview labeled
+  both synthetic prefixes as Gas works plants and exposed the unextractable
+  own-use detail as a separate comparison.
 
 ## DASH-014: Aggregate charts choose one observed common-row frontier
 
