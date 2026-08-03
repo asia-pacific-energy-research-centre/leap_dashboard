@@ -365,6 +365,39 @@ charts when only the aggregate demand row is available.
 - 2026-08-02: Confirmed after China 9th Target TFEC was plotted at 235,190 PJ
   in 2039 while the declared flow 13 value was 86,774 PJ.
 
+## DASH-011: Section aggregates use one non-expanding component frontier
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Aggregation / presentation validation
+**Affected areas:** Section-level aggregate-by-flow and aggregate-by-product charts
+
+### Current rule
+
+When an observed `NON_EXPANDING` subtotal and its additive component rows are
+both present, plot the subtotal once and remove the covered components for that
+source, economy, scenario, year, and common opposite-axis category. Use the
+mapping-owned `component_flow_code` or `component_product_code` expression to
+identify covered exact codes and inclusive ranges. Keep the alternative detail
+frontier when that source observation does not publish the subtotal.
+
+This handles compound subtotals such as `15.01,15.03-15.06 Transport non-road`
+without hard-coding transport labels or reconstructing mapping relationships.
+
+### Validation
+
+The regression test covers a compound transport rollup, two covered children,
+and unaffected `15.02 Road`. The 2026-08-03 China production render leaves only
+Transport non-road and Road in the Transport section aggregate-by-flow stack;
+all-economy publication readiness passed and page-noise analysis found zero
+flags.
+
+### History
+
+- 2026-08-03: Added after the China Transport stack displayed the non-road
+  subtotal together with Domestic air transport, Rail, Domestic navigation,
+  Pipeline transport, and Non-specified transport.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

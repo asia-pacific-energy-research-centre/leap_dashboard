@@ -279,6 +279,62 @@ def code_expression_matches_any_prefix(code_or_label: object, prefixes: list[obj
     return any(code_expression_matches_prefix(code_or_label, str(prefix)) for prefix in prefixes)
 
 
+def _numeric_code_parts(code: object) -> tuple[int, ...] | None:
+    """Return comparable numeric segments for one ESTO code."""
+    clean = str(code or "").strip()
+    if not clean:
+        return None
+    parts = clean.split(".")
+    if not all(part.isdigit() for part in parts):
+        return None
+    return tuple(int(part) for part in parts)
+
+
+def _code_is_within_record(code: object, record: dict[str, str]) -> bool:
+    """Return True when one exact code is represented by a parsed code record."""
+    clean_code = str(code or "").strip()
+    start = str(record.get("start", "")).strip()
+    end = str(record.get("end", "")).strip()
+    if not clean_code or not start:
+        return False
+    if not end:
+        return code_matches_prefix(clean_code, start)
+
+    code_parts = _numeric_code_parts(clean_code)
+    start_parts = _numeric_code_parts(start)
+    end_parts = _numeric_code_parts(end)
+    if code_parts is None or start_parts is None or end_parts is None:
+        return clean_code in {start, end}
+    if len(start_parts) != len(end_parts) or len(code_parts) < len(start_parts):
+        return False
+    comparable_code = code_parts[:len(start_parts)]
+    return start_parts <= comparable_code <= end_parts
+
+
+def _code_expression_contains_expression(parent: object, child: object) -> bool:
+    """Return True when every component of `child` belongs to `parent`."""
+    parent_records = parse_code_expression(parent)
+    child_records = parse_code_expression(child)
+    if not parent_records or not child_records:
+        return False
+    for child_record in child_records:
+        endpoints = [child_record.get("start", "")]
+        if child_record.get("end"):
+            endpoints.append(child_record["end"])
+        if not all(
+            any(_code_is_within_record(endpoint, parent_record) for parent_record in parent_records)
+            for endpoint in endpoints
+        ):
+            return False
+    return True
+
+
+def _is_compound_code_expression(value: object) -> bool:
+    """Return True for a comma list or inclusive range of ESTO codes."""
+    records = parse_code_expression(value)
+    return len(records) > 1 or any(record.get("end") for record in records)
+
+
 def code_axis_for_group_col(group_col: str) -> str | None:
     """Return the colour-map axis for a grouping column, or None if not code-named."""
     if "product" in group_col:
@@ -620,6 +676,95 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
         axis_matches = detail_keys.merge(subtotal_keys, on=key_columns, how="inner")
         drop_row_numbers.update(axis_matches["_frontier_row_number"].astype(int))
 
+    # NON_EXPANDING subtotal membership can also be encoded directly in the
+    # component-axis expression rather than in an aggregate-group id. For
+    # example, Transport non-road uses 15.01,15.03-15.06 while its additive
+    # alternative retains the individual 15.01/15.03/... rows. Match those
+    # component codes within the same observation and opposite-axis category.
+    for axis_name, opposite_axis_name in (("flow", "product"), ("product", "flow")):
+        axis_component_column = f"component_{axis_name}_code"
+        axis_common_column = f"common_{axis_name}_code"
+        opposite_common_column = f"common_{opposite_axis_name}_code"
+        if axis_common_column not in work.columns or opposite_common_column not in work.columns:
+            continue
+
+        axis_expression_column = f"_frontier_{axis_name}_expression"
+        opposite_expression_column = f"_frontier_{opposite_axis_name}_expression"
+        work[axis_expression_column] = work.get(
+            axis_component_column, pd.Series("", index=work.index)
+        ).fillna("").astype(str).str.strip()
+        work[axis_expression_column] = work[axis_expression_column].where(
+            work[axis_expression_column].ne(""),
+            work[axis_common_column].fillna("").astype(str).str.strip(),
+        )
+        # Use the shared comparison coordinate on the opposite axis. Its raw
+        # component list can legitimately differ between alternative common
+        # rows (for example 07.05 versus 07.04;07.05) even though both occupy
+        # the same common product category.
+        work[opposite_expression_column] = (
+            work[opposite_common_column].fillna("").astype(str).str.strip()
+        )
+
+        # Build the structural parent/detail relationships once from unique
+        # categories, then join them to observation keys. Re-evaluating the
+        # same code expressions for every source/year fact row is prohibitively
+        # expensive on production economy datasets.
+        categories = work[
+            [axis_expression_column, opposite_expression_column]
+        ].drop_duplicates()
+        parent_expressions = work.loc[
+            subtotal_mask,
+            [axis_expression_column, opposite_expression_column],
+        ].drop_duplicates()
+        parent_expressions = parent_expressions[
+            parent_expressions[axis_expression_column].map(_is_compound_code_expression)
+        ]
+        membership_rows: list[dict[str, str]] = []
+        for opposite_expression, same_opposite_parents in parent_expressions.groupby(
+            opposite_expression_column, dropna=False, sort=False
+        ):
+            candidate_expressions = categories.loc[
+                categories[opposite_expression_column].eq(opposite_expression),
+                axis_expression_column,
+            ].astype(str).drop_duplicates()
+            for parent_expression in same_opposite_parents[axis_expression_column].astype(str):
+                for detail_expression in candidate_expressions:
+                    if (
+                        detail_expression != parent_expression
+                        and _code_expression_contains_expression(parent_expression, detail_expression)
+                    ):
+                        membership_rows.append({
+                            opposite_expression_column: str(opposite_expression),
+                            "_frontier_parent_expression": parent_expression,
+                            axis_expression_column: detail_expression,
+                        })
+        if not membership_rows:
+            continue
+
+        memberships = pd.DataFrame(membership_rows).drop_duplicates()
+        observed_parents = work.loc[
+            subtotal_mask,
+            [*context_columns, opposite_expression_column, axis_expression_column],
+        ].drop_duplicates().rename(
+            columns={axis_expression_column: "_frontier_parent_expression"}
+        )
+        observed_details = work.loc[
+            ~subtotal_mask,
+            ["_frontier_row_number", *context_columns, opposite_expression_column, axis_expression_column],
+        ]
+        observed_matches = observed_details.merge(
+            memberships,
+            on=[opposite_expression_column, axis_expression_column],
+            how="inner",
+        ).merge(
+            observed_parents,
+            on=[*context_columns, opposite_expression_column, "_frontier_parent_expression"],
+            how="inner",
+        )
+        drop_row_numbers.update(
+            observed_matches["_frontier_row_number"].astype(int)
+        )
+
     # Source aggregate membership is the explicit link when display/hierarchy
     # coordinates differ between the parent and detail common rows.
     membership_column = "source_aggregate_group_ids"
@@ -663,7 +808,12 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
     if not drop_row_numbers:
         return df
     selected = work[~work["_frontier_row_number"].isin(drop_row_numbers)].copy()
-    return selected.drop(columns="_frontier_row_number")
+    helper_columns = [
+        column for column in selected.columns
+        if column == "_frontier_row_number" or column.startswith("_frontier_flow_expression")
+        or column.startswith("_frontier_product_expression")
+    ]
+    return selected.drop(columns=helper_columns)
 
 
 def _non_overlapping_flow_rows(df: pd.DataFrame) -> pd.DataFrame:

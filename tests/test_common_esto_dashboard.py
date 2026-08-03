@@ -758,6 +758,60 @@ def test_non_expanding_frontier_uses_shared_aggregate_id_when_axis_codes_differ(
     assert bool(selected.iloc[0]["is_non_expanding_rollup"])
 
 
+def test_non_expanding_frontier_uses_compound_component_code_membership() -> None:
+    common_values = {
+        "comparison_scope": "esto_leap_ninth",
+        "source_system": "ESTO",
+        "economy": "05_PRC",
+        "scenario": "historical",
+        "year": 2022,
+        "common_product_code": "07.04-07.05",
+    }
+    rows = pd.DataFrame([
+        {
+            **common_values,
+            "common_row_id": "transport_non_road_rollup",
+            "common_flow_code": "15.01,15.03-15.06",
+            "component_flow_code": "15.01,15.03-15.06",
+            "component_product_code": "07.05",
+            "is_non_expanding_rollup": True,
+            "value": 30.0,
+        },
+        {
+            **common_values,
+            "common_row_id": "domestic_air",
+            "common_flow_code": "15.01",
+            "component_flow_code": "15.01",
+            "component_product_code": "07.04; 07.05",
+            "is_non_expanding_rollup": False,
+            "value": 10.0,
+        },
+        {
+            **common_values,
+            "common_row_id": "rail",
+            "common_flow_code": "15.03",
+            "component_flow_code": "15.03",
+            "component_product_code": "07.04; 07.05",
+            "is_non_expanding_rollup": False,
+            "value": 20.0,
+        },
+        {
+            **common_values,
+            "common_row_id": "road",
+            "common_flow_code": "15.02",
+            "component_flow_code": "15.02",
+            "component_product_code": "07.04; 07.05",
+            "is_non_expanding_rollup": False,
+            "value": 40.0,
+        },
+    ])
+
+    selected = _non_overlapping_common_row_frontier(rows)
+
+    assert set(selected["common_row_id"]) == {"transport_non_road_rollup", "road"}
+    assert selected["value"].sum() == 70.0
+
+
 def test_section_aggregate_suppresses_chart_with_no_renderable_series() -> None:
     rows = pd.DataFrame([
         {
