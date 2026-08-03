@@ -48,10 +48,11 @@ These later commits supersede the corresponding snapshot rows below:
   comparison lines now prefer declared top-level flows instead of summing
   overlapping hierarchy views. The supply-detail charts also draw LEAP TFC
   from the aggregate flow when sector detail is unavailable.
-- **DASHQ-027 is complete in the current checkout.** Aggregate-backed Industry,
+- **DASHQ-029 is complete in the current checkout.** Aggregate-backed Industry,
   Buildings, Transport, and Other demand pages remain visible until detailed
   LEAP demand replaces the placeholders. The combined Other-sector/non-energy
-  placeholder routes to Other demand without changing exact code-17 routing.
+  placeholder routes to Other demand without changing exact code-17 routing;
+  aggregate-only Bunkers remains hidden.
 
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were

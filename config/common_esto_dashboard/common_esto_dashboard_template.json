@@ -237,7 +237,7 @@
   },
   "leap_demand_sector_coverage": {
     "enabled": true,
-    "hide_aggregate_only_pages": false,
+    "show_aggregate_only_page_keys": ["industry", "transport", "buildings", "others"],
     "page_leap_branches": {
       "industry": ["Industry"],
       "transport": ["Passenger road", "Freight road", "Transport non road"],
@@ -246,7 +246,7 @@
       "bunkers": ["Transport non road"]
     },
     "always_skip_page_keys": ["non_energy"],
-    "_note": "page_leap_branches maps each sector page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. With hide_aggregate_only_pages=false, those placeholder-backed pages stay visible until real LEAP detail replaces them. Set it true only when aggregate-backed standalone pages should be suppressed. always_skip_page_keys remains for pages without a usable standalone LEAP mapping: exact non-energy rows stay hidden, while the combined Other sector including non-energy all-demand placeholder is routed to Other demand by its explicit higher-priority page rule."
+    "_note": "page_leap_branches maps each sector page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. show_aggregate_only_page_keys keeps only the four domestic demand pages visible while they use placeholders; aggregate-only Bunkers remains hidden because it has no usable LEAP projection here. always_skip_page_keys remains for pages without a usable standalone LEAP mapping: exact non-energy rows stay hidden, while the combined Other sector including non-energy all-demand placeholder is routed to Other demand by its explicit higher-priority page rule."
   },
   "scope_specific_pages": {
     "enabled": false,

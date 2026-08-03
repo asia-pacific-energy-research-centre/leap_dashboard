@@ -790,10 +790,10 @@ def filter_template_for_leap_demand_coverage(
     demand branch names with no separately modelled detail (see
     ``leap_mappings.codebase.mapping_tools.source_branch_preflight.get_demand_sectors_without_detail``).
     A page listed in the template's ``leap_demand_sector_coverage.page_leap_branches``
-    is hidden only when ``hide_aggregate_only_pages`` is enabled and every one
-    of its configured LEAP branches is in that missing set. When that option
-    is disabled, aggregate-placeholder rows are intentionally shown until real
-    sector detail replaces them upstream.
+    is hidden when every configured LEAP branch is in that missing set, unless
+    its page key is explicitly listed in ``show_aggregate_only_page_keys``.
+    Allowed aggregate-placeholder pages remain visible until real sector detail
+    replaces them upstream.
     Pages listed in ``leap_demand_sector_coverage.always_skip_page_keys`` are
     hidden unconditionally: they have no LEAP-to-ESTO mapping at all (not even
     an aggregate-only one), so ``get_demand_sectors_without_detail`` can never
@@ -814,13 +814,16 @@ def filter_template_for_leap_demand_coverage(
     if not page_branches and not always_skip:
         return template
     missing = {str(branch).casefold() for branch in missing_leap_branches}
-    pages_to_drop: set[str] = set()
-    if coverage_config.get("hide_aggregate_only_pages", True):
-        pages_to_drop = {
-            page_key
-            for page_key, branches in page_branches.items()
-            if branches and all(str(branch).casefold() in missing for branch in branches)
-        }
+    show_aggregate_only = {
+        str(key) for key in coverage_config.get("show_aggregate_only_page_keys", [])
+    }
+    pages_to_drop = {
+        page_key
+        for page_key, branches in page_branches.items()
+        if page_key not in show_aggregate_only
+        and branches
+        and all(str(branch).casefold() in missing for branch in branches)
+    }
     pages_to_drop |= always_skip
     if not pages_to_drop:
         return template

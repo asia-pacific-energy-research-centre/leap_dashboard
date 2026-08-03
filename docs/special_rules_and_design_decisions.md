@@ -412,6 +412,10 @@ when their LEAP projection is still supplied by an `All demand aggregated`
 placeholder. These are transitional sector rows and should remain reviewable
 until detailed LEAP demand branches replace them upstream.
 
+Do not apply this exception to Bunkers. International bunkers are outside the
+four domestic demand placeholders and remain hidden when their LEAP branch is
+aggregate-only.
+
 Route the combined `Other sector including non-energy (all demand aggregate)`
 row to Other demand. Continue routing an exact code-17 row to Non-energy and
 keep that standalone page hidden while it has no usable standalone LEAP

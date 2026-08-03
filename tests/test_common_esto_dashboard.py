@@ -286,10 +286,13 @@ def test_aggregate_only_demand_pages_remain_visible_but_unmapped_page_is_hidden(
 
     filtered = filter_template_for_leap_demand_coverage(
         template,
-        {"Industry", "Buildings", "Other sector"},
+        {"Industry", "Buildings", "Other sector", "Transport non road"},
     )
 
-    assert filtered["leap_demand_sector_coverage"]["_hidden_page_keys"] == ["non_energy"]
+    assert filtered["leap_demand_sector_coverage"]["_hidden_page_keys"] == [
+        "bunkers",
+        "non_energy",
+    ]
 
 
 def test_aggregate_placeholder_overviews_require_leap_rows() -> None:
