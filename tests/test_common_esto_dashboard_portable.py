@@ -1,14 +1,20 @@
 """Tests for the narrow, packageable Common ESTO dashboard render entry point."""
 
+import json
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from codebase.common_esto_dashboard_portable import (
+    OPTIONAL_DASHBOARD_INPUTS,
     REQUIRED_DASHBOARD_INPUTS,
     normalize_dashboard_economy_key,
     render_common_esto_dashboard,
+)
+from codebase.common_esto_dashboard_renderer import (
+    load_code_colors,
+    set_code_colors_path,
 )
 
 
@@ -61,6 +67,28 @@ def test_required_inputs_are_declared_for_every_path_argument() -> None:
         "template_path",
         "series_config_path",
     }
+
+
+def test_optional_inputs_are_declared() -> None:
+    assert set(OPTIONAL_DASHBOARD_INPUTS) == {"code_colors_path"}
+
+
+def test_code_colors_path_can_be_redirected_and_restored(tmp_path: Path) -> None:
+    # A distributed package keeps config/ outside the repository layout, so the
+    # colour map must be locatable without a repo-relative path.
+    default_colors = load_code_colors()
+    custom = tmp_path / "code_colors.json"
+    custom.write_text(
+        json.dumps({"product": {"01.01": "#123456"}, "flow": {}, "plotting": {}}),
+        encoding="utf-8",
+    )
+    try:
+        assert set_code_colors_path(custom) == custom
+        assert load_code_colors()["product"]["01.01"] == "#123456"
+    finally:
+        restored = set_code_colors_path(None)
+    assert restored.name == "code_colors.json"
+    assert load_code_colors() == default_colors
 
 
 def test_render_writes_dashboard_index_and_manifest(tmp_path: Path) -> None:

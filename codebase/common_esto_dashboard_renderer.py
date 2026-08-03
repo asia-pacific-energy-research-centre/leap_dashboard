@@ -1012,6 +1012,10 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
     if nodes.empty:
         return []
     chart_config = template.get("chart_generation", {})
+    area_chart_flow_labels = {
+        str(code): str(label)
+        for code, label in chart_config.get("area_chart_flow_labels", {}).items()
+    }
     deep_min_depth = int(chart_config.get("deep_chain_min_depth", 3))
     max_depth = int(nodes["depth"].max())
     level_count = 2 if max_depth >= deep_min_depth else 1
@@ -1040,7 +1044,11 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
             if label_set in used_label_sets:
                 used_group_keys.add(group_key)
                 continue
-            label = node_label_for_prefix(nodes, prefix)
+            # Some hierarchy prefixes are synthetic in Common ESTO output and
+            # therefore have no exact row from which to obtain their proper
+            # parent name. Do not borrow the first descendant's name for those
+            # prefixes; use the configured ESTO hierarchy label instead.
+            label = area_chart_flow_labels.get(prefix, node_label_for_prefix(nodes, prefix))
             specs.append(
                 {
                     "area_level": level,
@@ -1088,6 +1096,28 @@ _PRODUCT_COLORWAY: list[str] = [
 ]
 
 CODE_COLORS_PATH = Path(__file__).resolve().parents[1] / "config" / "common_esto_dashboard" / "code_colors.json"
+
+
+def set_code_colors_path(path: Path | str | None) -> Path:
+    """Point the colour map at *path* and invalidate the cached load.
+
+    The default resolves ``config/`` relative to the repository root, which is
+    correct in a checkout. A distributed package keeps its configuration in an
+    external folder that is not laid out that way, so it sets the path
+    explicitly at start-up. Passing ``None`` restores the repository default.
+    """
+    global CODE_COLORS_PATH
+    if path is None:
+        CODE_COLORS_PATH = (
+            Path(__file__).resolve().parents[1]
+            / "config"
+            / "common_esto_dashboard"
+            / "code_colors.json"
+        )
+    else:
+        CODE_COLORS_PATH = Path(str(path).replace("\\", "/"))
+    load_code_colors.cache_clear()
+    return CODE_COLORS_PATH
 
 
 @lru_cache(maxsize=1)

@@ -51,10 +51,11 @@ from common_esto_dashboard_data import (  # noqa: E402
     load_common_esto_data,
 )
 from common_esto_dashboard_output_layout import build_output_layout  # noqa: E402
-from common_esto_dashboard_renderer import render_dashboard  # noqa: E402
+from common_esto_dashboard_renderer import render_dashboard, set_code_colors_path  # noqa: E402
 
 
 __all__ = [
+    "OPTIONAL_DASHBOARD_INPUTS",
     "REQUIRED_DASHBOARD_INPUTS",
     "normalize_dashboard_economy_key",
     "render_common_esto_dashboard",
@@ -68,6 +69,11 @@ REQUIRED_DASHBOARD_INPUTS = {
     "common_rows_path": "Common ESTO row metadata (common_esto_rows.csv)",
     "template_path": "Dashboard template JSON (common_esto_dashboard_template.json)",
     "series_config_path": "Dashboard series configuration JSON (series_config.json)",
+}
+
+#: Optional inputs. Absent ones fall back to a documented default.
+OPTIONAL_DASHBOARD_INPUTS = {
+    "code_colors_path": "Per-axis ESTO code colour map (code_colors.json)",
 }
 
 
@@ -91,6 +97,7 @@ def render_common_esto_dashboard(
     template_path: Path | str,
     series_config_path: Path | str,
     output_root: Path | str,
+    code_colors_path: Path | str | None = None,
     comparison_scope: str = "esto_leap_ninth",
     wide_file_scope: str = "esto_leap_ninth",
     min_year: int | None = 2010,
@@ -109,6 +116,8 @@ def render_common_esto_dashboard(
     renders every sector page.
     """
     economy_key = normalize_dashboard_economy_key(economy)
+    if code_colors_path is not None:
+        set_code_colors_path(code_colors_path)
     template = json.loads(Path(template_path).read_text(encoding="utf-8"))
     template = filter_template_for_leap_demand_coverage(
         template,
@@ -191,6 +200,7 @@ def render_common_esto_dashboard(
         "visible_row_count": int(len(visible_df)),
         "base_year": base_year,
         "missing_leap_demand_branches": list(missing_leap_demand_branches),
+        "code_colors_path": str(code_colors_path) if code_colors_path else "",
     }
 
 
