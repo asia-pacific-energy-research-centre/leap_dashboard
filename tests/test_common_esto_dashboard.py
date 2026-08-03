@@ -897,6 +897,43 @@ def test_detached_compound_flow_suppresses_its_observed_components() -> None:
     }
 
 
+def test_compound_buildings_range_does_not_create_an_incomplete_prefix_card() -> None:
+    from codebase.common_esto_dashboard_renderer import pick_area_specs as build_specs
+
+    rows = pd.DataFrame([
+        {
+            "common_flow_code": code,
+            "common_flow_label": label,
+            "source_system": source,
+        }
+        for source, code, label in [
+            ("ESTO", "16.01-16.02", "16.01-16.02 Buildings"),
+            ("ESTO", "16.02", "16.02 Residential"),
+            ("LEAP", "16.01-16.02", "16.01-16.02 Buildings"),
+            ("NINTH", "16.01", "16.01 Commercial and public services"),
+            ("NINTH", "16.02", "16.02 Residential"),
+        ]
+    ])
+
+    specs = build_specs(
+        rows,
+        {
+            "chart_generation": {
+                "deep_chain_min_depth": 3,
+                "top_levels_for_other_chains": 2,
+                "max_area_charts_per_page": 30,
+            }
+        },
+    )
+
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["16", "16.02"]
+    assert specs[0]["source_flow_labels_by_system"] == {
+        "ESTO": ["16.01-16.02 Buildings", "16.02 Residential"],
+        "LEAP": ["16.01-16.02 Buildings"],
+        "NINTH": ["16.01 Commercial and public services", "16.02 Residential"],
+    }
+
+
 def test_section_aggregate_suppresses_chart_with_no_renderable_series() -> None:
     rows = pd.DataFrame([
         {

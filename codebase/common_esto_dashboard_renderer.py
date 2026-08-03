@@ -579,6 +579,38 @@ def _frontier_labels_for_subtree(subtree: pd.DataFrame, target_level: int) -> li
     return sorted(set(selected_labels))
 
 
+def _flow_subtree_nodes(nodes: pd.DataFrame, parent_prefix: str) -> pd.DataFrame:
+    """Return a prefix subtree closed over intersecting compound code ranges.
+
+    A compound common row is one comparison boundary even when its first code
+    is also a generated hierarchy prefix. For example, 16.01-16.02 Buildings
+    is canonicalized to 16.01, but a 16.01 overview must not omit 16.02
+    Residential. Expand through the compound boundary so duplicate-card
+    detection can compare the complete source-specific frontiers.
+    """
+    subtree_mask = nodes["canonical_code"].astype(str).apply(
+        lambda value: value == parent_prefix or value.startswith(parent_prefix + ".")
+    )
+    while True:
+        subtree = nodes[subtree_mask].copy()
+        compound_codes = subtree.loc[
+            subtree["common_flow_code"].map(_is_compound_code_expression),
+            "common_flow_code",
+        ].astype(str).drop_duplicates()
+        if compound_codes.empty:
+            return subtree
+        expanded_mask = nodes["common_flow_code"].apply(
+            lambda candidate: any(
+                _code_expression_contains_expression(parent, candidate)
+                for parent in compound_codes
+            )
+        )
+        next_mask = subtree_mask | expanded_mask
+        if next_mask.equals(subtree_mask):
+            return subtree
+        subtree_mask = next_mask
+
+
 def frontier_flow_labels(nodes: pd.DataFrame, parent_prefix: str, target_level: int) -> dict[str, list[str]]:
     """Return, per source system, flow labels forming a non-double-counting frontier.
 
@@ -590,7 +622,7 @@ def frontier_flow_labels(nodes: pd.DataFrame, parent_prefix: str, target_level: 
     rollup - a shared frontier would silently drop the other sources'
     descendant rows from the aggregate.
     """
-    subtree = nodes[nodes["canonical_code"].astype(str).apply(lambda value: value == parent_prefix or value.startswith(parent_prefix + "."))].copy()
+    subtree = _flow_subtree_nodes(nodes, parent_prefix)
     if subtree.empty:
         return {}
 
