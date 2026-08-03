@@ -536,6 +536,35 @@ the complete transformation product stack.
   gas works even though 5,133 rows for the broad transformation category were
   present in the page assignment summary.
 
+## DASH-017: Comparison lines expose available base-year calibration gaps
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / time-series boundary
+**Affected areas:** Aggregate totals and flow-product line charts
+
+### Current rule
+
+Show LEAP and Ninth comparison-line values at the configured base year whenever
+those values exist. Hide their earlier backcast years. Continue using ESTO for
+the stacked historical area through the base year and LEAP for the stacked
+projection only after it, so the fill boundary remains unchanged.
+
+This intentionally allows ESTO, LEAP, and Ninth to display different values at
+the same base-year x coordinate. That visible gap is calibration evidence and
+must not be concealed by starting projection lines one year later.
+
+### Validation
+
+Regression tests require aggregate total lines and individual flow-product
+lines to include LEAP and Ninth at the base year while excluding their earlier
+years. A point available only before the base year remains non-renderable.
+
+### History
+
+- 2026-08-03: Confirmed because the difference between ESTO and model datasets
+  at the handoff year is important diagnostic information.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

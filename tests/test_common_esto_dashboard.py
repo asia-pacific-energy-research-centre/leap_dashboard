@@ -767,6 +767,78 @@ def test_non_expanding_subtotal_is_selected_once_for_dashboard_aggregates() -> N
     }
 
 
+def test_leap_and_ninth_lines_include_available_base_year_values() -> None:
+    series_labels = {
+        "ESTO|historical": "ESTO Historical",
+        "LEAP|Target": "LEAP Target",
+        "NINTH|Target": "9th Target",
+    }
+    common_values = {
+        "comparison_scope": "esto_leap_ninth",
+        "economy": "20_USA",
+        "common_flow_code": "16.02",
+        "common_flow_label": "16.02 Residential",
+        "common_product_code": "17",
+        "common_product_label": "17 Electricity",
+        "is_non_expanding_rollup": False,
+    }
+    rows = pd.DataFrame([
+        {
+            **common_values,
+            "source_system": source_system,
+            "scenario": scenario,
+            "year": year,
+            "value": value,
+        }
+        for source_system, scenario, year, value in [
+            ("ESTO", "historical", 2022, 100.0),
+            ("LEAP", "Target", 2021, 91.0),
+            ("LEAP", "Target", 2022, 105.0),
+            ("LEAP", "Target", 2023, 108.0),
+            ("NINTH", "Target", 2021, 93.0),
+            ("NINTH", "Target", 2022, 103.0),
+            ("NINTH", "Target", 2023, 106.0),
+        ]
+    ])
+    area_figure = build_area_chart(
+        rows,
+        {
+            "aggregate_flow_label": "16.02 Residential",
+            "source_flow_labels": ["16.02 Residential"],
+            "source_flow_labels_by_system": {},
+        },
+        series_labels,
+        {
+            "chart_generation": {
+                "comparison_source_system": "ESTO",
+                "base_year": 2022,
+                "primary_area_source_system": "LEAP",
+                "primary_area_scenario": "Target",
+            }
+        },
+    )
+    area_years = {
+        trace.name: list(trace.x)
+        for trace in area_figure.data
+        if str(trace.name).endswith(" total")
+    }
+
+    product_figure = build_product_chart(
+        rows,
+        "16.02 Residential",
+        "17 Electricity",
+        series_labels,
+        comparison_source="ESTO",
+        base_year=2022,
+    )
+    product_years = {trace.name: list(trace.x) for trace in product_figure.data}
+
+    assert area_years["LEAP Target total"] == [2022, 2023]
+    assert area_years["9th Target total"] == [2022, 2023]
+    assert product_years["LEAP Target"] == [2022, 2023]
+    assert product_years["9th Target"] == [2022, 2023]
+
+
 def test_non_expanding_frontier_uses_shared_aggregate_id_when_axis_codes_differ() -> None:
     rows = pd.DataFrame([
         {
@@ -1061,12 +1133,12 @@ def test_compound_buildings_range_does_not_create_an_incomplete_prefix_card() ->
     }
 
 
-def test_section_aggregate_suppresses_chart_with_no_renderable_series() -> None:
+def test_section_aggregate_suppresses_chart_with_only_pre_base_year_projection() -> None:
     rows = pd.DataFrame([
         {
             "source_system": "LEAP",
             "scenario": "Target",
-            "year": 2023,
+            "year": 2022,
             "common_flow_code": "08",
             "common_flow_label": "08 Transfers",
             "common_product_label": "07.01 Motor gasoline",

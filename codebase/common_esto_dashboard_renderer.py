@@ -1306,11 +1306,11 @@ def build_area_chart(
         # split into separate pos/neg stackgroups (see comment above), so the
         # stack alone no longer shows a single net total line to compare
         # against ESTO/NINTH totals.
-        # Non-comparison-source totals (e.g. NINTH) are projections and should
-        # only be drawn from base_year onward, not over the historical range
-        # already covered by the ESTO-derived stacked area.
+        # Non-comparison-source totals (LEAP and NINTH) include the base-year
+        # point when supplied. Keeping that point beside ESTO makes any
+        # calibration gap visible, while earlier backcast years remain hidden.
         if str(source_system).casefold() != comparison_source.casefold():
-            group = group[group["year"] > base_year]
+            group = group[group["year"] >= base_year]
         if group.empty:
             continue
         label = series_label_from_values(source_system, scenario, series_labels)
@@ -1646,9 +1646,10 @@ def build_product_chart(
         # Non-comparison sources (LEAP, NINTH) publish a full outlook time
         # series including their own historical backcast (e.g. NINTH goes
         # back to 1980), not just projections. Only ESTO should draw the
-        # historical range here; other sources are projection-only.
+        # historical range here; other sources start at the base year so their
+        # calibration gap against ESTO remains visible.
         if base_year is not None and str(source_system).casefold() != comparison_source.casefold():
-            group = group[group["year"] > base_year]
+            group = group[group["year"] >= base_year]
         if group.empty:
             continue
         label = series_label(group.iloc[0], series_labels)
