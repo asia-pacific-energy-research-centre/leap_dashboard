@@ -439,12 +439,19 @@ Other demand, and an exact code-17 row to retain its Non-energy assignment.
 
 ### Current rule
 
-Common ESTO may retain a generated compound comparison category and its
-contained categories as separate valid views. In an aggregate dashboard chart,
-do not add those overlapping views together. For each source, economy,
-scenario, year, and opposite-axis category, prefer an observed compound common
-code over common codes contained by its ranges or component list. If the
-compound row is absent for an observation, retain the available detail.
+Common ESTO may retain a generated compound flow category and its contained
+flows as separate valid views. Within one aggregate dashboard chart, do not add
+those overlapping flow views together. For each source, economy, scenario,
+year, and product category, prefer an observed compound common flow over common
+flows contained by its ranges or component list. If the compound row is absent
+for an observation, retain the available detail.
+
+Apply this detached-compound rule only after page routing and only on the flow
+axis. A broad transformation flow must not erase Power or Refining rows before
+their higher-priority page rules claim them. Compound product labels are normal
+disjoint dashboard categories and do not imply that contained product codes
+are additive alternatives. Explicit metadata-backed NON_EXPANDING product
+rollups continue to use their established frontier rule.
 
 This extends the existing NON_EXPANDING-rollup frontier rule to detached or
 aggregate-backed common rows that do not carry `is_non_expanding_rollup=True`.
@@ -465,6 +472,9 @@ combined flow in `Aggregate by flow: Other demand`.
   all-demand category is structurally compound but is not flagged as a
   NON_EXPANDING rollup, so the earlier subtotal-only selector retained it and
   its components together.
+- 2026-08-03: Restricted the rule after the global, two-axis implementation
+  removed Power and Refining detail before routing and changed the USA 2060
+  Transfers total from 2,134 PJ to 8,601 PJ by dropping a negative product.
 
 ## DASH-015: Compound-range overview cards include every range endpoint
 
@@ -498,6 +508,33 @@ Commercial and Ninth Residential.
   canonicalized `16.01-16.02` to `16.01`, titled that partial subtree with the
   compound label, and consequently omitted Ninth Residential from the card.
   The upstream Ninth Residential mapping itself was present and correct.
+
+## DASH-016: Mixed-depth compound flows remain valid overview frontiers
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / hierarchy-card generation
+**Affected areas:** Other transformation overview stacked-area cards
+
+### Current rule
+
+Determine a compound flow's overview level from every expression endpoint, not
+only its first canonical code. A row such as `09,09.03 Total transformation -
+no transfers` reaches level two through `09.03` and is therefore a valid
+level-two frontier for the code-09 overview. Its own row must not disappear and
+leave only deeper gas-processing descendants in the card.
+
+### Validation
+
+Regression tests require the mixed-depth row to be the source-specific code-09
+frontier. The production USA overview must contain all five dataset totals and
+the complete transformation product stack.
+
+### History
+
+- 2026-08-03: Confirmed after the Other transformation overview rendered only
+  gas works even though 5,133 rows for the broad transformation category were
+  present in the page assignment summary.
 
 ## End-to-end run report
 

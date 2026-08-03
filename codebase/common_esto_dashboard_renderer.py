@@ -561,7 +561,18 @@ def node_label_for_prefix(nodes: pd.DataFrame, prefix: str, fallback_name: str =
 
 def _frontier_labels_for_subtree(subtree: pd.DataFrame, target_level: int) -> list[str]:
     """Return flow labels forming a non-double-counting frontier within one subtree."""
-    exact_at_target = subtree[subtree["canonical_code"].apply(lambda value: len(str(value).split(".")) == target_level)].copy()
+    def expression_reaches_target_level(value: object) -> bool:
+        """Treat any endpoint at the target depth as the compound node's level."""
+        endpoints = []
+        for record in parse_code_expression(value):
+            endpoints.append(str(record.get("start", "")).strip())
+            if record.get("end"):
+                endpoints.append(str(record["end"]).strip())
+        return any(code_depth(endpoint) == target_level for endpoint in endpoints)
+
+    exact_at_target = subtree[
+        subtree["common_flow_code"].apply(expression_reaches_target_level)
+    ].copy()
     selected_labels: list[str] = []
     covered_prefixes: list[str] = []
     for _, node in exact_at_target.sort_values("canonical_code").iterrows():
@@ -699,7 +710,12 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
     # components remain available as separate comparison views. Use the common
     # axis expression itself to choose one observation-specific frontier, so a
     # detached aggregate and its contained categories cannot be added together.
-    for axis_name, opposite_axis_name in (("flow", "product"), ("product", "flow")):
+    # Detached generated aggregates currently exist on the flow axis. Do not
+    # infer the same relationship from compound product labels: ranges such as
+    # petroleum-products groupings are ordinary disjoint chart categories and
+    # must not suppress signed transfer inputs. Explicit NON_EXPANDING product
+    # rollups remain handled by the metadata-backed passes below.
+    for axis_name, opposite_axis_name in (("flow", "product"),):
         axis_column = f"common_{axis_name}_code"
         opposite_column = f"common_{opposite_axis_name}_code"
         if axis_column not in work.columns or opposite_column not in work.columns:
@@ -3855,11 +3871,9 @@ def render_dashboard(
     excluded_flow_code_prefixes = template.get("excluded_flow_code_prefixes", [])
     df = drop_esto_post_base_year_rows(df, comparison_source, base_year)
     df = drop_excluded_flow_rows(df, excluded_flow_code_prefixes)
-    df = _non_overlapping_common_row_frontier(df)
     if scope_df is not None:
         scope_df = drop_esto_post_base_year_rows(scope_df, comparison_source, base_year)
         scope_df = drop_excluded_flow_rows(scope_df, excluded_flow_code_prefixes)
-        scope_df = _non_overlapping_common_row_frontier(scope_df)
     assigned_df = assign_pages(df, page_rules)
     overview_flow_codes = {
         str(code) for code in template.get("total_demand_page", {}).get("overview_flow_codes", [])

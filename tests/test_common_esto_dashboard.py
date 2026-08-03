@@ -897,6 +897,133 @@ def test_detached_compound_flow_suppresses_its_observed_components() -> None:
     }
 
 
+def test_detached_flow_frontier_does_not_suppress_transfer_products() -> None:
+    common_values = {
+        "comparison_scope": "esto_leap_ninth",
+        "source_system": "LEAP",
+        "economy": "20_USA",
+        "scenario": "Target",
+        "year": 2060,
+        "common_flow_code": "08",
+        "common_flow_label": "08 Transfers",
+        "is_non_expanding_rollup": False,
+    }
+    rows = pd.DataFrame([
+        {
+            **common_values,
+            "common_row_id": "combined_hydrocarbons",
+            "common_product_code": "06.02-06.04",
+            "common_product_label": "06.02-06.04 Crude oil and NGL",
+            "value": 8728.0,
+        },
+        {
+            **common_values,
+            "common_row_id": "natural_gas_liquids",
+            "common_product_code": "06.02",
+            "common_product_label": "06.02 Natural gas liquids",
+            "value": -6594.0,
+        },
+    ])
+
+    selected = _non_overlapping_common_row_frontier(rows)
+
+    assert set(selected["common_row_id"]) == {
+        "combined_hydrocarbons",
+        "natural_gas_liquids",
+    }
+    assert selected["value"].sum() == 2134.0
+
+
+def test_mixed_depth_transformation_total_is_its_own_overview_frontier() -> None:
+    from codebase.common_esto_dashboard_renderer import pick_area_specs as build_specs
+
+    broad_label = "09,09.03 Total transformation - no transfers"
+    rows = pd.DataFrame([
+        {
+            "common_flow_code": code,
+            "common_flow_label": label,
+            "source_system": source_system,
+        }
+        for source_system, code, label in [
+            ("ESTO", "09,09.03", broad_label),
+            ("LEAP", "09,09.03", broad_label),
+            ("NINTH", "09,09.03", broad_label),
+            ("ESTO", "09.06.01", "09.06.01 Gas works plants"),
+            ("LEAP", "09.06.01", "09.06.01 Gas works plants"),
+            ("NINTH", "09.06.01", "09.06.01 Gas works plants"),
+        ]
+    ])
+
+    specs = build_specs(
+        rows,
+        {
+            "chart_generation": {
+                "deep_chain_min_depth": 3,
+                "top_levels_for_other_chains": 2,
+                "max_area_charts_per_page": 30,
+            }
+        },
+    )
+    total_spec = next(
+        spec for spec in specs if spec["aggregate_flow_prefix"] == "09"
+    )
+
+    assert total_spec["source_flow_labels_by_system"] == {
+        "ESTO": [broad_label],
+        "LEAP": [broad_label],
+        "NINTH": [broad_label],
+    }
+
+
+def test_page_routing_keeps_transformation_total_and_sector_details(tmp_path: Path) -> None:
+    template = _load_template()
+    series_config = _load_series_config()
+    common_values = {
+        "comparison_scope": "esto_leap_ninth",
+        "source_system": "LEAP",
+        "economy": "20_USA",
+        "scenario": "Target",
+        "year": 2024,
+        "common_product_code": "08.01",
+        "common_product_name": "Natural gas",
+        "common_product_label": "08.01 Natural gas",
+        "is_non_expanding_rollup": False,
+    }
+    rows = pd.DataFrame([
+        {
+            **common_values,
+            "common_flow_code": "09,09.03",
+            "common_flow_name": "Total transformation - no transfers",
+            "common_flow_label": "09,09.03 Total transformation - no transfers",
+            "value": -30.0,
+        },
+        {
+            **common_values,
+            "common_flow_code": "09.01-09.02",
+            "common_flow_name": "Power sector",
+            "common_flow_label": "09.01-09.02 Power sector",
+            "value": -10.0,
+        },
+        {
+            **common_values,
+            "common_flow_code": "09.07",
+            "common_flow_name": "Oil refineries",
+            "common_flow_label": "09.07 Oil refineries",
+            "value": -20.0,
+        },
+    ])
+    rows = apply_sign_semantics(rows, template["sign_semantics"])
+    layout = build_output_layout(tmp_path / "outputs", "20USA", clear_existing=True)
+
+    render_dashboard(rows, template, series_config, layout)
+
+    summary = pd.read_csv(layout["supporting"] / "page_assignment_summary.csv")
+    assignments = dict(zip(summary["common_flow_code"], summary["page_key"]))
+    assert assignments["09,09.03"] == "other_transformation"
+    assert assignments["09.01-09.02"] == "power"
+    assert assignments["09.07"] == "refining"
+
+
 def test_compound_buildings_range_does_not_create_an_incomplete_prefix_card() -> None:
     from codebase.common_esto_dashboard_renderer import pick_area_specs as build_specs
 
