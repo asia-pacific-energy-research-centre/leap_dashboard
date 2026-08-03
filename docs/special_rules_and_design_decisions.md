@@ -430,6 +430,42 @@ Other demand, and an exact code-17 row to retain its Non-energy assignment.
   had valid LEAP placeholder rows but were hidden, and the combined Other-sector
   placeholder was assigned to the hidden Non-energy page.
 
+## DASH-014: Aggregate charts choose one observed common-row frontier
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / aggregate-chart selection
+**Affected areas:** Stacked aggregate-by-flow and aggregate-by-product charts
+
+### Current rule
+
+Common ESTO may retain a generated compound comparison category and its
+contained categories as separate valid views. In an aggregate dashboard chart,
+do not add those overlapping views together. For each source, economy,
+scenario, year, and opposite-axis category, prefer an observed compound common
+code over common codes contained by its ranges or component list. If the
+compound row is absent for an observation, retain the available detail.
+
+This extends the existing NON_EXPANDING-rollup frontier rule to detached or
+aggregate-backed common rows that do not carry `is_non_expanding_rollup=True`.
+It changes dashboard aggregation only; the upstream rows and detailed line
+charts remain available.
+
+### Validation
+
+Regression tests require `16.03-16.05,17 Other sector including non-energy
+(all demand aggregate)` to suppress its observed `16.03-16.04` and `16.05`
+components in an aggregate chart, while another source without the broad row
+continues to use those components. A production USA render must show only the
+combined flow in `Aggregate by flow: Other demand`.
+
+### History
+
+- 2026-08-03: Confirmed from the USA Other demand chart. The generated
+  all-demand category is structurally compound but is not flagged as a
+  NON_EXPANDING rollup, so the earlier subtotal-only selector retained it and
+  its components together.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
