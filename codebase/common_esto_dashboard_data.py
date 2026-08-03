@@ -784,15 +784,16 @@ def filter_template_for_leap_demand_coverage(
     template: dict,
     missing_leap_branches: set[str] | list[str],
 ) -> dict:
-    """Hide standalone demand-sector pages whose LEAP branches are all aggregate-only.
+    """Apply the configured demand-page visibility policy for LEAP coverage.
 
     ``missing_leap_branches`` is the resolved, economy-scoped list of LEAP
     demand branch names with no separately modelled detail (see
     ``leap_mappings.codebase.mapping_tools.source_branch_preflight.get_demand_sectors_without_detail``).
     A page listed in the template's ``leap_demand_sector_coverage.page_leap_branches``
-    is hidden only when every one of its configured LEAP branches is in that
-    missing set — a page with at least one branch already modelled in detail
-    is kept, since it still has real LEAP data to show even if incomplete.
+    is hidden only when ``hide_aggregate_only_pages`` is enabled and every one
+    of its configured LEAP branches is in that missing set. When that option
+    is disabled, aggregate-placeholder rows are intentionally shown until real
+    sector detail replaces them upstream.
     Pages listed in ``leap_demand_sector_coverage.always_skip_page_keys`` are
     hidden unconditionally: they have no LEAP-to-ESTO mapping at all (not even
     an aggregate-only one), so ``get_demand_sectors_without_detail`` can never
@@ -813,11 +814,13 @@ def filter_template_for_leap_demand_coverage(
     if not page_branches and not always_skip:
         return template
     missing = {str(branch).casefold() for branch in missing_leap_branches}
-    pages_to_drop = {
-        page_key
-        for page_key, branches in page_branches.items()
-        if branches and all(str(branch).casefold() in missing for branch in branches)
-    }
+    pages_to_drop: set[str] = set()
+    if coverage_config.get("hide_aggregate_only_pages", True):
+        pages_to_drop = {
+            page_key
+            for page_key, branches in page_branches.items()
+            if branches and all(str(branch).casefold() in missing for branch in branches)
+        }
     pages_to_drop |= always_skip
     if not pages_to_drop:
         return template

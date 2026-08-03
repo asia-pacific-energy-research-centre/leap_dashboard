@@ -187,6 +187,17 @@
       "rule_note": "Other final demand rows outside buildings/industry/transport."
     },
     {
+      "rule_id": "all_demand_aggregate_other_sector_placeholder",
+      "page_key": "others",
+      "page_label": "Other demand",
+      "priority": 54,
+      "flow_code_prefixes": [],
+      "flow_keywords": [
+        "all demand aggregate"
+      ],
+      "rule_note": "Route the combined Other sector including non-energy LEAP placeholder to Other demand until separately modelled demand detail replaces it. Exact code-17 rows remain assigned by the Non-energy rule below."
+    },
+    {
       "page_key": "non_energy",
       "page_label": "Non-energy use",
       "priority": 55,
@@ -222,6 +233,7 @@
   },
   "leap_demand_sector_coverage": {
     "enabled": true,
+    "hide_aggregate_only_pages": false,
     "page_leap_branches": {
       "industry": ["Industry"],
       "transport": ["Passenger road", "Freight road", "Transport non road"],
@@ -230,7 +242,7 @@
       "bunkers": ["Transport non road"]
     },
     "always_skip_page_keys": ["non_energy"],
-    "_note": "page_leap_branches maps each sector_pages/total_demand_page page_key to the LEAP source branch name(s) it draws from. The dashboard workflow calls leap_mappings.source_branch_preflight.get_demand_sectors_without_detail(economy) and skips rendering a page here entirely when every one of its listed branches is still only available via 'All demand aggregated' for that economy (config/all_demand_aggregated_components.json in leap_mappings) — otherwise the page's post-base-year stacked area is empty of LEAP data. A page with at least one branch already modelled in detail is still shown. 'bunkers' (international marine/aviation, flow codes 04/05) is fed entirely from the 'Transport non road/International transport/Shipping' and '.../Air' sub-paths, per energy_balance_relationships.csv, so it shares that branch's coverage state with the 'transport' page. always_skip_page_keys is for pages with no LEAP mapping at all rather than an aggregate-only one: 'non_energy' (flow code 17) has zero LEAP-to-ESTO relationship rows targeting it in this pipeline (LEAP does not currently model non-energy use), so it can never appear via get_demand_sectors_without_detail and must be listed here explicitly. Remove an entry once that data genuinely exists."
+    "_note": "page_leap_branches maps each sector page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. With hide_aggregate_only_pages=false, those placeholder-backed pages stay visible until real LEAP detail replaces them. Set it true only when aggregate-backed standalone pages should be suppressed. always_skip_page_keys remains for pages without a usable standalone LEAP mapping: exact non-energy rows stay hidden, while the combined Other sector including non-energy all-demand placeholder is routed to Other demand by its explicit higher-priority page rule."
   },
   "scope_specific_pages": {
     "enabled": false,

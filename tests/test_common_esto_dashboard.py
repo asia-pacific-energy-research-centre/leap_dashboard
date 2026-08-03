@@ -10,6 +10,7 @@ from codebase.common_esto_dashboard_data import (
     apply_sign_semantics,
     filter_common_esto_data,
     filter_ninth_pre_base_year_data,
+    filter_template_for_leap_demand_coverage,
     load_common_esto_data,
 )
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
@@ -208,6 +209,36 @@ def test_power_sector_rollup_is_not_assigned_to_other_transformation() -> None:
 
     assert assigned.loc[0, "_page_key"] == "power"
     assert assigned.loc[0, "_section_key"] == "power"
+
+
+def test_aggregate_only_demand_pages_remain_visible_but_unmapped_page_is_hidden() -> None:
+    template = _load_template()
+
+    filtered = filter_template_for_leap_demand_coverage(
+        template,
+        {"Industry", "Buildings", "Other sector"},
+    )
+
+    assert filtered["leap_demand_sector_coverage"]["_hidden_page_keys"] == ["non_energy"]
+
+
+def test_all_demand_other_sector_placeholder_is_routed_before_non_energy() -> None:
+    template = _load_template()
+    df = pd.DataFrame([
+        {
+            "common_flow_code": "16.03-16.05,17",
+            "common_flow_label": "16.03-16.05,17 Other sector including non-energy (all demand aggregate)",
+        },
+        {
+            "common_flow_code": "17",
+            "common_flow_label": "17 Non-energy use",
+        },
+    ])
+
+    assigned = assign_pages(df, template["sector_pages"])
+
+    assert assigned.loc[0, "_page_key"] == "others"
+    assert assigned.loc[1, "_page_key"] == "non_energy"
 
 
 def test_transformation_total_selection_uses_rollup_membership_and_source_role() -> None:

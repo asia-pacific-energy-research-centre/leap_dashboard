@@ -398,6 +398,38 @@ flags.
   subtotal together with Domestic air transport, Rail, Domestic navigation,
   Pipeline transport, and Non-specified transport.
 
+## DASH-012: Aggregate demand placeholders remain visible by sector
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Demand-page routing / transitional presentation
+**Affected areas:** Industry, Transport, Buildings, Other demand, and Non-energy page routing
+
+### Current rule
+
+Keep standalone Industry, Transport, Buildings, and Other demand pages visible
+when their LEAP projection is still supplied by an `All demand aggregated`
+placeholder. These are transitional sector rows and should remain reviewable
+until detailed LEAP demand branches replace them upstream.
+
+Route the combined `Other sector including non-energy (all demand aggregate)`
+row to Other demand. Continue routing an exact code-17 row to Non-energy and
+keep that standalone page hidden while it has no usable standalone LEAP
+mapping. This is presentation routing only; the dashboard does not split or
+recalculate the upstream aggregate.
+
+### Validation
+
+Regression tests require aggregate-only demand pages to remain visible, the
+unmapped Non-energy page to remain hidden, the combined placeholder to route to
+Other demand, and an exact code-17 row to retain its Non-energy assignment.
+
+### History
+
+- 2026-08-03: Confirmed while reviewing China, where Industry and Buildings
+  had valid LEAP placeholder rows but were hidden, and the combined Other-sector
+  placeholder was assigned to the hidden Non-energy page.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
