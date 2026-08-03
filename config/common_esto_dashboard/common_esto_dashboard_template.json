@@ -3,7 +3,7 @@
   "default_comparison_scope": "esto_leap_ninth",
   "dashboard_mode": "auto_tree",
   "default_chart_type": "line",
-  "excluded_flow_code_prefixes": ["06", "11", "18", "19"],
+  "excluded_flow_code_prefixes": ["06", "10.01.11", "11", "18", "19"],
   "chart_generation": {
     "deep_chain_min_depth": 3,
     "top_levels_for_deep_chains": 2,

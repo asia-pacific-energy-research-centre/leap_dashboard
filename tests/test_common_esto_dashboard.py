@@ -163,6 +163,29 @@ def test_common_esto_dashboard_excludes_electricity_and_heat_output_rows() -> No
     assert filtered["common_flow_code"].tolist() == ["17"]
 
 
+def test_refinery_own_use_is_only_shown_in_the_inclusive_boundary() -> None:
+    template = _load_template()
+    rows = pd.DataFrame([
+        {
+            "common_flow_code": "09.07",
+            "common_flow_label": "09.07 Oil refineries (including own use)",
+        },
+        {
+            "common_flow_code": "10.01.11",
+            "common_flow_label": "10.01.11 Oil refineries",
+        },
+    ])
+
+    filtered = drop_excluded_flow_rows(
+        rows,
+        template["excluded_flow_code_prefixes"],
+    )
+
+    assert filtered["common_flow_label"].tolist() == [
+        "09.07 Oil refineries (including own use)",
+    ]
+
+
 def test_ninth_pre_base_year_rows_are_excluded_by_default() -> None:
     df = pd.DataFrame(
         [

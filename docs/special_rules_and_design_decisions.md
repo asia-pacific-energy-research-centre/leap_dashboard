@@ -565,6 +565,37 @@ years. A point available only before the base year remains non-renderable.
 - 2026-08-03: Confirmed because the difference between ESTO and model datasets
   at the handoff year is important diagnostic information.
 
+## DASH-018: Refinery own use appears only in the inclusive comparison boundary
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / comparison-boundary filtering
+**Affected areas:** Refining overview and detail charts
+
+### Current rule
+
+Do not display `10.01.11 Oil refineries` as a standalone dashboard comparison.
+LEAP does not publish refinery own use separately; its value is part of the
+refinery process. The mapping system already folds ESTO and Ninth `10.01.11`
+into `09.07 Oil refineries (including own use)`, which is paired with LEAP's
+`09.07 Oil refineries` as the shared boundary.
+
+Retain that inclusive refinery comparison and suppress the redundant code-10
+component. This is the same presentation principle used for gas-works own use;
+the mapping and its `NON_EXPANDING` rollup remain owned upstream.
+
+### Validation
+
+Regression tests require the inclusive `09.07` row to survive dashboard flow
+exclusions while standalone `10.01.11` is removed. A production USA Refining
+page must not contain a `10 Losses and own use` overview card or a standalone
+`10.01.11 Oil refineries` detail group.
+
+### History
+
+- 2026-08-03: Confirmed after the Refining page showed an ESTO/Ninth-only own-use
+  card beside the valid inclusive refinery comparison, with no LEAP series.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
