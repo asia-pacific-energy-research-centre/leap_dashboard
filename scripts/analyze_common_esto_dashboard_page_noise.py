@@ -3,6 +3,7 @@
 
 #%%
 import csv
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -24,7 +25,9 @@ def _resolve(path: str | Path) -> Path:
 
 #%%
 # User-tuned constants.
-DASHBOARD_OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
+DASHBOARD_OUTPUT_ROOT = _resolve(
+    os.getenv("COMMON_ESTO_DASHBOARD_OUTPUT_ROOT", "outputs/common_esto_dashboard")
+)
 PAGE_NOISE_SUMMARY_PATH = DASHBOARD_OUTPUT_ROOT / "page_noise_summary.csv"
 PAGE_NOISE_FLAGS_PATH = DASHBOARD_OUTPUT_ROOT / "page_noise_flags.csv"
 

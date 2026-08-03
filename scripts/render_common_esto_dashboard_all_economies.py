@@ -59,14 +59,24 @@ def _resolve(path: str | Path) -> Path:
 LEAP_MAPPINGS_ROOT = _resolve(
     os.getenv("LEAP_MAPPINGS_ROOT", REPO_ROOT.parent / "leap_mappings")
 )
-INPUT_DATA_PATH = _resolve(LEAP_MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_comparison_data.csv")
+INPUT_DATA_PATH = _resolve(
+    os.getenv(
+        "COMMON_ESTO_LEGACY_INPUT_PATH",
+        LEAP_MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_comparison_data.csv",
+    )
+)
 OUTPUT_CONTRACT_PATH = _resolve(
     os.getenv(
         "COMMON_ESTO_OUTPUT_CONTRACT_PATH",
         LEAP_MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_output_contract.json",
     )
 )
-COMMON_ROWS_PATH = _resolve(LEAP_MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_rows.csv")
+COMMON_ROWS_PATH = _resolve(
+    os.getenv(
+        "COMMON_ESTO_COMMON_ROWS_PATH",
+        LEAP_MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_rows.csv",
+    )
+)
 ESTO_EXACT_ROWS_PATH = _resolve(
     LEAP_MAPPINGS_ROOT / "results" / "mapping_relationships" / "esto_results_exact_rows.csv.gz"
 )
@@ -78,7 +88,9 @@ ESTO_EXTENDED_EXACT_ROWS_PATH = _resolve(
 )
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
-OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
+OUTPUT_ROOT = _resolve(
+    os.getenv("COMMON_ESTO_DASHBOARD_OUTPUT_ROOT", "outputs/common_esto_dashboard")
+)
 SUMMARY_PATH = OUTPUT_ROOT / "render_summary.csv"
 
 COMPARISON_SCOPE = os.getenv("COMMON_ESTO_COMPARISON_SCOPE", "esto_leap_ninth")

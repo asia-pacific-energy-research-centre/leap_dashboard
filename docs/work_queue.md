@@ -52,6 +52,16 @@ These later commits supersede the corresponding snapshot rows below:
   Buildings, Transport, and Other demand pages remain visible until detailed
   LEAP demand replaces the placeholders. The combined Other-sector/non-energy
   placeholder routes to Other demand without changing exact code-17 routing.
+- **The two-run Common ESTO v1 production soak is complete in isolated
+  worktrees.** Run 1 passed on 2026-07-28. Run 2 passed on 2026-08-03 against
+  mapping run `common_esto_20260803T053714732123Z` and dashboard commit
+  `8ad51dc`: 21/21 economies, 10,212 charts, 978,809 visible rows, empty
+  stderr, and publication readiness all passed. Seven page-noise flags were
+  retained and reproduced exactly from the same-generation legacy input; they
+  are not contract-reader regressions. The compact contract can now be
+  considered for default selection in a separate reviewed change. DASHQ-007
+  remains `partial` because its clean-code/artifact provenance requirement and
+  the dashboard's current uncommitted changes are separate gates.
 
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were

@@ -1,6 +1,6 @@
 # Common ESTO output contract migration
 
-**Status reviewed:** 2026-07-28
+**Status reviewed:** 2026-08-03
 
 ## Integrated strict opt-in support
 
@@ -44,13 +44,45 @@ The producer and consumer implementations are integrated on the local
 equivalence run passed. Existing mapping result files predate contract
 publication, so the contract is not yet the ordinary production default.
 
-## Remaining operational gate
+## Production-soak evidence
 
-The controlling item is DASHQ-007 in [`work_queue.md`](work_queue.md): publish
-the first QA-successful v1 generation from a clean mappings baseline, select it
-explicitly, and repeat representative and all-economy readiness checks. A
-successful representative equivalence run does not prove a later generation is
-publishable.
+Two independently dated all-economy contract candidates have now passed.
+
+| Run | Contract input | Dashboard input | Result |
+|---|---|---|---|
+| 1 — 2026-07-28 | `common_esto_20260728T035935111268Z`; 3,952,646 facts | isolated contract-soak branch | 21/21 economies, 6,510 charts, 1,020,120 visible rows, readiness passed |
+| 2 — 2026-08-03 | `common_esto_20260803T053714732123Z`; 3,887,707 facts and 6,127 metadata rows | committed dashboard `8ad51dc` | 21/21 economies, 10,212 charts, 978,809 visible rows, readiness passed |
+
+Run 2 used fact SHA-256
+`246c48b13018dcb823759960634b694369c1ed0c7d4db332e9fcca72bd30cb4b`
+and metadata SHA-256
+`63e4ce55c7d6389aa0c4dab7419d04e507d264fd59e73d710b089b6c00d68bfa`.
+The same-generation 985,559,800-byte legacy comparison was retained with
+SHA-256
+`b9b1e1f4afd23342171748e06a6adf3339ad5c3638b29aa48830311b47a95feb`.
+
+Run 2's page-noise review retained seven flags: `02BD` Others, `04CHL`
+Others, `05PRC` Industry, `06HKC` Others, `09ROK` Industry, `12NZ` Others,
+and `20USA` Industry. A targeted same-generation legacy control produced
+byte-identical chart manifests and sign-semantics summaries for all seven
+economies, plus identical render counts, 69 page-noise rows, and all seven
+flags. Nothing was suppressed to make the gate pass.
+
+The Stage 3 manifest status was `completed`. It also retained non-blocking QA
+findings: Common ESTO flow-hierarchy mismatches for ESTO Extended (85), LEAP
+(8), and 9th (202), product checks with no eligible parent/child cases, and
+anchor findings across overlapping scopes. These findings were not summed
+across scopes and do not indicate a missing or structurally invalid contract.
+
+## Remaining integration gate
+
+The two-run compatibility gate is satisfied, but the legacy adapter remains
+the ordinary default. Default selection must be a separate reviewed change.
+Before that change, reconcile the current uncommitted dashboard renderer/data
+work and repeat affected checks if those edits materially alter chart or input
+semantics. DASHQ-007 in [`work_queue.md`](work_queue.md) separately retains its
+clean mapping code/artifact provenance requirement. Do not retire the legacy
+rollback merely because the two compatibility soaks passed.
 
 ## Phase 2 disposition
 
