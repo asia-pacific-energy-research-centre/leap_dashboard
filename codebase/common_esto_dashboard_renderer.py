@@ -660,6 +660,31 @@ def area_spec_rows(df: pd.DataFrame, area_spec: dict[str, object]) -> pd.DataFra
     return df[df["common_flow_label"].isin(source_flow_labels)]
 
 
+def area_chart_allowed_for_demand_coverage(
+    page_key: str,
+    area_df: pd.DataFrame,
+    template: dict,
+) -> bool:
+    """Keep aggregate-placeholder demand overviews on a LEAP-backed frontier."""
+    coverage_config = template.get("leap_demand_sector_coverage", {})
+    placeholder_page_keys = {
+        str(key)
+        for key in coverage_config.get("show_aggregate_only_page_keys", [])
+    }
+    if str(page_key) not in placeholder_page_keys:
+        return True
+
+    primary_source = str(
+        template.get("chart_generation", {}).get(
+            "primary_area_source_system",
+            "LEAP",
+        )
+    ).casefold()
+    if "source_system" not in area_df.columns:
+        return False
+    return area_df["source_system"].astype(str).str.casefold().eq(primary_source).any()
+
+
 def equivalent_flow_labels_by_source(df: pd.DataFrame, flow_label: str) -> dict[str, list[str]]:
     """Match a displayed flow name to source-specific equivalent labels."""
     target_name = flow_name_without_code(flow_label).casefold()
@@ -3966,6 +3991,12 @@ def render_dashboard(
         for area_spec in pick_area_specs(page_df, template):
             chart_key = f"chart__area__{safe_slug(area_spec['aggregate_flow_prefix'])}__{safe_slug(area_spec['aggregate_flow_label'])}"
             area_df = area_spec_rows(page_df, area_spec)
+            if not area_chart_allowed_for_demand_coverage(
+                page_key,
+                area_df,
+                template,
+            ):
+                continue
             metrics = compute_ranking_metrics(area_df, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
             suppressed = metrics["total_abs_value"] < suppression_threshold
             manifest_rows.append({

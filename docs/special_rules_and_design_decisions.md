@@ -630,6 +630,40 @@ Target refinery total must be about `-3,605.34 PJ` in 2027, not the erroneous
   output and own use caused the Refining aggregate to alternate by roughly
   `624 PJ` depending on whether a zero row survived long-form serialization.
 
+## DASH-020: Aggregate-placeholder demand overviews require LEAP coverage
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Demand-page overview eligibility
+**Affected areas:** Buildings, Industry, Transport, and Other demand overviews
+
+### Current rule
+
+The four demand pages allowed to remain visible while LEAP uses an
+`All demand aggregated` placeholder may only display overview area cards whose
+selected frontier contains the configured primary LEAP source. Do not present
+an ESTO/Ninth-only child card as a three-dataset overview comparison.
+
+Keep those child categories in their detail groups. When detailed LEAP rows
+become available upstream, their overview cards become eligible automatically.
+Non-demand pages are unaffected by this rule.
+
+### Validation
+
+Regression coverage requires a Buildings overview selection containing only
+ESTO and Ninth Residential rows to be rejected, the same selection with LEAP
+to be accepted, and an equivalent non-demand selection to remain accepted.
+The production USA overview manifest must retain only the broad `16 Buildings`,
+`14 Industry sector`, `15 Transport sector`, and `16 Other sector` demand cards,
+while retaining Residential and Industry child detail groups.
+
+### History
+
+- 2026-08-03: Confirmed after hierarchy depth caused Residential, Mining,
+  Construction, and Manufacturing to appear as ESTO/Ninth-only overview cards,
+  while shallower Transport and Other-demand hierarchies happened not to expose
+  equivalent child cards.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

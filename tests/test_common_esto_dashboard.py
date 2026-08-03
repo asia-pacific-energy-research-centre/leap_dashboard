@@ -245,6 +245,44 @@ def test_aggregate_only_demand_pages_remain_visible_but_unmapped_page_is_hidden(
     assert filtered["leap_demand_sector_coverage"]["_hidden_page_keys"] == ["non_energy"]
 
 
+def test_aggregate_placeholder_overviews_require_leap_rows() -> None:
+    from codebase.common_esto_dashboard_renderer import (
+        area_chart_allowed_for_demand_coverage,
+    )
+
+    template = _load_template()
+    detailed_rows = pd.DataFrame(
+        [
+            {"source_system": "ESTO", "common_flow_label": "16.02 Residential"},
+            {"source_system": "NINTH", "common_flow_label": "16.02 Residential"},
+        ]
+    )
+
+    assert not area_chart_allowed_for_demand_coverage(
+        "buildings",
+        detailed_rows,
+        template,
+    )
+    assert area_chart_allowed_for_demand_coverage(
+        "buildings",
+        pd.concat(
+            [
+                detailed_rows,
+                pd.DataFrame(
+                    [{"source_system": "LEAP", "common_flow_label": "16 Buildings"}]
+                ),
+            ],
+            ignore_index=True,
+        ),
+        template,
+    )
+    assert area_chart_allowed_for_demand_coverage(
+        "refining",
+        detailed_rows,
+        template,
+    )
+
+
 def test_all_demand_other_sector_placeholder_is_routed_before_non_energy() -> None:
     template = _load_template()
     df = pd.DataFrame([
