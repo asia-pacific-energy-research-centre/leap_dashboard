@@ -683,11 +683,14 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
     The canonical all-rows contract deliberately preserves both a named
     aggregate and the additive detail frontier that represents the same energy.
     Dashboard aggregates must choose one of those alternatives. For each
-    source/economy/scenario/year, retain an observed compound common category
-    or explicitly flagged NON_EXPANDING subtotal and remove contained rows.
+    source/economy/scenario series, retain an observed compound common category
+    or explicitly flagged NON_EXPANDING subtotal and remove contained rows for
+    every year in that series.
 
-    Selection is observation-specific: if a source does not publish the
-    subtotal row, its detail frontier remains available.
+    Selection is series-specific: if a source never publishes the subtotal row,
+    its detail frontier remains available. If the subtotal is absent in only
+    some years because its components cancel to exact zero, those years remain
+    on the subtotal frontier instead of falling back to overlapping detail.
     """
     required = {"is_non_expanding_rollup", "source_system", "scenario", "year"}
     if df.empty or not required.issubset(df.columns):
@@ -699,7 +702,7 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
 
     context_columns = [
         column
-        for column in ["comparison_scope", "source_system", "economy", "scenario", "year"]
+        for column in ["comparison_scope", "source_system", "economy", "scenario"]
         if column in work.columns
     ]
     drop_row_numbers: set[int] = set()
@@ -708,7 +711,7 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
     # NON_EXPANDING rollups. For example, the LEAP all-demand placeholder is
     # represented by common flow 16.03-16.05,17 while its 16.03-16.04 and 16.05
     # components remain available as separate comparison views. Use the common
-    # axis expression itself to choose one observation-specific frontier, so a
+    # axis expression itself to choose one series-specific frontier, so a
     # detached aggregate and its contained categories cannot be added together.
     # Detached generated aggregates currently exist on the flow axis. Do not
     # infer the same relationship from compound product labels: ranges such as

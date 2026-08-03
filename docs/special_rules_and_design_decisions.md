@@ -596,6 +596,40 @@ page must not contain a `10 Losses and own use` overview card or a standalone
 - 2026-08-03: Confirmed after the Refining page showed an ESTO/Ninth-only own-use
   card beside the valid inclusive refinery comparison, with no LEAP series.
 
+## DASH-019: Aggregate frontiers remain fixed across a time series
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Aggregation / zero-row handling
+**Affected areas:** Aggregate charts containing generated or NON_EXPANDING rows
+
+### Current rule
+
+Choose a common-row frontier once for each comparison scope, source, economy,
+and scenario series. Do not choose it independently for each year. If a
+generated or NON_EXPANDING row is observed anywhere in that series, keep its
+frontier authoritative in years where the row is absent because its components
+cancel to exact zero; treat that absence as zero instead of restoring an
+overlapping detail row.
+
+Sources that never publish the aggregate row still retain their additive detail
+frontier. This preserves source-specific comparison boundaries without allowing
+long-form zero suppression to change the boundary from one year to the next.
+
+### Validation
+
+Regression coverage requires a refinery inclusive row observed with a
+floating-point residual in one year to suppress its ordinary refinery-gas
+detail in both that year and a later exact-zero year. The production USA Ninth
+Target refinery total must be about `-3,605.34 PJ` in 2027, not the erroneous
+`-2,981.39 PJ` fallback value.
+
+### History
+
+- 2026-08-03: Confirmed after exact cancellation between Ninth refinery-gas
+  output and own use caused the Refining aggregate to alternate by roughly
+  `624 PJ` depending on whether a zero row survived long-form serialization.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

@@ -790,6 +790,47 @@ def test_non_expanding_subtotal_is_selected_once_for_dashboard_aggregates() -> N
     }
 
 
+def test_non_expanding_frontier_does_not_fall_back_when_a_year_is_exact_zero() -> None:
+    common_values = {
+        "comparison_scope": "esto_extended_leap_ninth",
+        "source_system": "NINTH",
+        "economy": "20_USA",
+        "scenario": "target",
+        "common_flow_code": "09.07",
+        "common_product_code": "07.10",
+        "source_aggregate_group_ids": "refinery_including_own_use",
+    }
+    rows = pd.DataFrame([
+        {
+            **common_values,
+            "year": 2023,
+            "common_row_id": "refinery_including_own_use",
+            "is_non_expanding_rollup": True,
+            "value": 1e-13,
+        },
+        {
+            **common_values,
+            "year": 2023,
+            "common_row_id": "refinery_output",
+            "is_non_expanding_rollup": False,
+            "value": 637.08,
+        },
+        {
+            **common_values,
+            "year": 2027,
+            "common_row_id": "refinery_output",
+            "is_non_expanding_rollup": False,
+            "value": 623.93,
+        },
+    ])
+
+    selected = _non_overlapping_common_row_frontier(rows)
+
+    assert selected[["year", "common_row_id"]].to_dict("records") == [
+        {"year": 2023, "common_row_id": "refinery_including_own_use"},
+    ]
+
+
 def test_leap_and_ninth_lines_include_available_base_year_values() -> None:
     series_labels = {
         "ESTO|historical": "ESTO Historical",
