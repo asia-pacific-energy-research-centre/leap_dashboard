@@ -1165,11 +1165,9 @@ def write_mapping_diagnostics_page(
     source_to_common = _read_csv(source_to_common_path)
     many_to_many = _read_csv(many_to_many_path)
     rollup_catalogue = _read_csv(rollup_catalogue_path)
-    if (
-        contract_selection is not None
-        and not contract_selection["rollups"].empty
-    ):
-        rollup_catalogue = contract_selection["rollups"]
+    # The hierarchy contract owns ordinary parent/child structure and value
+    # conformance. Registered rollup modes and membership remain authoritative
+    # in the mapping pipeline's rollup catalogue.
     rollup_boundary_register = _rollup_boundary_details_html(rollup_catalogue, common_esto_tree)
     rollup_graph_data = _rollup_graph_data(
         common_esto_tree,
