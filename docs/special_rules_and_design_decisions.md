@@ -466,6 +466,39 @@ combined flow in `Aggregate by flow: Other demand`.
   NON_EXPANDING rollup, so the earlier subtotal-only selector retained it and
   its components together.
 
+## DASH-015: Compound-range overview cards include every range endpoint
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / hierarchy-card generation
+**Affected areas:** Overview stacked-area cards
+
+### Current rule
+
+When overview discovery encounters a compound common flow such as
+`16.01-16.02 Buildings`, close that generated subtree over every common
+category contained by the compound expression. Do not treat only the first
+range endpoint as the card's scope.
+
+Source-specific frontiers remain authoritative. For Buildings, LEAP can use the
+combined Buildings row while Ninth uses Commercial and Residential. If this
+closed frontier duplicates an already generated parent card, keep only the
+first card; retain genuinely distinct detail cards such as Residential.
+
+### Validation
+
+Regression tests require the incomplete `16.01`-derived Buildings card to be
+deduplicated. The production USA Buildings overview must contain `16 Buildings`
+and `16.02 Residential`, with the all-Buildings frontier including Ninth
+Commercial and Ninth Residential.
+
+### History
+
+- 2026-08-03: Confirmed from the USA Buildings overview. The dashboard
+  canonicalized `16.01-16.02` to `16.01`, titled that partial subtree with the
+  compound label, and consequently omitted Ninth Residential from the card.
+  The upstream Ninth Residential mapping itself was present and correct.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
