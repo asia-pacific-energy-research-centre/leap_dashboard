@@ -635,14 +635,13 @@ def equivalent_flow_labels_by_source(df: pd.DataFrame, flow_label: str) -> dict[
 
 
 def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
-    """Prefer an observed NON_EXPANDING subtotal over its detail alternative.
+    """Choose one observed, non-overlapping common-row frontier.
 
     The canonical all-rows contract deliberately preserves both a named
-    subtotal and the additive detail frontier that represents the same energy.
-    Dashboard aggregates must choose one of those alternatives.  For each
-    source/economy/scenario/year, retain the explicitly flagged subtotal and
-    remove unflagged rows that either share its compressed flow/product
-    coordinates or its source-aggregate membership.
+    aggregate and the additive detail frontier that represents the same energy.
+    Dashboard aggregates must choose one of those alternatives. For each
+    source/economy/scenario/year, retain an observed compound common category
+    or explicitly flagged NON_EXPANDING subtotal and remove contained rows.
 
     Selection is observation-specific: if a source does not publish the
     subtotal row, its detail frontier remains available.
@@ -654,8 +653,6 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
     work = df.copy()
     work["_frontier_row_number"] = range(len(work))
     subtotal_mask = _metadata_bool(work["is_non_expanding_rollup"])
-    if not subtotal_mask.any():
-        return df
 
     context_columns = [
         column
@@ -663,6 +660,61 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
         if column in work.columns
     ]
     drop_row_numbers: set[int] = set()
+
+    # Some generated comparison categories are aggregate-backed without being
+    # NON_EXPANDING rollups. For example, the LEAP all-demand placeholder is
+    # represented by common flow 16.03-16.05,17 while its 16.03-16.04 and 16.05
+    # components remain available as separate comparison views. Use the common
+    # axis expression itself to choose one observation-specific frontier, so a
+    # detached aggregate and its contained categories cannot be added together.
+    for axis_name, opposite_axis_name in (("flow", "product"), ("product", "flow")):
+        axis_column = f"common_{axis_name}_code"
+        opposite_column = f"common_{opposite_axis_name}_code"
+        if axis_column not in work.columns or opposite_column not in work.columns:
+            continue
+
+        categories = work[[axis_column, opposite_column]].drop_duplicates()
+        parent_categories = categories[
+            categories[axis_column].map(_is_compound_code_expression)
+        ]
+        membership_rows: list[dict[str, str]] = []
+        for opposite_code, same_opposite_parents in parent_categories.groupby(
+            opposite_column, dropna=False, sort=False
+        ):
+            candidate_codes = categories.loc[
+                categories[opposite_column].eq(opposite_code), axis_column
+            ].astype(str).drop_duplicates()
+            for parent_code in same_opposite_parents[axis_column].astype(str):
+                for detail_code in candidate_codes:
+                    if (
+                        detail_code != parent_code
+                        and _code_expression_contains_expression(parent_code, detail_code)
+                    ):
+                        membership_rows.append({
+                            opposite_column: str(opposite_code),
+                            "_frontier_parent_common_code": parent_code,
+                            axis_column: detail_code,
+                        })
+        if not membership_rows:
+            continue
+
+        memberships = pd.DataFrame(membership_rows).drop_duplicates()
+        observed_parents = work[
+            [*context_columns, opposite_column, axis_column]
+        ].drop_duplicates().rename(columns={axis_column: "_frontier_parent_common_code"})
+        observed_details = work[
+            ["_frontier_row_number", *context_columns, opposite_column, axis_column]
+        ]
+        observed_matches = observed_details.merge(
+            memberships,
+            on=[opposite_column, axis_column],
+            how="inner",
+        ).merge(
+            observed_parents,
+            on=[*context_columns, opposite_column, "_frontier_parent_common_code"],
+            how="inner",
+        )
+        drop_row_numbers.update(observed_matches["_frontier_row_number"].astype(int))
 
     # The split parent and detail rows normally retain the same compressed
     # hierarchy coordinates even though their common_row_id values differ.
@@ -682,6 +734,8 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
     # alternative retains the individual 15.01/15.03/... rows. Match those
     # component codes within the same observation and opposite-axis category.
     for axis_name, opposite_axis_name in (("flow", "product"), ("product", "flow")):
+        if not subtotal_mask.any():
+            break
         axis_component_column = f"component_{axis_name}_code"
         axis_common_column = f"common_{axis_name}_code"
         opposite_common_column = f"common_{opposite_axis_name}_code"

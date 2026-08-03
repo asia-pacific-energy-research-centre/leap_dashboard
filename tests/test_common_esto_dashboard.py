@@ -843,6 +843,60 @@ def test_non_expanding_frontier_uses_compound_component_code_membership() -> Non
     assert selected["value"].sum() == 70.0
 
 
+def test_detached_compound_flow_suppresses_its_observed_components() -> None:
+    common_values = {
+        "comparison_scope": "esto_leap_ninth",
+        "economy": "20_USA",
+        "common_product_code": "07.07",
+        "common_product_label": "07.07 Gas/diesel oil",
+        "is_non_expanding_rollup": False,
+    }
+    rows = pd.DataFrame([
+        {
+            **common_values,
+            "source_system": "ESTO", "scenario": "historical", "year": 2022,
+            "common_row_id": "all_demand_other", "common_flow_code": "16.03-16.05,17",
+            "common_flow_label": "16.03-16.05,17 Other sector including non-energy (all demand aggregate)",
+            "value": 30.0,
+        },
+        {
+            **common_values,
+            "source_system": "ESTO", "scenario": "historical", "year": 2022,
+            "common_row_id": "agriculture", "common_flow_code": "16.03-16.04",
+            "common_flow_label": "16.03-16.04 Agriculture and fishing", "value": 10.0,
+        },
+        {
+            **common_values,
+            "source_system": "ESTO", "scenario": "historical", "year": 2022,
+            "common_row_id": "nonspecified", "common_flow_code": "16.05",
+            "common_flow_label": "16.05 Non-specified others", "value": 20.0,
+        },
+        {
+            **common_values,
+            "source_system": "NINTH", "scenario": "target", "year": 2022,
+            "common_row_id": "agriculture", "common_flow_code": "16.03-16.04",
+            "common_flow_label": "16.03-16.04 Agriculture and fishing", "value": 10.0,
+        },
+        {
+            **common_values,
+            "source_system": "NINTH", "scenario": "target", "year": 2022,
+            "common_row_id": "nonspecified", "common_flow_code": "16.05",
+            "common_flow_label": "16.05 Non-specified others", "value": 20.0,
+        },
+    ])
+
+    selected = _non_overlapping_common_row_frontier(rows)
+
+    assert selected.groupby("source_system")["common_row_id"].agg(list).to_dict() == {
+        "ESTO": ["all_demand_other"],
+        "NINTH": ["agriculture", "nonspecified"],
+    }
+    assert selected.groupby("source_system")["value"].sum().to_dict() == {
+        "ESTO": 30.0,
+        "NINTH": 30.0,
+    }
+
+
 def test_section_aggregate_suppresses_chart_with_no_renderable_series() -> None:
     rows = pd.DataFrame([
         {
