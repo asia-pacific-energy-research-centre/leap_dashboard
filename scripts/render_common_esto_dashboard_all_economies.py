@@ -219,33 +219,9 @@ def _render_one_economy(
                 {
                     "page_key": "mapping_diagnostics",
                     "page_label": "Mapping diagnostics",
-                    "file": "mapping_diagnostics.html",
+                    "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
                 },
             ],
-        )
-        esto_exact_values = load_esto_exact_values_for_economy(
-            ESTO_EXACT_ROWS_PATH,
-            economy,
-            min_year=MIN_YEAR,
-            max_year=MAX_YEAR,
-        )
-        esto_extended_exact_values = load_esto_exact_values_for_economy(
-            ESTO_EXTENDED_EXACT_ROWS_PATH,
-            economy,
-            min_year=MIN_YEAR,
-            max_year=MAX_YEAR,
-            source_system="ESTO_EXTENDED_RAW",
-        )
-        write_mapping_diagnostics_page(
-            layout,
-            LEAP_MAPPINGS_ROOT,
-            dashboard_updated_label=dashboard_updated_label,
-            economy=economy,
-            comparison_data=scope_filtered_df,
-            esto_exact_values=pd.concat(
-                [esto_exact_values, esto_extended_exact_values],
-                ignore_index=True,
-            ),
         )
         _write_dashboard_metadata(
             layout,
@@ -302,6 +278,36 @@ def _write_summary(summary_rows: list[dict[str, object]]) -> pd.DataFrame:
     return summary_df
 
 
+def _render_shared_mapping_diagnostics(raw_df: pd.DataFrame) -> dict[str, str]:
+    """Render one APEC-first diagnostics page for every economy dashboard."""
+    scoped = raw_df.copy()
+    if MIN_YEAR is not None:
+        scoped = scoped[scoped["year"] >= MIN_YEAR]
+    if MAX_YEAR is not None:
+        scoped = scoped[scoped["year"] <= MAX_YEAR]
+    layout = build_output_layout(
+        OUTPUT_ROOT, "diagnostics", clear_existing=CLEAR_EXISTING_OUTPUTS
+    )
+    exact = load_esto_exact_values_for_economy(
+        ESTO_EXACT_ROWS_PATH, "", min_year=MIN_YEAR, max_year=MAX_YEAR
+    )
+    extended = load_esto_exact_values_for_economy(
+        ESTO_EXTENDED_EXACT_ROWS_PATH,
+        "",
+        min_year=MIN_YEAR,
+        max_year=MAX_YEAR,
+        source_system="ESTO_EXTENDED_RAW",
+    )
+    return write_mapping_diagnostics_page(
+        layout,
+        LEAP_MAPPINGS_ROOT,
+        dashboard_updated_label=_dashboard_updated_label(),
+        economy="00APEC",
+        comparison_data=scoped,
+        esto_exact_values=pd.concat([exact, extended], ignore_index=True),
+    )
+
+
 def render_all_economies() -> pd.DataFrame:
     """Load data once, render selected economies, and write render_summary.csv."""
     template = load_json(TEMPLATE_PATH)
@@ -314,6 +320,9 @@ def render_all_economies() -> pd.DataFrame:
     raw_df = _normalise_economy_column(raw_df)
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
     mapping_metadata = selected_run_metadata(LEAP_MAPPINGS_ROOT)
+    if RENDER_DASHBOARDS:
+        shared_diagnostics = _render_shared_mapping_diagnostics(raw_df)
+        print(f"Shared APEC diagnostics: {shared_diagnostics['page']}")
 
     requested_economies = [_dashboard_economy(e) for e in ECONOMIES_TO_RENDER]
     economies = requested_economies or _available_economies(raw_df)

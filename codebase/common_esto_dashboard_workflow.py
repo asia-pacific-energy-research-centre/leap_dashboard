@@ -374,7 +374,7 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
             {
                 "page_key": "mapping_diagnostics",
                 "page_label": "Mapping diagnostics",
-                "file": "mapping_diagnostics.html",
+                "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
             },
             {
                 "page_key": "mapping_tree_explorer",
@@ -383,27 +383,14 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
             },
         ],
     )
-    esto_exact_values = load_esto_exact_values_for_economy(
-        ESTO_EXACT_ROWS_PATH,
-        economy,
-        min_year=MIN_YEAR,
-        max_year=MAX_YEAR,
-    )
-    esto_extended_exact_values = load_esto_exact_values_for_economy(
-        ESTO_EXTENDED_EXACT_ROWS_PATH,
-        economy,
-        min_year=MIN_YEAR,
-        max_year=MAX_YEAR,
-        source_system="ESTO_EXTENDED_RAW",
-    )
-    mapping_diagnostics = write_mapping_diagnostics_page(
-        layout,
-        _LEAP_MAPPINGS_REPO,
-        dashboard_updated_label=dashboard_updated_label,
-        economy=economy,
-        comparison_data=scope_filtered_df,
-        esto_exact_values=pd.concat([esto_exact_values, esto_extended_exact_values], ignore_index=True),
-    )
+    mapping_diagnostics = {
+        "page": str(
+            OUTPUT_ROOT / "diagnostics" / "dashboards" / "mapping_diagnostics.html"
+        ),
+        "summary": str(
+            OUTPUT_ROOT / "diagnostics" / "supporting_files" / "mapping_diagnostics_summary.csv"
+        ),
+    }
     mapping_tree_explorer = render_full_tree_explorer(
         output_path=layout["dashboards"] / "mapping_tree_explorer.html",
         comparison_data=raw_df,
@@ -458,6 +445,53 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
     return result
 
 
+def run_shared_mapping_diagnostics() -> dict[str, str]:
+    """Render the one APEC-first diagnostics page linked by every economy."""
+    raw_df = load_common_esto_data(
+        INPUT_DATA_PATH,
+        wide_file_scope=WIDE_FILE_SCOPE,
+        output_contract_path=OUTPUT_CONTRACT_PATH if USE_OUTPUT_CONTRACT else None,
+    )
+    raw_df["economy"] = raw_df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
+    raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
+    if MIN_YEAR is not None:
+        raw_df = raw_df[raw_df["year"] >= MIN_YEAR]
+    if MAX_YEAR is not None:
+        raw_df = raw_df[raw_df["year"] <= MAX_YEAR]
+    layout = build_output_layout(
+        OUTPUT_ROOT,
+        "diagnostics",
+        clear_existing=CLEAR_EXISTING_OUTPUTS,
+    )
+    updated_label = _dashboard_updated_label()
+    esto_exact_values = load_esto_exact_values_for_economy(
+        ESTO_EXACT_ROWS_PATH,
+        "",
+        min_year=MIN_YEAR,
+        max_year=MAX_YEAR,
+    )
+    esto_extended_exact_values = load_esto_exact_values_for_economy(
+        ESTO_EXTENDED_EXACT_ROWS_PATH,
+        "",
+        min_year=MIN_YEAR,
+        max_year=MAX_YEAR,
+        source_system="ESTO_EXTENDED_RAW",
+    )
+    result = write_mapping_diagnostics_page(
+        layout,
+        _LEAP_MAPPINGS_REPO,
+        dashboard_updated_label=updated_label,
+        economy="00APEC",
+        comparison_data=raw_df,
+        esto_exact_values=pd.concat(
+            [esto_exact_values, esto_extended_exact_values], ignore_index=True
+        ),
+    )
+    if PUBLISH_TO_DOCS:
+        publish_to_docs(layout, REPO_ROOT / "docs")
+    return result
+
+
 def run_dashboard_workflow() -> dict[str, object]:
     """Run dashboard render once for all configured economies."""
     maybe_regen_common_esto_fast_path()
@@ -467,6 +501,7 @@ def run_dashboard_workflow() -> dict[str, object]:
         raise ValueError("ECONOMIES is empty. Provide a string or list with at least one economy code.")
 
     print(f"Configured economies: {', '.join(configured_economies)}")
+    shared_mapping_diagnostics = run_shared_mapping_diagnostics()
     economy_results: dict[str, dict[str, object]] = {}
     for idx, economy in enumerate(configured_economies, start=1):
         print("-" * 72)
@@ -481,6 +516,7 @@ def run_dashboard_workflow() -> dict[str, object]:
         "economies": configured_economies,
         "economy_results": economy_results,
         "total_chart_count": total_charts,
+        "mapping_diagnostics": shared_mapping_diagnostics,
     }
 
 
