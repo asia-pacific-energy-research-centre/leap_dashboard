@@ -34,6 +34,7 @@ import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 
@@ -226,9 +227,26 @@ CAPACITY_UNMET_CONVERGENCE_PATH = _resolve(
 
 
 #%%
+# Dashboards are read by the APERC team in Tokyo, and a hosted render would
+# otherwise be stamped with whatever timezone the server happens to sit in.
+DASHBOARD_TIMEZONE = os.environ.get("COMMON_ESTO_DASHBOARD_TIMEZONE", "Asia/Tokyo")
+
+
+def _dashboard_timezone() -> timezone | ZoneInfo:
+    """Return the timezone dashboard timestamps are shown in.
+
+    Falls back to the machine's own zone if the tz database is unavailable,
+    which is better than failing a completed render over a label.
+    """
+    try:
+        return ZoneInfo(DASHBOARD_TIMEZONE)
+    except (ZoneInfoNotFoundError, ValueError):
+        return datetime.now().astimezone().tzinfo or timezone.utc
+
+
 def _dashboard_updated_label() -> str:
     """Return the human-facing timestamp shown in rendered dashboard headers."""
-    return datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
+    return datetime.now(_dashboard_timezone()).strftime("%Y-%m-%d %H:%M %Z")
 
 
 def _write_dashboard_metadata(
@@ -239,7 +257,9 @@ def _write_dashboard_metadata(
     metadata = {
         "economy": layout["root"].name,
         "dashboard_updated_label": updated_label,
-        "rendered_at_local": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "rendered_at_local": datetime.now(_dashboard_timezone()).isoformat(
+            timespec="seconds"
+        ),
         **selected_run_metadata(_LEAP_MAPPINGS_REPO),
     }
     (layout["supporting"] / "dashboard_metadata.json").write_text(
