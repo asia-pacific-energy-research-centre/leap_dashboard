@@ -821,6 +821,23 @@ def _paired_tree_html(
             'This is a contradiction within the original source hierarchy, not evidence that a mapping row is missing.</p>'
             if float(row.parent_total) == 0 and float(row.children_total) != 0 else ""
         )
+        # Built here rather than nested in the card f-string: a replacement
+        # field cannot contain a backslash before Python 3.12, and the
+        # deployed Space runs an older interpreter than a maintainer's
+        # checkout.
+        detail_shortfall_note = (
+            ""
+            if detail_matches_total
+            else (
+                '<p class="source-warning">The mapped rows shown above add to '
+                f"{format_value(displayed_mapped_total)}, but the validator used "
+                f"{format_value(float(row.mapped_frontier_total))}. The unshown "
+                "contribution is "
+                f"{format_value(float(row.mapped_frontier_total) - displayed_mapped_total)}"
+                ". Do not use this card to diagnose the anchor difference until "
+                "that contribution is listed.</p>"
+            )
+        )
         cards.append(
             f'<article class="paired-case"><h3>{escape(source_system)} | {escape(str(row.validation_axis))} | '
             f'{escape(str(row.other_axis_value))}</h3><p class="subtle">{escape(str(row.scenarios))}; checked years: '
@@ -838,7 +855,7 @@ def _paired_tree_html(
             f'{mapped_branch_html}'
             f'<li class="tree-total"><span>{"Unique mapped comparison total" if detail_matches_total else "Validator mapped total (detail incomplete)"}</span><strong>{format_value(float(row.mapped_frontier_total))}</strong></li>'
             f'<li class="tree-residual"><span>Anchor difference (parent − mapped total)</span><strong>{format_value(float(row.mapped_difference))}</strong></li>'
-            f'</ul>{mapped_structure_note}{"" if detail_matches_total else f"<p class=\"source-warning\">The mapped rows shown above add to {format_value(displayed_mapped_total)}, but the validator used {format_value(float(row.mapped_frontier_total))}. The unshown contribution is {format_value(float(row.mapped_frontier_total) - displayed_mapped_total)}. Do not use this card to diagnose the anchor difference until that contribution is listed.</p>"}</section></div></article>'
+            f'</ul>{mapped_structure_note}{detail_shortfall_note}</section></div></article>'
         )
     return "".join(cards)
 
