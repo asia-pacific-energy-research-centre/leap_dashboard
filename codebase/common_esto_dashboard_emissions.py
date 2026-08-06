@@ -280,8 +280,15 @@ def load_esto_to_common_map(
     map_path: str | Path | None = None,
     comparison_scope: str = "esto_leap_ninth",
 ) -> pd.DataFrame:
-    """Read the generated ESTO component -> common dashboard axis map."""
-    path = _resolve_mappings_path(map_path or "results/common_esto/esto_to_common_esto_map.csv")
+    """Read the generated ESTO component -> common dashboard axis map.
+
+    Reads ``common_esto_rows.csv`` rather than ``esto_to_common_esto_map.csv``:
+    the two give set-identical component-ESTO -> common product/flow pairs
+    (verified 2026-08-06), and ``common_esto_rows.csv`` is already a declared
+    runtime asset (``mapping_chain_common_esto_rows``), so this removes one
+    manifest entry the Emissions page would otherwise need added.
+    """
+    path = _resolve_mappings_path(map_path or "results/common_esto/common_esto_rows.csv")
     frame = pd.read_csv(
         path,
         usecols=[
@@ -815,7 +822,11 @@ def _demand_rows(assigned_df: pd.DataFrame, config: dict) -> pd.DataFrame:
     return assigned_df[assigned_df["_page_key"].isin(demand_page_keys)]
 
 
-def emissions_page_enabled(template: dict, assigned_df: pd.DataFrame | None = None) -> bool:
+def emissions_page_enabled(
+    template: dict,
+    assigned_df: pd.DataFrame | None = None,
+    factor_config_path: str | Path | None = None,
+) -> bool:
     """Whether the Emissions page should appear in navigation and be rendered.
 
     Requires the config switch, the inputs the page derives from (its factor
@@ -828,6 +839,14 @@ def emissions_page_enabled(template: dict, assigned_df: pd.DataFrame | None = No
     written, so this is the single condition both that gate and
     ``build_emissions_page`` consult. They must not be able to disagree: a chip
     without a page is a broken link on every other page of the dashboard.
+
+    ``factor_config_path``, when given, is used in place of the template's
+    ``factor_sets_config_path`` and, being resolved as-is when absolute,
+    bypasses ``REPO_ROOT = __file__.parents[1]`` entirely. That default only
+    matches the Gradio runtime layout (``runtime/leap_dashboard/{codebase,config}/``);
+    a caller in a different layout (e.g. the portable staging, which flattens
+    with ``strip_prefix = "codebase"``) should pass its own resolved path
+    instead of relying on it.
     """
     config = emissions_page_config(template)
     if not config.get("enabled", False):
@@ -836,7 +855,8 @@ def emissions_page_enabled(template: dict, assigned_df: pd.DataFrame | None = No
         return False
     try:
         factor_config = load_factor_set_config(
-            config.get(
+            factor_config_path
+            or config.get(
                 "factor_sets_config_path",
                 "config/common_esto_dashboard/emissions_factor_sets.json",
             )
@@ -857,7 +877,7 @@ def emissions_page_enabled(template: dict, assigned_df: pd.DataFrame | None = No
     required.append(
         _resolve_mappings_path(
             mapping_sources.get(
-                "esto_to_common_map", "results/common_esto/esto_to_common_esto_map.csv"
+                "esto_to_common_map", "results/common_esto/common_esto_rows.csv"
             )
         )
     )
@@ -876,6 +896,7 @@ def build_emissions_page(
     dashboard_switcher: list[dict[str, str]] | None = None,
     current_dashboard: str = "",
     dashboard_updated_label: str = "",
+    factor_config_path: str | Path | None = None,
 ) -> tuple[list[dict], dict | None]:
     """Build the Emissions page (config-driven bespoke page).
 
@@ -891,6 +912,11 @@ def build_emissions_page(
     the ``emissions_page`` template key and
     ``config/common_esto_dashboard/emissions_factor_sets.json``.
 
+    ``factor_config_path``, when given, overrides that default location and is
+    passed straight through to ``emissions_page_enabled`` and
+    ``load_factor_set_config`` — see ``emissions_page_enabled`` for why a
+    caller outside the Gradio runtime layout needs this.
+
     Returns ``(manifest_rows, page_row_dict)``, or ``([], None)`` when disabled
     or when no demand rows carry a factor.
     """
@@ -902,7 +928,7 @@ def build_emissions_page(
     write_dashboard_page = renderer.write_dashboard_page
 
     config = emissions_page_config(template)
-    if not emissions_page_enabled(template, assigned_df):
+    if not emissions_page_enabled(template, assigned_df, factor_config_path):
         return [], None
 
     page_key = str(config.get("page_key", "emissions"))
@@ -926,7 +952,8 @@ def build_emissions_page(
         else "esto_leap_ninth"
     )
     factor_config = load_factor_set_config(
-        config.get(
+        factor_config_path
+        or config.get(
             "factor_sets_config_path",
             "config/common_esto_dashboard/emissions_factor_sets.json",
         )

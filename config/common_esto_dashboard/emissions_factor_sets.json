@@ -5,7 +5,7 @@
     "_note": "Paths are resolved against the leap_mappings repository root (LEAP_MAPPINGS_ROOT, default ../leap_mappings). leap_mappings owns these mappings; the dashboard only reads them.",
     "ninth_fuel_to_esto_workbook": "config/outlook_mappings_single_axis.xlsx",
     "ninth_fuel_to_esto_sheet": "ninth_fuel_to_esto",
-    "esto_to_common_map": "results/common_esto/esto_to_common_esto_map.csv"
+    "esto_to_common_map": "results/common_esto/common_esto_rows.csv"
   },
   "factor_sets": [
     {
