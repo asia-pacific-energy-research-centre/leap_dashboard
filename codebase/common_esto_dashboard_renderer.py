@@ -2412,14 +2412,22 @@ def _dashboard_switcher_html(dashboards: list[dict[str, str]], current_dashboard
 
 _DATASET_DISPLAY_LABELS = {"NINTH": "Ninth"}
 
+# The dataset filter is switched off in the header. It is kept whole -- markup,
+# styles and script -- so turning it back on is a one-line change here rather
+# than a rebuild.
+SHOW_DATASET_FILTER = False
+
 
 def _dataset_filter_html(datasets: list[str]) -> str:
     """Build the header dataset-filter button group.
 
     One toggle button per dataset (source system) present on the page. When a
     button is active (blue), chart cards lacking that dataset are hidden.
+
+    Returns nothing while ``SHOW_DATASET_FILTER`` is off, which leaves the
+    header without the control and the rest of the page untouched.
     """
-    if not datasets:
+    if not datasets or not SHOW_DATASET_FILTER:
         return ""
     buttons = "".join(
         f'<button type="button" class="dataset-filter-btn" data-dataset-filter="{escape(d)}">'
