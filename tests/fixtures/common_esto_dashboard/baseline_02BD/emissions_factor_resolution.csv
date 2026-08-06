@@ -1,0 +1,55 @@
+common_product_label,emissions_factor,esto_components,factor_source_keys,factor_set_key,emissions_unit,mapping_axis
+01.01 Coking coal,0.0946,01.01 Coking coal,01_01_coking_coal,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+01.02-01.04 Coal,0.0946,01.02 Other bituminous coal; 01.03 Sub-bituminous coal; 01.04 Anthracite,01_x_thermal_coal,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+01.05 Lignite,0.101,01.05 Lignite,01_05_lignite,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+01.99 Coal nonspecified,0.094354902,01.99 Coal nonspecified,01_coal_unallocated,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+02.01-02.08 Coal products,0.098348324,02.01 Coke oven coke; 02.02 Gas coke; 02.03 Coke oven gas; 02.04 Blast furnace gas; 02.05 Other recovered gases; 02.06 Patent fuel; 02.07 Coal tar; 02.08 BKB/PB,02_coal_products,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+03 Peat,0.106,03 Peat,03_peat,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+04 Peat products,0.1056,04 Peat products,04_peat_products,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+05 Oil shale and oil sands,0.0,05 Oil shale and oil sands,05_oil_shale_and_oil_sands,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+06.01 Crude oil,0.0733,06.01 Crude oil,06_01_crude_oil,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+06.02 Natural gas liquids,0.0642,06.02 Natural gas liquids,06_02_natural_gas_liquids,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+06.03-06.04 Crude oil and NGL,0.0733,06.03 Refinery feedstocks; 06.04 Additives/ oxygenates,06_x_other_hydrocarbons,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+06.05 Other hydrocarbons,0.0733,06.05 Other hydrocarbons,06_crude_oil_and_ngl_unallocated,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.01 Motor gasoline,0.0693,07.01 Motor gasoline,07_01_motor_gasoline,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.02 Aviation gasoline,0.07,07.02 Aviation gasoline,07_02_aviation_gasoline,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.03 Naphtha,0.0733,07.03 Naphtha,07_03_naphtha,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.04-07.05 Petroleum products,0.071499942,07.04 Gasoline type jet fuel; 07.05 Kerosene type jet fuel,07_x_jet_fuel,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.06 Kerosene,0.071632094,07.06 Kerosene,07_06_kerosene,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.07 Gas/diesel oil,0.07410006,07.07 Gas/diesel oil,07_07_gas_diesel_oil,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.08 Fuel oil,0.0774,07.08 Fuel oil,07_08_fuel_oil,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.09 LPG,0.0631,07.09 LPG,07_09_lpg,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.10 Refinery gas (not liquefied),0.0575999999999999,07.10 Refinery gas (not liquefied),07_10_refinery_gas_not_liquefied,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.11 Ethane,0.0616,07.11 Ethane,07_11_ethane,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.12-07.17 Petroleum products,0.0733,07.12 White spirit SBP; 07.13 Lubricants; 07.14 Bitumen; 07.15 Paraffin waxes; 07.16 Petroleum coke; 07.17 Other products,07_x_other_petroleum_products,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+07.99 PetProd nonspecified,0.073094697,07.99 PetProd nonspecified,07_petroleum_products_unallocated,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+08.01 Natural gas,0.056097826,08.01 Natural gas,08_01_natural_gas,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+08.02 LNG,0.063093503,08.02 LNG,08_02_lng,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+08.03 Gas works gas,0.0444,08.03 Gas works gas,08_03_gas_works_gas,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+08.99 Gas nonspecified,0.0560999999999999,08.99 Gas nonspecified,08_gas_unallocated,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+09 Nuclear,0.0,09 Nuclear,09_nuclear,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+10 Hydro,0.0,10 Hydro,10_hydro,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+11 Geothermal,0.0,11 Geothermal,11_geothermal,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+12.01 of which: Photovoltaics,0.0,12.01 of which: Photovoltaics,12_01_of_which_photovoltaics,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+12.99 Solar nonspecified,0.0,12.99 Solar nonspecified,12_solar_unallocated; 12_x_other_solar,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+"13 Tide, wave, ocean",0.0,"13 Tide, wave, ocean",13_tide_wave_ocean,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+14 Wind,0.0,14 Wind,14_wind,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+15.01 Fuelwood & woodwaste,0.112,15.01 Fuelwood & woodwaste,15_01_fuelwood_and_woodwaste,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+15.02 Bagasse,0.10441291,15.02 Bagasse,15_02_bagasse,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+15.03 Charcoal,0.112,15.03 Charcoal,15_03_charcoal,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+15.04 Black liquor,0.0953,15.04 Black liquor,15_04_black_liquor,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+15.05 Other biomass,0.1,15.05 Other biomass,15_05_other_biomass; 15_solid_biomass_unallocated,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.01 Biogas,0.054611515,16.01 Biogas,16_01_biogas,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.02 Industrial waste,0.143,16.02 Industrial waste,16_02_industrial_waste,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.03 Municipal solid waste (renewable),0.1,16.03 Municipal solid waste (renewable),16_03_municipal_solid_waste_renewable,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.04 Municipal solid waste (non-renewable),0.0917,16.04 Municipal solid waste (non-renewable),16_04_municipal_solid_waste_nonrenewable,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.05 Biogasoline,0.0708,16.05 Biogasoline,16_05_biogasoline,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.06 Biodiesel,0.0708,16.06 Biodiesel,16_06_biodiesel,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.07 Bio jet kerosene,0.074750521,16.07 Bio jet kerosene,16_07_bio_jet_kerosene,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.08 Other liquid biofuels,0.0796,16.08 Other liquid biofuels,16_08_other_liquid_biofuels,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.09 Other sources,0.0,16.09 Other sources,16_09_other_sources; 16_others_unallocated,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.10 Ammonia,0.0,16.10 Ammonia,16_x_ammonia,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.11 E-fuel,0.0,16.11 E-fuel,16_x_efuel,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+16.12 Hydrogen,0.0,16.12 Hydrogen,16_x_hydrogen,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+17 Electricity,0.0,17 Electricity,17_electricity; 17_x_green_electricity,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
+18 Heat,0.0,18 Heat,18_heat,ninth_edition_co2e_energy_weighted,Mt CO2e,ninth_fuel
