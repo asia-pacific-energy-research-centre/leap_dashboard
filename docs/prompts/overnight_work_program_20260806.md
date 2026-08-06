@@ -20,11 +20,11 @@ target shape is*. Read the relevant plan section before starting each item.
    push.
 3. **A number moving is a stop condition, not a baseline to update.** See
    Verification below.
-4. **`leap_mappings` has pre-existing uncommitted changes that belong to someone
-   else** — at time of writing: `apec_anchor_validation.py`,
-   `apply_common_esto_structure.py`, `structural_resolver.py`, and two config
-   files. Do not commit, revert, stash, or refactor around them. If a required
-   change collides, **stop and report**.
+4. **`leap_mappings` working tree is clean as of session start.** Its seven
+   previously-uncommitted files were committed to branch
+   `claude/common-esto-mapping-docs` in two separable commits (`85facf1` code,
+   `47e2526` generated artifacts). That branch — not `master` — is the base for
+   any `leap_mappings` work tonight.
 5. **If a work item's gate fails, stop that item and move to the next one.** Do
    not work around a gate. Record it in the log.
 6. When in doubt, prefer producing a *finding* over producing a *change*.
@@ -73,9 +73,117 @@ string hash randomisation). Therefore:
 Named invariants that must hold after every item:
 
 - 20USA 2022 total emissions = **3,443 Mt CO2e**, equal across LEAP, ESTO, 9th.
-- `pytest tests` green (**145 passed, 2 skipped** at start of session).
+- `leap_dashboard`: `pytest tests` green — **145 passed, 2 skipped** at session
+  start.
 - `scripts/check_common_esto_dashboard_publish_ready.py` passes.
 - `scripts/analyze_common_esto_dashboard_page_noise.py` flags **0**.
+
+**`leap_mappings` test baseline — 496 passed, 6 pre-existing failures on
+`master`.** Do not treat these as regressions and do not try to fix them:
+
+```text
+test_apply_partitioned_common_esto.py::test_chunked_cache_reuse_and_result_equivalence
+test_balance_flow_single_axis_mappings.py::test_esto_extended_detail_axes_are_maintained_even_when_zero_only
+test_separate_axis_mapping_exploration.py::test_leap_balance_structure_derives_report_rows_and_fuel_catalogue
+test_synthetic_reference_rows_sync.py::test_the_loader_matches_the_leap_initialisation_copy
+test_target_share_allocation.py::test_target_dataset_share_uses_target_component_values
+test_target_share_allocation.py::test_target_dataset_share_counts_unique_targets_when_source_rows_repeat
+```
+
+Two more (`test_leap_mapping_refresh_workflow.py`,
+`test_leap_results_dashboard_balance_crosswalk.py`) fail at *collection* because
+a LEAP balance-export workbook is absent; run with `--ignore` for both.
+
+The bar for `leap_mappings` work is therefore **no new failures beyond these
+six**, not a green suite.
+
+---
+
+## Deliverables — four artifacts to hand over at the end
+
+The work items are the means; these are what the owner actually wants to look
+at. Collect them under `outputs/overnight_20260806/` and list their paths in the
+final report. **A work item is not finished until its deliverable exists.**
+
+### D1 — A rendered `leap_dashboard` output with emissions
+
+Full render of **20USA and 02BD**, with the Emissions page produced by the new
+system (factors published by `leap_mappings` after W5, not resolved in dashboard
+code). Hand over the `dashboards/` folder path and confirm `emissions.html`
+opens and its charts draw.
+
+Depends on: W2–W5.
+
+### D2 — A locally run web app showing emissions
+
+The point is to prove the Space will show emissions, not just that the dashboard
+does. Both prerequisites are confirmed present:
+
+- `gradio 5.44.1` is installed and matches the Space's `sdk_version`.
+- LEAP balance exports exist at
+  `C:/Users/Work/github/leap_initialisation/data/leap balances exports/20_USA/`
+  (`0805 REF.xlsx`, `0805 TGT.xlsx`) and for `02_BD`.
+
+Steps:
+
+1. Refresh the runtime **locally from the working branches** via
+   `leap_review_tools/scripts/refresh_runtime.py`, including the files Phase 0
+   identified. Do not commit a refreshed runtime into `leap_review_web_app` and
+   do not deploy — this is a local proof only.
+2. Run the Gradio app locally, upload `20_USA/0805 REF.xlsx`, and confirm the
+   Emissions page and its nav chip appear in the generated dashboard.
+3. Capture a screenshot and the local output path.
+
+**If the manifest cannot be satisfied without a master merge, stop and report**
+rather than merging. In that case record exactly which entries blocked it — that
+list is itself a useful deliverable, because it is the remaining work to deploy.
+
+Depends on: W2, W5, and the Phase 0 file list.
+
+### D3 — Mapping CSVs a non-coder can use
+
+The published mapping outputs, made genuinely usable by someone who does not
+write code. Not just correct — *legible*.
+
+- `source_to_common_esto_map.csv` (W6) — any dataset → common categories.
+- The common-axis emissions factor table (W5, B1).
+
+Requirements, all of which matter more than they sound:
+
+- **Human-readable labels in every row**, not just IDs. A reader must never have
+  to join another file to understand a row.
+- **One row per mapping**, sorted stably (source system, then source flow, then
+  source product), so it diffs cleanly and reads top to bottom.
+- **`derived_from` present** on every factor row.
+- **A short `README.md` beside them** — what each file is, what one row means,
+  which column to filter on, and the one thing not to do (do not sum rows whose
+  `common_row_is_leaf` is false, and do not re-split a source aggregate).
+- Ship an `.xlsx` alongside each `.csv`. Excel is where these will actually be
+  opened.
+
+### D4 — The importable merger from `leap_mappings`
+
+A supported, importable function that applies the mappings — the thing that
+makes "one merge" real for a consumer:
+
+```python
+from mapping_tools import <merger>
+common_df = <merger>(source_values_df, source_to_common_map_df)
+```
+
+Requirements:
+
+- Importable without dragging the pipeline's orchestration or QA modules; check
+  the import closure.
+- A docstring stating the contract: what goes in, what comes out, and that it
+  never allocates.
+- A worked example in the `README.md` from D3, runnable as-is.
+- Covered by a test asserting it reproduces the current
+  `common_esto_comparison_data.csv` for at least one economy.
+
+Depends on: W6 producing the map. This is Phase C step 2, promoted into scope
+(owner request, 2026-08-06); Phase C steps 3–8 — cache, dashboard switch-over,
+retiring the old path — remain Deferred.
 
 ---
 
@@ -196,7 +304,43 @@ original 4,838-vs-3,443 bug.
 
 ---
 
-### W5 — Stretch: Phase C map generation *(only if W1 returned "viable")*
+### W5 — Phase B: move factor resolution into `leap_mappings` *(owner-approved unsupervised, 2026-08-06)*
+
+Plan reference: Phase B, and test T5.
+
+Work on branch `claude/common-esto-mapping-docs` in `leap_mappings`.
+
+1. Move the 9th factor CSV and `emissions_factor_sets.json` into
+   `leap_mappings/config/`.
+2. Move the resolution logic out of
+   `leap_dashboard/codebase/common_esto_dashboard_emissions.py` — subfuel
+   collapse, `_unallocated` aliasing, `prefer_specific_then_mean` conflict
+   resolution, the common-axis join — into `leap_mappings` beside
+   `build_common_esto_structure.py`. This clears the duplicate-implementation
+   debt. Reuse the existing conflict rule; do not write a second one.
+3. Publish **B1** (factors on the common ESTO axis, 54 rows) and **B2**
+   (ESTO-product-keyed and LEAP-fuel-keyed sets). Every published artifact gets
+   a `derived_from` column, valued `ninth`.
+4. Make the derivation source a **config parameter**, not a hardcoded path, so
+   LEAP can later derive from ESTO via `leap_fuel_to_esto` (a clean 1:1, 70 of
+   70) when real ESTO factors arrive.
+5. Leave the dashboard consuming the published table via a single merge.
+
+**T5 is the gate:** `emissions_factor_resolution.csv` must be byte-identical in
+content after the move — same factors, same `factor_source_keys`, same
+`esto_components`. That is the whole proof this was a relocation and not a
+rewrite. 20USA 2022 must still be 3,443 Mt CO2e.
+
+Do **not** relax the `native_unit == "PJ"` assertion or register emissions
+datasets tonight — that is the part of Phase B that changes pipeline behaviour,
+and it should follow W3 landing.
+
+**Done when:** T5 passes, 3,443 holds, both suites at their baselines, committed
+to branches in both repos.
+
+---
+
+### W6 — Phase C map + importable merger *(only if W1 returned "viable")*
 
 Plan reference: Phase C, step 1.
 
@@ -205,9 +349,16 @@ Generate `source_to_common_esto_map.csv` in `leap_mappings` from
 per scope, participating sources only. Assert zero fan-out at the common level
 while generating and fail loudly otherwise.
 
-**Branch `leap_mappings` first**, and heed rule 4 about the pre-existing changes
-there. Generate the artifact and its generator script only — do **not** move the
-factor resolution upstream tonight (that is Phase B, Deferred).
+Work on branch `claude/common-esto-mapping-docs`.
+
+Then **publish the importable merger (D4)** — Phase C step 2, promoted into
+scope. One merge plus an aggregation, taking native source values and the map.
+Check its import closure so it does not drag orchestration or QA modules in.
+
+Stop there. Phase C steps 3-8 — cache layer, dashboard switch-over, retiring the
+prebuilt path — remain Deferred.
+
+Produce **D3** (legible CSVs + xlsx + README) as part of this item.
 
 **Done when:** the map generates, fan-out assertion passes, committed to a
 `leap_mappings` branch.
@@ -219,9 +370,10 @@ factor resolution upstream tonight (that is Phase B, Deferred).
 | Item | Why |
 |---|---|
 | Any merge to `master` in either repo | Owner decision: merge only once the whole program is proven |
+| **Any `git push`, and any Space deploy** | Not authorised. The owner said "almost happy" — that is not a yes. Outward-facing and hard to reverse; needs an explicit go-ahead |
+| Relaxing `native_unit == "PJ"` / registering emissions datasets | The behaviour-changing half of Phase B; follow W3 |
 | Phase 0 manifest edits, runtime refresh, Space deploy | Manifest pins commits and sha256 hashes; needs a master merge first |
-| Phase B — moving factor resolution into `leap_mappings` | Moves files between repos and publishes artifacts the Space consumes; wants supervision |
-| Phase C steps 2–8 — apply API, cache, dashboard switch-over | Depends on W5 and on Phase A landing; too large for one unattended run |
+| Phase C steps 3–8 — cache, dashboard switch-over, retiring the prebuilt path | Too large for one unattended run; step 2 (the merger) is now in scope as D4 |
 | Flags on the mapping outputs | Denormalises onto the Phase C map; sequenced with Phase C |
 | Fixing `render_full_mapping_tree_explorer.py` | Pre-existing, unrelated |
 
@@ -249,7 +401,12 @@ factor resolution upstream tonight (that is Phase B, Deferred).
 | W2 Phase 0 prep | | | |
 | W3 measure-aware | | | |
 | W4 frontier | | | |
-| W5 map (stretch) | | | |
+| W5 Phase B | | | |
+| W6 map + merger | | | |
+| D1 dashboard output | | | |
+| D2 local web app | | | |
+| D3 mapping CSVs | | | |
+| D4 importable merger | | | |
 
 ---
 
@@ -262,5 +419,8 @@ factor resolution upstream tonight (that is Phase B, Deferred).
 4. **Findings** — especially W1's answer, which determines whether Phase C is
    viable.
 5. **Stop conditions hit**, and where each was left.
-6. **What is ready to merge**, and what still needs supervision.
-7. Confirm **nothing was merged to master and nothing was pushed.**
+6. **The four deliverables** — D1-D4 — with their paths, and a screenshot for
+   D2. Say explicitly if any could not be produced and why.
+7. **What is ready to merge**, and what still needs supervision.
+8. Confirm **nothing was merged to master, nothing was pushed, and nothing was
+   deployed.**
