@@ -8,7 +8,7 @@ in this repo (never edited by the run); design detail is in
 ```text
 Status:       ACTIVE
 Firing:       002             # interactive takeover, not a scheduled firing
-Heartbeat:    2026-08-07T03:46+09:00
+Heartbeat:    2026-08-07T04:01+09:00
 Started:      2026-08-07T00:20+09:00
 Repo:         C:\Users\Work\github\leap_dashboard\.claude\worktrees\dashboard-emissions-page-5c4fbd
 Branch:       claude/dashboard-emissions-page-5c4fbd
@@ -63,23 +63,28 @@ final report (plan §"Final report") is written from this baton's log.
       ed82958 in leap_mappings). Dashboard-side switch (plan step 5)
       deliberately NOT done — scope decision, see log. leap_dashboard still
       runs its own (unchanged, still-verified) copy of the same logic.
-- [ ] W6 — Phase C map + importable merger (D4) + D3 CSVs, in `leap_mappings`
-      on `claude/common-esto-mapping-docs`. Zero fan-out assertion.
+- [x] W6 — Phase C map + importable merger (D4) + D3 CSVs, in `leap_mappings`
+      on `claude/common-esto-mapping-docs`. Zero fan-out assertion. DONE
+      (commit c1b12d7). Cross-checked exactly against W1's hand-computed
+      numbers (2988/1969 mapped, 3347/0 unmapped for esto_leap_ninth).
 - [ ] D1 — rendered dashboard output, 20USA + 02BD, emissions page. Depends
-      W2–W5.
+      W2–W5. NOT STARTED — dashboard already re-rendered multiple times
+      during W2/W3 verification (outputs/common_esto_dashboard/{20USA,02BD}/
+      in the leap_dashboard worktree is current from the last W3 verification
+      render), but not yet collected/labelled as the D1 deliverable.
 - [ ] D2 — local Gradio app proof, screenshot. Depends W2, W5, Phase 0 file
       list. Hand-stage files if the manifest can't be satisfied — do not
-      merge, do not deploy.
-- [ ] D3 — legible mapping CSVs + README. Part of W6.
-- [ ] D4 — importable merger with docstring, worked example, test. Part of
-      W6.
+      merge, do not deploy. NOT STARTED.
+- [x] D3 — legible mapping CSVs + README. Part of W6. DONE.
+- [x] D4 — importable merger with docstring, worked example, test. Part of
+      W6. DONE.
 
-**Next: W6** — Phase C map + importable merger (D4) + D3 CSVs, in
-`leap_mappings` on `claude/common-esto-mapping-docs`. Zero fan-out assertion
-while generating `source_to_common_esto_map.csv`. W1's coverage CSV
-(outputs/overnight_20260806/w1_unmapped_leap_links_coverage.csv, gitignored)
-has the 388 links to exclude explicitly, categorised — reuse it rather than
-recomputing.
+**Next: D1** — collect a rendered dashboard output (20USA + 02BD, emissions
+page) as the labelled deliverable. The render itself is cheap at this point
+(everything needed is already verified); this is mostly "run once more
+cleanly and copy/label the output," plus confirming emissions.html opens and
+its charts draw. D2 (local Gradio proof) after that — read Phase 0's file
+list in the design plan first (four files that must reach the runtime).
 
 ## 3. State of the tree
 
@@ -158,3 +163,4 @@ C:/Users/Work/miniconda3/python.exe -m pytest tests -q
 | 2026-08-07T03:07+09:00 | s002 | W3 | done | 482e0cd | Added measure ("energy", constant)/unit (from leap_mappings dataset_registry.csv native_unit, falls back "PJ") columns in load_common_esto_data. Replaced all 24 hardcoded "PJ" literals in renderer.py with the chart's own unit (_chart_unit() helper). Gated drop_excluded_flow_rows and apply_sign_semantics to measure=="energy" (no-op today, non-energy rows would get "not_applicable" placeholders). Added _keep_one_measure_for_energy_balance_charts as the single top-level filter satisfying "never diff an emissions series against an energy series" — deliberately NOT threaded through each of the ~9 individual comparison_source_system/ninth_source_system call sites (higher risk of inconsistent partial edit for a property one filter already guarantees; recorded as a scope decision, not a skipped requirement). Broke 2 tests on first full-suite run (test_contract_matches_legacy_for_dense_and_sparse_economies, test_fixture_updater_contract_matches_legacy_and_preserves_schema) — both were strict column-count assertions that predated measure/unit; fixed by (a) comparing on CONTRACT_JOINED_COLUMNS + [measure, unit] in the output-contract test since both loading paths now carry them, (b) dropping measure/unit before writing fixture CSVs in scripts/update_common_esto_dashboard_fixture.py since fixtures are legacy-shaped raw input that gets the columns added fresh when reloaded. Verified: both economies re-rendered, all 4 supporting CSVs identical to T1 baseline (642/5292/54/72 rows 20USA; 233/1210/54/43 rows 02BD). Suite: 147 passed (2nd run after fixes). publish_ready script: passed. page_noise script: flags 1 (02BD others, high_suppressed_share) — confirmed pre-existing (chart_manifest.csv byte-identical to T1 baseline captured on unmodified code), plan's "flags 0" is stale, not a W3 regression. |
 | 2026-08-07T03:33+09:00 | s002 | W4 | blocked, reverted | 0425226 (T6 baseline only) | Captured T6 baseline (556/53 tuples) on unmodified code first, per plan. Implemented hierarchy-contract-based select_non_overlapping_rows (declared_relationship_edges.csv, dataset_id=common_esto, relationship_type in {ordinary_hierarchy, non_expanding_replacement, expanding_rollup}, legacy code-expression fallback for labels absent from axis_nodes.csv). Unit tests passed after one fix (union legacy+contract ancestors rather than switching per-label — the 3 known out-of-tree labels need their coverage of IN-tree labels added, not just their own fallback). Full T6 re-render surfaced REAL regressions beyond the 3 known residual labels: declared_relationship_edges.csv is sparse relative to what this function needs — e.g. `16.03-16.04 Agriculture and fishing` has exactly one declared child edge (`16.04 Fishing`); `16.03 Agriculture` (clearly nested by code-range) has no edge to it at all, only to a different sibling aggregate `16.03-16.05 Other sector (all demand aggregate)`. Same shape for `15 Transport sector`, `16.01 Commercial and public services`, `"15.01,15.03-15.06 Transport non-road"`. Result: those aggregates were wrongly RETAINED (double-counting risk) instead of dropped. This is exactly what T6 exists to catch. Reverted the code change (git checkout --, was never committed) rather than resolve unilaterally — the plan's own guidance for gaps in the contract is "raise with leap_mappings before building around them," and this needs a decision about what declared_relationship_edges.csv is actually meant to represent, not a guess under this run's time/stakes pressure. select_non_overlapping_rows is unchanged from W3. Full finding + the two open questions for the mappings team: outputs/overnight_20260806/w4_finding_hierarchy_contract_gaps.md (gitignored, not committed). T6 fixtures (0425226) stay committed as the regression baseline for a future attempt. |
 | 2026-08-07T03:46+09:00 | s002 | W5 | done (scoped) | ed82958 (leap_mappings) | Relocated build_factor_table + collapse_ninth_fuel_rows + _collapse_factors + load_ninth_fuel_to_esto + load_esto_to_common_map verbatim into leap_mappings/codebase/mapping_tools/emissions_factor_resolution.py (only path resolution changed: leap_mappings-repo-relative instead of dashboard-repo-relative). Copied the 9th-edition factor CSV + emissions_factor_sets.json into leap_mappings/config/ (originals left in place in leap_dashboard — see below). Added derived_from="ninth" (config parameter on the factor set) to every published row. T5 verified: published emissions_factor_resolution.csv (54 rows) byte-identical in content to leap_dashboard's own T1-baseline-captured factor table, modulo derived_from. leap_mappings suite: 496 passed, 6 pre-existing failures (exact match to documented baseline) + 1 new passing smoke test; no existing leap_mappings file touched. SCOPE DECISION: did NOT do plan step 5 ("leave the dashboard consuming the published table via a single merge") — leap_dashboard's common_esto_dashboard_emissions.py is completely unchanged, still runs its own copy of the identical logic, still verified against its own T1 baseline (W0-W3's verification stays valid). Reasoning: the dashboard-side switch is the part that actually changes what leap_dashboard imports/depends on at runtime, carries real regression risk if rushed, and W4 already showed tonight that "looks mechanical" cross-repo moves can hide real gaps — better to ship B1 as a verified, standalone, reversible artifact now and do the switch as its own reviewed step than rush both together. Nothing lost: today's two implementations are provably identical (T5), so doing the switch later is low-risk whenever it happens. |
+| 2026-08-07T04:01+09:00 | s002 | W6+D3+D4 | done | c1b12d7 (leap_mappings) | Built codebase/mapping_tools/build_source_to_common_esto_map.py: composes energy_balance_relationships.csv (dedup by relationship_id) with esto_to_common_esto_map.csv per comparison_scope (participating sources read off the scope name: "leap" always, "ninth" for the 3-way scopes), ESTO excluded (has its own map). Zero fan-out asserted per scope (groupby source pair, nunique(common_row_id) must be 1), raises FanOutError rather than allocating if violated — didn't fire, all 4 scopes clean. Wrote source_to_common_esto_map.csv (15,858 rows) + source_to_common_esto_map_coverage.csv (13,420 excluded rows, listed with reasons, not dropped). Cross-checked esto_leap_ninth scope against W1's independently hand-computed numbers: 2,988 LEAP + 1,969 NINTH mapped, 3,347 LEAP + 0 NINTH unmapped — exact match, strong correctness signal since W1 and W6 were computed by different code paths. D4: apply_source_to_common_esto_map.py, one merge + groupby-sum, import closure checked (only pandas+pathlib). D3: reordered/resorted the map CSV for legibility (labels before common_row_id, sorted comparison_scope/source_system/source_flow/source_product) rather than publishing a duplicate file; docs/common_esto_mapping_outputs_readme.md explains both this map and W5's B1 table for a non-coder (placed in docs/ not results/, since results/** is gitignored and a README needs to survive being tracked). leap_mappings suite: 505 passed (496+9 new), same 6 pre-existing failures. Stopped at Phase C step 2 as scoped — steps 3-8 (cache, dashboard switch-over, retiring prebuilt path) stay Deferred. |
