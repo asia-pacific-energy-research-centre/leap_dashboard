@@ -155,6 +155,12 @@ OUTPUT_CONTRACT_PATH = _resolve(
     os.getenv("COMMON_ESTO_OUTPUT_CONTRACT_PATH", str(DEFAULT_OUTPUT_CONTRACT_PATH))
 )
 COMMON_ROWS_PATH = _resolve(os.getenv("COMMON_ESTO_ROWS_PATH", str(_LEAP_MAPPINGS_RESULTS / "common_esto_rows.csv")))
+DATASET_REGISTRY_PATH = _resolve(
+    os.getenv(
+        "COMMON_ESTO_DATASET_REGISTRY_PATH",
+        str(_LEAP_MAPPINGS_REPO / "config" / "datasets" / "dataset_registry.csv"),
+    )
+)
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
 OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
@@ -348,6 +354,7 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         INPUT_DATA_PATH,
         wide_file_scope=WIDE_FILE_SCOPE,
         output_contract_path=OUTPUT_CONTRACT_PATH if USE_OUTPUT_CONTRACT else None,
+        dataset_registry_path=DATASET_REGISTRY_PATH,
     )
     raw_df["economy"] = raw_df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
@@ -475,6 +482,7 @@ def run_shared_mapping_diagnostics() -> dict[str, str]:
         INPUT_DATA_PATH,
         wide_file_scope=WIDE_FILE_SCOPE,
         output_contract_path=OUTPUT_CONTRACT_PATH if USE_OUTPUT_CONTRACT else None,
+        dataset_registry_path=DATASET_REGISTRY_PATH,
     )
     raw_df["economy"] = raw_df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)

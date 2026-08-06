@@ -33,6 +33,14 @@ ALL_SCOPES = "__all_scopes__"
 ID_COLUMNS_WIDE = ["economy", "scenario", "product", "flow"]
 OUTPUT_CONTRACT_VERSION = "common_esto_output_contract_v1"
 
+# Every row loaded through this module today is an energy series, so these are
+# the defaults every existing input resolves to. A non-energy measure (e.g.
+# emissions) is not registered anywhere in this pipeline yet — see
+# leap_mappings' dataset_registry.csv "native_unit == 'PJ'" convention, which
+# this module reads rather than assumes (load_dataset_registry_native_units).
+DEFAULT_MEASURE = "energy"
+DEFAULT_UNIT = "PJ"
+
 LEGACY_TEXT_COLUMNS = {
     "comparison_scope",
     "source_system",
@@ -196,7 +204,16 @@ def _legacy_csv_text_dtypes(path: Path) -> dict[str, type[str]]:
 
 
 def apply_sign_semantics(df: pd.DataFrame, sign_rules: list[dict]) -> pd.DataFrame:
-    """Attach sign-convention metadata based on common ESTO flow/sector."""
+    """Attach sign-convention metadata based on common ESTO flow/sector.
+
+    Sign rules are keyed on ``common_flow_code``/``common_flow_label``, which
+    only means what the energy-balance identities (supply/TFC/TFEC) say it
+    means for ``measure == "energy"`` rows. Any other measure gets a
+    "not_applicable" placeholder instead of a sign classification derived
+    from rules that were never written with it in mind (see the bottom of
+    this function). A frame without a ``measure`` column is treated as
+    all-energy, matching behaviour before that column existed.
+    """
     if not sign_rules:
         raise ValueError("Template is missing required 'sign_semantics' rules.")
     out = df.copy()
@@ -246,6 +263,23 @@ def apply_sign_semantics(df: pd.DataFrame, sign_rules: list[dict]) -> pd.DataFra
     out["sign_interpretation"] = np.where(values == 0, zero_interp, np.where(values > 0, pos_interp, neg_interp))
 
     out["plot_value"] = out["value"]
+
+    if "measure" in out.columns:
+        is_energy = out["measure"].astype(str).eq(DEFAULT_MEASURE)
+        if (~is_energy).any():
+            not_applicable_text = "not applicable; sign semantics apply only to measure == energy"
+            not_applicable_columns = {
+                "sign_rule_id": "not_applicable",
+                "sign_convention": "not_applicable",
+                "expected_sign": "not_applicable",
+                "positive_value_meaning": not_applicable_text,
+                "negative_value_meaning": not_applicable_text,
+                "zero_value_meaning": not_applicable_text,
+                "sign_status": "not_applicable",
+                "sign_interpretation": not_applicable_text,
+            }
+            for column, placeholder in not_applicable_columns.items():
+                out.loc[~is_energy, column] = placeholder
     return out
 
 
@@ -647,10 +681,57 @@ def load_common_esto_output_contract(manifest_path: Path) -> pd.DataFrame:
     return joined[CONTRACT_JOINED_COLUMNS].copy()
 
 
+def load_dataset_registry_native_units(registry_path: Path | str | None) -> dict[str, str]:
+    """Read ``{dataset_id: native_unit}`` from leap_mappings' dataset registry.
+
+    Returns an empty dict when no path is given or the file is absent, so a
+    caller without a leap_mappings checkout (the portable module, tests) gets
+    the documented ``DEFAULT_UNIT`` fallback for every row rather than an
+    error. This is the single reason a "measure" dimension does not need its
+    own registry: the dashboard is not the owner of what unit a dataset
+    reports in, so it reads that fact rather than repeating it.
+    """
+    if not registry_path:
+        return {}
+    path = Path(registry_path)
+    if not path.exists():
+        return {}
+    registry = pd.read_csv(path, usecols=["dataset_id", "native_unit"])
+    return dict(zip(registry["dataset_id"].astype(str), registry["native_unit"].astype(str)))
+
+
+def add_measure_and_unit_columns(
+    df: pd.DataFrame,
+    native_units: dict[str, str] | None = None,
+) -> pd.DataFrame:
+    """Add ``measure`` and ``unit`` columns, defaulting to energy/PJ.
+
+    ``measure`` is constant today: nothing in this pipeline registers a
+    non-energy series yet (see the overnight work program's Deferred list —
+    "registering emissions datasets" is explicitly out of scope). ``unit`` is
+    looked up per ``source_system`` from ``native_units`` (the dataset
+    registry's ``native_unit``, keyed by ``dataset_id`` — the same values as
+    this frame's ``source_system``); a source system absent from the registry,
+    or no registry at all, keeps ``DEFAULT_UNIT`` so every existing input
+    renders exactly as before.
+    """
+    df = df.copy()
+    native_units = native_units or {}
+    df["measure"] = DEFAULT_MEASURE
+    if "source_system" in df.columns:
+        df["unit"] = (
+            df["source_system"].astype(str).map(native_units).fillna(DEFAULT_UNIT)
+        )
+    else:
+        df["unit"] = DEFAULT_UNIT
+    return df
+
+
 def load_common_esto_data(
     path: Path,
     wide_file_scope: str = DEFAULT_WIDE_FILE_SCOPE,
     output_contract_path: Path | None = None,
+    dataset_registry_path: Path | str | None = None,
 ) -> pd.DataFrame:
     """Load an explicit output contract, or retain the legacy long/wide adapters.
 
@@ -658,18 +739,28 @@ def load_common_esto_data(
     files already carry a resolved ``comparison_scope`` column. Supplying
     ``output_contract_path`` is an explicit opt-in and never falls back to
     ``path`` when the selected contract is invalid.
+
+    Every path adds ``measure`` and ``unit`` columns (see
+    ``add_measure_and_unit_columns``) before returning, so callers downstream
+    of this loader never need to branch on which adapter ran.
+    ``dataset_registry_path``, when given, sources ``unit`` from
+    leap_mappings' dataset registry rather than the ``DEFAULT_UNIT`` fallback.
     """
     if output_contract_path is not None:
-        return load_common_esto_output_contract(output_contract_path)
-    sample_df = pd.read_csv(path, nrows=0, low_memory=False)
-    if all(column in sample_df.columns for column in REQUIRED_COLUMNS):
-        return load_long_common_esto_data(path)
-    if all(column in sample_df.columns for column in ID_COLUMNS_WIDE) and get_year_columns(sample_df):
-        return load_wide_common_esto_data(path, wide_file_scope=wide_file_scope)
-    raise ValueError(
-        "Input file is neither long common ESTO data nor recognised wide data. "
-        f"Columns found: {list(sample_df.columns)}"
-    )
+        loaded = load_common_esto_output_contract(output_contract_path)
+    else:
+        sample_df = pd.read_csv(path, nrows=0, low_memory=False)
+        if all(column in sample_df.columns for column in REQUIRED_COLUMNS):
+            loaded = load_long_common_esto_data(path)
+        elif all(column in sample_df.columns for column in ID_COLUMNS_WIDE) and get_year_columns(sample_df):
+            loaded = load_wide_common_esto_data(path, wide_file_scope=wide_file_scope)
+        else:
+            raise ValueError(
+                "Input file is neither long common ESTO data nor recognised wide data. "
+                f"Columns found: {list(sample_df.columns)}"
+            )
+    native_units = load_dataset_registry_native_units(dataset_registry_path)
+    return add_measure_and_unit_columns(loaded, native_units)
 
 
 def join_unique_text(values: pd.Series) -> str:

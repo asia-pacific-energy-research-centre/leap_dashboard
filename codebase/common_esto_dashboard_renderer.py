@@ -24,6 +24,26 @@ except ModuleNotFoundError:  # pragma: no cover - import shim
     )
 
 
+def _chart_unit(df: pd.DataFrame, default: str = "PJ") -> str:
+    """Return the unit carried by a chart's rows, falling back to PJ.
+
+    Every existing input is PJ-denominated energy data (see ``DEFAULT_UNIT``
+    in ``common_esto_dashboard_data.py``); this reads the unit each chart's
+    own rows carry rather than assuming it, so hover text and axis labels
+    stay correct if a future series carries a different one. A frame with no
+    ``unit`` column, or a genuinely mixed one (should not happen post
+    ``_keep_one_measure_for_energy_balance_charts``), falls back to
+    ``default`` rather than guessing.
+    """
+    if df.empty or "unit" not in df.columns:
+        return default
+    values = df["unit"].dropna().astype(str)
+    if values.empty:
+        return default
+    mode = values.mode()
+    return str(mode.iloc[0]) if not mode.empty else default
+
+
 CODE_MATCH_COLUMNS = [
     "common_flow_code",
     "common_flow_label",
@@ -1317,6 +1337,7 @@ def build_area_chart(
     chart_df = _non_overlapping_common_row_frontier(area_spec_rows(df, area_spec))
     if "flow" in group_col:
         chart_df = _non_overlapping_flow_rows(chart_df)
+    chart_unit = _chart_unit(chart_df)
     chart_config = template.get("chart_generation", {})
     comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
     base_year = int(chart_config.get("base_year", 2023))
@@ -1360,7 +1381,7 @@ def build_area_chart(
                     stackgroup=f"scenario_{tag}_{group_sign}",
                     name=str(group_label),
                     visible=True if is_default else False,
-                    hovertemplate="%{x}<br>Signed value: %{y:,.2f} PJ<extra>" + escape(str(group_label)) + "</extra>",
+                    hovertemplate="%{x}<br>Signed value: %{y:,.2f}" + chart_unit + "<extra>" + escape(str(group_label)) + "</extra>",
                 )
             )
             trace_meta.append(trace_meta_entry(primary_source, scenario_name, True))
@@ -1396,7 +1417,7 @@ def build_area_chart(
     fig.update_layout(
         title=title_with_sign_note(f"{title_prefix}: {area_spec['aggregate_flow_label']}", chart_df),
         xaxis_title="Year",
-        yaxis_title="Signed energy (PJ)",
+        yaxis_title=f"Signed energy ({chart_unit})",
         # Product legends can contain 20+ entries. Keeping them above the plot
         # made the legend collide with the title in narrow overview cards.
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
@@ -1709,6 +1730,7 @@ def build_product_chart(
     be built and left for the client-side REF/TGT toggle to show/hide.
     """
     chart_df = _non_overlapping_common_row_frontier(chart_df)
+    chart_unit = _chart_unit(chart_df)
     fig = go.Figure()
     trace_meta: list[dict] = []
     for (source_system, scenario), group in chart_df.groupby(["source_system", "scenario"], dropna=False):
@@ -1737,11 +1759,11 @@ def build_product_chart(
             .sort_values("year")
         )
         customdata = None
-        hovertemplate = "%{x}<br>Signed value: %{y:,.2f} PJ<extra>" + escape(label) + "</extra>"
+        hovertemplate = "%{x}<br>Signed value: %{y:,.2f}" + chart_unit + "<extra>" + escape(label) + "</extra>"
         if {"sign_status", "sign_interpretation"}.issubset(set(group.columns)):
             customdata = group[["sign_status", "sign_interpretation"]].astype(str).values
             hovertemplate = (
-                "%{x}<br>Signed value: %{y:,.2f} PJ"
+                "%{x}<br>Signed value: %{y:,.2f} " + chart_unit +
                 "<br>Sign status: %{customdata[0]}"
                 "<br>Meaning: %{customdata[1]}"
                 "<extra>" + escape(label) + "</extra>"
@@ -1769,7 +1791,7 @@ def build_product_chart(
                 name=diff_label,
                 visible="legendonly",
                 line={"dash": "dot", "color": "#6b7280"},
-                hovertemplate="%{x}<br>Diff: %{y:,.2f} PJ<extra>" + escape(diff_label) + "</extra>",
+                hovertemplate="%{x}<br>Diff: %{y:,.2f}" + chart_unit + "<extra>" + escape(diff_label) + "</extra>",
             )
         )
         trace_meta.append(trace_meta_entry(primary_source, scenario_name, "legendonly"))
@@ -1785,14 +1807,14 @@ def build_product_chart(
                 name=diff_label,
                 visible="legendonly",
                 line={"dash": "dot", "color": "#f59e0b"},
-                hovertemplate="%{x}<br>Diff: %{y:,.2f} PJ<extra>" + escape(diff_label) + "</extra>",
+                hovertemplate="%{x}<br>Diff: %{y:,.2f}" + chart_unit + "<extra>" + escape(diff_label) + "</extra>",
             )
         )
         trace_meta.append(trace_meta_entry(primary_source, scenario_name, "legendonly"))
     fig.update_layout(
         title=title_with_sign_note(f"{flow_label} - {product_label}", chart_df),
         xaxis_title="Year",
-        yaxis_title="Signed energy (PJ)",
+        yaxis_title=f"Signed energy ({chart_unit})",
         # Legend below the plot, not above: long product legends collide
         # with the title otherwise (see build_area_chart).
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
@@ -2962,6 +2984,7 @@ def _build_td_sector_chart(
     are excluded because they are not recorded in LEAP projection scenarios,
     making the supply line a valid comparison across the full time series.
     """
+    chart_unit = _chart_unit(demand_df)
     fig = go.Figure()
     trace_meta: list[dict] = []
     stacked_sources: set[str] = set()
@@ -3013,7 +3036,7 @@ def _build_td_sector_chart(
                 stackgroup=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}_{group_sign}",
                 name=page_label,
                 visible=True if is_default else False,
-                hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(page_label) + "</extra>",
+                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(page_label) + "</extra>",
             )
             if color:
                 trace_kw["line"] = {"color": color}
@@ -3045,7 +3068,7 @@ def _build_td_sector_chart(
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
             mode="lines+markers", name=lbl, line={"dash": "dash"},
-            hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+            hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
         ))
         trace_meta.append(trace_meta_entry(src, scen, True, "tfc"))
 
@@ -3057,7 +3080,7 @@ def _build_td_sector_chart(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
             mode="lines+markers", name=lbl, line={"dash": "dash"},
             visible=False,
-            hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+            hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
         ))
         trace_meta.append(trace_meta_entry(src, scen, True, "tfec"))
 
@@ -3069,7 +3092,7 @@ def _build_td_sector_chart(
             fig.add_trace(go.Scatter(
                 x=grp_sorted["year"], y=grp_sorted["value"],
                 mode="lines", name=lbl, line={"dash": "dot"},
-                hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
             ))
             trace_meta.append(trace_meta_entry(src, scen, True, "both"))
 
@@ -3078,7 +3101,7 @@ def _build_td_sector_chart(
     fig.update_layout(
         title="Supply vs Demand by sector (TFC)",
         xaxis_title="Year",
-        yaxis_title="Signed energy (PJ)",
+        yaxis_title=f"Signed energy ({chart_unit})",
         margin={"l": 64, "r": 28, "t": 100, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         updatemenus=[{
@@ -3113,6 +3136,7 @@ def _build_td_fuel_chart(
     base_year: int | None = None,
 ) -> go.Figure:
     """Stacked-area chart by fuel across all demand sectors (TFC), with supply line."""
+    chart_unit = _chart_unit(demand_df)
     fig = go.Figure()
     trace_meta: list[dict] = []
     stacked_sources: set[str] = set()
@@ -3154,7 +3178,7 @@ def _build_td_fuel_chart(
                 x=grp["year"], y=grp["value"],
                 mode="lines", stackgroup=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}_{group_sign}", name=lbl,
                 visible=True if is_default else False,
-                hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
             ))
             stacked_sources.add(stack_source_name)
             trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
@@ -3175,7 +3199,7 @@ def _build_td_fuel_chart(
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
             mode="lines+markers", name=lbl, line={"dash": "dash"},
-            hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+            hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
         ))
         trace_meta.append(trace_meta_entry(src, scen, True))
 
@@ -3187,14 +3211,14 @@ def _build_td_fuel_chart(
             fig.add_trace(go.Scatter(
                 x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
                 mode="lines", name=lbl, line={"dash": "dot"},
-                hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
             ))
             trace_meta.append(trace_meta_entry(src, scen, True))
 
     fig.update_layout(
         title="Supply vs Demand by fuel (TFC)",
         xaxis_title="Year",
-        yaxis_title="Signed energy (PJ)",
+        yaxis_title=f"Signed energy ({chart_unit})",
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={
@@ -3226,6 +3250,7 @@ def _build_supply_stack_chart(
     caller filtered into supply_detail_df (total_demand_page.supply_codes), so adding
     codes there (e.g. bunkers 04/05) automatically adds new stacked series here.
     """
+    chart_unit = _chart_unit(supply_detail_df)
     fig = go.Figure()
     trace_meta: list[dict] = []
     stacked_sources: set[str] = set()
@@ -3257,7 +3282,7 @@ def _build_supply_stack_chart(
                 x=grp["year"], y=grp["value"],
                 mode="lines", stackgroup=f"supply_{scenario_toggle_tag(primary_source, scenario_name)}_{group_sign}", name=lbl,
                 visible=True if is_default else False,
-                hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
             ))
             stacked_sources.add(primary_source)
             trace_meta.append(trace_meta_entry(primary_source, scenario_name, True))
@@ -3271,7 +3296,7 @@ def _build_supply_stack_chart(
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
             mode="lines+markers", name=lbl, line={"dash": "dash"},
-            hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+            hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
         ))
         trace_meta.append(trace_meta_entry(src, scen, True))
 
@@ -3289,14 +3314,14 @@ def _build_supply_stack_chart(
             fig.add_trace(go.Scatter(
                 x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
                 mode="lines", name=lbl, line={"dash": "dot"},
-                hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(lbl) + "</extra>",
+                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
             ))
             trace_meta.append(trace_meta_entry(src, scen, True))
 
     fig.update_layout(
         title=chart_title,
         xaxis_title="Year",
-        yaxis_title="Signed energy (PJ)",
+        yaxis_title=f"Signed energy ({chart_unit})",
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={
@@ -3361,6 +3386,7 @@ def _build_transformation_total_chart(
     base_year: int | None = None,
 ) -> go.Figure:
     """Build the signed no-transfers transformation total comparison."""
+    chart_unit = _chart_unit(transformation_df)
     fig = go.Figure()
     trace_meta: list[dict] = []
     totals = transformation_df.groupby(
@@ -3374,13 +3400,13 @@ def _build_transformation_total_chart(
             y=ordered["value"],
             mode="lines+markers",
             name=label,
-            hovertemplate="%{x}<br>%{y:,.2f} PJ<extra>" + escape(label) + "</extra>",
+            hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(label) + "</extra>",
         ))
         trace_meta.append(trace_meta_entry(source_system, scenario, True))
     fig.update_layout(
         title="Total transformation sector (excluding transfers)",
         xaxis_title="Year",
-        yaxis_title="Signed energy balance (PJ)",
+        yaxis_title=f"Signed energy balance ({chart_unit})",
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={"trace_meta": trace_meta},
@@ -3396,6 +3422,7 @@ def _build_balance_flow_total_chart(
     base_year: int | None = None,
 ) -> go.Figure:
     """Build a signed total line for one top-level energy-balance flow."""
+    chart_unit = _chart_unit(balance_df)
     fig = go.Figure()
     trace_meta: list[dict] = []
     totals = balance_df.groupby(
@@ -3409,13 +3436,13 @@ def _build_balance_flow_total_chart(
             y=ordered["value"],
             mode="lines+markers",
             name=label,
-            hovertemplate="%{x}<br>Signed value: %{y:,.2f} PJ<extra>" + escape(label) + "</extra>",
+            hovertemplate="%{x}<br>Signed value: %{y:,.2f}" + chart_unit + "<extra>" + escape(label) + "</extra>",
         ))
         trace_meta.append(trace_meta_entry(source_system, scenario, True))
     fig.update_layout(
         title=flow_label,
         xaxis_title="Year",
-        yaxis_title="Signed energy balance (PJ)",
+        yaxis_title=f"Signed energy balance ({chart_unit})",
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={"trace_meta": trace_meta},
@@ -3922,13 +3949,50 @@ def drop_esto_post_base_year_rows(df: pd.DataFrame, comparison_source: str, base
 
 
 def drop_excluded_flow_rows(df: pd.DataFrame, excluded_flow_code_prefixes: list[object]) -> pd.DataFrame:
-    """Drop rows whose common flow code matches a configured exclusion prefix."""
+    """Drop rows whose common flow code matches a configured exclusion prefix.
+
+    Applies only to ``measure == "energy"`` rows: the exclusion list encodes
+    energy-balance identity rules (supply/TFC/TFEC), which do not mean
+    anything for a non-energy series. A frame without a ``measure`` column is
+    treated as all-energy, matching behaviour before that column existed.
+    """
     if df.empty or not excluded_flow_code_prefixes:
         return df
-    excluded_mask = df["common_flow_code"].apply(
+    is_energy = (
+        df["measure"].astype(str).eq("energy")
+        if "measure" in df.columns
+        else pd.Series(True, index=df.index)
+    )
+    excluded_mask = is_energy & df["common_flow_code"].apply(
         lambda value: code_expression_matches_any_prefix(value, excluded_flow_code_prefixes)
     )
     return df[~excluded_mask].copy()
+
+
+def _keep_one_measure_for_energy_balance_charts(df: pd.DataFrame) -> pd.DataFrame:
+    """Restrict to a single measure before any source/scenario comparison logic runs.
+
+    Every comparison this renderer draws (``comparison_source_system`` /
+    ``ninth_source_system`` resolution, the TFC/TFEC identities, sign
+    semantics) was written for one energy series compared against another. If
+    a future caller's frame ever carried more than one ``measure`` value, a
+    plain ``(source_system, scenario)`` match could pair a "LEAP energy" row
+    against an "ESTO emissions" row with no error — same source system,
+    different measure. Restricting to the dominant measure up front makes
+    that impossible without threading ``measure`` through every one of this
+    module's comparison call sites individually. Today every input is
+    ``measure == "energy"`` (see ``DEFAULT_MEASURE`` in
+    ``common_esto_dashboard_data``), so this is a no-op; a frame without a
+    ``measure`` column passes through unchanged, matching behaviour before
+    that column existed.
+    """
+    if df.empty or "measure" not in df.columns:
+        return df
+    measures = df["measure"].astype(str)
+    dominant = measures.mode()
+    if dominant.empty:
+        return df
+    return df[measures == dominant.iloc[0]].copy()
 
 
 def render_dashboard(
@@ -3952,9 +4016,11 @@ def render_dashboard(
     comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
     base_year = int(chart_config.get("base_year", 2023))
     excluded_flow_code_prefixes = template.get("excluded_flow_code_prefixes", [])
+    df = _keep_one_measure_for_energy_balance_charts(df)
     df = drop_esto_post_base_year_rows(df, comparison_source, base_year)
     df = drop_excluded_flow_rows(df, excluded_flow_code_prefixes)
     if scope_df is not None:
+        scope_df = _keep_one_measure_for_energy_balance_charts(scope_df)
         scope_df = drop_esto_post_base_year_rows(scope_df, comparison_source, base_year)
         scope_df = drop_excluded_flow_rows(scope_df, excluded_flow_code_prefixes)
     assigned_df = assign_pages(df, page_rules)
