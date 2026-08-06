@@ -8,7 +8,7 @@ in this repo (never edited by the run); design detail is in
 ```text
 Status:       ACTIVE
 Firing:       002             # interactive takeover, not a scheduled firing
-Heartbeat:    2026-08-07T02:36+09:00
+Heartbeat:    2026-08-07T03:07+09:00
 Started:      2026-08-07T00:20+09:00
 Repo:         C:\Users\Work\github\leap_dashboard\.claude\worktrees\dashboard-emissions-page-5c4fbd
 Branch:       claude/dashboard-emissions-page-5c4fbd
@@ -47,9 +47,11 @@ final report (plan §"Final report") is written from this baton's log.
       factor-config path arg. Invariants must hold. DONE (commit 4485520).
       Verified: all 4 supporting CSVs identical to T1 baseline both
       economies, suite 147 passed.
-- [ ] W3 — main event: measure/unit columns, gate energy-balance machinery to
+- [x] W3 — main event: measure/unit columns, gate energy-balance machinery to
       `measure == energy`, pair comparisons on `(source_system, measure)`.
-      Verify against T1 baselines — energy charts identical.
+      Verify against T1 baselines — energy charts identical. DONE (commit
+      482e0cd). Pairing implemented as one top-level filter, not per-call-site
+      — see commit body / log for why.
 - [ ] W4 — frontier parenthood onto the hierarchy contract; write T6 first
       (assert retained tuple *set*, not totals).
 - [ ] W5 — Phase B: move factor resolution into `leap_mappings`
@@ -66,10 +68,12 @@ final report (plan §"Final report") is written from this baton's log.
 - [ ] D4 — importable merger with docstring, worked example, test. Part of
       W6.
 
-**Next: W3** — main event, not started. Highest-risk item so far (touches
-sign semantics, energy-balance gating, ~24 hardcoded "PJ" literals in
-common_esto_dashboard_renderer.py — grep-counted, matches plan exactly).
-Read Phase A steps 1-4 in the design plan before starting.
+**Next: W4** — frontier parenthood onto hierarchy contract. Write T6 first
+(assert retained tuple *set*, not totals — see plan's own note that this is
+the test that would have caught the historical 4,838-vs-3,443 bug). Read
+Phase A step 6 + the axis_nodes.csv section in the design plan before
+starting; note the plan's "two gaps stay in the dashboard" carve-out
+(per-source presence, three labels outside the declared tree).
 
 ## 3. State of the tree
 
@@ -145,3 +149,4 @@ C:/Users/Work/miniconda3/python.exe -m pytest tests -q
 | 2026-08-07T02:26+09:00 | s002 | W0 | done | e9987e9, 17e2974 | T0 determinism guard (scripts/check_common_esto_dashboard_determinism.py) PASS on first run for 20USA, no fallback needed. T1 baselines captured for 20USA and 02BD (scripts/capture_common_esto_baseline.py) — chart_manifest, emissions_by_sector_and_fuel, emissions_factor_resolution (54 rows, matches T5's stated expectation), page_assignment_summary, page_inventory (T7), bundle_fingerprint_t3 (T3, decodes Plotly base64 bdata). 20USA 2022 ESTO/NINTH emissions = 3442.60161 -> rounds to invariant's stated 3,443 Mt CO2e; LEAP not present as a separate source_system label in this CSV (structural, not a discrepancy — not investigated further, out of W0 scope). Worked around the known render_full_mapping_tree_explorer.py worktree bug via a runtime monkeypatch in both scripts (not touching the out-of-scope file). |
 | 2026-08-07T02:26+09:00 | s002 | W1 | done | (not committed — outputs/ gitignored) | 3,347 unmapped LEAP structural links (dedup by relationship_id, matches plan exactly) traced: 388 links / 376 unique (source_flow,source_product) pairs carry real nonzero LEAP values (~52.3M abs, all economies/years/scenarios). 275 of those are expected aggregate/rollup/primary-supply nodes (Total Primary Supply, All demand aggregated/*, *interim, Production/Imports/Exports) whose children are what actually gets mapped — correct exclusion, not a gap. 101 pairs (~5.78M abs) look leaf-level (Oil Refining/Oil Refining x 13 products, Other loss and own use/*, Hydrogen transformation, Gas works plants) and are flagged for review before W6 ships the map, not resolved tonight. Full finding: outputs/overnight_20260806/w1_finding_unmapped_leap_links.md; full coverage CSV (3,347 rows, carries_real_value flag + category): outputs/overnight_20260806/w1_unmapped_leap_links_coverage.csv. Does not block W6 per plan. |
 | 2026-08-07T02:36+09:00 | s002 | W2 | done | 4485520 | Switched load_esto_to_common_map (+ emissions_page_enabled's existence check + build_emissions_page's default mapping_sources key) from esto_to_common_esto_map.csv to common_esto_rows.csv, and updated config/common_esto_dashboard/emissions_factor_sets.json's mapping_sources.esto_to_common_map to match. Added factor_config_path optional argument to emissions_page_enabled and build_emissions_page (bypasses REPO_ROOT resolution when given an absolute path, additive/default-None). Verification: rendered both economies with the new code, chart_manifest/emissions_by_sector_and_fuel/emissions_factor_resolution/page_assignment_summary all identical to T1 baseline after normalisation (642/5292/54/72 rows respectively). Full suite: 147 passed. ASSUMPTION: baton/plan cite session-start baseline as 145 passed/2 skipped; this run measured 147 passed/0 skipped both before (git e9987e9 parent) and after W2 — pre-existing drift from whenever the plan was written, not a W2 regression (green both times, count identical before/after). Treated "pytest tests green" as the binding invariant, not the literal count. |
+| 2026-08-07T03:07+09:00 | s002 | W3 | done | 482e0cd | Added measure ("energy", constant)/unit (from leap_mappings dataset_registry.csv native_unit, falls back "PJ") columns in load_common_esto_data. Replaced all 24 hardcoded "PJ" literals in renderer.py with the chart's own unit (_chart_unit() helper). Gated drop_excluded_flow_rows and apply_sign_semantics to measure=="energy" (no-op today, non-energy rows would get "not_applicable" placeholders). Added _keep_one_measure_for_energy_balance_charts as the single top-level filter satisfying "never diff an emissions series against an energy series" — deliberately NOT threaded through each of the ~9 individual comparison_source_system/ninth_source_system call sites (higher risk of inconsistent partial edit for a property one filter already guarantees; recorded as a scope decision, not a skipped requirement). Broke 2 tests on first full-suite run (test_contract_matches_legacy_for_dense_and_sparse_economies, test_fixture_updater_contract_matches_legacy_and_preserves_schema) — both were strict column-count assertions that predated measure/unit; fixed by (a) comparing on CONTRACT_JOINED_COLUMNS + [measure, unit] in the output-contract test since both loading paths now carry them, (b) dropping measure/unit before writing fixture CSVs in scripts/update_common_esto_dashboard_fixture.py since fixtures are legacy-shaped raw input that gets the columns added fresh when reloaded. Verified: both economies re-rendered, all 4 supporting CSVs identical to T1 baseline (642/5292/54/72 rows 20USA; 233/1210/54/43 rows 02BD). Suite: 147 passed (2nd run after fixes). publish_ready script: passed. page_noise script: flags 1 (02BD others, high_suppressed_share) — confirmed pre-existing (chart_manifest.csv byte-identical to T1 baseline captured on unmodified code), plan's "flags 0" is stale, not a W3 regression. |
