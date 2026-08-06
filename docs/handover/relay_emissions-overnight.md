@@ -8,7 +8,7 @@ in this repo (never edited by the run); design detail is in
 ```text
 Status:       ACTIVE
 Firing:       002             # interactive takeover, not a scheduled firing
-Heartbeat:    2026-08-07T03:07+09:00
+Heartbeat:    2026-08-07T03:33+09:00
 Started:      2026-08-07T00:20+09:00
 Repo:         C:\Users\Work\github\leap_dashboard\.claude\worktrees\dashboard-emissions-page-5c4fbd
 Branch:       claude/dashboard-emissions-page-5c4fbd
@@ -52,8 +52,11 @@ final report (plan §"Final report") is written from this baton's log.
       Verify against T1 baselines — energy charts identical. DONE (commit
       482e0cd). Pairing implemented as one top-level filter, not per-call-site
       — see commit body / log for why.
-- [ ] W4 — frontier parenthood onto the hierarchy contract; write T6 first
-      (assert retained tuple *set*, not totals).
+- [x] W4 — frontier parenthood onto the hierarchy contract; write T6 first
+      (assert retained tuple *set*, not totals). ATTEMPTED, BLOCKED, REVERTED
+      (item-level, not a hard-line trip — see log + finding doc). T6 baseline
+      committed (0425226) as a reusable regression fixture for a future
+      attempt. `select_non_overlapping_rows` unchanged from W3.
 - [ ] W5 — Phase B: move factor resolution into `leap_mappings`
       (branch `claude/common-esto-mapping-docs`). T5 gate: resolution CSV
       content-identical after the move.
@@ -68,12 +71,9 @@ final report (plan §"Final report") is written from this baton's log.
 - [ ] D4 — importable merger with docstring, worked example, test. Part of
       W6.
 
-**Next: W4** — frontier parenthood onto hierarchy contract. Write T6 first
-(assert retained tuple *set*, not totals — see plan's own note that this is
-the test that would have caught the historical 4,838-vs-3,443 bug). Read
-Phase A step 6 + the axis_nodes.csv section in the design plan before
-starting; note the plan's "two gaps stay in the dashboard" carve-out
-(per-source presence, three labels outside the declared tree).
+**Next: W5** — Phase B, move factor resolution into `leap_mappings`
+(branch `claude/common-esto-mapping-docs`). T5 gate: resolution CSV
+content-identical after the move. Owner-approved unsupervised per the plan.
 
 ## 3. State of the tree
 
@@ -150,3 +150,4 @@ C:/Users/Work/miniconda3/python.exe -m pytest tests -q
 | 2026-08-07T02:26+09:00 | s002 | W1 | done | (not committed — outputs/ gitignored) | 3,347 unmapped LEAP structural links (dedup by relationship_id, matches plan exactly) traced: 388 links / 376 unique (source_flow,source_product) pairs carry real nonzero LEAP values (~52.3M abs, all economies/years/scenarios). 275 of those are expected aggregate/rollup/primary-supply nodes (Total Primary Supply, All demand aggregated/*, *interim, Production/Imports/Exports) whose children are what actually gets mapped — correct exclusion, not a gap. 101 pairs (~5.78M abs) look leaf-level (Oil Refining/Oil Refining x 13 products, Other loss and own use/*, Hydrogen transformation, Gas works plants) and are flagged for review before W6 ships the map, not resolved tonight. Full finding: outputs/overnight_20260806/w1_finding_unmapped_leap_links.md; full coverage CSV (3,347 rows, carries_real_value flag + category): outputs/overnight_20260806/w1_unmapped_leap_links_coverage.csv. Does not block W6 per plan. |
 | 2026-08-07T02:36+09:00 | s002 | W2 | done | 4485520 | Switched load_esto_to_common_map (+ emissions_page_enabled's existence check + build_emissions_page's default mapping_sources key) from esto_to_common_esto_map.csv to common_esto_rows.csv, and updated config/common_esto_dashboard/emissions_factor_sets.json's mapping_sources.esto_to_common_map to match. Added factor_config_path optional argument to emissions_page_enabled and build_emissions_page (bypasses REPO_ROOT resolution when given an absolute path, additive/default-None). Verification: rendered both economies with the new code, chart_manifest/emissions_by_sector_and_fuel/emissions_factor_resolution/page_assignment_summary all identical to T1 baseline after normalisation (642/5292/54/72 rows respectively). Full suite: 147 passed. ASSUMPTION: baton/plan cite session-start baseline as 145 passed/2 skipped; this run measured 147 passed/0 skipped both before (git e9987e9 parent) and after W2 — pre-existing drift from whenever the plan was written, not a W2 regression (green both times, count identical before/after). Treated "pytest tests green" as the binding invariant, not the literal count. |
 | 2026-08-07T03:07+09:00 | s002 | W3 | done | 482e0cd | Added measure ("energy", constant)/unit (from leap_mappings dataset_registry.csv native_unit, falls back "PJ") columns in load_common_esto_data. Replaced all 24 hardcoded "PJ" literals in renderer.py with the chart's own unit (_chart_unit() helper). Gated drop_excluded_flow_rows and apply_sign_semantics to measure=="energy" (no-op today, non-energy rows would get "not_applicable" placeholders). Added _keep_one_measure_for_energy_balance_charts as the single top-level filter satisfying "never diff an emissions series against an energy series" — deliberately NOT threaded through each of the ~9 individual comparison_source_system/ninth_source_system call sites (higher risk of inconsistent partial edit for a property one filter already guarantees; recorded as a scope decision, not a skipped requirement). Broke 2 tests on first full-suite run (test_contract_matches_legacy_for_dense_and_sparse_economies, test_fixture_updater_contract_matches_legacy_and_preserves_schema) — both were strict column-count assertions that predated measure/unit; fixed by (a) comparing on CONTRACT_JOINED_COLUMNS + [measure, unit] in the output-contract test since both loading paths now carry them, (b) dropping measure/unit before writing fixture CSVs in scripts/update_common_esto_dashboard_fixture.py since fixtures are legacy-shaped raw input that gets the columns added fresh when reloaded. Verified: both economies re-rendered, all 4 supporting CSVs identical to T1 baseline (642/5292/54/72 rows 20USA; 233/1210/54/43 rows 02BD). Suite: 147 passed (2nd run after fixes). publish_ready script: passed. page_noise script: flags 1 (02BD others, high_suppressed_share) — confirmed pre-existing (chart_manifest.csv byte-identical to T1 baseline captured on unmodified code), plan's "flags 0" is stale, not a W3 regression. |
+| 2026-08-07T03:33+09:00 | s002 | W4 | blocked, reverted | 0425226 (T6 baseline only) | Captured T6 baseline (556/53 tuples) on unmodified code first, per plan. Implemented hierarchy-contract-based select_non_overlapping_rows (declared_relationship_edges.csv, dataset_id=common_esto, relationship_type in {ordinary_hierarchy, non_expanding_replacement, expanding_rollup}, legacy code-expression fallback for labels absent from axis_nodes.csv). Unit tests passed after one fix (union legacy+contract ancestors rather than switching per-label — the 3 known out-of-tree labels need their coverage of IN-tree labels added, not just their own fallback). Full T6 re-render surfaced REAL regressions beyond the 3 known residual labels: declared_relationship_edges.csv is sparse relative to what this function needs — e.g. `16.03-16.04 Agriculture and fishing` has exactly one declared child edge (`16.04 Fishing`); `16.03 Agriculture` (clearly nested by code-range) has no edge to it at all, only to a different sibling aggregate `16.03-16.05 Other sector (all demand aggregate)`. Same shape for `15 Transport sector`, `16.01 Commercial and public services`, `"15.01,15.03-15.06 Transport non-road"`. Result: those aggregates were wrongly RETAINED (double-counting risk) instead of dropped. This is exactly what T6 exists to catch. Reverted the code change (git checkout --, was never committed) rather than resolve unilaterally — the plan's own guidance for gaps in the contract is "raise with leap_mappings before building around them," and this needs a decision about what declared_relationship_edges.csv is actually meant to represent, not a guess under this run's time/stakes pressure. select_non_overlapping_rows is unchanged from W3. Full finding + the two open questions for the mappings team: outputs/overnight_20260806/w4_finding_hierarchy_contract_gaps.md (gitignored, not committed). T6 fixtures (0425226) stay committed as the regression baseline for a future attempt. |
