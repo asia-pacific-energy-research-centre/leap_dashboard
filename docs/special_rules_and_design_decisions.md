@@ -701,6 +701,84 @@ while retaining Residential and Industry child detail groups.
   while shallower Transport and Other-demand hierarchies happened not to expose
   equivalent child cards.
 
+## DASH-021: Emissions are derived from a declared factor set and a detail frontier
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Derived-quantity presentation
+**Affected areas:** Emissions page; `codebase/common_esto_dashboard_emissions.py`;
+`config/common_esto_dashboard/emissions_factor_sets.json`
+
+### Current rule
+
+The Emissions page is derived, not sourced. Every chart is
+`final energy demand x emissions factor`, applied to the same demand rows the
+sector pages plot, so LEAP, ESTO, and the 9th edition are compared on one
+consistent basis.
+
+Four rules make that derivation reproducible:
+
+1. **The factor axis is declared, not assumed.** A factor set names the axis its
+   factors are keyed on (`ninth_fuel`, `esto_product`, or `esto_product_flow`).
+   The loader resolves that axis onto `common_product_label` - and
+   `common_flow_label` when the set is keyed on product/flow pairs - using the
+   leap_mappings contract (`ninth_fuel_to_esto`) and the generated
+   `esto_to_common_esto_map.csv`. A new factor source with different mapping
+   requirements is a config entry, not a code change.
+2. **Subfuels collapse onto their parent fuel.** In a fuels/subfuels factor
+   file, any subfuel other than the placeholder replaces its parent fuel. A
+   parent row carrying the placeholder stands in for that fuel's
+   `<fuel>_unallocated` code only when no explicit unallocated subfuel row
+   already supplies it; otherwise it is a fuel-level aggregate over rows already
+   present and is dropped so its members are not counted twice. Aggregates with
+   no mappable code at all (`19_total`, `20_total_renewables`) are dropped and
+   reported.
+3. **A blank factor means no emissions, not missing data.** Blanks resolve to
+   zero, so electricity, heat, hydrogen, and the renewable carriers contribute
+   nothing at the point of final use rather than dropping out of a total.
+4. **Only one non-overlapping frontier is summed.** Sector pages carry a whole
+   flow hierarchy plus generated rollups that span several pages
+   (`16.03-16.05,17 Other sector including non-energy`). A row that covers
+   another row of the same source and scenario on both axes is dropped, keeping
+   the detail. Detail is preferred over aggregate because the aggregates overlap
+   each other - `16 Other sector` and `16.03-16.05,17` share `16.03-16.05` - so
+   no set of aggregates is guaranteed to partition demand.
+
+Scope is deliberately final energy demand only. Combustion in transformation
+and the power sector is excluded, which is why electricity carries a zero
+factor here rather than an implied grid intensity. Adding transformation page
+keys to `emissions_page.demand_page_keys` would double count against the fuels
+those inputs produce.
+
+Conflicts are resolved by declared strategy and reported, never silently
+averaged. Several 9th fuels mapping to one ESTO product resolve by
+`prefer_specific_then_mean`, which drops residual `_unallocated` contributors
+when a specific one exists; ESTO components disagreeing under one common fuel
+resolve by `component_conflict_resolution`. Both land in
+`supporting_files/emissions_factor_conflicts.csv`.
+
+### Validation
+
+`supporting_files/` must contain `emissions_factor_resolution.csv` (one factor
+per common fuel with its contributing 9th fuels and ESTO components),
+`emissions_factor_conflicts.csv`, `emissions_dropped_factor_rows.csv`,
+`emissions_axis_values_without_factor.csv` (expected empty), and
+`emissions_frontier_coverage_check.csv`.
+
+The coverage check compares every dropped aggregate against the detail retained
+inside it; a gap above `emissions_page.frontier_coverage_tolerance_pj` means the
+detail is incomplete and that source's emissions are understated, and the page
+says so in its note. Base-year totals for LEAP, ESTO, and the 9th edition must
+agree where all three report the same demand: for 20USA at 2022 all three read
+3,443 Mt CO2e.
+
+### History
+
+- 2026-08-06: Added the Emissions page. The first implementation summed every
+  demand row and reported 4,838 Mt CO2e for 20USA 2022 against 3,443 for LEAP;
+  the gap was parent and child flows counted together, which is what rule 4
+  above now prevents.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

@@ -12,6 +12,17 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.utils import PlotlyJSONEncoder
 
+# The emissions module imports this one lazily inside its functions, so this
+# top-level import stays acyclic. Both spellings are supported because the
+# workflow puts codebase/ on sys.path while tests import codebase as a package.
+try:  # pragma: no cover - import shim
+    from common_esto_dashboard_emissions import build_emissions_page, emissions_page_enabled
+except ModuleNotFoundError:  # pragma: no cover - import shim
+    from codebase.common_esto_dashboard_emissions import (
+        build_emissions_page,
+        emissions_page_enabled,
+    )
+
 
 CODE_MATCH_COLUMNS = [
     "common_flow_code",
@@ -2309,6 +2320,7 @@ def _nav_chips_html(all_pages: list[dict], current_file: str) -> str:
     demand = ["buildings", "bunkers", "industry", "transport", "others", "non_energy"]
     transform = ["power", "refining", "other_transformation"]
     supply = ["supply"]
+    derived = ["emissions"]
     page_map = {p["page_key"]: p for p in all_pages}
 
     def chip(page_key: str) -> str:
@@ -2341,7 +2353,11 @@ def _nav_chips_html(all_pages: list[dict], current_file: str) -> str:
     if supply_chips:
         parts.append(sep)
         parts.extend(supply_chips)
-    remaining_keys = {p["page_key"] for p in all_pages} - set(overview + demand + transform + supply)
+    derived_chips = [chip(k) for k in derived if chip(k)]
+    if derived_chips:
+        parts.append(sep)
+        parts.extend(derived_chips)
+    remaining_keys = {p["page_key"] for p in all_pages} - set(overview + demand + transform + supply + derived)
     remaining_chips = [chip(k) for k in sorted(remaining_keys) if chip(k)]
     if remaining_chips:
         parts.append(sep)
@@ -3995,6 +4011,17 @@ def render_dashboard(
                     "file": f"{scope_page_key}.html",
                 })
 
+    # The Emissions page is derived from the demand pages above, so it must be
+    # in the inventory before any page renders its navigation chips.
+    if emissions_page_enabled(template, assigned_df):
+        emissions_config = template.get("emissions_page", {})
+        emissions_page_key = safe_slug(emissions_config.get("page_key", "emissions"))
+        page_inventory.append({
+            "page_key": emissions_page_key,
+            "page_label": str(emissions_config.get("page_label", "Emissions")),
+            "file": f"{emissions_page_key}.html",
+        })
+
     for page in additional_pages or []:
         page_key = safe_slug(page.get("page_key", ""))
         if page_key and page_key not in {item["page_key"] for item in page_inventory}:
@@ -4186,6 +4213,21 @@ def render_dashboard(
     manifest_rows.extend(td_manifest_rows)
     if td_page_row:
         page_rows.append(td_page_row)
+
+    emissions_manifest_rows: list[dict] = []
+    emissions_page_row: dict | None = None
+    if emissions_page_enabled(template, assigned_df):
+        emissions_manifest_rows, emissions_page_row = build_emissions_page(
+            assigned_df, template, series_labels, layout, page_inventory,
+            primary_source=primary_source, primary_scenario=primary_scenario,
+            economy_label=economy_label,
+            dashboard_switcher=dashboard_switcher,
+            current_dashboard=current_dashboard,
+            dashboard_updated_label=dashboard_updated_label,
+        )
+    manifest_rows.extend(emissions_manifest_rows)
+    if emissions_page_row:
+        page_rows.append(emissions_page_row)
 
     scope_manifest_rows, scope_page_rows = build_scope_specific_pages(
         scope_df if scope_df is not None else pd.DataFrame(),

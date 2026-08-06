@@ -16,6 +16,7 @@ Project instructions for the production Common ESTO dashboard.
   - `common_esto_dashboard_workflow.py`
   - `common_esto_dashboard_data.py`
   - `common_esto_dashboard_renderer.py`
+  - `common_esto_dashboard_emissions.py`
   - `common_esto_dashboard_output_layout.py`
 - Production configuration lives under `config/common_esto_dashboard/`.
 - Tests and fixtures live under `tests/` and
@@ -45,6 +46,18 @@ data consumed here. Read
 `C:\Users\Work\github\leap_mappings\docs\mappings_system.md` before changing
 assumptions about comparison scopes, hierarchy, component membership, rollups,
 or generated category labels. Do not reproduce mapping logic in dashboard code.
+
+"Do not reproduce" means do not write a **second implementation** of the mapping
+semantics. It does not forbid this repository from performing a conversion by
+calling the upstream one.
+
+Before consuming or extending the Common ESTO mappings, read
+`docs/common_esto_mapping_consumer.md` and the contract it points at,
+`leap_mappings/docs/using_common_esto_mappings.md`. The short version: common
+rows sit at the lowest common denominator of the datasets in a scope, so mapping
+a source onto them is a merge and an aggregation — never an allocation. This
+dashboard is intended to be the reference implementation of that contract, so
+keep the consumption path obvious.
 
 ## Running and validation
 

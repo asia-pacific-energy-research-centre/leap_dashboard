@@ -235,6 +235,18 @@
     },
     "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports). Bunkers (04,05) and stock changes (06) are excluded because they are not recorded in LEAP projection scenarios."
   },
+  "emissions_page": {
+    "enabled": true,
+    "page_key": "emissions",
+    "page_label": "Emissions",
+    "factor_sets_config_path": "config/common_esto_dashboard/emissions_factor_sets.json",
+    "factor_set_key": "",
+    "demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"],
+    "suppression_threshold": 0.1,
+    "frontier_coverage_tolerance_pj": 10.0,
+    "sector_colors": {},
+    "_note": "Emissions are derived, not sourced: each demand row plotted on the pages in demand_page_keys is multiplied by the active factor set's factor for its common_product_label. Factor sources and their mapping axis live in factor_sets_config_path; leave factor_set_key empty to use that file's active_factor_set. suppression_threshold is in the factor set's emissions unit (Mt CO2e today), not PJ; frontier_coverage_tolerance_pj is the PJ gap above which the page warns that a source's detail does not add back up to an aggregate it also reports. Scope is deliberately final energy demand only - add transformation or power page keys here if inputs to transformation should be counted, and expect double counting against the fuels those inputs produce."
+  },
   "leap_demand_sector_coverage": {
     "enabled": true,
     "show_aggregate_only_page_keys": ["industry", "transport", "buildings", "others"],

@@ -25,4 +25,4 @@ jobs:
         run: python -c "import setuptools.build_meta; import codebase.common_esto_dashboard_data"
 
       - name: Run focused dashboard tests
-        run: python -m pytest tests/test_common_esto_dashboard.py tests/test_capacity_unmet_convergence_dashboard.py tests/test_raw_input_boundary.py
+        run: python -m pytest tests/test_common_esto_dashboard.py tests/test_capacity_unmet_convergence_dashboard.py tests/test_raw_input_boundary.py tests/test_emissions_page.py

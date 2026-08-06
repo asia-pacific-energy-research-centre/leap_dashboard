@@ -56,6 +56,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     filter_template_for_leap_demand_coverage,
     load_common_esto_data,
 )
+from common_esto_dashboard_emissions import set_leap_mappings_root  # noqa: E402
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
 from common_esto_dashboard_output_layout import build_output_layout, publish_to_docs  # noqa: E402
 from common_esto_dashboard_convergence import write_capacity_unmet_convergence_page  # noqa: E402
@@ -157,6 +158,9 @@ COMMON_ROWS_PATH = _resolve(os.getenv("COMMON_ESTO_ROWS_PATH", str(_LEAP_MAPPING
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
 OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
+# The emissions page reads its 9th-fuel -> ESTO mapping contract and the
+# generated ESTO -> common axis map from the same sibling repository.
+set_leap_mappings_root(_LEAP_MAPPINGS_REPO)
 
 
 #%%

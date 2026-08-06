@@ -19,7 +19,12 @@ portable package does not carry):
 - the shared mapping-diagnostics page (``common_esto_dashboard_mapping_diagnostics``);
 - the full mapping tree explorer (``scripts/render_full_mapping_tree_explorer``);
 - the capacity-unmet convergence page (needs a ``leap_initialisation`` run CSV);
-- the upstream Common ESTO fast-path data refresh.
+- the upstream Common ESTO fast-path data refresh;
+- the Emissions page. ``render_dashboard`` still offers it, but its factor
+  mapping needs the ``leap_mappings`` 9th-fuel contract and generated
+  ESTO -> common axis map, so a portable package without that checkout renders
+  neither the page nor its navigation chip. See
+  ``common_esto_dashboard_emissions.emissions_page_enabled``.
 
 Use ``common_esto_dashboard_workflow.py`` when those pages are wanted.
 """
