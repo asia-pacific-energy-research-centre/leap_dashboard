@@ -8,7 +8,7 @@ in this repo (never edited by the run); design detail is in
 ```text
 Status:       ACTIVE
 Firing:       002             # interactive takeover, not a scheduled firing
-Heartbeat:    2026-08-07T02:26+09:00
+Heartbeat:    2026-08-07T02:36+09:00
 Started:      2026-08-07T00:20+09:00
 Repo:         C:\Users\Work\github\leap_dashboard\.claude\worktrees\dashboard-emissions-page-5c4fbd
 Branch:       claude/dashboard-emissions-page-5c4fbd
@@ -43,9 +43,10 @@ final report (plan §"Final report") is written from this baton's log.
 - [x] W1 — investigation only, gates nothing: explain the 3,347 unmapped LEAP
       links (real values or not). Does not block W6. DONE — finding + coverage
       CSV in outputs/overnight_20260806/ (gitignored, not committed).
-- [ ] W2 — Phase 0 code prep: switch to `common_esto_rows.csv`, add explicit
-      factor-config path arg. Invariants must hold. Code edited, verification
-      render in progress.
+- [x] W2 — Phase 0 code prep: switch to `common_esto_rows.csv`, add explicit
+      factor-config path arg. Invariants must hold. DONE (commit 4485520).
+      Verified: all 4 supporting CSVs identical to T1 baseline both
+      economies, suite 147 passed.
 - [ ] W3 — main event: measure/unit columns, gate energy-balance machinery to
       `measure == energy`, pair comparisons on `(source_system, measure)`.
       Verify against T1 baselines — energy charts identical.
@@ -65,8 +66,10 @@ final report (plan §"Final report") is written from this baton's log.
 - [ ] D4 — importable merger with docstring, worked example, test. Part of
       W6.
 
-**Next: W2** — code edited (common_esto_dashboard_emissions.py +
-emissions_factor_sets.json), verification render running.
+**Next: W3** — main event, not started. Highest-risk item so far (touches
+sign semantics, energy-balance gating, ~24 hardcoded "PJ" literals in
+common_esto_dashboard_renderer.py — grep-counted, matches plan exactly).
+Read Phase A steps 1-4 in the design plan before starting.
 
 ## 3. State of the tree
 
@@ -141,4 +144,4 @@ C:/Users/Work/miniconda3/python.exe -m pytest tests -q
 | 2026-08-07T01:49+09:00 | s002 (interactive takeover) | — | start | f196f33 (prev) | Maintainer confirmed via chat that s000 was not running (transcript static since 00:27, ~82 min silence, no lock, no new commits) and instructed: "if it isn't running in 1hr just do the planned project yourself." Took the lock, updated baton header to this session. Proceeding to W0 per plan §"Next: W0". This is an interactive session, not a scheduled firing — will keep working through the plan rather than standing down after one item, per maintainer's request. |
 | 2026-08-07T02:26+09:00 | s002 | W0 | done | e9987e9, 17e2974 | T0 determinism guard (scripts/check_common_esto_dashboard_determinism.py) PASS on first run for 20USA, no fallback needed. T1 baselines captured for 20USA and 02BD (scripts/capture_common_esto_baseline.py) — chart_manifest, emissions_by_sector_and_fuel, emissions_factor_resolution (54 rows, matches T5's stated expectation), page_assignment_summary, page_inventory (T7), bundle_fingerprint_t3 (T3, decodes Plotly base64 bdata). 20USA 2022 ESTO/NINTH emissions = 3442.60161 -> rounds to invariant's stated 3,443 Mt CO2e; LEAP not present as a separate source_system label in this CSV (structural, not a discrepancy — not investigated further, out of W0 scope). Worked around the known render_full_mapping_tree_explorer.py worktree bug via a runtime monkeypatch in both scripts (not touching the out-of-scope file). |
 | 2026-08-07T02:26+09:00 | s002 | W1 | done | (not committed — outputs/ gitignored) | 3,347 unmapped LEAP structural links (dedup by relationship_id, matches plan exactly) traced: 388 links / 376 unique (source_flow,source_product) pairs carry real nonzero LEAP values (~52.3M abs, all economies/years/scenarios). 275 of those are expected aggregate/rollup/primary-supply nodes (Total Primary Supply, All demand aggregated/*, *interim, Production/Imports/Exports) whose children are what actually gets mapped — correct exclusion, not a gap. 101 pairs (~5.78M abs) look leaf-level (Oil Refining/Oil Refining x 13 products, Other loss and own use/*, Hydrogen transformation, Gas works plants) and are flagged for review before W6 ships the map, not resolved tonight. Full finding: outputs/overnight_20260806/w1_finding_unmapped_leap_links.md; full coverage CSV (3,347 rows, carries_real_value flag + category): outputs/overnight_20260806/w1_unmapped_leap_links_coverage.csv. Does not block W6 per plan. |
-| 2026-08-07T02:26+09:00 | s002 | W2 | in progress | uncommitted | Switched load_esto_to_common_map (+ emissions_page_enabled's existence check + build_emissions_page's default mapping_sources key) from esto_to_common_esto_map.csv to common_esto_rows.csv, and updated config/common_esto_dashboard/emissions_factor_sets.json's mapping_sources.esto_to_common_map to match (same 10,682 rows, verified set-identical per plan). Added factor_config_path optional argument to emissions_page_enabled and build_emissions_page (bypasses REPO_ROOT resolution when given an absolute path, additive/default-None so no caller breaks) — the portable-layout ask from Phase 0 step 2. tests/test_emissions_page.py (10 tests, uses its own fixture paths, doesn't touch the default) passed already. Verification render of 20USA vs T1 baseline running in background (bczg780r1); will run pytest tests -q after. |
+| 2026-08-07T02:36+09:00 | s002 | W2 | done | 4485520 | Switched load_esto_to_common_map (+ emissions_page_enabled's existence check + build_emissions_page's default mapping_sources key) from esto_to_common_esto_map.csv to common_esto_rows.csv, and updated config/common_esto_dashboard/emissions_factor_sets.json's mapping_sources.esto_to_common_map to match. Added factor_config_path optional argument to emissions_page_enabled and build_emissions_page (bypasses REPO_ROOT resolution when given an absolute path, additive/default-None). Verification: rendered both economies with the new code, chart_manifest/emissions_by_sector_and_fuel/emissions_factor_resolution/page_assignment_summary all identical to T1 baseline after normalisation (642/5292/54/72 rows respectively). Full suite: 147 passed. ASSUMPTION: baton/plan cite session-start baseline as 145 passed/2 skipped; this run measured 147 passed/0 skipped both before (git e9987e9 parent) and after W2 — pre-existing drift from whenever the plan was written, not a W2 regression (green both times, count identical before/after). Treated "pytest tests green" as the binding invariant, not the literal count. |
