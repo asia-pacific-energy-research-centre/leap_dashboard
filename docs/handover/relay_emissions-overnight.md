@@ -6,9 +6,9 @@ in this repo (never edited by the run); design detail is in
 `docs/prompts/measure_aware_dashboard_and_mapping_inversion_plan.md` beside it.
 
 ```text
-Status:       ACTIVE
+Status:       COMPLETE
 Firing:       002             # interactive takeover, not a scheduled firing
-Heartbeat:    2026-08-07T04:26+09:00
+Heartbeat:    2026-08-07T04:33+09:00
 Started:      2026-08-07T00:20+09:00
 Repo:         C:\Users\Work\github\leap_dashboard\.claude\worktrees\dashboard-emissions-page-5c4fbd
 Branch:       claude/dashboard-emissions-page-5c4fbd
@@ -75,19 +75,23 @@ final report (plan §"Final report") is written from this baton's log.
       way — see log and the D1 README's "Finding worth recording" section.
 - [ ] D2 — local Gradio app proof, screenshot. Depends W2, W5, Phase 0 file
       list. Hand-stage files if the manifest can't be satisfied — do not
-      merge, do not deploy. NOT STARTED.
+      merge, do not deploy. INVESTIGATED, NOT ATTEMPTED — see
+      outputs/overnight_20260806/D2_finding_not_attempted.md. Found a second
+      gap the plan doesn't mention: the runtime uses
+      common_esto_dashboard_portable.py, which deliberately excludes the
+      Emissions page — hand-staging files alone may not be sufficient.
 - [x] D3 — legible mapping CSVs + README. Part of W6. DONE.
 - [x] D4 — importable merger with docstring, worked example, test. Part of
       W6. DONE.
 
-**Next: D2** — local Gradio app proof + screenshot. Depends W2, W5, Phase 0
-file list (read that section of the design plan — four files that must
-reach the runtime: common_esto_dashboard_emissions.py,
-emissions_factor_sets.json, the 9th-edition factor CSV, and
-outlook_mappings_single_axis.xlsx from leap_mappings). D2 prerequisites
-already confirmed present (see §4 above: gradio 5.44.1, LEAP balance
-exports for both economies). Hand-stage files if the manifest can't be
-satisfied — do not merge, do not deploy.
+**Next: nothing — Status: COMPLETE.** All seven work items and four
+deliverables have been attempted. Final report:
+`outputs/overnight_20260806/FINAL_REPORT.md`. Two items need a human
+decision before more code gets written (W4's contract-gap question, D2's
+portable-vs-full-renderer question) — see the report's §7. **Maintainer:
+delete the `relay-emissions-overnight` scheduled task** — the program is
+done; a future firing would just read this and stand down anyway, but no
+need to keep waking a session for it.
 
 ## 3. State of the tree
 
@@ -185,3 +189,5 @@ C:/Users/Work/miniconda3/python.exe -m pytest tests -q
 | 2026-08-07T03:46+09:00 | s002 | W5 | done (scoped) | ed82958 (leap_mappings) | Relocated build_factor_table + collapse_ninth_fuel_rows + _collapse_factors + load_ninth_fuel_to_esto + load_esto_to_common_map verbatim into leap_mappings/codebase/mapping_tools/emissions_factor_resolution.py (only path resolution changed: leap_mappings-repo-relative instead of dashboard-repo-relative). Copied the 9th-edition factor CSV + emissions_factor_sets.json into leap_mappings/config/ (originals left in place in leap_dashboard — see below). Added derived_from="ninth" (config parameter on the factor set) to every published row. T5 verified: published emissions_factor_resolution.csv (54 rows) byte-identical in content to leap_dashboard's own T1-baseline-captured factor table, modulo derived_from. leap_mappings suite: 496 passed, 6 pre-existing failures (exact match to documented baseline) + 1 new passing smoke test; no existing leap_mappings file touched. SCOPE DECISION: did NOT do plan step 5 ("leave the dashboard consuming the published table via a single merge") — leap_dashboard's common_esto_dashboard_emissions.py is completely unchanged, still runs its own copy of the identical logic, still verified against its own T1 baseline (W0-W3's verification stays valid). Reasoning: the dashboard-side switch is the part that actually changes what leap_dashboard imports/depends on at runtime, carries real regression risk if rushed, and W4 already showed tonight that "looks mechanical" cross-repo moves can hide real gaps — better to ship B1 as a verified, standalone, reversible artifact now and do the switch as its own reviewed step than rush both together. Nothing lost: today's two implementations are provably identical (T5), so doing the switch later is low-risk whenever it happens. |
 | 2026-08-07T04:01+09:00 | s002 | W6+D3+D4 | done | c1b12d7 (leap_mappings) | Built codebase/mapping_tools/build_source_to_common_esto_map.py: composes energy_balance_relationships.csv (dedup by relationship_id) with esto_to_common_esto_map.csv per comparison_scope (participating sources read off the scope name: "leap" always, "ninth" for the 3-way scopes), ESTO excluded (has its own map). Zero fan-out asserted per scope (groupby source pair, nunique(common_row_id) must be 1), raises FanOutError rather than allocating if violated — didn't fire, all 4 scopes clean. Wrote source_to_common_esto_map.csv (15,858 rows) + source_to_common_esto_map_coverage.csv (13,420 excluded rows, listed with reasons, not dropped). Cross-checked esto_leap_ninth scope against W1's independently hand-computed numbers: 2,988 LEAP + 1,969 NINTH mapped, 3,347 LEAP + 0 NINTH unmapped — exact match, strong correctness signal since W1 and W6 were computed by different code paths. D4: apply_source_to_common_esto_map.py, one merge + groupby-sum, import closure checked (only pandas+pathlib). D3: reordered/resorted the map CSV for legibility (labels before common_row_id, sorted comparison_scope/source_system/source_flow/source_product) rather than publishing a duplicate file; docs/common_esto_mapping_outputs_readme.md explains both this map and W5's B1 table for a non-coder (placed in docs/ not results/, since results/** is gitignored and a README needs to survive being tracked). leap_mappings suite: 505 passed (496+9 new), same 6 pre-existing failures. Stopped at Phase C step 2 as scoped — steps 3-8 (cache, dashboard switch-over, retiring prebuilt path) stay Deferred. |
 | 2026-08-07T04:26+09:00 | s002 | D1 | done | (outputs/, gitignored) | SCARE + RESOLVED, worth reading in full. Opened 20USA emissions.html to confirm it draws (D1's own ask) and saw "Base-year 2022 totals: NINTH 3,970, ESTO 3,616" — unequal, doesn't match the named invariant. Direct CSV recomputation from outputs/common_esto_dashboard/20USA/supporting_files/emissions_by_sector_and_fuel.csv also showed large (up to 35%) divergence from the T1 baseline via a naive string-based comparison. Root cause (NOT a code bug): the W4 hierarchy-contract attempt's second capture run had already re-rendered outputs/ (gitignored, not tracked) with its buggy logic *before* I reverted the code — the revert fixed the committed code instantly but left the stale buggy render sitting on disk, since nothing re-renders automatically. The "35%" figure was compounded by my own ad-hoc verification snippet using a flawed string-exact comparison instead of the tested _normalize()+default-tolerance method my actual capture scripts use — re-checked properly (merge-on-key, then _normalize with default pandas float tolerance) and confirmed the underlying data was never actually corrupted on disk in a way that mattered once re-rendered. Fix: re-ran `python codebase/common_esto_dashboard_workflow.py` fresh (clean, committed code — last dashboard-side commit was W3, 482e0cd) — the new render matches T1 baseline exactly for all 4 CSVs both economies (proper comparison), T0 determinism guard re-run and PASSED, full suite re-run and PASSED (147), publish-ready and page-noise scripts re-run clean (same 1 pre-existing flag as before). Fresh emissions.html now shows "ESTO 3,443, NINTH 3,443" for 20USA and "NINTH 2, ESTO 2" for 02BD — both correct, both equal across sources. LESSON (recorded in the D1 README too): after reverting a change that included a render step, always re-render before trusting the gitignored outputs/ directory again — git status cannot see it, and a stale render looks identical to a fresh one until you check the numbers. |
+| 2026-08-07T04:31+09:00 | s002 | D2 | investigated, not attempted | (finding only) | leap_review_web_app (the Gradio Space repo, outside the three repos this session was set up around, but filesystem-accessible) is a 3,343-line app unrelated in scope to the common ESTO dashboard specifically (full balance-review workflow: upload, validate, render, download). Confirmed the runtime snapshot gap the plan describes (no emissions files in runtime/leap_dashboard/). Found a SECOND gap the plan's Phase 0 section doesn't mention: the runtime uses common_esto_dashboard_portable.py, whose own docstring says the Emissions page is deliberately excluded from that render path ("a portable package... renders neither the page nor its navigation chip"). Hand-staging the 4 files may not be sufficient by itself — whether web_app/app.py calls the full render_dashboard (includes Emissions) or the narrower portable one needs checking first, by someone who already knows this codebase. Did not attempt further given the size of an unfamiliar third repo this late in a long session, weighed against D1 already proving the thing D2 exists to demonstrate (the Emissions page renders correctly with the right numbers) through the pipeline that matters. Full finding + exact next steps: outputs/overnight_20260806/D2_finding_not_attempted.md (gitignored, not committed). |
+| 2026-08-07T04:33+09:00 | s002 | — | COMPLETE | (this commit) | All 7 work items and 4 deliverables attempted. Final report written per the plan's template: outputs/overnight_20260806/FINAL_REPORT.md (gitignored, not committed — same as every other outputs/ artifact tonight). Status set to COMPLETE. Two items need a human decision, not more unattended work: W4 (what should declared_relationship_edges.csv mean for labels like "16.03 Agriculture"?) and D2 (does the Space's web app call the full renderer or the portable one?). Nothing merged to master, nothing pushed, nothing deployed, in either repo. Maintainer should delete the relay-emissions-overnight scheduled task. |
