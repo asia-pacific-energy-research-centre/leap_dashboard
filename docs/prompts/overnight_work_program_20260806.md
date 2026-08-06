@@ -195,7 +195,7 @@ retiring the old path — remain Deferred.
 
 ## Work items
 
-### W0 — Set up guard rails *(blocking; everything depends on it)*
+### W0 — Set up guard rails *(do first; later items compare against it)*
 
 Plan reference: "Before/after equivalence tests", T0 and T1.
 
@@ -211,14 +211,15 @@ Plan reference: "Before/after equivalence tests", T0 and T1.
    inventory, and the T3 bundle fingerprint.
 4. Commit the baselines.
 
-**This must complete before any code change.** A "before" snapshot cannot be
-recovered once the code has moved.
+**Capture the baselines before any code change** — a "before" snapshot cannot be
+recovered once the code has moved. If some part of the capture will not work,
+capture what you can, record the gap, and continue.
 
-**Done when:** T0 passes, baselines exist for both economies and are committed.
+**Done when:** baselines exist for both economies and are committed.
 
 ---
 
-### W1 — Phase C0 gate: explain the 3,347 unmapped LEAP links *(investigation only)*
+### W1 — Explain the 3,347 unmapped LEAP links *(investigation only; gates nothing)*
 
 Plan reference: Phase C, step C0.
 
@@ -226,8 +227,8 @@ Of 6,335 structural LEAP links in `energy_balance_relationships.csv`, **3,347
 have no common row** in `esto_leap_ninth`. The 9th has zero such links.
 
 Determine whether any of those LEAP source pairs **carry real non-zero values**
-in the LEAP results. If they do, a direct native→common map would silently drop
-data, and Phase C needs rethinking.
+in the LEAP results. If they do, a direct native→common map would drop that data,
+so it needs to be excluded explicitly and listed rather than silently missed.
 
 No code changes. Produce a written finding with counts and examples.
 
