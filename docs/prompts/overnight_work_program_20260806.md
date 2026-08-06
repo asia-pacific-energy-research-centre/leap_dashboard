@@ -25,9 +25,16 @@ target shape is*. Read the relevant plan section before starting each item.
    `claude/common-esto-mapping-docs` in two separable commits (`85facf1` code,
    `47e2526` generated artifacts). That branch — not `master` — is the base for
    any `leap_mappings` work tonight.
-5. **If a work item's gate fails, stop that item and move to the next one.** Do
-   not work around a gate. Record it in the log.
-6. When in doubt, prefer producing a *finding* over producing a *change*.
+5. **Keep going.** This program is designed to survive surprises unattended. If
+   something is ambiguous, missing, or mildly broken: **make the most reasonable
+   assumption, write it in the Assumptions register, and carry on.** Do not halt
+   the night over a path, a dependency, a flaky check, or a judgement call.
+   Finishing six items with four recorded assumptions beats finishing one.
+6. **The one thing that must never happen is a wrong number shipped quietly.**
+   That is the only hard line. Everything else is recoverable tomorrow; a
+   silently wrong total is not, because nobody will know to look.
+7. If a work item genuinely cannot proceed, **skip it and move to the next**.
+   Never skip the whole program.
 
 ---
 
@@ -134,9 +141,10 @@ Steps:
    Emissions page and its nav chip appear in the generated dashboard.
 3. Capture a screenshot and the local output path.
 
-**If the manifest cannot be satisfied without a master merge, stop and report**
-rather than merging. In that case record exactly which entries blocked it — that
-list is itself a useful deliverable, because it is the remaining work to deploy.
+If the manifest cannot be satisfied from unmerged branches, **do not merge and
+do not stop** — copy the needed files into the local runtime by hand. This is a
+local proof, not a deploy, so hand-staging is legitimate. Record which entries
+could not be satisfied properly; that list is the remaining work to deploy.
 
 Depends on: W2, W5, and the Phase 0 file list.
 
@@ -157,9 +165,7 @@ Requirements, all of which matter more than they sound:
 - **`derived_from` present** on every factor row.
 - **A short `README.md` beside them** — what each file is, what one row means,
   which column to filter on, and the one thing not to do (do not sum rows whose
-  `common_row_is_leaf` is false, and do not re-split a source aggregate).
-- Ship an `.xlsx` alongside each `.csv`. Excel is where these will actually be
-  opened.
+  `is_subtotal` is true, and do not re-split a source aggregate).
 
 ### D4 — The importable merger from `leap_mappings`
 
@@ -196,8 +202,8 @@ Plan reference: "Before/after equivalence tests", T0 and T1.
 1. Commit the current branch state so there is a known starting point.
 2. Write and run **T0, the determinism guard**: render 20USA twice with no code
    change, assert every generated CSV equal after sorting.
-   **If T0 fails, stop the entire program and report.** Every later comparison
-   depends on it.
+   If T0 fails, **do not stop** — fall back to sorted comparison with a `1e-9`
+   tolerance, record it in the Assumptions register, and carry on.
 3. Write `scripts/capture_common_esto_baseline.py` and capture **T1 baselines**
    for **20USA and 02BD** into `tests/fixtures/common_esto_dashboard/baseline_<economy>/`
    — normalised `chart_manifest.csv`, `emissions_by_sector_and_fuel.csv`,
@@ -225,12 +231,9 @@ data, and Phase C needs rethinking.
 
 No code changes. Produce a written finding with counts and examples.
 
-**Done when:** the answer is recorded in the log as one of —
-*(a)* all unmapped links are value-less or out of scope → Phase C viable;
-*(b)* some carry real values → **Phase C blocked**, record which.
-
-This is deliberately early: it is cheap, needs no changes, and it is the only
-finding that can invalidate a whole phase.
+**Done when:** the answer is recorded, either way. This does **not** block W6 —
+if some links carry real values, build the map anyway, exclude those pairs, and
+emit a coverage CSV listing them. The finding is what matters, not the gate.
 
 ---
 
@@ -340,7 +343,7 @@ to branches in both repos.
 
 ---
 
-### W6 — Phase C map + importable merger *(only if W1 returned "viable")*
+### W6 — Phase C map + importable merger
 
 Plan reference: Phase C, step 1.
 
@@ -379,16 +382,44 @@ Produce **D3** (legible CSVs + xlsx + README) as part of this item.
 
 ---
 
-## Stop conditions — halt the item and report
+## When something goes wrong
 
-1. **T0 fails** → stop the entire program.
-2. **Any named invariant moves** — especially 20USA 2022 ≠ 3,443 Mt CO2e.
-3. **W1 finds unmapped LEAP links carrying real values** → W5 is blocked.
-4. **Fan-out appears at the common level** when generating the map → upstream
-   structure bug; report, never add allocation downstream.
-5. **A collision with the pre-existing `leap_mappings` changes.**
-6. **Scope would grow** into `leap_mappings` pipeline stages beyond the named
-   outputs.
+Default is **assume and continue**. Only one situation stops an item, and
+nothing stops the whole program.
+
+### The single hard line — revert the item, keep going
+
+**A named invariant moves and you cannot explain why.** Above all
+20USA 2022 ≠ 3,443 Mt CO2e.
+
+Do not update the baseline to match. Revert *that item's* commits, record it
+under Findings, move to the next item. The rest of the night still runs.
+
+If you *can* explain it and the explanation is sound — for example Phase B
+legitimately recomputing a factor — record the before/after and the reason, and
+continue.
+
+### Everything else — assume, record, continue
+
+| Situation | What to do |
+|---|---|
+| **T0 determinism guard fails** | Do not stop. Fall back to comparing sorted content with a `1e-9` tolerance, note it, continue. |
+| **W1 finds unmapped LEAP links with real values** | Do not block W6. Build the map anyway, exclude those pairs, emit a coverage CSV listing them, and report. The finding is the value. |
+| **Fan-out appears at the common level** | Do not add allocation. Keep the affected pairs out of the map, list them in the coverage CSV, continue. |
+| **A path, file or dependency is missing** | Look for the obvious equivalent. If there is one, use it and record the substitution. If not, skip that item. |
+| **The manifest cannot be satisfied for D2** | Copy the needed files into the local runtime by hand. It is a local proof, not a deploy — hand-staging is fine and the blocked entries are themselves the deliverable. |
+| **A test outside the named baselines fails** | Check whether it fails on the branch point too. If yes, it is pre-existing — note and continue. |
+| **An API or column name is unspecified** | Choose the clearest option, record it, continue. Naming is reversible. |
+| **Scope would grow into `leap_mappings` pipeline stages** | Stop growing, keep what is done, note where the line was drawn. |
+
+### Assumptions register — fill this in
+
+Every assumption made under the rules above goes here, so the morning review is
+about decisions rather than archaeology.
+
+| # | Item | Assumption made | Why | How to reverse |
+|---|---|---|---|---|
+| | | | | |
 
 ---
 
@@ -416,9 +447,10 @@ Produce **D3** (legible CSVs + xlsx + README) as part of this item.
 2. **What was verified** — which of T0–T8 ran, and their results.
 3. **Invariants**: state the 20USA 2022 emissions total and the test counts
    explicitly, not "unchanged".
-4. **Findings** — especially W1's answer, which determines whether Phase C is
-   viable.
-5. **Stop conditions hit**, and where each was left.
+4. **Findings** — especially W1's answer, and any coverage CSV of excluded
+   mapping pairs.
+5. **The Assumptions register**, filled in — every assumption made, and how to
+   reverse it. This is the main thing to review in the morning.
 6. **The four deliverables** — D1-D4 — with their paths, and a screenshot for
    D2. Say explicitly if any could not be produced and why.
 7. **What is ready to merge**, and what still needs supervision.

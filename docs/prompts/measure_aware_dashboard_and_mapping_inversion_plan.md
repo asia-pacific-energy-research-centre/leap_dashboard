@@ -332,8 +332,7 @@ argument so both layouts work.
    authority: one row per `(comparison_scope, common_row_id)`, 6,105 rows) and
    denormalise onto the any-dataset map Phase C creates, plus the existing
    ESTO-only `leap_mappings/results/common_esto/esto_to_common_esto_map.csv`:
-   `common_flow_is_structural_parent`, `common_product_is_structural_parent`,
-   `common_row_is_leaf`, and
+   `is_subtotal`, `common_flow_is_subtotal`, `common_product_is_subtotal`, and
    `common_flow_hierarchy_status` / `common_product_hierarchy_status` valued
    `leaf` / `parent` / `outside_declared_tree`.
 
@@ -612,8 +611,7 @@ with the ESTO map itself.
 ```text
 comparison_scope, source_system, source_flow, source_product,
 common_row_id, common_flow_label, common_product_label,
-common_row_is_leaf, common_flow_is_structural_parent,
-common_product_is_structural_parent,
+is_subtotal, common_flow_is_subtotal, common_product_is_subtotal,
 common_flow_hierarchy_status, common_product_hierarchy_status
 ```
 
