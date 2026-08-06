@@ -132,3 +132,4 @@ C:/Users/Work/miniconda3/python.exe -m pytest tests -q
 | Time | Firing | Item | Status | Commit | Note |
 |---|---|---|---|---|---|
 | 2026-08-07T00:20+09:00 | s000 (kickoff) | — | start | — | Baton created, plan read in full, recurring task about to be armed. `leap_mappings` tree has one pre-existing uncommitted doc edit (see Traps) — not touched. `leap_dashboard` worktree tree clean. Next set to W0. |
+| 2026-08-07T00:43+09:00 | s001 (this firing) | — | stand-down | — | Fired 6 min after scheduled 00:37 (not late). No lock file present, but baton `Heartbeat:` (00:20) is under 30 min old at firing time → predecessor treated as alive per protocol §3 (any-of test). Kickoff session (s000) may still be finishing setup (arming the recurring task) per its own last log line. Standing down without touching the tree; did not take the lock. Next firing in 6h will re-check liveness. |
