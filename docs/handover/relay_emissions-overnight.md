@@ -7,15 +7,17 @@ in this repo (never edited by the run); design detail is in
 
 ```text
 Status:       ACTIVE
-Firing:       000             # kickoff session, not a firing
-Heartbeat:    2026-08-07T00:20+09:00
+Firing:       002             # interactive takeover, not a scheduled firing
+Heartbeat:    2026-08-07T01:49+09:00
 Started:      2026-08-07T00:20+09:00
 Repo:         C:\Users\Work\github\leap_dashboard\.claude\worktrees\dashboard-emissions-page-5c4fbd
 Branch:       claude/dashboard-emissions-page-5c4fbd
 Plan:         docs\prompts\overnight_work_program_20260806.md
-Session id:   local_dcec7536-985e-49c0-8b15-b788512259d0
-Transcript:   C:\Users\Work\.claude\projects\C--Users-Work-github-leap-dashboard--claude-worktrees-relay-emissions-overnight-4c8e22\dcec7536-985e-49c0-8b15-b788512259d0.jsonl
-Previous id:  none            # this is kickoff
+Session id:   local_a08212ac-da1e-4c70-b49a-dcd6796cc9dc
+Transcript:   C:\Users\Work\.claude\projects\C--Users-Work-github-leap-dashboard\a08212ac-da1e-4c70-b49a-dcd6796cc9dc.jsonl
+Previous id:  local_dcec7536-985e-49c0-8b15-b788512259d0 (s000, kickoff — transcript
+              stopped writing at 00:27, no commits/heartbeat update for 82+ min,
+              declared dead by maintainer instruction)
 ```
 
 `HALTED` means a **program-level** stop condition fired and the whole run is
@@ -133,3 +135,4 @@ C:/Users/Work/miniconda3/python.exe -m pytest tests -q
 |---|---|---|---|---|---|
 | 2026-08-07T00:20+09:00 | s000 (kickoff) | — | start | — | Baton created, plan read in full, recurring task about to be armed. `leap_mappings` tree has one pre-existing uncommitted doc edit (see Traps) — not touched. `leap_dashboard` worktree tree clean. Next set to W0. |
 | 2026-08-07T00:43+09:00 | s001 (this firing) | — | stand-down | — | Fired 6 min after scheduled 00:37 (not late). No lock file present, but baton `Heartbeat:` (00:20) is under 30 min old at firing time → predecessor treated as alive per protocol §3 (any-of test). Kickoff session (s000) may still be finishing setup (arming the recurring task) per its own last log line. Standing down without touching the tree; did not take the lock. Next firing in 6h will re-check liveness. |
+| 2026-08-07T01:49+09:00 | s002 (interactive takeover) | — | start | f196f33 (prev) | Maintainer confirmed via chat that s000 was not running (transcript static since 00:27, ~82 min silence, no lock, no new commits) and instructed: "if it isn't running in 1hr just do the planned project yourself." Took the lock, updated baton header to this session. Proceeding to W0 per plan §"Next: W0". This is an interactive session, not a scheduled firing — will keep working through the plan rather than standing down after one item, per maintainer's request. |
