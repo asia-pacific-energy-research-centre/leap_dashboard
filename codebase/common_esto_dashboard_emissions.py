@@ -679,21 +679,29 @@ def _stacked_emissions_chart(
     series_label_from_values = renderer.series_label_from_values
     stacked_area_dataset_note = renderer.stacked_area_dataset_note
     trace_meta_entry = renderer.trace_meta_entry
+    comparison_projection_rows = renderer._comparison_projection_area_rows
+    has_nonzero_values = renderer._has_nonzero_values
 
     fig = go.Figure()
     trace_meta: list[dict] = []
     stacked_sources: set[str] = set()
 
     def stack_rows(scenario_name: str) -> pd.DataFrame:
-        """Return the most detailed available source for one scenario."""
-        for source_name in (primary_source, "NINTH", "LEAP", "ESTO"):
-            rows = emissions_df[
-                (emissions_df["source_system"].astype(str).str.casefold() == source_name.casefold())
-                & (emissions_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
-            ]
-            if not rows.empty and rows[group_column].nunique() > 1:
-                return rows
-        return emissions_df.iloc[0:0]
+        """Return ESTO historical plus the most detailed projected source."""
+        if base_year is None:
+            return emissions_df.iloc[0:0]
+        rows, _ = comparison_projection_rows(
+            emissions_df,
+            scenario_name=scenario_name,
+            primary_source=primary_source,
+            comparison_source="ESTO",
+            base_year=int(base_year),
+            group_col=group_column,
+            detail_col=group_column,
+            detail_minimum=1,
+            value_col=EMISSIONS_COLUMN,
+        )
+        return rows
 
     # Stacking order comes from the default scenario and is reused for both, so
     # switching REF/TGT does not reshuffle the layers.
@@ -710,11 +718,18 @@ def _stacked_emissions_chart(
         if scenario_df.empty or not order:
             continue
         is_default = scenario_name.casefold() == primary_scenario.casefold()
-        stack_source_name = str(scenario_df["source_system"].iloc[0])
+        projected_source = scenario_df[
+            scenario_df["source_system"].astype(str).str.casefold().ne("esto")
+        ]
+        if projected_source.empty:
+            continue
+        stack_source_name = str(projected_source["source_system"].iloc[0])
         by_year = scenario_df.groupby([group_column, "year"], as_index=False)[EMISSIONS_COLUMN].sum()
         for group_value in order:
             group_rows = by_year[by_year[group_column] == group_value].sort_values("year")
             if group_rows.empty:
+                continue
+            if not has_nonzero_values(group_rows[EMISSIONS_COLUMN]):
                 continue
             label = str(group_value)
             sign = "neg" if group_rows[EMISSIONS_COLUMN].sum() < 0 else "pos"
@@ -732,11 +747,15 @@ def _stacked_emissions_chart(
                 hovertemplate="%{x}<br>%{y:,.2f} " + escape(unit) + "<extra>" + escape(label) + "</extra>",
                 **trace_kwargs,
             ))
+            if (scenario_df["source_system"].astype(str).str.casefold() == "esto").any():
+                stacked_sources.add("ESTO")
             stacked_sources.add(stack_source_name)
             trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
 
     totals = emissions_df.groupby(["source_system", "scenario", "year"], as_index=False)[EMISSIONS_COLUMN].sum()
     for (source_system, scenario), group in totals.groupby(["source_system", "scenario"]):
+        if not has_nonzero_values(group[EMISSIONS_COLUMN]):
+            continue
         label = series_label_from_values(source_system, scenario, series_labels) + " total"
         ordered = group.sort_values("year")
         fig.add_trace(go.Scatter(

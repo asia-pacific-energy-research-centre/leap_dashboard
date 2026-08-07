@@ -691,6 +691,66 @@ def area_spec_rows(df: pd.DataFrame, area_spec: dict[str, object]) -> pd.DataFra
     return df[df["common_flow_label"].isin(source_flow_labels)]
 
 
+def _has_nonzero_values(values: pd.Series, tolerance: float = 1e-12) -> bool:
+    """Return whether a chart series contains a meaningful non-zero value."""
+    numeric = pd.to_numeric(values, errors="coerce").fillna(0.0)
+    return bool((numeric.abs() > tolerance).any())
+
+
+def _comparison_projection_area_rows(
+    df: pd.DataFrame,
+    *,
+    scenario_name: str,
+    primary_source: str,
+    comparison_source: str,
+    base_year: int,
+    group_col: str,
+    detail_col: str,
+    detail_minimum: int = 2,
+    value_col: str = "value",
+) -> tuple[pd.DataFrame, str]:
+    """Return comparison historical rows plus detailed projected rows.
+
+    The area charts should use one category frontier on both sides of the
+    base-year boundary.  Choose the most detailed available projection source,
+    then restrict ESTO historical rows to categories that are actually active
+    in that source after the base year.  This prevents an ESTO-only category
+    from appearing as a misleading zero band beside the LEAP stack.
+    """
+    candidates = [primary_source, "NINTH", "LEAP", "ESTO"]
+    source_column = df["source_system"].astype(str).str.casefold()
+    scenario_column = df["scenario"].astype(str).str.casefold()
+    selected_source = ""
+    projected = df.iloc[0:0].copy()
+    for source_name in candidates:
+        source_rows = df[
+            source_column.eq(source_name.casefold())
+            & scenario_column.eq(scenario_name.casefold())
+            & df["year"].gt(base_year)
+        ]
+        if source_rows.empty or source_rows[detail_col].nunique(dropna=True) < detail_minimum:
+            continue
+        selected_source = source_name
+        projected = source_rows
+        break
+    if not selected_source:
+        return df.iloc[0:0].copy(), ""
+
+    active_groups = (
+        projected.groupby(group_col, dropna=False)[value_col]
+        .sum()
+        .loc[lambda values: values.abs() > 1e-12]
+        .index
+    )
+    projected = projected[projected[group_col].isin(active_groups)]
+    historical = df[
+        source_column.eq(comparison_source.casefold())
+        & df["year"].le(base_year)
+        & df[group_col].isin(active_groups)
+    ]
+    return pd.concat([historical, projected], ignore_index=True), selected_source
+
+
 def area_chart_allowed_for_demand_coverage(
     page_key: str,
     area_df: pd.DataFrame,
@@ -1349,6 +1409,22 @@ def build_area_chart(
         & (chart_df["year"] <= base_year)
     ]
 
+    # Keep the historical comparison stack on the same category frontier as
+    # the active LEAP projection stack.  ESTO can contain categories that are
+    # absent or zero throughout the projection; showing those as empty bands
+    # makes the legend look like a data series exists when it does not.
+    projected_groups = (
+        chart_df[
+            (chart_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
+            & (chart_df["scenario"].astype(str).str.casefold().isin({"reference", "target"}))
+            & (chart_df["year"] > base_year)
+        ]
+        .groupby(group_col, dropna=False)["value"]
+        .sum()
+    )
+    active_groups = projected_groups.loc[projected_groups.abs() > 1e-12].index
+    pre_base_df = pre_base_df[pre_base_df[group_col].isin(active_groups)]
+
     fig = go.Figure()
     trace_meta: list[dict] = []
     for scenario_name in ("Reference", "Target"):
@@ -1356,6 +1432,7 @@ def build_area_chart(
             (chart_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
             & (chart_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
             & (chart_df["year"] > base_year)
+            & (chart_df[group_col].isin(active_groups))
         ]
         area_df = pd.concat([pre_base_df, post_base_df], ignore_index=True)
         if area_df.empty:
@@ -1366,6 +1443,8 @@ def build_area_chart(
             area_df.groupby([group_col, "year"], as_index=False)["value"].sum().sort_values([group_col, "year"])
         )
         for group_label, group in group_df.groupby(group_col, dropna=False):
+            if not _has_nonzero_values(group["value"]):
+                continue
             # Plotly stacks traces cumulatively in the order they're added,
             # regardless of sign - a positive (output) product added after
             # several negative (input) products would render below zero,
@@ -1758,6 +1837,8 @@ def build_product_chart(
             .agg(aggregation)
             .sort_values("year")
         )
+        if not _has_nonzero_values(group["value"]):
+            continue
         customdata = None
         hovertemplate = "%{x}<br>Signed value: %{y:,.2f}" + chart_unit + "<extra>" + escape(label) + "</extra>"
         if {"sign_status", "sign_interpretation"}.issubset(set(group.columns)):
@@ -3011,18 +3092,20 @@ def _build_td_sector_chart(
     fig = go.Figure()
     trace_meta: list[dict] = []
     stacked_sources: set[str] = set()
+    resolved_base_year = 2023 if base_year is None else int(base_year)
 
     def stack_source(scenario_name: str) -> pd.DataFrame:
-        """Return the most detailed available projection source for a scenario."""
-        candidates = [primary_source, "NINTH", "LEAP", "ESTO"]
-        for source_name in candidates:
-            rows = demand_df[
-                (demand_df["source_system"].astype(str).str.casefold() == source_name.casefold())
-                & (demand_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
-            ]
-            if not rows.empty and rows["_page_key"].nunique() > 1:
-                return rows
-        return pd.DataFrame(columns=demand_df.columns)
+        """Return ESTO historical plus the most detailed projected source."""
+        rows, _ = _comparison_projection_area_rows(
+            demand_df,
+            scenario_name=scenario_name,
+            primary_source=primary_source,
+            comparison_source="ESTO",
+            base_year=resolved_base_year,
+            group_col="_page_key",
+            detail_col="_page_key",
+        )
+        return rows
 
     # Use the detailed source available for each scenario. LEAP is preferred,
     # but some economies only have aggregate LEAP demand and therefore need
@@ -3038,7 +3121,21 @@ def _build_td_sector_chart(
         is_default = scenario_name.casefold() == primary_scenario.casefold()
         if scenario_df.empty or sector_order.empty:
             continue
-        stack_source_name = str(scenario_df["source_system"].iloc[0])
+        projected_source_rows, stack_source_name = _comparison_projection_area_rows(
+            demand_df,
+            scenario_name=scenario_name,
+            primary_source=primary_source,
+            comparison_source="ESTO",
+            base_year=resolved_base_year,
+            group_col="_page_key",
+            detail_col="_page_key",
+        )
+        scenario_df = projected_source_rows
+        if not stack_source_name:
+            continue
+        if (scenario_df["source_system"].astype(str).str.casefold() == "esto").any():
+            stacked_sources.add("ESTO")
+        stacked_sources.add(stack_source_name)
         for _, sector_row in sector_order.iterrows():
             page_key = str(sector_row["_page_key"])
             page_label = str(sector_row["_page_label"])
@@ -3048,6 +3145,8 @@ def _build_td_sector_chart(
                 .sort_values("year")
             )
             if sector_data.empty:
+                continue
+            if not _has_nonzero_values(sector_data["value"]):
                 continue
             is_tfec_excluded = page_key in tfec_exclude_keys
             color = sector_colors.get(page_key)
@@ -3064,7 +3163,6 @@ def _build_td_sector_chart(
             if color:
                 trace_kw["line"] = {"color": color}
             fig.add_trace(go.Scatter(**trace_kw))
-            stacked_sources.add(stack_source_name)
             trace_meta.append(trace_meta_entry(
                 stack_source_name, scenario_name, True, "tfc" if is_tfec_excluded else "both"
             ))
@@ -3087,6 +3185,8 @@ def _build_td_sector_chart(
     # no longer shows a single net total line on its own.
     tfc_totals = tfc_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in tfc_totals.groupby(["source_system", "scenario"]):
+        if not _has_nonzero_values(grp["value"]):
+            continue
         lbl = series_label_from_values(src, scen, series_labels) + " (TFC)"
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
@@ -3098,6 +3198,8 @@ def _build_td_sector_chart(
     # TFEC comparison demand totals
     tfec_totals = tfec_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in tfec_totals.groupby(["source_system", "scenario"]):
+        if not _has_nonzero_values(grp["value"]):
+            continue
         lbl = series_label_from_values(src, scen, series_labels) + " (TFEC)"
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
@@ -3110,6 +3212,8 @@ def _build_td_sector_chart(
     # Supply total lines — always visible regardless of TFC/TFEC mode
     if not supply_df.empty:
         for (src, scen), grp in supply_df.groupby(["source_system", "scenario"]):
+            if not _has_nonzero_values(grp["value"]):
+                continue
             lbl = series_label_from_values(src, scen, series_labels) + " supply (01–03)"
             grp_sorted = grp.sort_values("year")
             fig.add_trace(go.Scatter(
@@ -3163,18 +3267,20 @@ def _build_td_fuel_chart(
     fig = go.Figure()
     trace_meta: list[dict] = []
     stacked_sources: set[str] = set()
+    resolved_base_year = 2023 if base_year is None else int(base_year)
 
     def stack_source(scenario_name: str) -> pd.DataFrame:
-        """Return the most detailed available projection source for a scenario."""
-        candidates = [primary_source, "NINTH", "LEAP", "ESTO"]
-        for source_name in candidates:
-            rows = demand_df[
-                (demand_df["source_system"].astype(str).str.casefold() == source_name.casefold())
-                & (demand_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
-            ]
-            if not rows.empty and rows["common_product_label"].nunique() > 1:
-                return rows
-        return pd.DataFrame(columns=demand_df.columns)
+        """Return ESTO historical plus the most detailed projected source."""
+        rows, _ = _comparison_projection_area_rows(
+            demand_df,
+            scenario_name=scenario_name,
+            primary_source=primary_source,
+            comparison_source="ESTO",
+            base_year=resolved_base_year,
+            group_col="common_product_label",
+            detail_col="common_product_label",
+        )
+        return rows
 
     # Product stacking order is computed from the default scenario and reused
     # for both scenarios so switching REF/TGT does not reshuffle the layers.
@@ -3189,11 +3295,26 @@ def _build_td_fuel_chart(
         is_default = scenario_name.casefold() == primary_scenario.casefold()
         if scenario_df.empty or not product_totals:
             continue
-        stack_source_name = str(scenario_df["source_system"].iloc[0])
+        scenario_df, stack_source_name = _comparison_projection_area_rows(
+            demand_df,
+            scenario_name=scenario_name,
+            primary_source=primary_source,
+            comparison_source="ESTO",
+            base_year=resolved_base_year,
+            group_col="common_product_label",
+            detail_col="common_product_label",
+        )
+        if not stack_source_name:
+            continue
+        if (scenario_df["source_system"].astype(str).str.casefold() == "esto").any():
+            stacked_sources.add("ESTO")
+        stacked_sources.add(stack_source_name)
         product_by_year = scenario_df.groupby(["common_product_label", "year"], as_index=False)["value"].sum()
         for product in product_totals:
             grp = product_by_year[product_by_year["common_product_label"] == product].sort_values("year")
             if grp.empty:
+                continue
+            if not _has_nonzero_values(grp["value"]):
                 continue
             lbl = str(product)
             group_sign = "neg" if grp["value"].sum() < 0 else "pos"
@@ -3203,7 +3324,6 @@ def _build_td_fuel_chart(
                 visible=True if is_default else False,
                 hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
             ))
-            stacked_sources.add(stack_source_name)
             trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
 
     # Use the same authoritative aggregate policy as the sector chart.
@@ -3218,6 +3338,8 @@ def _build_td_fuel_chart(
     # show a single net total when fuels have mixed signs).
     comp_totals = tfc_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in comp_totals.groupby(["source_system", "scenario"]):
+        if not _has_nonzero_values(grp["value"]):
+            continue
         lbl = series_label_from_values(src, scen, series_labels) + " total (TFC)"
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
@@ -3230,6 +3352,8 @@ def _build_td_fuel_chart(
     if not supply_df.empty:
         supply_totals = supply_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
         for (src, scen), grp in supply_totals.groupby(["source_system", "scenario"]):
+            if not _has_nonzero_values(grp["value"]):
+                continue
             lbl = series_label_from_values(src, scen, series_labels) + " supply (01–03)"
             fig.add_trace(go.Scatter(
                 x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
@@ -3277,44 +3401,57 @@ def _build_supply_stack_chart(
     fig = go.Figure()
     trace_meta: list[dict] = []
     stacked_sources: set[str] = set()
+    resolved_base_year = 2023 if base_year is None else int(base_year)
 
-    default_mask = (
-        (supply_detail_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
-        & (supply_detail_df["scenario"].astype(str).str.casefold() == primary_scenario.casefold())
-    )
+    def stack_source(scenario_name: str) -> tuple[pd.DataFrame, str]:
+        return _comparison_projection_area_rows(
+            supply_detail_df,
+            scenario_name=scenario_name,
+            primary_source=primary_source,
+            comparison_source="ESTO",
+            base_year=resolved_base_year,
+            group_col=group_col,
+            detail_col=group_col,
+        )
+
+    default_rows, _ = stack_source(primary_scenario)
     group_totals = (
-        supply_detail_df[default_mask].groupby(group_col)["value"].sum().abs()
+        default_rows.groupby(group_col)["value"].sum().abs()
         .sort_values(ascending=False).index.tolist()
     )
 
     for scenario_name in ("Reference", "Target"):
-        scenario_mask = (
-            (supply_detail_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
-            & (supply_detail_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
-        )
-        scenario_df = supply_detail_df[scenario_mask]
+        scenario_df, stack_source_name = stack_source(scenario_name)
         is_default = scenario_name.casefold() == primary_scenario.casefold()
+        if scenario_df.empty or not stack_source_name:
+            continue
+        if (scenario_df["source_system"].astype(str).str.casefold() == "esto").any():
+            stacked_sources.add("ESTO")
+        stacked_sources.add(stack_source_name)
         group_by_year = scenario_df.groupby([group_col, "year"], as_index=False)["value"].sum()
         for group_value in group_totals:
             grp = group_by_year[group_by_year[group_col] == group_value].sort_values("year")
             if grp.empty:
                 continue
+            if not _has_nonzero_values(grp["value"]):
+                continue
             lbl = str(group_value)
             group_sign = "neg" if grp["value"].sum() < 0 else "pos"
             fig.add_trace(go.Scatter(
                 x=grp["year"], y=grp["value"],
-                mode="lines", stackgroup=f"supply_{scenario_toggle_tag(primary_source, scenario_name)}_{group_sign}", name=lbl,
+                mode="lines", stackgroup=f"supply_{scenario_toggle_tag(stack_source_name, scenario_name)}_{group_sign}", name=lbl,
                 visible=True if is_default else False,
                 hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
             ))
-            stacked_sources.add(primary_source)
-            trace_meta.append(trace_meta_entry(primary_source, scenario_name, True))
+            trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
 
     # Supply total lines, incl. primary LEAP scenarios (see note in
     # _build_td_sector_chart on why the stacked breakdown alone doesn't show
     # a single net total when components have mixed signs).
     comp_totals = supply_detail_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in comp_totals.groupby(["source_system", "scenario"]):
+        if not _has_nonzero_values(grp["value"]):
+            continue
         lbl = series_label_from_values(src, scen, series_labels) + " supply total"
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
@@ -3333,6 +3470,8 @@ def _build_supply_stack_chart(
     if not demand_total_df.empty:
         demand_totals = demand_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
         for (src, scen), grp in demand_totals.groupby(["source_system", "scenario"]):
+            if not _has_nonzero_values(grp["value"]):
+                continue
             lbl = series_label_from_values(src, scen, series_labels) + " demand (TFC)"
             fig.add_trace(go.Scatter(
                 x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
@@ -3349,10 +3488,7 @@ def _build_supply_stack_chart(
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={
             "trace_meta": trace_meta,
-            "stacked_area_note": (
-                f"Stacked areas: {dataset_display_name(primary_source)} supply detail "
-                "for the selected scenario."
-            ),
+            "stacked_area_note": stacked_area_dataset_note(stacked_sources, "supply"),
         },
     )
     apply_chart_chrome(fig, base_year, code_axis=code_axis_for_group_col(group_col))

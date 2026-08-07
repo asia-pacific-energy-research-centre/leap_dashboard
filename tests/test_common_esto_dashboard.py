@@ -27,6 +27,7 @@ from codebase.common_esto_dashboard_renderer import (
     render_dashboard,
     select_transformation_total_rows,
     _build_section_aggregate_charts,
+    _build_td_fuel_chart,
     _build_supply_stack_chart,
     aggregate_only_tfec_note,
     _select_total_rows_by_source,
@@ -917,6 +918,66 @@ def test_non_expanding_frontier_does_not_fall_back_when_a_year_is_exact_zero() -
     assert selected[["year", "common_row_id"]].to_dict("records") == [
         {"year": 2023, "common_row_id": "refinery_including_own_use"},
     ]
+
+
+def test_area_charts_drop_zero_only_categories_and_align_esto_frontier() -> None:
+    common = {
+        "comparison_scope": "esto_leap_ninth",
+        "economy": "20_USA",
+        "common_flow_code": "16.02",
+        "common_flow_label": "16.02 Residential",
+        "is_non_expanding_rollup": False,
+    }
+    rows = pd.DataFrame([
+        {**common, "source_system": "ESTO", "scenario": "historical", "year": 2022,
+         "common_product_code": "07.01", "common_product_label": "07.01 Motor gasoline", "value": 10.0},
+        {**common, "source_system": "ESTO", "scenario": "historical", "year": 2022,
+         "common_product_code": "12.99", "common_product_label": "12.99 Solar nonspecified", "value": 0.0},
+        {**common, "source_system": "LEAP", "scenario": "Target", "year": 2023,
+         "common_product_code": "07.01", "common_product_label": "07.01 Motor gasoline", "value": 20.0},
+        {**common, "source_system": "LEAP", "scenario": "Target", "year": 2023,
+         "common_product_code": "12.99", "common_product_label": "12.99 Solar nonspecified", "value": 0.0},
+    ])
+    figure = build_area_chart(
+        rows,
+        {
+            "aggregate_flow_label": "16.02 Residential",
+            "source_flow_labels": ["16.02 Residential"],
+            "source_flow_labels_by_system": {},
+        },
+        {"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
+        {"chart_generation": {"comparison_source_system": "ESTO", "base_year": 2022,
+                               "primary_area_source_system": "LEAP", "primary_area_scenario": "Target"}},
+    )
+    area_names = {str(trace.name) for trace in figure.data if trace.stackgroup}
+    assert area_names == {"07.01 Motor gasoline"}
+    assert "12.99 Solar nonspecified" not in area_names
+
+
+def test_energy_balance_fuel_area_uses_esto_history_on_leap_category_frontier() -> None:
+    rows = pd.DataFrame([
+        {"source_system": "ESTO", "scenario": "historical", "year": 2022,
+         "common_product_label": "07.01 Motor gasoline", "value": 10.0},
+        {"source_system": "ESTO", "scenario": "historical", "year": 2022,
+         "common_product_label": "12.99 Solar nonspecified", "value": 0.0},
+        {"source_system": "LEAP", "scenario": "Target", "year": 2023,
+         "common_product_label": "07.01 Motor gasoline", "value": 20.0},
+        {"source_system": "LEAP", "scenario": "Target", "year": 2023,
+         "common_product_label": "12.99 Solar nonspecified", "value": 0.0},
+    ])
+    figure = _build_td_fuel_chart(
+        rows,
+        pd.DataFrame(columns=rows.columns),
+        pd.DataFrame(columns=rows.columns),
+        {"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
+        "LEAP",
+        "Target",
+        base_year=2022,
+    )
+    area_names = {str(trace.name) for trace in figure.data if trace.stackgroup}
+    assert area_names == {"07.01 Motor gasoline"}
+    motor = next(trace for trace in figure.data if trace.name == "07.01 Motor gasoline")
+    assert list(motor.x) == [2022, 2023]
 
 
 def test_leap_and_ninth_lines_include_available_base_year_values() -> None:
