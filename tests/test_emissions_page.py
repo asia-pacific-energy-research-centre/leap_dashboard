@@ -191,6 +191,51 @@ def test_frontier_coverage_check_reports_missing_detail():
     assert gap.iloc[0] == pytest.approx(40.0)
 
 
+def test_emissions_uses_aggregate_tfc_when_sector_detail_is_absent():
+    detail = pd.DataFrame([
+        {"source_system": "NINTH", "scenario": "Target", "common_flow_label": "Industry", "common_product_label": "Gas", "value": 10.0},
+    ])
+    overview = pd.DataFrame([
+        {"source_system": "LEAP", "scenario": "Target", "common_flow_code": "12", "common_flow_label": "12 Total final consumption", "common_product_label": "Gas", "value": 25.0},
+    ])
+
+    selected, selection = emissions.select_emissions_demand_rows(detail, overview)
+
+    assert set(selected["source_system"]) == {"LEAP", "NINTH"}
+    assert selected.loc[selected["source_system"] == "LEAP", "value"].tolist() == [25.0]
+    assert selection.set_index("source_system").loc["LEAP", "emissions_level"] == "aggregate"
+    assert selection.set_index("source_system").loc["NINTH", "emissions_level"] == "detail"
+
+
+def test_emissions_prefers_detail_over_aggregate_for_same_source():
+    detail = pd.DataFrame([
+        {"source_system": "LEAP", "scenario": "Target", "common_flow_label": "Industry", "common_product_label": "Gas", "value": 10.0},
+    ])
+    overview = pd.DataFrame([
+        {"source_system": "LEAP", "scenario": "Target", "common_flow_code": "12", "common_flow_label": "12 Total final consumption", "common_product_label": "Gas", "value": 25.0},
+    ])
+
+    selected, selection = emissions.select_emissions_demand_rows(detail, overview)
+
+    assert selected["value"].tolist() == [10.0]
+    assert selection.loc[0, "emissions_level"] == "detail"
+
+
+def test_emissions_keeps_major_sector_labels_from_aggregate_branch_rows():
+    detail = pd.DataFrame([
+        {"source_system": "LEAP", "scenario": "Target", "_page_label": "Industry", "common_flow_label": "All demand aggregated / Industry", "common_product_label": "Gas", "value": 10.0},
+        {"source_system": "LEAP", "scenario": "Target", "_page_label": "Buildings", "common_flow_label": "All demand aggregated / Buildings", "common_product_label": "Gas", "value": 20.0},
+    ])
+    overview = pd.DataFrame(columns=[
+        "source_system", "scenario", "common_flow_code", "common_flow_label",
+        "common_product_label", "value",
+    ])
+
+    selected, _ = emissions.select_emissions_demand_rows(detail, overview)
+
+    assert selected["_page_label"].tolist() == ["Industry", "Buildings"]
+
+
 def test_emissions_page_is_hidden_when_its_inputs_are_missing(tmp_path):
     template = {
         "emissions_page": {

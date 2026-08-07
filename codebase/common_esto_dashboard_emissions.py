@@ -822,6 +822,63 @@ def _demand_rows(assigned_df: pd.DataFrame, config: dict) -> pd.DataFrame:
     return assigned_df[assigned_df["_page_key"].isin(demand_page_keys)]
 
 
+def select_emissions_demand_rows(
+    detail_frontier: pd.DataFrame,
+    overview_flow_rows: pd.DataFrame,
+    aggregate_flow_code: str = "12",
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Select one emissions level per source/scenario without allocating totals.
+
+    Sources with sector detail use their non-overlapping detail frontier. A
+    source with no sector detail falls back to its declared top-level TFC row,
+    preserving the aggregate as one series rather than inventing a sector split.
+    The second return value records which level was selected.
+    """
+    detail = detail_frontier.copy()
+    if not detail.empty:
+        detail["emissions_level"] = "detail"
+    overview = overview_flow_rows.copy()
+    if not overview.empty:
+        overview = overview[
+            overview["common_flow_code"].astype(str).eq(str(aggregate_flow_code))
+        ].copy()
+        overview["emissions_level"] = "aggregate"
+
+    source_keys = set()
+    for frame in (detail, overview):
+        if not frame.empty:
+            source_keys.update(
+                zip(frame["source_system"].astype(str), frame["scenario"].astype(str))
+            )
+
+    selected: list[pd.DataFrame] = []
+    records: list[dict[str, object]] = []
+    for source, scenario in sorted(source_keys):
+        detail_rows = detail[
+            detail["source_system"].astype(str).eq(source)
+            & detail["scenario"].astype(str).eq(scenario)
+        ]
+        aggregate_rows = overview[
+            overview["source_system"].astype(str).eq(source)
+            & overview["scenario"].astype(str).eq(scenario)
+        ]
+        chosen = detail_rows if not detail_rows.empty else aggregate_rows
+        if chosen.empty:
+            continue
+        selected.append(chosen)
+        records.append({
+            "source_system": source,
+            "scenario": scenario,
+            "emissions_level": str(chosen["emissions_level"].iloc[0]),
+            "row_count": int(len(chosen)),
+        })
+
+    columns = ["source_system", "scenario", "emissions_level", "row_count"]
+    if not selected:
+        return detail.iloc[0:0].copy(), pd.DataFrame(columns=columns)
+    return pd.concat(selected, ignore_index=True), pd.DataFrame(records, columns=columns)
+
+
 def emissions_page_enabled(
     template: dict,
     assigned_df: pd.DataFrame | None = None,
@@ -937,14 +994,22 @@ def build_emissions_page(
     demand_page_keys = [str(key) for key in config.get("demand_page_keys", [])]
     suppression_threshold = float(config.get("suppression_threshold", 0.1))
 
-    demand_df = _demand_rows(assigned_df, config).copy()
+    demand_detail_df = _demand_rows(assigned_df, config).copy()
     # Sector pages plot every level of the flow hierarchy; an emissions total
     # may only add up one non-overlapping frontier of it. Applied across all
     # demand pages at once because generated rollups such as
     # "16.03-16.05,17 Other sector including non-energy" span several pages.
-    all_demand_df = demand_df
-    demand_df = select_non_overlapping_rows(all_demand_df)
-    coverage_check = frontier_coverage_check(all_demand_df, demand_df)
+    all_demand_df = demand_detail_df
+    detail_frontier = select_non_overlapping_rows(all_demand_df)
+    coverage_check = frontier_coverage_check(all_demand_df, detail_frontier)
+    aggregate_flow_code = str(config.get("aggregate_flow_code", "12"))
+    overview_flow_rows = assigned_df[
+        assigned_df["_page_key"].eq("total_demand")
+        & assigned_df["common_flow_code"].astype(str).eq(aggregate_flow_code)
+    ].copy()
+    demand_df, source_selection = select_emissions_demand_rows(
+        detail_frontier, overview_flow_rows, aggregate_flow_code
+    )
 
     comparison_scope = str(
         demand_df["comparison_scope"].astype(str).mode().iloc[0]
@@ -988,12 +1053,15 @@ def build_emissions_page(
             f"emissions factor. Unmatched fuels: {', '.join(missing_labels) or 'none'}.",
         )
     emissions_df["_sector_label"] = emissions_df["_page_label"].astype(str)
+    aggregate_mask = emissions_df["emissions_level"].eq("aggregate")
+    emissions_df.loc[aggregate_mask, "_sector_label"] = "LEAP aggregate demand"
 
     diagnostics["frontier_coverage_check"] = coverage_check
+    diagnostics["source_selection"] = source_selection
     for name, frame in diagnostics.items():
         frame.to_csv(layout["supporting"] / f"emissions_{name}.csv", index=False)
     emissions_df.groupby(
-        ["source_system", "scenario", "year", "_page_label", "common_product_label"], as_index=False
+        ["source_system", "scenario", "year", "_sector_label", "common_product_label"], as_index=False
     )[EMISSIONS_COLUMN].sum().to_csv(
         layout["supporting"] / "emissions_by_sector_and_fuel.csv", index=False
     )
@@ -1136,7 +1204,9 @@ def build_emissions_page(
         page_note=_page_note(
             factor_set, unit, demand_page_keys, template, missing_labels,
             _base_year_summary(emissions_df, base_year, unit),
-            len(all_demand_df) - len(demand_df), coverage_check,
+            len(all_demand_df) - len(detail_frontier), coverage_check,
+            sorted(emissions_df["source_system"].astype(str).unique()),
+            sorted(emissions_df.loc[aggregate_mask, "source_system"].astype(str).unique()),
             float(config.get("frontier_coverage_tolerance_pj", 10.0)),
         ),
         dashboard_updated_label=dashboard_updated_label,
@@ -1238,6 +1308,8 @@ def _page_note(
     base_year_summary: str,
     dropped_overlapping_rows: int,
     coverage_check: pd.DataFrame,
+    source_systems: list[str],
+    aggregate_sources: list[str],
     coverage_tolerance_pj: float,
 ) -> str:
     """Describe the emissions scope, factor source, and any unfactored fuels."""
@@ -1258,6 +1330,23 @@ def _page_note(
         f"{dropped_overlapping_rows:,} aggregate demand rows were excluded in favour of the detail "
         "inside them, so no fuel is counted twice."
     )
+    if aggregate_sources:
+        note += (
+            " Aggregate-level emissions are shown for "
+            + ", ".join(aggregate_sources)
+            + " where sector detail is unavailable. The aggregate is kept as one "
+            "series, following the TFC total policy; it is not split into sector "
+            "placeholders."
+        )
+    elif not any(source.casefold() == "leap" for source in source_systems):
+        note += (
+            " LEAP is not shown on this page because this economy supplies demand "
+            "through aggregate-only branches rather than separately mapped sector "
+            "detail. Those aggregate branches remain valid for the Energy balance "
+            "overview, but they are not used as sector-emissions placeholders: "
+            "splitting one aggregate across sectors would require an explicit, "
+            "auditable allocation and could double-count demand."
+        )
     if not coverage_check.empty:
         worst = coverage_check.assign(gap=coverage_check["difference"].abs()).nlargest(1, "gap").iloc[0]
         if float(worst["gap"]) > coverage_tolerance_pj:

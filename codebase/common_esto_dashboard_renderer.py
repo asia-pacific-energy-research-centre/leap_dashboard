@@ -2827,6 +2827,29 @@ def write_index(
     <p style="color:#4b5563;">Charts are generated automatically from common ESTO flow/product rows.</p>
     <ul>{cards}</ul>
     <div style="margin-top:32px;border-top:1px solid #d8dee4;padding-top:24px;">
+      <h2 style="margin:0 0 8px 0;font-size:18px;">About this dashboard</h2>
+      <p style="margin:0 0 12px 0;color:#4b5563;font-size:13px;">This dashboard compares three sources on one shared set of flow/product
+      categories (the "common ESTO" axis): LEAP model results, ESTO historical
+      balances, and 9th Edition Outlook projections. A source's native flow and
+      product codes are mapped onto the common axis in <code>leap_mappings</code>,
+      so a chart here is always comparing like with like even when the three
+      sources describe the same fuel or sector differently.</p>
+      <p style="margin:0 0 12px 0;color:#4b5563;font-size:13px;">Every page is generated automatically from that shared data — nothing on
+      this page is hand-edited, and re-running the generator overwrites it
+      completely. See <code>codebase/common_esto_dashboard_workflow.py</code>
+      in the <code>leap_dashboard</code> repository to reproduce or update it.</p>
+      <p style="margin:0 0 12px 0;color:#4b5563;font-size:13px;">Some LEAP economies still report demand through <code>All demand aggregated</code> while detailed branches are being developed. The dashboard uses the mapping-owned coverage record to decide which sector pages are transitional, uses declared TFC/TFEC totals for balance lines, and keeps aggregate-only emissions as one clearly labelled series rather than inventing a sector split. See the Emissions note and the source-selection CSV for the level used by each source.</p>
+      <p style="margin:0;color:#4b5563;font-size:13px;">Each rendered economy is a self-contained set of static files: this page,
+      the other pages linked above, a <code>chart_bundles/</code> folder holding
+      each page's chart data, and a <code>supporting_files/</code> folder holding
+      the CSVs behind the charts. Pages load their charts from
+      <code>chart_bundles/</code> by a relative path, so <strong>copying a single
+      <code>.html</code> file on its own will open the page but its charts will not
+      draw</strong> — copy the whole economy folder (or the whole
+      <code>dashboards/</code> + <code>chart_bundles/</code> pair) together
+      whenever sharing a rendered dashboard.</p>
+    </div>
+    <div style="margin-top:32px;border-top:1px solid #d8dee4;padding-top:24px;">
       <h2 style="margin:0 0 8px 0;font-size:18px;">Model guide</h2>
       <p style="margin:0 0 16px 0;color:#4b5563;font-size:13px;">In the APERC LEAP system, the model is organised around the main LEAP branches of Demand, Transformation, and Resources. The dashboard sits outside LEAP and helps users check how these branches behave in the results, especially by comparing LEAP outputs with ESTO historical balances and 9th Outlook projections. The table below gives a short guide to the main model groups and how they should be understood when using either LEAP or the dashboard.</p>
       <div style="overflow-x:auto;">
