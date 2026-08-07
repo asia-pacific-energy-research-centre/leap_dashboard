@@ -81,6 +81,12 @@ def test_emissions_components_keep_demand_sectors_and_combine_signed_transformat
         },
         {
             "_page_key": "power", "_page_label": "Power",
+            "common_flow_code": "09", "common_flow_label": "09 Total transformation sector",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": -37.0,
+        },
+        {
+            "_page_key": "power", "_page_label": "Power",
             "common_flow_code": "09.01.01", "common_flow_label": "09.01.01 Electricity plants",
             "common_product_label": "17 Electricity", "source_system": "LEAP",
             "scenario": "Target", "year": 2030, "value": 27.0,
@@ -100,6 +106,12 @@ def test_emissions_components_keep_demand_sectors_and_combine_signed_transformat
         {
             "_page_key": "refining", "_page_label": "Refining",
             "common_flow_code": "09.07", "common_flow_label": "09.07 Oil refineries",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": -7.0,
+        },
+        {
+            "_page_key": "refining", "_page_label": "Refining",
+            "common_flow_code": "09.07", "common_flow_label": "09.07 Oil refineries (including own use)",
             "common_product_label": "01 Coal", "source_system": "LEAP",
             "scenario": "Target", "year": 2030, "value": -7.0,
         },

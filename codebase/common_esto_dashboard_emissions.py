@@ -871,6 +871,23 @@ def _lowest_transformation_frontier(df: pd.DataFrame) -> pd.DataFrame:
     work = df.copy()
     work["_transformation_flow_depth"] = work["common_flow_code"].map(renderer.code_depth)
 
+    # The mapped balance can contain the same parent transformation row and
+    # its child rows.  It can also contain an exact duplicate of a child under
+    # an "including own use" rollup label.  Neither should be counted twice.
+    base_keys = [
+        "source_system",
+        "scenario",
+        "year",
+        "common_product_label",
+    ]
+    parent_mask = work["common_flow_code"].astype(str).str.strip().isin({"09", "10"})
+    has_child = work.assign(_is_child=~parent_mask).groupby(base_keys)['_is_child'].transform('any')
+    work = work.loc[~(parent_mask & has_child)].copy()
+    work = work.drop_duplicates(
+        subset=[*base_keys, "common_flow_code", "value"],
+        keep="first",
+    )
+
     def family(code: object) -> str:
         # Compound boundaries such as 09.01-09.02 and
         # 09.01.01,09.02.01 belong to the same power family. Keeping the
