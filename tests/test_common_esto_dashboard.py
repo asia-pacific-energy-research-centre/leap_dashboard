@@ -16,6 +16,7 @@ from codebase.common_esto_dashboard_data import (
 from codebase.common_esto_dashboard_emissions import select_emissions_component_rows
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
 from codebase.common_esto_dashboard_renderer import (
+    _build_td_fuel_chart,
     apply_chart_chrome,
     assert_unique_line_trace_x,
     assign_pages,
@@ -161,6 +162,50 @@ def test_total_demand_sector_area_uses_non_overlapping_parent_child_frontier() -
     selected = _non_overlapping_common_row_frontier(rows)
 
     assert selected["value"].sum() == 20.0
+
+
+def test_total_demand_fuel_area_uses_non_overlapping_parent_child_frontier() -> None:
+    rows = []
+    for source_system, scenario, year, parent_value, child_one, child_two in [
+        ("ESTO", "historical", 2022, 20.0, 9.0, 11.0),
+        ("LEAP", "Target", 2023, 21.0, None, None),
+    ]:
+        for product_code, value in [("01", parent_value), ("02", 1.0 if source_system == "LEAP" else 2.0)]:
+            rows.append({
+                "_page_key": "buildings", "_page_label": "Buildings",
+                "common_flow_code": "16.01-16.02", "common_flow_label": "16.01-16.02 Buildings",
+                "common_product_code": product_code, "common_product_label": f"{product_code} Fuel",
+                "source_system": source_system, "scenario": scenario, "year": year,
+                "value": value, "common_row_id": f"{source_system}_{product_code}_parent",
+                "is_non_expanding_rollup": True, "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            })
+        if source_system == "ESTO":
+            for flow_code, value, row_id in [
+                ("16.01.99", child_one, "commercial"),
+                ("16.02", child_two, "residential"),
+            ]:
+                rows.append({
+                    "_page_key": "buildings", "_page_label": "Buildings",
+                    "common_flow_code": flow_code, "common_flow_label": flow_code,
+                    "common_product_code": "01", "common_product_label": "01 Fuel",
+                    "source_system": source_system, "scenario": scenario, "year": year,
+                    "value": value, "common_row_id": row_id, "is_non_expanding_rollup": False,
+                    "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+                })
+
+    figure = _build_td_fuel_chart(
+        pd.DataFrame(rows),
+        pd.DataFrame(columns=["source_system", "scenario", "year", "value"]),
+        pd.DataFrame(columns=["source_system", "scenario", "year", "common_flow_code", "value"]),
+        {},
+        "LEAP",
+        "Target",
+        base_year=2022,
+    )
+    fuel_trace = next(trace for trace in figure.data if trace.name == "01 Fuel" and trace.visible)
+    values = dict(zip(fuel_trace.x, fuel_trace.y))
+    assert values[2022] == 20.0
+    assert values[2023] == 21.0
 
 
 def _build_common_esto_rows() -> pd.DataFrame:
