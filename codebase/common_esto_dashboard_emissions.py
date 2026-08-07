@@ -841,6 +841,131 @@ def _demand_rows(assigned_df: pd.DataFrame, config: dict) -> pd.DataFrame:
     return assigned_df[assigned_df["_page_key"].isin(demand_page_keys)]
 
 
+_TRANSFORMATION_PAGE_KEYS = {"power", "refining", "other_transformation"}
+
+
+def _is_non_energy_or_mixed_demand(df: pd.DataFrame) -> pd.Series:
+    """Identify demand rows that cannot be treated as combustion fuel use."""
+    flow_code = df["common_flow_code"].astype(str)
+    flow_label = df["common_flow_label"].astype(str).str.casefold()
+    return (
+        df["_page_key"].astype(str).eq("non_energy")
+        | flow_code.str.startswith("17")
+        | flow_label.str.contains("including non-energy", regex=False)
+    )
+
+
+def _lowest_transformation_frontier(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep the deepest available transformation flow per source/fuel.
+
+    Transformation rows are often supplied at several hierarchy levels. A
+    vectorized depth filter is sufficient here because the sign classification
+    is performed on each lowest flow/fuel row before any higher-level netting;
+    it also avoids the quadratic label-containment work used by the demand
+    frontier across the much larger transformation table.
+    """
+    if df.empty:
+        return df.copy()
+    renderer = _renderer()
+    work = df.copy()
+    work["_transformation_flow_depth"] = work["common_flow_code"].map(renderer.code_depth)
+    depth_keys = ["source_system", "scenario", "common_product_label"]
+    max_depth = work.groupby(depth_keys)["_transformation_flow_depth"].transform("max")
+    return work.loc[work["_transformation_flow_depth"].eq(max_depth)].drop(
+        columns=["_transformation_flow_depth"]
+    )
+
+
+def select_emissions_component_rows(
+    assigned_df: pd.DataFrame,
+    config: dict,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Select combustion rows for the two emissions charts.
+
+    Demand uses the existing non-overlapping frontier. Transformation and own
+    use are selected separately at that same lowest available frontier, then
+    only negative signed rows are retained: negative means fuel consumed by a
+    transformation/own-use flow, while positive means fuel output. Transfers
+    (flow 08) and non-energy or mixed demand aggregates are excluded.
+
+    Returns ``(rows, coverage_rows, component_selection)``. The returned rows
+    have positive ``value`` values and a normalized ``_sector_label`` suitable
+    for both the fuel and major-sector charts.
+    """
+    demand = _demand_rows(assigned_df, config).copy()
+    demand = demand[~_is_non_energy_or_mixed_demand(demand)].copy()
+    demand_frontier = select_non_overlapping_rows(demand)
+    coverage = frontier_coverage_check(demand, demand_frontier)
+
+    aggregate_flow_code = str(config.get("aggregate_flow_code", "12"))
+    overview = assigned_df[
+        assigned_df["_page_key"].astype(str).eq("total_demand")
+        & assigned_df["common_flow_code"].astype(str).eq(aggregate_flow_code)
+    ].copy()
+    overview = overview[~_is_non_energy_or_mixed_demand(overview)].copy()
+    demand_rows, demand_selection = select_emissions_demand_rows(
+        demand_frontier, overview, aggregate_flow_code
+    )
+    if not demand_rows.empty:
+        demand_rows["_emissions_component"] = "Final demand"
+        demand_rows["_sector_label"] = demand_rows["_page_key"].astype(str).map({
+            "industry": "Industry",
+            "transport": "Transport",
+            "buildings": "Buildings",
+            "others": "Other demand",
+        }).fillna("Other demand")
+        demand_rows["signed_value_pj"] = pd.to_numeric(demand_rows["value"], errors="coerce")
+
+    transformation = assigned_df[
+        assigned_df["_page_key"].astype(str).isin(_TRANSFORMATION_PAGE_KEYS)
+    ].copy()
+    # Transfers are routing operations, not fuel combustion. Select the leaf
+    # frontier before using the sign, because parent transformation rows can
+    # net an input and output to zero.
+    transformation = transformation[
+        ~transformation["common_flow_code"].astype(str).str.startswith("08")
+    ].copy()
+    transformation_frontier = _lowest_transformation_frontier(transformation)
+    transformation_frontier["signed_value_pj"] = pd.to_numeric(
+        transformation_frontier["value"], errors="coerce"
+    )
+    transformation_rows = transformation_frontier[
+        transformation_frontier["signed_value_pj"] < 0
+    ].copy()
+    if not transformation_rows.empty:
+        transformation_rows["value"] = transformation_rows["signed_value_pj"].abs()
+        transformation_rows["_emissions_component"] = "Transformation and own use"
+        transformation_rows["_sector_label"] = "Transformation and own use"
+
+    selected_frames = [frame for frame in (demand_rows, transformation_rows) if not frame.empty]
+    if selected_frames:
+        selected = pd.concat(selected_frames, ignore_index=True)
+    else:
+        selected = assigned_df.iloc[0:0].copy()
+        selected["_emissions_component"] = pd.Series(dtype=str)
+        selected["_sector_label"] = pd.Series(dtype=str)
+        selected["signed_value_pj"] = pd.Series(dtype=float)
+
+    component_rows = [
+        demand_selection.assign(emissions_component="Final demand"),
+        pd.DataFrame([{
+            "source_system": source,
+            "scenario": scenario,
+            "emissions_level": "transformation_leaf_frontier",
+            "row_count": int(len(group)),
+            "emissions_component": "Transformation and own use",
+        } for (source, scenario), group in transformation_rows.groupby(
+            ["source_system", "scenario"], sort=False
+        )]),
+    ]
+    component_selection = pd.concat(
+        [frame for frame in component_rows if not frame.empty], ignore_index=True
+    ) if any(not frame.empty for frame in component_rows) else pd.DataFrame(
+        columns=["source_system", "scenario", "emissions_level", "row_count", "emissions_component"]
+    )
+    return selected, coverage, component_selection
+
+
 def select_emissions_demand_rows(
     detail_frontier: pd.DataFrame,
     overview_flow_rows: pd.DataFrame,
@@ -976,13 +1101,11 @@ def build_emissions_page(
 ) -> tuple[list[dict], dict | None]:
     """Build the Emissions page (config-driven bespoke page).
 
-    Applies the active emissions factor set to the same final-energy demand
-    rows the sector pages plot, then compares the resulting emissions across
-    LEAP, ESTO, and the 9th edition:
-
-    - stacked emissions by fuel and by sector, with comparison total lines;
-    - a total-emissions comparison line;
-    - one comparison line chart per sector and per fuel.
+    Applies the active emissions factor set to the final-demand rows and to
+    negative transformation/own-use input rows, then renders exactly two
+    stacked comparison charts: emissions by fuel and emissions by major
+    sector. Positive transformation outputs, transfers, and non-energy demand
+    are not included in the combustion boundary.
 
     Scope, factor set, sector membership, and suppression are config-driven via
     the ``emissions_page`` template key and
@@ -998,7 +1121,6 @@ def build_emissions_page(
     """
     renderer = _renderer()
     chart_dataset_tokens = renderer.chart_dataset_tokens
-    safe_slug = renderer.safe_slug
     stacked_area_note_from_figure = renderer.stacked_area_note_from_figure
     write_chart_bundle = renderer.write_chart_bundle
     write_dashboard_page = renderer.write_dashboard_page
@@ -1010,24 +1132,9 @@ def build_emissions_page(
     page_key = str(config.get("page_key", "emissions"))
     page_label = str(config.get("page_label", "Emissions"))
     base_year = int(template.get("chart_generation", {}).get("base_year", 2023))
-    demand_page_keys = [str(key) for key in config.get("demand_page_keys", [])]
-    suppression_threshold = float(config.get("suppression_threshold", 0.1))
 
-    demand_detail_df = _demand_rows(assigned_df, config).copy()
-    # Sector pages plot every level of the flow hierarchy; an emissions total
-    # may only add up one non-overlapping frontier of it. Applied across all
-    # demand pages at once because generated rollups such as
-    # "16.03-16.05,17 Other sector including non-energy" span several pages.
-    all_demand_df = demand_detail_df
-    detail_frontier = select_non_overlapping_rows(all_demand_df)
-    coverage_check = frontier_coverage_check(all_demand_df, detail_frontier)
-    aggregate_flow_code = str(config.get("aggregate_flow_code", "12"))
-    overview_flow_rows = assigned_df[
-        assigned_df["_page_key"].eq("total_demand")
-        & assigned_df["common_flow_code"].astype(str).eq(aggregate_flow_code)
-    ].copy()
-    demand_df, source_selection = select_emissions_demand_rows(
-        detail_frontier, overview_flow_rows, aggregate_flow_code
+    demand_df, coverage_check, source_selection = select_emissions_component_rows(
+        assigned_df, config
     )
 
     comparison_scope = str(
@@ -1071,10 +1178,6 @@ def build_emissions_page(
             "No emissions charts: none of the demand fuels for this economy carry an "
             f"emissions factor. Unmatched fuels: {', '.join(missing_labels) or 'none'}.",
         )
-    emissions_df["_sector_label"] = emissions_df["_page_label"].astype(str)
-    aggregate_mask = emissions_df["emissions_level"].eq("aggregate")
-    emissions_df.loc[aggregate_mask, "_sector_label"] = "LEAP aggregate demand"
-
     diagnostics["frontier_coverage_check"] = coverage_check
     diagnostics["source_selection"] = source_selection
     for name, frame in diagnostics.items():
@@ -1129,8 +1232,9 @@ def build_emissions_page(
             "common_flow_label": title,
             "common_product_label": "All products",
             "row_count": int(len(rows)),
-            "source_flow_labels": "; ".join(demand_page_keys),
-            "sign_note": f"Emissions in {unit}, derived from final energy demand and the "
+            "source_flow_labels": "final demand; transformation and own use",
+            "sign_note": f"Emissions in {unit}, derived from final demand plus negative "
+                         f"transformation/own-use inputs using the "
                          f"{factor_set.get('label', factor_set.get('key', ''))} factor set.",
             "suppressed": False,
             "total_abs_value": chart_total_abs,
@@ -1163,52 +1267,6 @@ def build_emissions_page(
         "Overview",
         emissions_df,
     )
-    record(
-        f"chart__line__{page_key}__total",
-        _emissions_comparison_chart(
-            emissions_df, f"Total emissions from final energy demand ({unit})", unit,
-            series_labels, base_year,
-        ),
-        "line",
-        f"Total emissions from final energy demand ({unit})",
-        "Total emissions",
-        emissions_df,
-    )
-
-    for sector_label, sector_rows in emissions_df.groupby("_sector_label"):
-        if float(sector_rows[EMISSIONS_COLUMN].abs().sum()) < suppression_threshold:
-            continue
-        record(
-            f"chart__line__{page_key}__sector__{safe_slug(sector_label)}",
-            _emissions_comparison_chart(
-                sector_rows, f"{sector_label} emissions", unit, series_labels, base_year
-            ),
-            "line",
-            str(sector_label),
-            "By sector",
-            sector_rows,
-        )
-
-    fuel_order = (
-        emissions_df.groupby("common_product_label")[EMISSIONS_COLUMN]
-        .apply(lambda values: values.abs().sum())
-        .sort_values(ascending=False)
-    )
-    for fuel_label, fuel_total in fuel_order.items():
-        if float(fuel_total) < suppression_threshold:
-            continue
-        fuel_rows = emissions_df[emissions_df["common_product_label"] == fuel_label]
-        record(
-            f"chart__line__{page_key}__fuel__{safe_slug(fuel_label)}",
-            _emissions_comparison_chart(
-                fuel_rows, f"{fuel_label} emissions", unit, series_labels, base_year
-            ),
-            "line",
-            str(fuel_label),
-            "By fuel",
-            fuel_rows,
-        )
-
     bundle_name = f"{page_key}__charts.json"
     write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
     write_dashboard_page(
@@ -1223,7 +1281,12 @@ def build_emissions_page(
         page_note=_page_note(
             factor_set,
             unit,
-            sorted(emissions_df.loc[aggregate_mask, "source_system"].astype(str).unique()),
+            sorted(
+                source_selection.loc[
+                    source_selection.get("emissions_level", pd.Series(dtype=str)).eq("aggregate"),
+                    "source_system",
+                ].astype(str).unique()
+            ),
         ),
         dashboard_updated_label=dashboard_updated_label,
     )
@@ -1306,11 +1369,13 @@ def _page_note(
 ) -> str:
     """Give the page a short explanation of what its emissions represent."""
     note = (
-        f"Emissions ({unit}) are estimated from final energy demand using "
+        f"Emissions ({unit}) are estimated from final demand plus transformation "
+        f"and own-use fuel inputs using "
         f"{factor_set.get('label', factor_set.get('key', 'CO2e emissions factors'))}. "
-        "The same demand categories used elsewhere in the dashboard are used here. "
-        "Factors are mapped onto the common ESTO fuel categories, so this page shows "
-        "combustion emissions from final demand; transformation and power-sector fuel use are excluded."
+        "Final demand is split into Industry, Transport, Buildings, and Other demand. "
+        "Transformation inputs and own use are combined: negative lowest-level rows "
+        "are treated as fuel consumption, while positive outputs and transfers are excluded. "
+        "Non-energy use, including unresolved mixed Other-sector aggregates, is excluded."
     )
     if aggregate_sources:
         note += (

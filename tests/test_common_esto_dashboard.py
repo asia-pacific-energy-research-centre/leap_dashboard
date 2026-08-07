@@ -13,6 +13,7 @@ from codebase.common_esto_dashboard_data import (
     filter_template_for_leap_demand_coverage,
     load_common_esto_data,
 )
+from codebase.common_esto_dashboard_emissions import select_emissions_component_rows
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
 from codebase.common_esto_dashboard_renderer import (
     apply_chart_chrome,
@@ -49,6 +50,66 @@ def _load_template() -> dict:
 def _load_series_config() -> dict:
     config_path = REPO_ROOT / "config" / "common_esto_dashboard" / "series_config.json"
     return json.loads(config_path.read_text(encoding="utf-8"))
+
+
+def test_emissions_components_keep_demand_sectors_and_combine_signed_transformation_use() -> None:
+    rows = pd.DataFrame([
+        {
+            "_page_key": "industry", "_page_label": "Industry",
+            "common_flow_code": "14", "common_flow_label": "14 Industry",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": 20.0,
+        },
+        {
+            "_page_key": "non_energy", "_page_label": "Non-energy use",
+            "common_flow_code": "17", "common_flow_label": "17 Non-energy use",
+            "common_product_label": "06 Crude oil", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": 8.0,
+        },
+        {
+            "_page_key": "others", "_page_label": "Other demand",
+            "common_flow_code": "16.03-16.05,17",
+            "common_flow_label": "16.03-16.05,17 Other sector including non-energy (all demand aggregate)",
+            "common_product_label": "07 Gasoline", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": 9.0,
+        },
+        {
+            "_page_key": "power", "_page_label": "Power",
+            "common_flow_code": "09.01.01", "common_flow_label": "09.01.01 Electricity plants",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": -30.0,
+        },
+        {
+            "_page_key": "power", "_page_label": "Power",
+            "common_flow_code": "09.01.01", "common_flow_label": "09.01.01 Electricity plants",
+            "common_product_label": "17 Electricity", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": 27.0,
+        },
+        {
+            "_page_key": "other_transformation", "_page_label": "Other transformation",
+            "common_flow_code": "08", "common_flow_label": "08 Transfers",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": -4.0,
+        },
+        {
+            "_page_key": "other_transformation", "_page_label": "Other transformation",
+            "common_flow_code": "10.01.17", "common_flow_label": "10.01.17 Non-specified own uses",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": -5.0,
+        },
+    ])
+
+    selected, coverage, selection = select_emissions_component_rows(
+        rows,
+        {"demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"]},
+    )
+
+    assert coverage.empty
+    assert set(selected["_sector_label"]) == {"Industry", "Transformation and own use"}
+    assert set(selected["value"]) == {20.0, 30.0, 5.0}
+    assert "08 Transfers" not in set(selected["common_flow_label"])
+    assert (selected["_sector_label"] == "Transformation and own use").sum() == 2
+    assert set(selection["emissions_component"]) == {"Final demand", "Transformation and own use"}
 
 
 def _build_common_esto_rows() -> pd.DataFrame:
