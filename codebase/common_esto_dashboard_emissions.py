@@ -1221,12 +1221,9 @@ def build_emissions_page(
         dashboard_switcher=dashboard_switcher,
         current_dashboard=current_dashboard,
         page_note=_page_note(
-            factor_set, unit, demand_page_keys, template, missing_labels,
-            _base_year_summary(emissions_df, base_year, unit),
-            len(all_demand_df) - len(detail_frontier), coverage_check,
-            sorted(emissions_df["source_system"].astype(str).unique()),
+            factor_set,
+            unit,
             sorted(emissions_df.loc[aggregate_mask, "source_system"].astype(str).unique()),
-            float(config.get("frontier_coverage_tolerance_pj", 10.0)),
         ),
         dashboard_updated_label=dashboard_updated_label,
     )
@@ -1282,22 +1279,6 @@ def _write_explained_empty_page(
     }
 
 
-def _base_year_summary(emissions_df: pd.DataFrame, base_year: int, unit: str) -> str:
-    """State the base-year total per source, where the three should agree."""
-    base_rows = emissions_df[emissions_df["year"] == base_year]
-    if base_rows.empty:
-        return f"No {base_year} rows are available for a base-year comparison."
-    totals = (
-        base_rows.groupby(["source_system", "scenario"])[EMISSIONS_COLUMN]
-        .sum()
-        .groupby("source_system")
-        .max()
-        .sort_values(ascending=False)
-    )
-    parts = ", ".join(f"{source} {value:,.0f}" for source, value in totals.items())
-    return f"Base-year {base_year} totals ({unit}): {parts}."
-
-
 def _sector_color_map(template: dict, assigned_df: pd.DataFrame) -> dict[str, str]:
     """Map sector page labels to the colours the overview page already uses."""
     colors_by_key = {
@@ -1321,66 +1302,21 @@ def _sector_color_map(template: dict, assigned_df: pd.DataFrame) -> dict[str, st
 def _page_note(
     factor_set: dict,
     unit: str,
-    demand_page_keys: list[str],
-    template: dict,
-    missing_labels: list[str],
-    base_year_summary: str,
-    dropped_overlapping_rows: int,
-    coverage_check: pd.DataFrame,
-    source_systems: list[str],
     aggregate_sources: list[str],
-    coverage_tolerance_pj: float,
 ) -> str:
-    """Describe the emissions scope, factor source, and any unfactored fuels."""
-    page_labels: list[str] = []
-    for rule in template.get("sector_pages", []):
-        if str(rule.get("page_key")) in demand_page_keys:
-            label = str(rule.get("page_label", rule.get("page_key")))
-            if label not in page_labels:
-                page_labels.append(label)
+    """Give the page a short explanation of what its emissions represent."""
     note = (
-        f"Emissions ({unit}) = final energy demand x "
-        f"{factor_set.get('label', factor_set.get('key', 'emissions factors'))}, applied to the same "
-        f"demand rows plotted on {', '.join(page_labels) or 'the demand pages'}. "
-        "Factors are mapped 9th-edition fuel -> ESTO product -> common dashboard fuel using the "
-        "leap_mappings contract, so combustion emissions here exclude transformation and power-sector "
-        "fuel use; electricity and heat carry a zero factor at the point of final use. "
-        f"{base_year_summary} "
-        f"{dropped_overlapping_rows:,} aggregate demand rows were excluded in favour of the detail "
-        "inside them, so no fuel is counted twice."
+        f"Emissions ({unit}) are estimated from final energy demand using "
+        f"{factor_set.get('label', factor_set.get('key', 'CO2e emissions factors'))}. "
+        "The same demand categories used elsewhere in the dashboard are used here. "
+        "Factors are mapped onto the common ESTO fuel categories, so this page shows "
+        "combustion emissions from final demand; transformation and power-sector fuel use are excluded."
     )
     if aggregate_sources:
         note += (
-            " Aggregate-level emissions are shown for "
+            " Where LEAP detail is unavailable, aggregate demand is shown as one series for "
             + ", ".join(aggregate_sources)
-            + " where sector detail is unavailable. The aggregate is kept as one "
-            "series, following the TFC total policy; it is not split into sector "
-            "placeholders."
-        )
-    elif not any(source.casefold() == "leap" for source in source_systems):
-        note += (
-            " LEAP is not shown on this page because this economy supplies demand "
-            "through aggregate-only branches rather than separately mapped sector "
-            "detail. Those aggregate branches remain valid for the Energy balance "
-            "overview, but they are not used as sector-emissions placeholders: "
-            "splitting one aggregate across sectors would require an explicit, "
-            "auditable allocation and could double-count demand."
-        )
-    if not coverage_check.empty:
-        worst = coverage_check.assign(gap=coverage_check["difference"].abs()).nlargest(1, "gap").iloc[0]
-        if float(worst["gap"]) > coverage_tolerance_pj:
-            note += (
-                f" Coverage warning: {worst['source_system']} {worst['scenario']} "
-                f"{int(worst['year'])} reports {worst['common_flow_label']} at "
-                f"{worst['aggregate_value']:,.1f} PJ but only {worst['frontier_value']:,.1f} PJ of "
-                "detail underneath it; emissions for that source are understated by the difference. "
-                "See emissions_frontier_coverage_check.csv."
-            )
-    if missing_labels:
-        note += (
-            " Fuels with no factor (excluded from every chart): "
-            + ", ".join(missing_labels[:12])
-            + ("..." if len(missing_labels) > 12 else "")
+            + "."
         )
     return note
 
