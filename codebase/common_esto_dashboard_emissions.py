@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from html import escape
 from pathlib import Path
 
@@ -869,10 +870,29 @@ def _lowest_transformation_frontier(df: pd.DataFrame) -> pd.DataFrame:
     renderer = _renderer()
     work = df.copy()
     work["_transformation_flow_depth"] = work["common_flow_code"].map(renderer.code_depth)
-    depth_keys = ["source_system", "scenario", "common_product_label"]
+
+    def family(code: object) -> str:
+        # Compound boundaries such as 09.01-09.02 and
+        # 09.01.01,09.02.01 belong to the same power family. Keeping the
+        # first two code levels prevents a detailed power row from suppressing
+        # a separate refinery/other-transformation row for the same fuel.
+        tokens = re.findall(r"\d+(?:\.\d+)*", str(code))
+        prefixes = {
+            ".".join(token.split(".")[:2]) if "." in token else token
+            for token in tokens
+        }
+        return ",".join(sorted(prefixes))
+
+    work["_transformation_family"] = work["common_flow_code"].map(family)
+    depth_keys = [
+        "source_system",
+        "scenario",
+        "common_product_label",
+        "_transformation_family",
+    ]
     max_depth = work.groupby(depth_keys)["_transformation_flow_depth"].transform("max")
     return work.loc[work["_transformation_flow_depth"].eq(max_depth)].drop(
-        columns=["_transformation_flow_depth"]
+        columns=["_transformation_flow_depth", "_transformation_family"]
     )
 
 
