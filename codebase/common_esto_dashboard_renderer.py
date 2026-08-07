@@ -3105,7 +3105,12 @@ def _build_td_sector_chart(
             group_col="_page_key",
             detail_col="_page_key",
         )
-        return rows
+        # Keep the sector stack on the same non-overlapping parent/child
+        # frontier as the authoritative TFC/TFEC totals.  Without this,
+        # historical ESTO rows such as Buildings plus its Commercial and
+        # Residential children are summed together, while the projected LEAP
+        # side may contain only the parent row.
+        return _non_overlapping_common_row_frontier(rows)
 
     # Use the detailed source available for each scenario. LEAP is preferred,
     # but some economies only have aggregate LEAP demand and therefore need
@@ -3130,6 +3135,7 @@ def _build_td_sector_chart(
             group_col="_page_key",
             detail_col="_page_key",
         )
+        projected_source_rows = _non_overlapping_common_row_frontier(projected_source_rows)
         scenario_df = projected_source_rows
         if not stack_source_name:
             continue

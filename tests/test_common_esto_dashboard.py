@@ -130,6 +130,39 @@ def test_emissions_components_keep_demand_sectors_and_combine_signed_transformat
     assert set(selection["emissions_component"]) == {"Final demand", "Transformation and own use"}
 
 
+def test_total_demand_sector_area_uses_non_overlapping_parent_child_frontier() -> None:
+    rows = pd.DataFrame([
+        {
+            "_page_key": "buildings", "_page_label": "Buildings",
+            "common_flow_code": "16.01-16.02", "common_flow_label": "16.01-16.02 Buildings",
+            "common_product_code": "01", "common_product_label": "01 Coal", "source_system": "ESTO",
+            "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            "scenario": "historical", "year": 2022, "value": 20.0,
+            "common_row_id": "buildings_parent", "is_non_expanding_rollup": True,
+        },
+        {
+            "_page_key": "buildings", "_page_label": "Buildings",
+            "common_flow_code": "16.01.99", "common_flow_label": "16.01.99 Commercial and public services unallocated",
+            "common_product_code": "01", "common_product_label": "01 Coal", "source_system": "ESTO",
+            "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            "scenario": "historical", "year": 2022, "value": 9.0,
+            "common_row_id": "buildings_commercial", "is_non_expanding_rollup": False,
+        },
+        {
+            "_page_key": "buildings", "_page_label": "Buildings",
+            "common_flow_code": "16.02", "common_flow_label": "16.02 Residential",
+            "common_product_code": "01", "common_product_label": "01 Coal", "source_system": "ESTO",
+            "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            "scenario": "historical", "year": 2022, "value": 11.0,
+            "common_row_id": "buildings_residential", "is_non_expanding_rollup": False,
+        },
+    ])
+
+    selected = _non_overlapping_common_row_frontier(rows)
+
+    assert selected["value"].sum() == 20.0
+
+
 def _build_common_esto_rows() -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for scope in ["leap_vs_esto_vs_ninth", "leap_vs_ninth"]:
