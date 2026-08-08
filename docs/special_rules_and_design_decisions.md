@@ -165,8 +165,10 @@ test also checks the overview legend position and reserved bottom margin.
 ### Current rule
 
 The former Total demand page is presented as the Energy balance overview. It
-continues to show the reviewed supply, TFC, and TFEC aggregates and also shows
-`Total transformation sector (excluding transfers)`.
+continues to show the reviewed supply and TFC aggregates and also shows `Total
+transformation sector (excluding transfers)`. TFEC remains temporarily disabled
+under DASH-010 until non-energy use can be separated from aggregated
+Other-sector LEAP demand.
 
 Transformation selection is not inferred from display labels. Rows must carry
 source-aggregate membership for `Total transformation - no transfers`. LEAP
@@ -343,10 +345,18 @@ line traces across 311 bundled charts with zero repeated-year traces.
 
 ### Current rule
 
-Use the declared top-level flow `12 Total final consumption` and flow `13 Total
-final energy consumption` for TFC and TFEC comparison lines whenever those rows
-exist for a source. Use visible demand detail only as a fallback when the
-requested aggregate is absent.
+Use declared top-level flow `12 Total final consumption` for the TFC comparison
+line whenever that row exists for a source. Use visible demand detail only as a
+fallback when the requested aggregate is absent.
+
+Flow `13 Total final energy consumption` is temporarily unavailable for the
+production presentation. LEAP currently carries non-energy use inside an
+aggregated Other-sector demand category, so the dashboard cannot extract and
+subtract that amount reliably to present TFEC. Retain flow 13 upstream and in
+diagnostic evidence, but do not show a production TFEC comparison or silently
+substitute an incomplete detail sum. Record it as explicitly disabled with this
+dependency; enable it after the non-energy boundary is separately available
+and validated.
 
 Do not calculate a total by adding every displayed demand row. Common ESTO can
 legitimately retain parent, child, exact, and generated rollup views together;
@@ -364,6 +374,10 @@ charts when only the aggregate demand row is available.
 
 - 2026-08-02: Confirmed after China 9th Target TFEC was plotted at 235,190 PJ
   in 2039 while the declared flow 13 value was 86,774 PJ.
+- 2026-08-08: Clarified the current operational boundary. Flow 13 is
+  intentionally disabled because non-energy use cannot yet be separated from
+  aggregated Other-sector LEAP demand; the dashboard must not present an
+  incomplete TFEC fallback while that dependency remains.
 
 ## DASH-011: Section aggregates use one non-expanding component frontier
 

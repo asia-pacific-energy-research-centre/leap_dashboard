@@ -82,11 +82,14 @@ non-zero; it does not silently zero either one.
 The dashboard uses that resolved list for page routing: domestic placeholder
 pages remain visible where useful, while pages without a usable standalone
 mapping stay hidden. The aggregate itself remains in the overview data.
-TFC/TFEC comparison lines use declared common flows 12 and 13 rather than
-summing every visible hierarchy row. Emissions follows the same principle with
-flow 12: detail wins when available, otherwise the aggregate is shown once as
-`LEAP aggregate demand`. This is the current documented mechanism to review or
-improve upstream; it is not an emissions allocation model.
+The TFC comparison line uses declared common flow 12 rather than summing every
+visible hierarchy row. Flow 13 TFEC is temporarily disabled because non-energy
+use cannot yet be separated from aggregated Other-sector LEAP demand; the
+dashboard must not substitute an incomplete visible-detail sum. Emissions
+follows the declared-total principle with flow 12: detail wins when available,
+otherwise the aggregate is shown once as `LEAP aggregate demand`. This is the
+current documented mechanism to review or improve upstream; it is not an
+emissions allocation model.
 
 ## Mapping diagnostics: ESTO Extended
 
@@ -210,6 +213,14 @@ Scope-specific pages are disabled by default until their content has been
 reviewed for production usefulness; enable `scope_specific_pages.enabled` only
 for focused review runs. `series_config.json` controls visible source/scenario
 series, labels, economy display text, and the static dashboard switcher.
+
+The approved page-root ownership model, boundary-safe prefix rules,
+most-specific-root routing, explicit routing special cases, and the separate
+dataset-presence chart-filter contract are defined in
+[`dashboard_page_routing_and_chart_visibility.md`](dashboard_page_routing_and_chart_visibility.md).
+That document distinguishes the target contract from the current
+priority/keyword implementation and is the authority for the systematic
+routing migration.
 
 Page status and diagnostic-page review notes are tracked in:
 

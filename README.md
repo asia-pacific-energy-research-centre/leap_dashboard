@@ -74,7 +74,9 @@ C:\Users\Work\miniconda3\python.exe scripts\analyze_common_esto_dashboard_page_n
 Additional scripts refresh fixtures from `leap_mappings`, render all available
 economies, and validate the disabled Sankey routing scaffold. See
 `docs/common_esto_dashboard_guide.md` for operational details and
-`docs/common_esto_dashboard_plan.md` for the design.
+`docs/common_esto_dashboard_plan.md` for the design. The approved contract for
+page-root ownership, routing special cases, and dataset-presence chart filtering
+is in `docs/dashboard_page_routing_and_chart_visibility.md`.
 
 ## Repository structure
 

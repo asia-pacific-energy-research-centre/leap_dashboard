@@ -140,6 +140,14 @@ Buildings, Other demand, Other transformation, and other configured sections.
 Per-economy demand pages can be hidden when the mappings-owned coverage config
 says LEAP has only aggregate detail.
 
+The approved systematic replacement for the current priority/keyword routing
+is documented in
+[`../dashboard_page_routing_and_chart_visibility.md`](../dashboard_page_routing_and_chart_visibility.md).
+It defines boundary-safe page roots, most-specific-root ownership, exact
+routing special cases, one builder per page, and the separate chart-level
+dataset-presence filter contract. Treat that document as the migration target,
+not as a claim that every part is already implemented.
+
 ## Rendering and outputs
 
 Per-economy output:

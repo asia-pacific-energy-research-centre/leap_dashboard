@@ -64,6 +64,23 @@ These later commits supersede the corresponding snapshot rows below:
   remains `partial` because its clean-code/artifact provenance requirement and
   the dashboard's current uncommitted changes are separate gates.
 
+## Post-snapshot active design work on 2026-08-08
+
+- **DASHQ-037 is `partial`.** The approved page-root routing and
+  dataset-presence filter contract is documented in
+  [`dashboard_page_routing_and_chart_visibility.md`](dashboard_page_routing_and_chart_visibility.md).
+  Ordinary pages should own configured highest-level flow roots, nested roots
+  should resolve by most-specific match, and exceptional categories should use
+  exact documented `routing_special_cases`. The migration must preserve exact
+  code-boundary matching (`14` must not match `5.14`), keep exact code 17
+  independent of the combined Other/non-energy placeholder, and render every
+  page through one builder. The chart filter is currently disabled and must not
+  be re-enabled until membership comes from final figure traces, selections
+  persist on pages with no matches, an explained empty state exists, and the
+  aggregate-only Industry/LEAP case has regression coverage. Flow 13 remains
+  intentionally disabled until non-energy use can be separated from aggregated
+  Other-sector LEAP demand.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not
