@@ -1,0 +1,181 @@
+{
+  "guide_label": "COMMON ESTO DASHBOARD GUIDE",
+  "page_purposes": {
+    "default": "Use this page to compare LEAP results with ESTO history and the 9th Outlook on a shared set of energy-balance categories.",
+    "total_demand": "Start here for a whole-system view of final demand, transformation, supply and the principal energy-balance totals.",
+    "buildings": "Use Buildings to review residential and commercial energy demand, including fuel totals and changes that need to be traced back to model assumptions.",
+    "industry": "Use Industry to review industrial energy demand by subsector and fuel, with particular attention to large changes and differences between sources.",
+    "transport": "Use Transport to review road and non-road energy demand, fuel switching and the effect of the detailed transport model on LEAP results.",
+    "bunkers": "Use Bunkers to review international aviation and marine energy use separately from domestic transport demand.",
+    "others": "Use Other demand to review agriculture, fishing, non-specified demand and aggregate-only demand that has not yet been replaced by detailed LEAP branches.",
+    "non_energy": "Use Non-energy use to review fuels consumed as feedstocks or materials rather than as an energy source.",
+    "power": "Use Power to review electricity and heat generation, fuel inputs, outputs and unusual dispatch or conversion outcomes.",
+    "refining": "Use Refining to review refinery inputs, oil-product outputs and differences that may indicate a yield, capacity or balance issue.",
+    "other_transformation": "Use Other transformation to review conversion processes and transfers that sit outside power and refining.",
+    "supply": "Use Supply to review how production, trade and transformation outputs meet the model's fuel requirements.",
+    "emissions": "Use Emissions to review the emissions implied by energy demand. Read the page note carefully where aggregate-only demand prevents a detailed sector split.",
+    "transport_leap_vs_ninth": "This diagnostic page provides a focused LEAP-versus-9th view of transport detail. Use it alongside, not instead of, the main three-source Transport page.",
+    "datacentres_leap_vs_ninth": "This diagnostic page provides a focused LEAP-versus-9th view of datacentre demand. Use it alongside the main Buildings page."
+  },
+  "chart_steps": [
+    {
+      "id": "page-purpose",
+      "target": "[data-guide-id='page-purpose']",
+      "title": "What this page is for",
+      "copy": "{page_purpose} The dashboard is a review surface, not the model itself: investigate and correct material issues in LEAP or the relevant upstream data, then rerun the dashboard."
+    },
+    {
+      "id": "economy",
+      "target": "[data-guide-id='economy-context']",
+      "title": "Confirm the economy and update",
+      "copy": "Check the economy before interpreting a result. The update label records when this rendered dashboard was built; it is not the date of every underlying source observation."
+    },
+    {
+      "id": "scenario",
+      "target": "[data-guide-id='scenario-toggle']",
+      "title": "Compare projection scenarios",
+      "copy": "Reference shows the central projection and Target shows the policy-oriented pathway. ESTO history remains visible in either mode, while the LEAP and 9th Outlook projection traces change together."
+    },
+    {
+      "id": "page-navigation",
+      "target": "[data-guide-id='page-navigation']",
+      "title": "Move through the energy system",
+      "copy": "Use these page links to move from the whole-system overview through Demand, Transformation, Supply and Emissions. The current page is outlined in blue."
+    },
+    {
+      "id": "section-navigation",
+      "target": "[data-guide-id='section-navigation']",
+      "title": "Jump to the part you need",
+      "copy": "Orange chips identify major sections and purple chips identify subsections. They move within this page without changing the data or scenario.",
+      "optional": true
+    },
+    {
+      "id": "chart-card",
+      "target": "[data-guide-id='chart-card']",
+      "title": "Read like with like",
+      "copy": "Each chart compares sources after they have been placed on the shared Common ESTO flow and product axes. ESTO supplies historical balance values; LEAP and the 9th Outlook provide modelled series where available. Hover for exact values and use the legend to isolate a trace."
+    },
+    {
+      "id": "chart-tools",
+      "target": "[data-guide-id='chart-card'] .lazy-chart-plot",
+      "title": "Use the chart tools",
+      "copy": "Hover to inspect a year, drag to zoom, double-click to reset and use the Plotly toolbar to download a chart. Inputs to transformation are normally negative and outputs positive; page and chart notes call out important sign conventions."
+    },
+    {
+      "id": "sorting",
+      "target": "[data-guide-id='sort-controls']",
+      "title": "Find material differences first",
+      "copy": "Default preserves the configured order. Largest total finds the biggest parts of the system; Largest difference and Largest % diff help triage disagreements. A large percentage on a tiny series still needs judgement.",
+      "optional": true
+    },
+    {
+      "id": "review-workflow",
+      "target": "[data-guide-id='review-workflow']",
+      "title": "Turn a difference into a review action",
+      "copy": "Start with material totals, compare the historical overlap, then inspect how Reference and Target develop. Identify which source and category diverge, trace the cause to LEAP or upstream data, make the correction there and rerun. Do not edit generated dashboard HTML or treat every difference as an error."
+    }
+  ],
+  "index_steps": [
+    {
+      "id": "index-purpose",
+      "target": "[data-guide-id='index-purpose']",
+      "title": "What this dashboard is for",
+      "copy": "The Common ESTO dashboard compares LEAP model results, ESTO historical balances and 9th Outlook projections on shared flow and product categories. Use it to find results that need explanation or correction; it does not replace LEAP or the source datasets."
+    },
+    {
+      "id": "index-economy",
+      "target": "[data-guide-id='economy-switcher']",
+      "title": "Choose the economy",
+      "copy": "Select the economy you want to review. The equivalent page is opened in that economy's dashboard when it exists.",
+      "optional": true
+    },
+    {
+      "id": "index-pages",
+      "target": "[data-guide-id='page-list']",
+      "title": "Choose where to begin",
+      "copy": "Start with Energy balance overview for the whole system, then open the relevant Demand, Transformation, Supply or Emissions page. The counts show how many overview, summary and detail charts were generated."
+    },
+    {
+      "id": "index-about",
+      "target": "[data-guide-id='about-dashboard']",
+      "title": "Understand the comparison boundary",
+      "copy": "The three sources use different native structures. Upstream mappings place them on the lowest common comparison categories, so dashboard totals are merges and aggregations rather than allocations."
+    },
+    {
+      "id": "index-model-guide",
+      "target": "[data-guide-id='model-guide']",
+      "title": "Use the model guide as a reference",
+      "copy": "This table explains where each dashboard group sits in the wider LEAP model and what reviewers should understand before changing assumptions. Return to it when a page or balance flow is unfamiliar."
+    },
+    {
+      "id": "index-sharing",
+      "target": "[data-guide-id='sharing-note']",
+      "title": "Share the complete dashboard",
+      "copy": "Charts are stored in a neighbouring chart_bundles folder. When sharing a rendered economy, copy the complete economy folder rather than an individual HTML page."
+    }
+  ],
+  "diagnostics_steps": [
+    {
+      "id": "diagnostics-purpose",
+      "target": "header",
+      "title": "What mapping diagnostics are for",
+      "copy": "This APEC-wide page checks whether source hierarchies, registered mapping boundaries and Common ESTO comparison rows reconcile. Use it to investigate structural evidence; do not treat every failed numerical check as a missing mapping."
+    },
+    {
+      "id": "diagnostics-terms",
+      "target": ".guide-grid",
+      "title": "Read the hierarchy terms first",
+      "copy": "These cards distinguish source-tree children, mapping fan-out, de-duplicated frontiers and contradictions already present in raw source data. Those distinctions prevent double counting and incorrect mapping fixes."
+    },
+    {
+      "id": "diagnostics-metrics",
+      "target": ".metrics",
+      "title": "Use counts as an entry point",
+      "copy": "The summary cards show how much evidence is present. Counts indicate where to investigate; they do not by themselves establish severity or confirm the cause of a mismatch."
+    },
+    {
+      "id": "diagnostics-graph",
+      "target": "#rollup-graph",
+      "title": "Inspect hierarchy and rollup structure",
+      "copy": "Solid edges are ordinary hierarchy relationships. Rollup edges describe compiled comparison boundaries and are not additional parents. Filter the graph, select a node and inspect its neighbours before interpreting an issue."
+    },
+    {
+      "id": "diagnostics-evidence",
+      "target": "details.panel",
+      "title": "Open the supporting evidence",
+      "copy": "Collapsed sections contain validation failures, reviewed exceptions, related economy contexts and coverage evidence. Review material APEC failures first, then use economy evidence to locate the source of the mismatch."
+    }
+  ],
+  "tree_steps": [
+    {
+      "id": "tree-purpose",
+      "target": "h1",
+      "title": "What the mapping tree shows",
+      "copy": "The explorer keeps source hierarchy edges, registered mapping routes and real ESTO target edges separate. Use it when you need to understand how one native source node reaches Common ESTO rows."
+    },
+    {
+      "id": "tree-controls",
+      "target": "main > .box",
+      "title": "Choose the view",
+      "copy": "Select the source tree, labels, year, scenario and magnitude. Find node filters the visible source tree; changing these controls does not edit mappings or source data."
+    },
+    {
+      "id": "tree-source",
+      "target": ".trees .tree",
+      "title": "Select a source node",
+      "copy": "Open the hierarchy and select a node on the left. Highlighting shows its registered ESTO components and Common ESTO targets without inventing additional parent-child relationships."
+    },
+    {
+      "id": "tree-targets",
+      "target": ".trees",
+      "title": "Compare source and target structure",
+      "copy": "The panels separate the native source tree, the original ESTO component hierarchy and the Common ESTO comparison hierarchy. Similar labels do not imply that the structures are identical."
+    },
+    {
+      "id": "tree-routes",
+      "target": "#detail",
+      "title": "Review the registered routes",
+      "copy": "After selecting a node, the route table lists its source pair, ESTO component, Common row ID, values and comparison scope. It counts each Common ESTO row ID once in the summary."
+    }
+  ]
+}

@@ -12,6 +12,11 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.utils import PlotlyJSONEncoder
 
+try:  # pragma: no cover - import shim
+    from common_esto_dashboard_guide import build_guide_fragments
+except ModuleNotFoundError:  # pragma: no cover - import shim
+    from codebase.common_esto_dashboard_guide import build_guide_fragments
+
 # The emissions module imports this one lazily inside its functions, so this
 # top-level import stays acyclic. Both spellings are supported because the
 # workflow puts codebase/ on sys.path while tests import codebase as a package.
@@ -1982,7 +1987,7 @@ a:hover { text-decoration: underline; }
   color: #0b3d5c;
   cursor: pointer;
 }
-.header-toggle-row { display:flex;justify-content:flex-end;margin-top:8px; }
+.header-toggle-row { display:flex;justify-content:flex-end;gap:8px;margin-top:8px; }
 .page-header.is-collapsed .header-collapsible { display: none; }
 .page-header.is-collapsed { padding-bottom:0;background:transparent;backdrop-filter:none;border-bottom-color:transparent; }
 .page-header.is-collapsed .header-toggle-row { margin-top:0; }
@@ -2522,7 +2527,7 @@ def _dashboard_switcher_html(dashboards: list[dict[str, str]], current_dashboard
         options.append(f'<option value="{href}"{selected}>{escape(label)}</option>')
 
     return (
-        '<label class="dashboard-switcher">'
+        '<label class="dashboard-switcher" data-guide-id="economy-switcher">'
         '<span>Economy</span>'
         f'<select data-dashboard-switcher aria-label="Switch dashboard">{"".join(options)}</select>'
         '</label>'
@@ -2586,7 +2591,7 @@ def _jump_nav_html(page_label: str, section_tree: list[tuple[str, list[str]]]) -
         )
         rows.append(f'<div class="jump-nav-row" data-level="2">{sub_chips}</div>')
     return (
-        f'<div class="jump-nav"><span class="jump-nav-label">Sections:</span>'
+        f'<div class="jump-nav" data-guide-id="section-navigation"><span class="jump-nav-label">Sections:</span>'
         f'<div class="jump-nav-groups">{"".join(rows)}</div></div>'
     )
 
@@ -2609,7 +2614,7 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
         caption = escape(str(row.get("title", "")))
         key = escape(row["chart_key"])
         cards.append(
-            f'<figure class="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
+            f'<figure class="chart-card" data-guide-id="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
             f'<figcaption class="chart-caption">{caption}</figcaption>'
             f'<div class="meta-subline">{escape(page_label)}</div>'
             f'<div class="area-data-note">{escape(str(row.get("stacked_area_note", "")))}</div>'
@@ -2620,7 +2625,7 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
     return (
         f'<h2 class="section-heading">Overview</h2>'
         f'<section class="section-sort-group">'
-        f'<div class="sort-bar"><span class="sort-bar-label">Sort:</span>'
+            f'<div class="sort-bar" data-guide-id="sort-controls"><span class="sort-bar-label">Sort:</span>'
         f'<button class="sort-btn active" data-sort="default">Default</button>'
         f'<button class="sort-btn" data-sort="totalAbs">Largest total</button>'
         f'<button class="sort-btn" data-sort="absDiff">Largest difference</button>'
@@ -2654,7 +2659,7 @@ def _chart_cards_html(rows: list[dict], subline: str) -> str:
             else ""
         )
         cards.append(
-            f'<figure class="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
+            f'<figure class="chart-card" data-guide-id="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
             f'<figcaption class="chart-caption">{product_name}</figcaption>'
             f'<div class="meta-subline">{escape(subline)}</div>'
             f'{area_note}'
@@ -2667,7 +2672,7 @@ def _chart_cards_html(rows: list[dict], subline: str) -> str:
 
 def _sort_bar_html() -> str:
     return (
-        '<div class="sort-bar"><span class="sort-bar-label">Sort:</span>'
+        '<div class="sort-bar" data-guide-id="sort-controls"><span class="sort-bar-label">Sort:</span>'
         '<button class="sort-btn active" data-sort="default">Default</button>'
         '<button class="sort-btn" data-sort="totalAbs">Largest total</button>'
         '<button class="sort-btn" data-sort="absDiff">Largest difference</button>'
@@ -2800,6 +2805,7 @@ def write_dashboard_page(
     economy_ctx = f"Economy: <strong>{escape(economy_label)}</strong>" if economy_label else ""
     if economy_ctx and dashboard_updated_label:
         economy_ctx = f'{economy_ctx}<span class="dashboard-updated">Updated: {escape(dashboard_updated_label)}</span>'
+    guide = build_guide_fragments("chart", str(page_config.get("page_key", "")), page_label)
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -2807,36 +2813,38 @@ def write_dashboard_page(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{escape(page_label)}</title>
-  <style>{_PAGE_CSS}</style>
+  <style>{_PAGE_CSS}{guide["css"]}</style>
 </head>
 <body>
   <div class="page-shell">
     <header class="page-header" id="page-header">
       <div class="header-collapsible">
       <div class="header-main-row">
-        <div style="min-width:220px;flex:1 1 320px;">
+        <div style="min-width:220px;flex:1 1 320px;" data-guide-id="page-purpose">
           <h1 style="margin:0;font-size:24px;line-height:1.15;">{escape(page_label)}</h1>
-          {f'<div class="dashboard-context">{economy_ctx}</div>' if economy_ctx else ""}
+          {f'<div class="dashboard-context" data-guide-id="economy-context">{economy_ctx}</div>' if economy_ctx else ""}
         </div>
         <div class="header-side-controls">
-          {_SCENARIO_TOGGLE_HTML}
+          {_SCENARIO_TOGGLE_HTML.replace('class="scenario-toggle"', 'class="scenario-toggle" data-guide-id="scenario-toggle"')}
           {switcher_html}
           {dataset_filter_html}
-          <div class="header-inline-controls">{nav_chips}</div>
+          <div class="header-inline-controls" data-guide-id="page-navigation">{nav_chips}</div>
         </div>
       </div>
       {jump_nav}
       </div>
       <div class="header-toggle-row">
+        {guide["launch_button_html"]}
         <button id="header-toggle" class="header-toggle" type="button" aria-expanded="true" aria-label="Collapse header">&#9652;</button>
       </div>
     </header>
-    <main class="page-body">
+    <main class="page-body" data-guide-id="review-workflow">
       {note_html}
       {overview_html}
       {sections_html}
     </main>
   </div>
+  {guide["dialog_html"]}
   <script>{_HEADER_TOGGLE_JS}</script>
   <script>{_DASHBOARD_SWITCHER_JS}</script>
   <script>{_SCENARIO_TOGGLE_JS}</script>
@@ -2845,6 +2853,7 @@ def write_dashboard_page(
   <script>{_LAZY_LOAD_JS}</script>
   <script>{_SORT_JS}</script>
   <script>{_DATASET_FILTER_JS}</script>
+  <script>{guide["script"]}</script>
 </body>
 </html>
 """
@@ -2880,6 +2889,7 @@ def write_index(
         f'<p style="margin:0;color:#4b5563;font-size:13px;">Updated: {escape(dashboard_updated_label)}</p>'
         if dashboard_updated_label else ""
     )
+    guide = build_guide_fragments("index", "index", f"Common ESTO Dashboard{economy_heading}")
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2894,20 +2904,21 @@ def write_index(
     .dashboard-switcher {{ display:flex;align-items:center;gap:6px;font-size:13px;color:#4b5563;white-space:nowrap; }}
     .dashboard-switcher select {{ max-width:240px;padding:6px 28px 6px 8px;border:1px solid #c5ccd3;border-radius:6px;background:#fff;color:#111;font:inherit; }}
     ul {{ list-style: none; padding: 0; margin-top: 20px; }}
+    {guide["css"]}
   </style>
 </head>
 <body>
   <div class="shell">
-    <div class="top-row">
+    <div class="top-row" data-guide-id="index-purpose">
       <div>
         <h1>Common ESTO Dashboard{economy_heading}</h1>
         {updated_html}
       </div>
-      {switcher_html}
+      <div style="display:flex;align-items:center;gap:8px;">{switcher_html}{guide["launch_button_html"]}</div>
     </div>
     <p style="color:#4b5563;">Charts are generated automatically from common ESTO flow/product rows.</p>
-    <ul>{cards}</ul>
-    <div style="margin-top:32px;border-top:1px solid #d8dee4;padding-top:24px;">
+    <ul data-guide-id="page-list">{cards}</ul>
+    <div data-guide-id="about-dashboard" style="margin-top:32px;border-top:1px solid #d8dee4;padding-top:24px;">
       <h2 style="margin:0 0 8px 0;font-size:18px;">About this dashboard</h2>
       <p style="margin:0 0 12px 0;color:#4b5563;font-size:13px;">This dashboard compares three sources on one shared set of flow/product
       categories (the "common ESTO" axis): LEAP model results, ESTO historical
@@ -2920,7 +2931,7 @@ def write_index(
       completely. See <code>codebase/common_esto_dashboard_workflow.py</code>
       in the <code>leap_dashboard</code> repository to reproduce or update it.</p>
       <p style="margin:0 0 12px 0;color:#4b5563;font-size:13px;">Some LEAP economies still report demand through <code>All demand aggregated</code> while detailed branches are being developed. The dashboard uses the mapping-owned coverage record to decide which sector pages are transitional, uses declared TFC/TFEC totals for balance lines, and keeps aggregate-only emissions as one clearly labelled series rather than inventing a sector split. See the Emissions note and the source-selection CSV for the level used by each source.</p>
-      <p style="margin:0;color:#4b5563;font-size:13px;">Each rendered economy is a self-contained set of static files: this page,
+      <p data-guide-id="sharing-note" style="margin:0;color:#4b5563;font-size:13px;">Each rendered economy is a self-contained set of static files: this page,
       the other pages linked above, a <code>chart_bundles/</code> folder holding
       each page's chart data, and a <code>supporting_files/</code> folder holding
       the CSVs behind the charts. Pages load their charts from
@@ -2930,7 +2941,7 @@ def write_index(
       <code>dashboards/</code> + <code>chart_bundles/</code> pair) together
       whenever sharing a rendered dashboard.</p>
     </div>
-    <div style="margin-top:32px;border-top:1px solid #d8dee4;padding-top:24px;">
+    <div data-guide-id="model-guide" style="margin-top:32px;border-top:1px solid #d8dee4;padding-top:24px;">
       <h2 style="margin:0 0 8px 0;font-size:18px;">Model guide</h2>
       <p style="margin:0 0 16px 0;color:#4b5563;font-size:13px;">In the APERC LEAP system, the model is organised around the main LEAP branches of Demand, Transformation, and Resources. The dashboard sits outside LEAP and helps users check how these branches behave in the results, especially by comparing LEAP outputs with ESTO historical balances and 9th Outlook projections. The table below gives a short guide to the main model groups and how they should be understood when using either LEAP or the dashboard.</p>
       <div style="overflow-x:auto;">
@@ -3027,7 +3038,9 @@ def write_index(
       </div>
     </div>
   </div>
+  {guide["dialog_html"]}
   <script>{_DASHBOARD_SWITCHER_JS}</script>
+  <script>{guide["script"]}</script>
 </body>
 </html>
 """

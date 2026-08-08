@@ -22,6 +22,11 @@ inspection of the current upstream mapping artifacts.
 
 These later commits supersede the corresponding snapshot rows below:
 
+- **DASHQ-037 is complete in an isolated worktree.** The configurable,
+  page-aware guided tour covers the landing page, all chart pages, mapping
+  diagnostics, and the full mapping-tree explorer. It uses stable
+  renderer-owned targets and keeps editable guide text outside generated HTML.
+
 - **DASHQ-003 and DASHQ-004 are complete in the current documentation
   checkout.** `docs/handover_mapping_diagnostics.md` now retains the original
   doubling diagnosis as dated incident evidence while clearly recording the
@@ -174,6 +179,7 @@ decisions can be made without review.
 
 | ID | Priority | Target | Status | Depends on | Work item | Evidence and completion test |
 |---|---|---|---|---|---|---|
+| DASHQ-037 | P1 | 2026-08-08 | `complete_in_worktree` | none | Add an interactive guide to every dashboard page | Complete in `codex/dashboard-guided-tour`: a top-right Guide button opens keyboard-accessible, page-aware walkthroughs on the index, every chart page, mapping diagnostics, and the full mapping-tree explorer. Content is editable in `guide_config.json`; stable targets are generated with each page. Verification: all 160 tests pass; the tracked USA fixture renders 579 charts; every rendered HTML page contains the launcher; publication readiness passes; page-noise reports zero flags; browser QA passes forward/back/Escape, chart lazy loading, index and diagnostics/tree tours with no console errors. |
 | DASHQ-030 | P0 | 2026-08-03 | `complete_on_master` | none | Prevent detached common aggregates from stacking with their components | Done in `746bcc7`. Aggregate charts now select one observation-specific common-code frontier even when the broad row is not flagged NON_EXPANDING. The USA Other demand production bundle contains only `16.03-16.05,17`; a source without that row retains `16.03-16.04` and `16.05`. Verification: 47 focused tests pass, fixture and production USA renders completed, required bundles/manifests exist, publication readiness passes, and page-noise flags are unrelated existing density/suppression findings. |
 | DASHQ-031 | P0 | 2026-08-03 | `complete_on_master` | none | Include every compound-range endpoint in overview-card scopes | Done in `6142240`. Range-aware subtree closure removes the incomplete `16.01`-derived Buildings card while retaining the valid all-Buildings and Residential views. Verification: 48 focused tests pass; the production USA render contains 520 charts and its all-Buildings frontier includes Ninth Commercial plus Residential; publication readiness passes and page-noise findings are unrelated. |
 | DASHQ-032 | P0 | 2026-08-03 | `complete_on_master` | DASHQ-030, DASHQ-031 | Keep detached frontiers local to their chart and restore transformation pages | Implemented and verified. Detached compound suppression now runs after page routing and only on flows; explicit NON_EXPANDING product rules are unchanged. Mixed-depth compounds use every endpoint when selecting overview levels. USA Power and Refining again contain all five dataset totals; the 2060 Transfers LEAP Target total is restored from the erroneous 8,601 PJ to the source-consistent 2,134 PJ; the broad transformation overview is no longer gas-only. Verification: 51 dashboard tests pass, the production USA render writes 676 charts, publication readiness passes, and the six page-noise flags are pre-existing unrelated findings. |

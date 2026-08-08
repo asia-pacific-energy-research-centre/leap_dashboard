@@ -202,6 +202,7 @@ Dashboard config lives in:
 ```text
 config/common_esto_dashboard/common_esto_dashboard_template.json
 config/common_esto_dashboard/series_config.json
+config/common_esto_dashboard/guide_config.json
 ```
 
 The template controls page assignment, sign semantics, total demand, optional
@@ -210,6 +211,15 @@ Scope-specific pages are disabled by default until their content has been
 reviewed for production usefulness; enable `scope_specific_pages.enabled` only
 for focused review runs. `series_config.json` controls visible source/scenario
 series, labels, economy display text, and the static dashboard switcher.
+
+`guide_config.json` contains the editable text and ordered steps for the
+top-right **Guide** button. It has separate step lists for the landing page,
+chart pages, mapping diagnostics, and the full mapping-tree explorer. To edit
+the tour, change a step's `title` or `copy`, or add a step with a unique `id`
+and a stable CSS `target`. Use `optional: true` only when the target is
+legitimately absent on some rendered pages. The renderer validates required
+fields and duplicate IDs before it writes HTML; guide markup, styling, and
+interaction code live in `codebase/common_esto_dashboard_guide.py`.
 
 Page status and diagnostic-page review notes are tracked in:
 
