@@ -99,3 +99,21 @@ def test_mappings_preflight_loads_when_dashboard_codebase_package_is_loaded(
         check=True,
     )
     assert "['20USA:loaded']" in result.stdout
+
+
+def test_batch_and_qa_scripts_accept_isolated_output_path_overrides() -> None:
+    batch_source = (
+        REPO_ROOT / "scripts" / "render_common_esto_dashboard_all_economies.py"
+    ).read_text(encoding="utf-8")
+    readiness_source = (
+        REPO_ROOT / "scripts" / "check_common_esto_dashboard_publish_ready.py"
+    ).read_text(encoding="utf-8")
+    noise_source = (
+        REPO_ROOT / "scripts" / "analyze_common_esto_dashboard_page_noise.py"
+    ).read_text(encoding="utf-8")
+
+    assert "COMMON_ESTO_LEGACY_INPUT_PATH" in batch_source
+    assert "COMMON_ESTO_COMMON_ROWS_PATH" in batch_source
+    assert "COMMON_ESTO_DASHBOARD_OUTPUT_ROOT" in batch_source
+    assert "COMMON_ESTO_DASHBOARD_OUTPUT_ROOT" in readiness_source
+    assert "COMMON_ESTO_DASHBOARD_OUTPUT_ROOT" in noise_source

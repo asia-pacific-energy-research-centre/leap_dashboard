@@ -48,11 +48,21 @@ These later commits supersede the corresponding snapshot rows below:
   comparison lines now prefer declared top-level flows instead of summing
   overlapping hierarchy views. The supply-detail charts also draw LEAP TFC
   from the aggregate flow when sector detail is unavailable.
-- **DASHQ-029 is complete in the current checkout.** Aggregate-backed Industry,
+- **DASHQ-027 is complete in the current checkout.** Aggregate-backed Industry,
   Buildings, Transport, and Other demand pages remain visible until detailed
   LEAP demand replaces the placeholders. The combined Other-sector/non-energy
   placeholder routes to Other demand without changing exact code-17 routing;
   aggregate-only Bunkers remains hidden.
+- **The two-run Common ESTO v1 production soak is complete in isolated
+  worktrees.** Run 1 passed on 2026-07-28. Run 2 passed on 2026-08-03 against
+  mapping run `common_esto_20260803T053714732123Z` and dashboard commit
+  `8ad51dc`: 21/21 economies, 10,212 charts, 978,809 visible rows, empty
+  stderr, and publication readiness all passed. Seven page-noise flags were
+  retained and reproduced exactly from the same-generation legacy input; they
+  are not contract-reader regressions. The compact contract can now be
+  considered for default selection in a separate reviewed change. DASHQ-007
+  remains `partial` because its clean-code/artifact provenance requirement and
+  the dashboard's current uncommitted changes are separate gates.
 
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
@@ -184,7 +194,6 @@ decisions can be made without review.
 | DASHQ-001 | P0 | 2026-07-28 | ✅ `complete_on_master` | — | Recover at-risk uncommitted renderer work | **Done 2026-07-28 in `f514b1f`.** The uncommitted fix to `_apply_total_series_chrome` and its test were replayed onto current `master`. Verified still needed (master retained the `" total"` guard) and verified safe: no collision between source names and the authoritative 104-flow / 75-product label universe. Stacked traces are now skipped explicitly so the invariant is enforced, not assumed, with an added regression test. Evidence: 30 tests pass; a real 20USA render shows 8 comparison lines that the old guard missed now stably coloured. The worktree may now be removed under DASHQ-014. |
 | DASHQ-002 | P0 | 2026-07-28 to 2026-07-30 | `partial_uncommitted` | — | Land or park the diagnostics structural-flag overlay | **Under active development by another session — coordinate before touching.** As first read, the change added `structural_flags` (`DUPLICATE_FLOW_CODE`, `ORPHAN_PARENT`) and per-node anchor-validation counts to `_rollup_graph_data`, with the caller at line 1058 passing `validation=stage` and `economy=economy`. It has since grown to +681/-21 across the renderer and `tests/test_mapping_diagnostics_page.py`, so test coverage is now being added. Complete when it is committed with its tests passing, or moved to a named branch. Do not combine it with DASHQ-001 in one commit. |
 | DASHQ-027 | P0 | 2026-08-03 | `verified_uncommitted` | DASHQ-002 | Commit the diagnostics rollup-catalogue source fix | The verified fix removes the hierarchy-contract override of mapping-owned `rollup_edges.csv`, so Electricity plants, CHP plants, and Heat plants all receive their registered `EXPANDING` badges and the erroneous contract-derived `CHP plants → Coal CHP` boundary is absent. Commit `codebase/common_esto_dashboard_mapping_diagnostics.py` and `tests/test_mapping_diagnostics_rollup_source.py` as one scoped checkpoint after coordinating the overlapping DASHQ-002 edits. Before committing, confirm the regenerated shared diagnostics page still contains all three plant rollup IDs. Verification already completed on 2026-08-03: 14 diagnostics tests and 42 dashboard tests passed, publication readiness passed for all rendered economies, and page-noise analysis reported zero flags. |
-| DASHQ-028 | P0 | 2026-08-03 | ✅ `complete_on_master` | — | Remove the invalid standalone gas-works own-use comparison | Implemented and verified: `10.01.02 Gas works plants` is filtered because LEAP exposes it only inside `09.06.01 Gas works plants (including own use)`, while synthetic parents use `10 Losses and own use` and `10.01 Own use`. The focused suite passes (46 tests); USA fixture and China production renders contain the required bundles/manifests; the China manifest and HTML contain no standalone `10.01.02`; publication readiness passes. Page-noise QA completed with six pre-existing density/suppression flags unrelated to this change. |
 | DASHQ-003 | P0 | 2026-07-28 to 2026-07-30 | ✅ `complete_on_master` | DASHQ-007 | Correct the stale doubling section in the handover note | **Done in `1d309c3`.** The handover retains the diagnosis as dated incident evidence and records the fixed run and measured replacement identity counts. No tracked document presents current ordinary ESTO as doubled. |
 | DASHQ-004 | P0 | 2026-07-28 to 2026-07-30 | ✅ `complete_on_master` | `leap_mappings` MAPQ-001 | Fix the broken cross-repository prompt reference | **Done in `1d309c3` and this documentation reconciliation.** The handover labels the mappings prompt complete and absent from `master`; the active dashboard prompt now points to the retained handover evidence rather than instructing readers to open the absent file. |
 | DASHQ-005 | P0 | 2026-07-29 to 2026-08-03 | `complete_unpushed` | — | Reconcile local `master` with `origin/master` | 55 local commits are absent from the remote and the last fetch was 2026-07-24. Re-fetch, confirm zero divergence, then review and push through the user's normal process. Complete when the intended remote contains them or the handover explicitly records why it does not. This is the single largest "work exists only on one laptop" risk in this repository. |
@@ -207,37 +216,7 @@ decisions can be made without review.
 | DASHQ-023 | P2 | 2026-08-12 to 2026-08-19 | `not_started` | DASHQ-008 | Diagnostics: candidate readiness | Display review-only, non-workbook candidates with their evidence and destination sheet. The dashboard must never add candidates to the workbook. |
 | DASHQ-024 | P2 | 2026-08-12 to 2026-08-19 | `not_started` | DASHQ-008 | Diagnostics: crosswalk target conflicts and duplicate mappings | Classify intentional versus accidental duplicates first; do not present all raw duplicate rows as errors. |
 | DASHQ-025 | P1 | 2026-08-03 to 2026-08-10 | ✅ `complete_unpushed` | DASHQ-007 | Resolve the publication blocker on empty transfers charts | **Done in `b125425`.** Empty area figures are suppressed. The recorded `20USA`/`02BD` legacy-versus-contract equivalence run passed readiness and page-noise checks; DASHQ-007 must repeat the gates for a newly published all-economy generation. |
-| DASHQ-026 | P1 | 2026-08-03 to 2026-08-10 | `not_started` | `leap_mappings` MAPQ-033 | Pin hierarchy-contract selection and bound legacy fallback | Replace filesystem-driven selection (`manifest exists` or legacy CSVs) with configured `required_contract` and temporary explicit `legacy_compatibility` modes. Record mode, build ID, schema, and reason in page/run evidence; fail publication readiness in compatibility mode. Preserve rendering behavior and source-specific QA. Complete when tests cover absent/corrupt/stale contracts, explicit compatibility mode, and production-required mode; remove fallback only after two successful current all-economy pinned builds. See the [cross-repository audit](../../leap_mappings/docs/cross_repo_hierarchy_subtotal_modularisation_plan.md). |
-| DASHQ-027 | P1 | 2026-08-03 to 2026-08-10 | `not_started` | DASHQ-026, `leap_mappings` MAPQ-033 | Converge the shared consumer loader and fixtures | Keep dashboard-only diagnostic labels and contract-to-render adaptation local, but generate/reference-test the shared load core and corrupt/valid fixtures with mappings and initialisation. Add required-member, required-column, key-uniqueness, enum, and boolean checks. Complete when all three repositories pass the same fixture matrix and report the same schema/build identity without importing a sibling checkout at runtime. |
 | DASHQ-017 | P0 | 2026-08-18 to 2026-08-24 | `not_started` | all above | Run the clean-checkout handover rehearsal | A colleague or clean agent session follows the runbook from a fresh checkout of all three repositories, records every missing assumption, and renders one economy end to end. Complete when the rehearsal succeeds without undocumented local knowledge and the queue is frozen with owner, risk, next action, and last-verified date on every remaining item. |
-
-### DASHQ-026 production-soak evidence
-
-**Run 1 passed on 2026-07-28; Run 2 is still required.** The selected strict
-contract was run ID `common_esto_20260728T035935111268Z` from mappings revision
-`86b1162`, with 3,952,646 facts. The all-economy render completed 21/21
-economies with status `ok`, 6,510 charts, 1,020,120 visible rows, zero stderr,
-and a passing publication-readiness check. It wrote only to
-`outputs/common_esto_contract_soak_run_1_20260728`; tracked serving assets were
-not published.
-
-Page-noise review found five `high_suppressed_share` rows: `04CHL`
-other transformation (28/95), `12NZ` other transformation (17/61) and refining
-(11/30), `14PE` other transformation (12/43), and `18CT` other transformation
-(21/67). A targeted control rendered those four economies from the preserved
-same-generation 975,673,793-byte legacy comparison. All four chart manifests,
-sign-semantics summaries, chart counts, visible-row counts, and all 24
-page-noise rows matched the contract render exactly, including all five flags.
-The flags therefore describe this producer generation's low-magnitude page
-structure; they are not contract-reader regressions and were not suppressed.
-
-The first isolated attempt is retained as failure evidence. It failed before
-rendering because dashboard's already-loaded `codebase` package masked
-`leap_mappings/codebase`. The retry loads the self-contained mappings preflight
-module by its configured file path under a unique module name; a regression
-test recreates the package collision. The 975,673,793-byte legacy file remains
-available as rollback. Do not change the default or remove it until a second
-dated all-economy contract candidate independently passes the same gates.
 
 ## Deferred by decision — not queue items
 
