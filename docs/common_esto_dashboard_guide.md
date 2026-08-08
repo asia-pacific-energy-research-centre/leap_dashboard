@@ -214,12 +214,25 @@ series, labels, economy display text, and the static dashboard switcher.
 
 `guide_config.json` contains the editable text and ordered steps for the
 top-right **Guide** button. It has separate step lists for the landing page,
-chart pages, mapping diagnostics, and the full mapping-tree explorer. To edit
-the tour, change a step's `title` or `copy`, or add a step with a unique `id`
-and a stable CSS `target`. Use `optional: true` only when the target is
-legitimately absent on some rendered pages. The renderer validates required
-fields and duplicate IDs before it writes HTML; guide markup, styling, and
-interaction code live in `codebase/common_esto_dashboard_guide.py`.
+chart pages, mapping diagnostics, and the full mapping-tree explorer. The
+`page_steps` object adds one content step to the shared chart tour for each
+page key, so Supply can explain signs while Emissions explains its derived
+boundary without duplicating the navigation steps.
+
+To edit the tour, change a step's `title` or `copy`, or add a step with a unique
+`id` and a stable CSS `target`. A step may also include a `table` object with a
+`caption`, `headers`, and `rows`; this is useful for compact sign guides,
+inclusion boundaries, and review sequences. Use `optional: true` only when the
+target is legitimately absent on some rendered pages. The renderer validates
+required fields and duplicate IDs before it writes HTML; guide markup, styling,
+page-step insertion, and interaction code live in
+`codebase/common_esto_dashboard_guide.py`.
+
+Guide content should explain how to interpret and review the existing output,
+not create new mapping semantics. Keep mapping-boundary wording aligned with
+`docs/common_esto_mapping_consumer.md`, sign wording aligned with
+`common_esto_dashboard_template.json`, and emissions wording aligned with
+DASH-021 in `docs/special_rules_and_design_decisions.md`.
 
 Page status and diagnostic-page review notes are tracked in:
 

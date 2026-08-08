@@ -98,10 +98,10 @@ def guide_launch_button_html() -> str:
 
 def validate_guide_config(config: dict) -> None:
     """Fail early when editorial changes would produce a broken guide."""
-    for list_name in ("chart_steps", "index_steps", "diagnostics_steps", "tree_steps"):
-        steps = config.get(list_name)
-        if not isinstance(steps, list) or not steps:
-            raise ValueError(f"Guide config requires a non-empty {list_name} list.")
+    def validate_steps(steps: object, list_name: str, require_non_empty: bool = True) -> set[str]:
+        if not isinstance(steps, list) or (require_non_empty and not steps):
+            requirement = "a non-empty list" if require_non_empty else "a list"
+            raise ValueError(f"Guide config requires {list_name} to be {requirement}.")
         seen: set[str] = set()
         for position, step in enumerate(steps, start=1):
             if not isinstance(step, dict):
@@ -113,9 +113,37 @@ def validate_guide_config(config: dict) -> None:
             if step_id in seen:
                 raise ValueError(f"Duplicate guide step id in {list_name}: {step_id}")
             seen.add(step_id)
+            table = step.get("table")
+            if table is not None:
+                if not isinstance(table, dict):
+                    raise ValueError(f"{list_name} step {position} table must be an object.")
+                headers = table.get("headers")
+                rows = table.get("rows")
+                if not isinstance(headers, list) or not headers:
+                    raise ValueError(f"{list_name} step {position} table requires headers.")
+                if not isinstance(rows, list) or any(
+                    not isinstance(row, list) or len(row) != len(headers) for row in rows
+                ):
+                    raise ValueError(
+                        f"{list_name} step {position} table rows must match the header count."
+                    )
+        return seen
+
+    step_ids_by_list: dict[str, set[str]] = {}
+    for list_name in ("chart_steps", "index_steps", "diagnostics_steps", "tree_steps"):
+        step_ids_by_list[list_name] = validate_steps(config.get(list_name), list_name)
     purposes = config.get("page_purposes")
     if not isinstance(purposes, dict) or not str(purposes.get("default", "")).strip():
         raise ValueError("Guide config requires page_purposes.default.")
+    page_steps = config.get("page_steps", {})
+    if not isinstance(page_steps, dict):
+        raise ValueError("Guide config page_steps must be an object when provided.")
+    for page_key, steps in page_steps.items():
+        page_ids = validate_steps(steps, f"page_steps.{page_key}", require_non_empty=False)
+        collisions = page_ids & step_ids_by_list["chart_steps"]
+        if collisions:
+            duplicate = sorted(collisions)[0]
+            raise ValueError(f"Page-specific guide step id duplicates a chart step: {duplicate}")
 
 
 @lru_cache(maxsize=4)
@@ -134,7 +162,14 @@ def _resolved_steps(config: dict, page_kind: str, page_key: str, page_label: str
         "diagnostics": "diagnostics_steps",
         "tree": "tree_steps",
     }
-    source_steps = config[list_by_kind[page_kind]]
+    source_steps = list(config[list_by_kind[page_kind]])
+    if page_kind == "chart":
+        page_specific_steps = list(config.get("page_steps", {}).get(page_key, []))
+        insert_at = next(
+            (index + 1 for index, step in enumerate(source_steps) if step.get("id") == "chart-card"),
+            len(source_steps),
+        )
+        source_steps[insert_at:insert_at] = page_specific_steps
     purposes = config["page_purposes"]
     page_purpose = str(purposes.get(page_key, purposes["default"]))
     replacements = {"page_key": page_key, "page_label": page_label, "page_purpose": page_purpose}

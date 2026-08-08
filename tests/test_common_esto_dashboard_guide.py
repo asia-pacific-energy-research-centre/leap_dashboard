@@ -38,6 +38,25 @@ def test_index_and_chart_guides_have_different_steps() -> None:
     )["script"]
 
 
+def test_chart_guide_adds_only_the_current_pages_review_content() -> None:
+    power_script = build_guide_fragments("chart", "power", "Power")["script"]
+    emissions_script = build_guide_fragments("chart", "emissions", "Emissions")["script"]
+
+    assert "Review the conversion story" in power_script
+    assert "Power review sequence" in power_script
+    assert "These emissions are derived" not in power_script
+    assert "These emissions are derived" in emissions_script
+    assert "Included and excluded boundaries" in emissions_script
+
+
+def test_index_guide_includes_the_recommended_review_route() -> None:
+    index_script = build_guide_fragments("index", "index", "Common ESTO Dashboard")["script"]
+
+    assert "Recommended review route" in index_script
+    assert "Mapping diagnostics" in index_script
+    assert "does not allocate coarse values" in index_script
+
+
 def test_guide_validation_rejects_duplicate_step_ids() -> None:
     step = {"id": "same", "target": "#target", "title": "Title", "copy": "Copy"}
     invalid = {
@@ -49,6 +68,40 @@ def test_guide_validation_rejects_duplicate_step_ids() -> None:
     }
 
     with pytest.raises(ValueError, match="Duplicate guide step id"):
+        validate_guide_config(invalid)
+
+
+def test_guide_validation_rejects_invalid_page_steps() -> None:
+    step = {"id": "step", "target": "#target", "title": "Title", "copy": "Copy"}
+    invalid = {
+        "page_purposes": {"default": "Purpose"},
+        "chart_steps": [step],
+        "index_steps": [step],
+        "diagnostics_steps": [step],
+        "tree_steps": [step],
+        "page_steps": {"power": "not-a-list"},
+    }
+
+    with pytest.raises(ValueError, match="page_steps.power.*list"):
+        validate_guide_config(invalid)
+
+
+def test_guide_validation_rejects_malformed_rich_table() -> None:
+    step = {"id": "step", "target": "#target", "title": "Title", "copy": "Copy"}
+    invalid = {
+        "page_purposes": {"default": "Purpose"},
+        "chart_steps": [step],
+        "index_steps": [
+            {
+                **step,
+                "table": {"headers": ["One", "Two"], "rows": [["only one cell"]]},
+            }
+        ],
+        "diagnostics_steps": [step],
+        "tree_steps": [step],
+    }
+
+    with pytest.raises(ValueError, match="table rows must match the header count"):
         validate_guide_config(invalid)
 
 

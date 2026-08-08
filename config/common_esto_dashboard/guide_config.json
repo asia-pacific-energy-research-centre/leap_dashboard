@@ -17,6 +17,181 @@
     "transport_leap_vs_ninth": "This diagnostic page provides a focused LEAP-versus-9th view of transport detail. Use it alongside, not instead of, the main three-source Transport page.",
     "datacentres_leap_vs_ninth": "This diagnostic page provides a focused LEAP-versus-9th view of datacentre demand. Use it alongside the main Buildings page."
   },
+  "page_steps": {
+    "total_demand": [
+      {
+        "id": "overview-boundaries",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Know what each overview total includes",
+        "copy": "These are reviewed comparison views, not a sum of every chart elsewhere in the dashboard. Parent, child and generated rollup rows can coexist in the source surface, so the renderer selects one non-overlapping boundary for each total.",
+        "table": {
+          "caption": "Overview measures",
+          "headers": ["Measure", "What it represents", "Review prompt"],
+          "rows": [
+            ["Supply", "Production + imports + signed exports", "Bunkers and stock changes are outside this projection-comparable total."],
+            ["TFC", "Energy and non-energy final consumption", "Use it to test the overall demand boundary before opening sector pages."],
+            ["TFEC", "Final consumption excluding non-energy use", "A TFC/TFEC gap should be explainable by feedstocks and other non-energy use."],
+            ["Transformation", "Total transformation excluding transfers", "Inputs are normally negative and outputs positive; compare the boundary, not a simple gross sum."]
+          ]
+        }
+      }
+    ],
+    "supply": [
+      {
+        "id": "supply-signs",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Read supply signs before comparing size",
+        "copy": "The dashboard applies explicit display sign rules. A surprising sign is a prompt to check the source or mapping convention; it should not be silently reversed during review.",
+        "table": {
+          "caption": "Supply sign guide",
+          "headers": ["Flow", "Expected display sign", "Meaning"],
+          "rows": [
+            ["Production", "Positive", "Adds domestic supply."],
+            ["Imports", "Positive", "Adds supply from outside the economy."],
+            ["Exports", "Negative", "Removes energy from domestic supply."],
+            ["Stock changes", "Either", "Positive is a stock draw; negative is a stock build."],
+            ["Statistical discrepancy", "Either", "A balancing signal to investigate, not an ordinary supply source."]
+          ]
+        }
+      }
+    ],
+    "bunkers": [
+      {
+        "id": "bunkers-boundary",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Keep international bunkers outside domestic transport",
+        "copy": "International aviation and marine bunkers are shown as negative because they are removed from domestic supply. Review them separately from domestic Transport; a positive bunker value is a sign-convention warning."
+      }
+    ],
+    "power": [
+      {
+        "id": "power-review",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Review the conversion story, not one line alone",
+        "copy": "Power rows use shared plant categories because the source systems do not align at every public/autoproducer or technology split. Read fuel inputs, electricity or heat outputs, and related own use together.",
+        "table": {
+          "caption": "Power review sequence",
+          "headers": ["Signal", "What to check next"],
+          "rows": [
+            ["Input changes sharply", "Generation mix, dispatch, fuel availability and the matching output."],
+            ["Output changes without input", "Efficiency, technology classification and units."],
+            ["Large source difference", "Whether both sources support the same plant detail and comparison boundary."],
+            ["Unexpected sign", "Inputs should normally be negative; electricity and heat outputs positive."]
+          ]
+        }
+      }
+    ],
+    "refining": [
+      {
+        "id": "refining-review",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Read refinery inputs, outputs and own use together",
+        "copy": "Crude and other refinery inputs are normally negative, while petroleum-product outputs are positive. Categories labelled “including own use” deliberately align different source boundaries; they are not ordinary one-to-one mappings.",
+        "table": {
+          "caption": "Refining review sequence",
+          "headers": ["Signal", "What to check next"],
+          "rows": [
+            ["Inputs and outputs move differently", "Refinery yield assumptions, throughput and product mix."],
+            ["Only one product diverges", "Product classification and the common product grouping."],
+            ["Including-own-use row differs", "Check the full adjusted process boundary before inspecting individual own-use rows."],
+            ["Transfer row seems absent", "Transfers are intentionally routed to Other transformation > Transfers."]
+          ]
+        }
+      }
+    ],
+    "other_transformation": [
+      {
+        "id": "transformation-boundaries",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Distinguish conversion, transfers and own use",
+        "copy": "Transformation inputs are normally negative and outputs positive. Transfers can have either sign and show movement between product categories. Some comparison rows absorb ESTO own-use or loss rows so their boundary matches LEAP and the 9th Outlook.",
+        "table": {
+          "caption": "How to interpret a row",
+          "headers": ["Row type", "Interpretation"],
+          "rows": [
+            ["Transformation", "Compare inputs and outputs as one conversion process."],
+            ["Transfers", "Positive enters a product/category; negative leaves it. Do not interpret it as net supply by itself."],
+            ["Including own use", "An explicit comparison-boundary adjustment, not an extra additive component."],
+            ["Loss or own use", "Normally negative energy consumed or lost inside the energy sector."]
+          ]
+        }
+      }
+    ],
+    "industry": [
+      {
+        "id": "industry-review",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Work from sector total to subsector and fuel",
+        "copy": "Industry can contain both structural parents and detailed subsectors. Use the overview and section order to locate the material change, then check whether it comes from activity, efficiency, fuel switching or a difference in supported source detail. Do not add parent and child charts together."
+      }
+    ],
+    "transport": [
+      {
+        "id": "transport-review",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Separate domestic mode detail from total transport",
+        "copy": "Road, non-road and total Transport are context-specific comparison views: the same LEAP branch can contribute to more than one view, but those views are alternatives rather than additive rows. Trace differences through mode, activity, efficiency and fuel switching; review international bunkers on their own page."
+      }
+    ],
+    "buildings": [
+      {
+        "id": "buildings-review",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Check detail availability before explaining a split",
+        "copy": "Buildings covers residential plus commercial and public services, with datacentres where the shared structure supports them. If LEAP is aggregate-only for this economy, the page preserves that honest boundary instead of inventing a residential, commercial or datacentre allocation."
+      }
+    ],
+    "others": [
+      {
+        "id": "other-demand-review",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Treat aggregate-only demand as a boundary, not detail",
+        "copy": "Other demand covers agriculture, fishing and non-specified demand. For economies still using the All demand aggregated LEAP placeholder, a combined Other-sector/non-energy row may appear here until detailed branches replace it. Do not infer a sector or non-energy split that the model does not provide."
+      }
+    ],
+    "non_energy": [
+      {
+        "id": "non-energy-boundary",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Keep feedstock use separate from combustion",
+        "copy": "Non-energy use records fuels used as materials or feedstocks rather than for their energy content. It is included in total final consumption but excluded from total final energy consumption and from the dashboard's combustion-emissions calculation."
+      }
+    ],
+    "emissions": [
+      {
+        "id": "emissions-method",
+        "target": "[data-guide-id='chart-card']",
+        "title": "These emissions are derived from energy demand",
+        "copy": "The page applies the configured factor set to a non-overlapping energy-demand frontier. It is a consistent comparison calculation, not a source emissions inventory. Electricity, heat, hydrogen and renewable carriers with blank factors contribute zero at point of final use.",
+        "table": {
+          "caption": "Included and excluded boundaries",
+          "headers": ["Included", "Excluded or treated separately"],
+          "rows": [
+            ["Final energy demand by fuel and major sector", "Non-energy use and mixed aggregates that cannot be separated"],
+            ["Negative transformation inputs and own use, shown as positive consumption", "Positive transformation outputs and transfers"],
+            ["Declared aggregate TFC where a source lacks sector detail", "An invented allocation across sectors"],
+            ["Configured direct-combustion factors", "Implied electricity-grid emissions at point of use"]
+          ]
+        }
+      }
+    ],
+    "transport_leap_vs_ninth": [
+      {
+        "id": "transport-diagnostic-limit",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Use this as a focused diagnostic slice",
+        "copy": "This alternate-scope page can contain sparse categories that are not suitable for default publication. Confirm that both LEAP and the 9th Outlook actually report the row before treating an absent or short series as a disagreement."
+      }
+    ],
+    "datacentres_leap_vs_ninth": [
+      {
+        "id": "datacentres-diagnostic-limit",
+        "target": "[data-guide-id='chart-card']",
+        "title": "Do not infer detail from a sparse comparison",
+        "copy": "This page is hidden by default because current evidence may be limited to a small number of datacentre rows. Use it to inspect available LEAP-versus-9th detail, then return to Buildings for the production-facing demand context."
+      }
+    ]
+  },
   "chart_steps": [
     {
       "id": "page-purpose",
@@ -34,7 +209,7 @@
       "id": "scenario",
       "target": "[data-guide-id='scenario-toggle']",
       "title": "Compare projection scenarios",
-      "copy": "Reference shows the central projection and Target shows the policy-oriented pathway. ESTO history remains visible in either mode, while the LEAP and 9th Outlook projection traces change together."
+      "copy": "Use the scenario control to compare the configured projection pathways. ESTO remains the historical comparator; LEAP and 9th Outlook traces change where the selected scenario is available. A missing trace is not converted to zero."
     },
     {
       "id": "page-navigation",
@@ -53,7 +228,7 @@
       "id": "chart-card",
       "target": "[data-guide-id='chart-card']",
       "title": "Read like with like",
-      "copy": "Each chart compares sources after they have been placed on the shared Common ESTO flow and product axes. ESTO supplies historical balance values; LEAP and the 9th Outlook provide modelled series where available. Hover for exact values and use the legend to isolate a trace."
+      "copy": "Each chart compares sources after they have been merged and aggregated onto the lowest common flow and product categories they can all express without splitting a source value. A broad generated label can therefore be the correct comparison boundary, not a loss of data. Hover for exact values and use the legend to isolate a trace."
     },
     {
       "id": "chart-tools",
@@ -65,14 +240,14 @@
       "id": "sorting",
       "target": "[data-guide-id='sort-controls']",
       "title": "Find material differences first",
-      "copy": "Default preserves the configured order. Largest total finds the biggest parts of the system; Largest difference and Largest % diff help triage disagreements. A large percentage on a tiny series still needs judgement.",
+      "copy": "Default preserves the configured order. Largest total finds the biggest parts of the system; Largest difference and Largest % diff help triage disagreements over the available comparison periods. A large percentage on a tiny series still needs judgement, and missing values are not treated as zero.",
       "optional": true
     },
     {
       "id": "review-workflow",
       "target": "[data-guide-id='review-workflow']",
       "title": "Turn a difference into a review action",
-      "copy": "Start with material totals, compare the historical overlap, then inspect how Reference and Target develop. Identify which source and category diverge, trace the cause to LEAP or upstream data, make the correction there and rerun. Do not edit generated dashboard HTML or treat every difference as an error."
+      "copy": "Start with material totals, identify the first year and source that diverge, then check signs, comparison boundary and source coverage before diagnosing the cause. A difference can reflect a model assumption, source revision, supported level of detail or a real mapping issue. Correct the owning model, source data, mapping or dashboard rule, rerun, and keep the explanation with the review evidence. Never edit generated HTML."
     }
   ],
   "index_steps": [
@@ -80,7 +255,17 @@
       "id": "index-purpose",
       "target": "[data-guide-id='index-purpose']",
       "title": "What this dashboard is for",
-      "copy": "The Common ESTO dashboard compares LEAP model results, ESTO historical balances and 9th Outlook projections on shared flow and product categories. Use it to find results that need explanation or correction; it does not replace LEAP or the source datasets."
+      "copy": "The Common ESTO dashboard puts LEAP model results, ESTO historical balances and 9th Outlook projections onto shared flow and product categories. Use it to find, explain and track material differences; it is a review surface, not a replacement for the model or source datasets.",
+      "table": {
+        "caption": "What each source contributes",
+        "headers": ["Source", "Role in the dashboard", "Important limitation"],
+        "rows": [
+          ["ESTO", "Historical energy-balance comparator", "A raw ESTO row may be more detailed than the shared comparison category."],
+          ["LEAP", "Current model history and projections", "Detail depends on the economy's implemented model branches."],
+          ["9th Outlook", "Earlier Outlook projection comparator", "It participates only in comparison scopes configured for the 9th."],
+          ["Common ESTO", "Shared comparison structure", "It aggregates to a safe common grain; it does not allocate coarse values into invented detail."]
+        ]
+      }
     },
     {
       "id": "index-economy",
@@ -93,13 +278,24 @@
       "id": "index-pages",
       "target": "[data-guide-id='page-list']",
       "title": "Choose where to begin",
-      "copy": "Start with Energy balance overview for the whole system, then open the relevant Demand, Transformation, Supply or Emissions page. The counts show how many overview, summary and detail charts were generated."
+      "copy": "Start broad, then move to the page that owns the difference. The counts show how many overview, summary and detail charts were generated; a high count means use the page's sections and sorting controls rather than scanning every chart.",
+      "table": {
+        "caption": "Recommended review route",
+        "headers": ["If you are checking…", "Start with…", "Then open…"],
+        "rows": [
+          ["Overall balance or demand", "Energy balance overview", "Supply and the relevant demand or transformation page"],
+          ["Sector assumptions", "Industry, Transport, Buildings or Other demand", "The material subsector and fuel charts"],
+          ["Conversion efficiency or output", "Power, Refining or Other transformation", "Inputs, outputs and own-use rows together"],
+          ["Combustion impact", "Emissions", "The energy page that supplies the underlying demand"],
+          ["Structural or mapping concern", "Mapping diagnostics", "Full tree explorer and supporting evidence"]
+        ]
+      }
     },
     {
       "id": "index-about",
       "target": "[data-guide-id='about-dashboard']",
       "title": "Understand the comparison boundary",
-      "copy": "The three sources use different native structures. Upstream mappings place them on the lowest common comparison categories, so dashboard totals are merges and aggregations rather than allocations."
+      "copy": "The sources use different native structures. Upstream mappings place them on the lowest common categories each participating source can express without being split. Broad categories and compressed code ranges are therefore traceable comparison boundaries. Never add parent, child and rolled views together or compare one Common ESTO row directly with an unrelated raw row."
     },
     {
       "id": "index-model-guide",
@@ -125,7 +321,18 @@
       "id": "diagnostics-terms",
       "target": ".guide-grid",
       "title": "Read the hierarchy terms first",
-      "copy": "These cards distinguish source-tree children, mapping fan-out, de-duplicated frontiers and contradictions already present in raw source data. Those distinctions prevent double counting and incorrect mapping fixes."
+      "copy": "These cards distinguish source-tree children, mapping fan-out, de-duplicated frontiers and contradictions already present in raw source data. Those distinctions prevent double counting and incorrect mapping fixes.",
+      "table": {
+        "caption": "Diagnostic terms in plain language",
+        "headers": ["Term", "What it tells you", "What it does not prove"],
+        "rows": [
+          ["Hierarchy failure", "A tested parent does not match its expected frontier, or the frontier is incomplete.", "That a mapping is missing."],
+          ["Source/mapping anchor", "A raw source parent is compared with its de-duplicated mapped boundary.", "That every individual child is correctly classified."],
+          ["Common output check", "A Common ESTO parent is compared with its declared output children.", "Coverage outside the eligible tested boundary."],
+          ["Reviewed exception", "A person has classified known evidence attached to a failure.", "A numerical pass or automatic correction."],
+          ["Rollup edge", "A registered comparison or display relationship.", "An extra additive hierarchy parent."]
+        ]
+      }
     },
     {
       "id": "diagnostics-metrics",
@@ -143,7 +350,7 @@
       "id": "diagnostics-evidence",
       "target": "details.panel",
       "title": "Open the supporting evidence",
-      "copy": "Collapsed sections contain validation failures, reviewed exceptions, related economy contexts and coverage evidence. Review material APEC failures first, then use economy evidence to locate the source of the mismatch."
+      "copy": "Collapsed sections contain validation failures, reviewed exceptions, related economy contexts and coverage evidence. Rank numerical failures by materiality, keep final-output and source-anchor checks distinct, and read the stated reason before proposing a fix. A skipped check is not a pass, and a confirmed source issue remains a numerical failure."
     }
   ],
   "tree_steps": [
@@ -175,7 +382,7 @@
       "id": "tree-routes",
       "target": "#detail",
       "title": "Review the registered routes",
-      "copy": "After selecting a node, the route table lists its source pair, ESTO component, Common row ID, values and comparison scope. It counts each Common ESTO row ID once in the summary."
+      "copy": "After selecting a node, the route table lists its source pair, ESTO component, Common row ID, values and comparison scope. Follow the registered route rather than inferring membership from similar labels. A source reaching several components can still land in one safe Common row; a source split across several Common rows in its participating scope is a structural problem, not a cue to invent allocation shares."
     }
   ]
 }
