@@ -1157,7 +1157,7 @@ def build_emissions_page(
     or when no demand rows carry a factor.
     """
     renderer = _renderer()
-    chart_dataset_tokens = renderer.chart_dataset_tokens
+    chart_dataset_tokens_from_figure = renderer.chart_dataset_tokens_from_figure
     stacked_area_note_from_figure = renderer.stacked_area_note_from_figure
     write_chart_bundle = renderer.write_chart_bundle
     write_dashboard_page = renderer.write_dashboard_page
@@ -1249,11 +1249,7 @@ def build_emissions_page(
             "total_abs_value": chart_total_abs,
             "abs_diff": 0.0,
             "pct_diff": 0.0,
-            # chart_dataset_tokens reads a "value" column; feed it emissions so
-            # a fuel that carries energy but no factor is not offered as a filter.
-            "datasets": chart_dataset_tokens(
-                rows[["source_system", EMISSIONS_COLUMN]].rename(columns={EMISSIONS_COLUMN: "value"})
-            ),
+            "datasets": chart_dataset_tokens_from_figure(figure),
         }
         if chart_type == "stacked_area":
             row["stacked_area_note"] = stacked_area_note_from_figure(figure)

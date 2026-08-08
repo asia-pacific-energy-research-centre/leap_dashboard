@@ -52,6 +52,11 @@ CODE_MATCH_COLUMNS = [
     "component_flow_name",
 ]
 
+# Page-root ownership is resolved from the common axis itself. Component names
+# and display labels remain available to the legacy keyword fallback, but must
+# not turn a coincidental number in prose into a hierarchy match.
+PAGE_ROOT_CODE_COLUMN = "common_flow_code"
+
 LABEL_MATCH_COLUMNS = [
     "common_flow_label",
     "common_flow_name",
@@ -178,23 +183,37 @@ def trace_meta_entry(
     TFC/TFEC sector chart ("tfc"/"tfec"/"both"); every other chart leaves it
     at the default "both" so the REF/TGT toggle is the only axis that applies.
     """
-    return {"tag": scenario_toggle_tag(source_system, scenario), "metric": metric, "active_visible": active_visible}
+    return {
+        "source_system": str(source_system).strip().upper(),
+        "tag": scenario_toggle_tag(source_system, scenario),
+        "metric": metric,
+        "active_visible": active_visible,
+    }
 
 
-def chart_dataset_tokens(*dfs: pd.DataFrame | None) -> str:
-    """Comma-joined, uppercased source systems contributing nonzero energy to a chart.
+def chart_dataset_tokens_from_figure(figure: go.Figure) -> str:
+    """Return source systems represented by actual non-empty figure traces.
 
-    Accepts one or more dataframes (e.g. demand + supply slices) and returns the
-    union, sorted, e.g. "ESTO,LEAP,NINTH". Used for the client-side dataset
-    filter buttons via each chart card's data-datasets attribute.
+    Chart-card filtering is a statement about what the user can see, not every
+    source row supplied to the builder before frontier and fallback selection.
+    ``trace_meta`` is therefore the authority after chart construction.
     """
+    meta = figure.layout.meta
+    trace_meta = meta.get("trace_meta", []) if isinstance(meta, dict) else []
     tokens: set[str] = set()
-    for df in dfs:
-        if df is None or df.empty or "source_system" not in df.columns or "value" not in df.columns:
+    for position, trace in enumerate(figure.data):
+        if position >= len(trace_meta):
             continue
-        values = pd.to_numeric(df["value"], errors="coerce").fillna(0.0)
-        systems = df.loc[values.abs() > 0, "source_system"].astype(str).str.strip()
-        tokens.update(s.upper() for s in systems if s and s.casefold() != "nan")
+        source = str(trace_meta[position].get("source_system", "")).strip().upper()
+        if not source:
+            continue
+        x_values = getattr(trace, "x", None)
+        y_values = getattr(trace, "y", None)
+        if x_values is not None and len(x_values) == 0:
+            continue
+        if y_values is not None and len(y_values) == 0:
+            continue
+        tokens.add(source)
     return ",".join(sorted(tokens))
 
 
@@ -497,8 +516,99 @@ def sorted_page_rules(page_rules: list[dict]) -> list[dict]:
     return [rule for _, rule in indexed]
 
 
-def assign_pages(df: pd.DataFrame, page_rules: list[dict]) -> pd.DataFrame:
-    """Assign each row to the first matching sector page and record the rule used."""
+def _matching_root_depth(code_expression: object, prefixes: list[object]) -> tuple[int, str]:
+    """Return the deepest configured root represented by *code_expression*.
+
+    Matching is hierarchical and boundary-safe: root ``14`` matches ``14`` or
+    ``14.*``, never ``5.14`` or ``114``. A compound/range category is tested as
+    one expression so every page can state only its highest-level roots.
+    """
+    records = parse_code_expression(code_expression)
+    matches: list[str] = []
+    for raw_prefix in prefixes:
+        prefix = str(raw_prefix or "").strip()
+        if not prefix:
+            continue
+        for record in records:
+            if code_range_matches_prefix(
+                record.get("start", ""), record.get("end", ""), prefix
+            ) or (
+                record.get("end", "")
+                and _code_is_within_record(prefix, record)
+            ):
+                matches.append(prefix)
+                break
+    if not matches:
+        return 0, ""
+    selected = max(matches, key=lambda value: (code_depth(value), len(value), value))
+    return code_depth(selected), selected
+
+
+def _routing_special_case_mask(df: pd.DataFrame, special_case: dict) -> pd.Series:
+    """Return rows selected by one explicit routing special case."""
+    match = special_case.get("match", {}) or {}
+    mask = pd.Series(True, index=df.index)
+    has_selector = False
+
+    exact_code = str(match.get("common_flow_code_exact", "")).strip()
+    if exact_code:
+        has_selector = True
+        mask = mask & df.get(
+            "common_flow_code", pd.Series("", index=df.index)
+        ).astype(str).str.strip().eq(exact_code)
+
+    prefixes = match.get("common_flow_code_prefixes", []) or []
+    if prefixes:
+        has_selector = True
+        mask = mask & df.get(
+            "common_flow_code", pd.Series("", index=df.index)
+        ).apply(lambda value: code_expression_matches_any_prefix(value, prefixes))
+
+    keywords = match.get("common_flow_keywords", []) or []
+    if keywords:
+        has_selector = True
+        mask = mask & text_columns_mask(df, LABEL_MATCH_COLUMNS, keywords)
+
+    return mask if has_selector else pd.Series(False, index=df.index)
+
+
+def _compound_component_pages(code_expression: object, page_rules: list[dict]) -> set[str]:
+    """Resolve each compound endpoint independently to its deepest page root."""
+    resolved_pages: set[str] = set()
+    for record in parse_code_expression(code_expression):
+        endpoints = [record.get("start", "")]
+        if record.get("end"):
+            endpoints.append(record["end"])
+        for endpoint in endpoints:
+            endpoint_candidates: list[tuple[int, str]] = []
+            for rule in page_rules:
+                prefixes = normalise_rule_list(
+                    rule, "include_flow_code_prefixes", "flow_code_prefixes"
+                )
+                depth, _ = _matching_root_depth(endpoint, prefixes)
+                if depth:
+                    endpoint_candidates.append((depth, str(rule.get("page_key", "page"))))
+            if not endpoint_candidates:
+                continue
+            best_depth = max(item[0] for item in endpoint_candidates)
+            resolved_pages.update(
+                page for depth, page in endpoint_candidates if depth == best_depth
+            )
+    return resolved_pages
+
+
+def assign_pages(
+    df: pd.DataFrame,
+    page_rules: list[dict],
+    routing_special_cases: list[dict] | None = None,
+) -> pd.DataFrame:
+    """Assign rows by explicit special case, then most-specific page root.
+
+    Code roots are authoritative. Label keywords remain a compatibility
+    fallback only for rows that have no root match. Rows with equally specific
+    roots on different pages remain unassigned and are marked ``ambiguous`` so
+    a new exact special case can resolve them deliberately.
+    """
     out = df.copy()
     out["_page_key"] = "unassigned"
     out["_page_label"] = "Unassigned"
@@ -506,19 +616,136 @@ def assign_pages(df: pd.DataFrame, page_rules: list[dict]) -> pd.DataFrame:
     out["_section_label"] = "Unassigned"
     out["_page_rule_priority"] = ""
     out["_page_rule_note"] = "No sector/page recogniser matched this generated flow label or component code."
+    out["_routing_status"] = "unassigned"
+    out["_routing_candidates"] = ""
+    out["_routing_special_case"] = ""
     remaining = pd.Series(True, index=out.index)
-    for rule in sorted_page_rules(page_rules):
-        mask = rule_mask(out, rule) & remaining
+
+    # Exact, documented exceptions are evaluated before ordinary roots. They
+    # cover compound/temporary categories that cannot be owned by one root.
+    for special_case in routing_special_cases or []:
+        if not special_case.get("enabled", True):
+            continue
+        if str(special_case.get("action", "route")) != "route":
+            continue
+        mask = _routing_special_case_mask(out, special_case) & remaining
+        if not mask.any():
+            continue
+        page_key = str(special_case.get("page_key", "unassigned"))
+        page_label = str(special_case.get("page_label", page_key))
+        out.loc[mask, "_page_key"] = page_key
+        out.loc[mask, "_page_label"] = page_label
+        out.loc[mask, "_section_key"] = str(special_case.get("section_key", page_key))
+        out.loc[mask, "_section_label"] = str(special_case.get("section_label", page_label))
+        out.loc[mask, "_page_rule_priority"] = "special"
+        out.loc[mask, "_page_rule_note"] = str(special_case.get("reason", ""))
+        out.loc[mask, "_routing_status"] = "special_case"
+        out.loc[mask, "_routing_special_case"] = str(special_case.get("case_id", ""))
+        remaining = remaining & ~mask
+
+    # Resolve ordinary hierarchy roots without relying on rule ordering. The
+    # deepest matching root wins; ties on the same page are harmless.
+    root_candidates: dict[object, list[tuple[int, str, dict]]] = {}
+    for rule in page_rules:
+        prefixes = normalise_rule_list(rule, "include_flow_code_prefixes", "flow_code_prefixes")
+        if not prefixes:
+            continue
+        exclude_prefixes = normalise_rule_list(rule, "exclude_flow_code_prefixes", "")
+        for index in out.index[remaining]:
+            code_expression = out.at[index, PAGE_ROOT_CODE_COLUMN] if PAGE_ROOT_CODE_COLUMN in out.columns else ""
+            if exclude_prefixes and code_expression_matches_any_prefix(code_expression, exclude_prefixes):
+                continue
+            depth, root = _matching_root_depth(code_expression, prefixes)
+            if depth:
+                root_candidates.setdefault(index, []).append((depth, root, rule))
+
+    for index, candidates in root_candidates.items():
+        component_pages = _compound_component_pages(
+            out.at[index, PAGE_ROOT_CODE_COLUMN], page_rules
+        )
+        if len(component_pages) > 1:
+            out.at[index, "_routing_status"] = "ambiguous"
+            out.at[index, "_routing_candidates"] = "; ".join(sorted(component_pages))
+            out.at[index, "_page_rule_note"] = (
+                "Compound category components resolve to different pages; "
+                "add an explicit routing special case."
+            )
+            remaining.at[index] = False
+            continue
+        best_depth = max(item[0] for item in candidates)
+        best = [item for item in candidates if item[0] == best_depth]
+        page_keys = {str(item[2].get("page_key", "page")) for item in best}
+        out.at[index, "_routing_candidates"] = "; ".join(
+            sorted(f"{item[2].get('page_key', 'page')}:{item[1]}" for item in best)
+        )
+        if len(page_keys) != 1:
+            out.at[index, "_routing_status"] = "ambiguous"
+            out.at[index, "_page_rule_note"] = "Equally specific page roots matched different pages."
+            remaining.at[index] = False
+            continue
+        # Preserve config order only to choose display metadata when several
+        # roots belonging to the same page tie.
+        _, root, rule = best[0]
         page_key = str(rule.get("page_key", "page"))
         page_label = str(rule.get("page_label", rule.get("page_key", "Page")))
+        out.at[index, "_page_key"] = page_key
+        out.at[index, "_page_label"] = page_label
+        out.at[index, "_section_key"] = str(rule.get("section_key", page_key))
+        out.at[index, "_section_label"] = str(rule.get("section_label", page_label))
+        out.at[index, "_page_rule_priority"] = f"root:{root}"
+        out.at[index, "_page_rule_note"] = str(rule.get("rule_note", ""))
+        out.at[index, "_routing_status"] = "page_root"
+        remaining.at[index] = False
+
+    # Retain keyword compatibility for categories that no configured root can
+    # recognise. It is visibly recorded and never overrides a root assignment.
+    for rule in sorted_page_rules(page_rules):
+        keywords = normalise_rule_list(rule, "include_flow_keywords", "flow_keywords")
+        regexes = normalise_rule_list(rule, "include_flow_regexes", "flow_regexes")
+        if not keywords and not regexes:
+            continue
+        keyword_rule = dict(rule)
+        keyword_rule["flow_code_prefixes"] = []
+        keyword_rule["include_flow_code_prefixes"] = []
+        mask = rule_mask(out, keyword_rule) & remaining
+        if not mask.any():
+            continue
+        page_key = str(rule.get("page_key", "page"))
+        page_label = str(rule.get("page_label", page_key))
         out.loc[mask, "_page_key"] = page_key
         out.loc[mask, "_page_label"] = page_label
         out.loc[mask, "_section_key"] = str(rule.get("section_key", page_key))
         out.loc[mask, "_section_label"] = str(rule.get("section_label", page_label))
         out.loc[mask, "_page_rule_priority"] = str(rule.get("priority", ""))
         out.loc[mask, "_page_rule_note"] = str(rule.get("rule_note", ""))
+        out.loc[mask, "_routing_status"] = "keyword_fallback"
         remaining = remaining & ~mask
     return out
+
+
+def page_keys_without_required_source(
+    assigned_df: pd.DataFrame,
+    required_page_keys: list[object],
+    source_system: object,
+) -> set[str]:
+    """Return configured pages that do not contain the required source.
+
+    This is a page-visibility rule, not a routing rule. In particular, exact
+    code 17 always routes to Non-energy, while the page is published only once
+    usable LEAP rows exist there.
+    """
+    source_key = str(source_system).strip().casefold()
+    missing: set[str] = set()
+    for raw_page_key in required_page_keys:
+        page_key = str(raw_page_key)
+        page_rows = assigned_df[assigned_df["_page_key"].astype(str).eq(page_key)]
+        has_source = (
+            not page_rows.empty
+            and page_rows["source_system"].astype(str).str.casefold().eq(source_key).any()
+        )
+        if not has_source:
+            missing.add(page_key)
+    return missing
 
 
 def build_page_assignment_summary(assigned_df: pd.DataFrame) -> pd.DataFrame:
@@ -530,6 +757,9 @@ def build_page_assignment_summary(assigned_df: pd.DataFrame) -> pd.DataFrame:
         "_page_label",
         "_section_key",
         "_section_label",
+        "_routing_status",
+        "_routing_candidates",
+        "_routing_special_case",
         "_page_rule_priority",
         "_page_rule_note",
         "common_flow_code",
@@ -555,6 +785,9 @@ def build_page_assignment_summary(assigned_df: pd.DataFrame) -> pd.DataFrame:
             "_page_label": "page_label",
             "_section_key": "section_key",
             "_section_label": "section_label",
+            "_routing_status": "routing_status",
+            "_routing_candidates": "routing_candidates",
+            "_routing_special_case": "routing_special_case",
             "_page_rule_priority": "page_rule_priority",
             "_page_rule_note": "page_rule_note",
         })
@@ -1605,7 +1838,7 @@ def _build_section_aggregate_charts(
                 "title": f"{title_prefix}: {section_label}",
                 "product_label": f"{title_prefix}: {section_label}",
                 "section_label": section_label,
-                "datasets": chart_dataset_tokens(area_df),
+                "datasets": chart_dataset_tokens_from_figure(figure),
                 "stacked_area_note": stacked_area_note_from_figure(figure),
                 **metrics,
             })
@@ -1724,7 +1957,7 @@ def _build_flow_group_aggregate_charts(
                 "product_label": f"{title_prefix}: {flow_label}",
                 "section_label": section_label,
                 "flow_group_label": flow_label,
-                "datasets": chart_dataset_tokens(flow_df),
+                "datasets": chart_dataset_tokens_from_figure(figure),
                 "stacked_area_note": stacked_area_note_from_figure(figure),
                 **metrics,
             })
@@ -2038,6 +2271,9 @@ a:hover { text-decoration: underline; }
 }
 .dataset-filter-btn + .dataset-filter-btn { border-left:1px solid #c5ccd3; }
 .dataset-filter-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.dataset-filter-clear { padding:4px 8px;border:0;background:transparent;color:#1f6feb;font:inherit;cursor:pointer; }
+.dataset-filter-status { width:100%;text-align:right;color:#64748b;font-size:11px; }
+.dataset-filter-status.is-empty { color:#9a3412;font-weight:600; }
 .chart-card.dataset-filtered { display:none; }
 .dashboard-grid {
   display:grid;
@@ -2167,25 +2403,39 @@ _DATASET_FILTER_JS = """
   var buttons = Array.from(document.querySelectorAll('[data-dataset-filter]'));
   if (!buttons.length) return;
   var key = 'common-esto-dataset-filter';
-  var available = buttons.map(function(b) { return b.dataset.datasetFilter; });
+  var status = document.querySelector('[data-dataset-filter-status]');
+  var clear = document.querySelector('[data-dataset-filter-clear]');
   var active = [];
   try {
     var stored = JSON.parse(window.localStorage.getItem(key) || '[]');
     if (Array.isArray(stored)) {
-      active = stored.filter(function(d) { return available.indexOf(d) !== -1; });
+      active = stored.map(function(d) { return String(d).toUpperCase(); });
     }
   } catch (e) {}
 
   // A card stays visible only if it contains every highlighted (active) dataset.
   var apply = function() {
     buttons.forEach(function(btn) {
-      btn.classList.toggle('active', active.indexOf(btn.dataset.datasetFilter) !== -1);
+      var selected = active.indexOf(btn.dataset.datasetFilter) !== -1;
+      btn.classList.toggle('active', selected);
+      btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
     });
-    document.querySelectorAll('.chart-card[data-datasets]').forEach(function(card) {
+    var cards = Array.from(document.querySelectorAll('.chart-card[data-datasets]'));
+    var visibleCount = 0;
+    cards.forEach(function(card) {
       var have = (card.dataset.datasets || '').split(',').filter(Boolean);
       var hidden = active.some(function(d) { return have.indexOf(d) === -1; });
       card.classList.toggle('dataset-filtered', hidden);
+      if (!hidden) visibleCount += 1;
     });
+    if (status) {
+      var selectedText = active.length ? ' containing ' + active.join(' + ') : '';
+      status.textContent = visibleCount
+        ? 'Showing ' + visibleCount + ' of ' + cards.length + ' charts' + selectedText + '.'
+        : 'No charts on this page show every selected dataset (' + active.join(' + ') + '). Clear the chart filter to show all charts.';
+      status.classList.toggle('is-empty', visibleCount === 0);
+    }
+    if (clear) clear.hidden = active.length === 0;
     try { window.localStorage.setItem(key, JSON.stringify(active)); } catch (e) {}
     if (window.Plotly) {
       document.querySelectorAll('.chart-card:not(.dataset-filtered) .lazy-chart-plot[data-rendered="true"]')
@@ -2201,6 +2451,12 @@ _DATASET_FILTER_JS = """
       apply();
     });
   });
+  if (clear) {
+    clear.addEventListener('click', function() {
+      active = [];
+      apply();
+    });
+  }
   apply();
 })();
 """
@@ -2531,10 +2787,7 @@ def _dashboard_switcher_html(dashboards: list[dict[str, str]], current_dashboard
 
 _DATASET_DISPLAY_LABELS = {"NINTH": "Ninth"}
 
-# The dataset filter is switched off in the header. It is kept whole -- markup,
-# styles and script -- so turning it back on is a one-line change here rather
-# than a rebuild.
-SHOW_DATASET_FILTER = False
+SHOW_DATASET_FILTER = True
 
 
 def _dataset_filter_html(datasets: list[str]) -> str:
@@ -2549,15 +2802,17 @@ def _dataset_filter_html(datasets: list[str]) -> str:
     if not datasets or not SHOW_DATASET_FILTER:
         return ""
     buttons = "".join(
-        f'<button type="button" class="dataset-filter-btn" data-dataset-filter="{escape(d)}">'
+        f'<button type="button" class="dataset-filter-btn" data-dataset-filter="{escape(d)}" aria-pressed="false">'
         f'{escape(_DATASET_DISPLAY_LABELS.get(d, d))}</button>'
         for d in datasets
     )
     return (
-        '<div class="dataset-filter" role="group" aria-label="Dataset filter">'
+        '<div class="dataset-filter" role="group" aria-label="Charts containing dataset">'
         '<span class="dataset-filter-label">'
-        "Exclude charts that don't contain the highlighted datasets:</span>"
+        "Charts containing:</span>"
         f'<div class="dataset-filter-buttons">{buttons}</div>'
+        '<button type="button" class="dataset-filter-clear" data-dataset-filter-clear hidden>Clear</button>'
+        '<span class="dataset-filter-status" data-dataset-filter-status aria-live="polite"></span>'
         '</div>'
     )
 
@@ -3073,15 +3328,15 @@ def _build_td_sector_chart(
     series_labels: dict[str, str],
     primary_source: str,
     primary_scenario: str,
-    tfec_exclude_keys: list[str],
     sector_colors: dict[str, str],
     base_year: int | None = None,
 ) -> go.Figure:
-    """Stacked-area chart by demand sector with a TFC/TFEC Plotly dropdown.
+    """Build the sector stack against the currently valid TFC total.
 
     TFC (Total Final Consumption) includes all demand sectors (codes 14-17).
-    TFEC (Total Final Energy Consumption) excludes sectors listed in
-    tfec_exclude_keys (typically non_energy / code 17).
+    TFEC remains deliberately unavailable until non-energy use can be separated
+    from aggregated Other-sector LEAP demand, so this chart must not calculate
+    a visible-detail substitute for flow 13.
 
     supply_total = sum of signed values for codes 01, 02, 03
     (Production + Imports - Exports). Bunkers (04, 05) and stock changes (06)
@@ -3154,7 +3409,6 @@ def _build_td_sector_chart(
                 continue
             if not _has_nonzero_values(sector_data["value"]):
                 continue
-            is_tfec_excluded = page_key in tfec_exclude_keys
             color = sector_colors.get(page_key)
             group_sign = "neg" if sector_data["value"].sum() < 0 else "pos"
             trace_kw: dict = dict(
@@ -3169,21 +3423,14 @@ def _build_td_sector_chart(
             if color:
                 trace_kw["line"] = {"color": color}
             fig.add_trace(go.Scatter(**trace_kw))
-            trace_meta.append(trace_meta_entry(
-                stack_source_name, scenario_name, True, "tfc" if is_tfec_excluded else "both"
-            ))
+            trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
 
-    # Explicit flow 12/13 rows are the reliable totals. The displayed detail
-    # can contain several valid hierarchy views and must not be added together.
+    # Explicit flow 12 is the reliable total. The displayed detail can contain
+    # several valid hierarchy views and must not be added together.
     tfc_total_df = _select_total_rows_by_source(
         demand_df,
         overview_flow_df,
         flow_code="12",
-    )
-    tfec_total_df = _select_total_rows_by_source(
-        demand_df[~demand_df["_page_key"].isin(tfec_exclude_keys)],
-        overview_flow_df,
-        flow_code="13",
     )
 
     # TFC demand totals, incl. primary LEAP scenarios: the sector stack above
@@ -3199,21 +3446,7 @@ def _build_td_sector_chart(
             mode="lines+markers", name=lbl, line={"dash": "dash"},
             hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
         ))
-        trace_meta.append(trace_meta_entry(src, scen, True, "tfc"))
-
-    # TFEC comparison demand totals
-    tfec_totals = tfec_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
-    for (src, scen), grp in tfec_totals.groupby(["source_system", "scenario"]):
-        if not _has_nonzero_values(grp["value"]):
-            continue
-        lbl = series_label_from_values(src, scen, series_labels) + " (TFEC)"
-        fig.add_trace(go.Scatter(
-            x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
-            mode="lines+markers", name=lbl, line={"dash": "dash"},
-            visible=False,
-            hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
-        ))
-        trace_meta.append(trace_meta_entry(src, scen, True, "tfec"))
+        trace_meta.append(trace_meta_entry(src, scen, True))
 
     # Supply total lines — always visible regardless of TFC/TFEC mode
     if not supply_df.empty:
@@ -3229,30 +3462,15 @@ def _build_td_sector_chart(
             ))
             trace_meta.append(trace_meta_entry(src, scen, True, "both"))
 
-    tfc_vis = [m["metric"] in ("tfc", "both") for m in trace_meta]
-    tfec_vis = [m["metric"] in ("tfec", "both") for m in trace_meta]
     fig.update_layout(
         title="Supply vs Demand by sector (TFC)",
         xaxis_title="Year",
         yaxis_title=f"Signed energy ({chart_unit})",
         margin={"l": 64, "r": 28, "t": 100, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
-        updatemenus=[{
-            "buttons": [
-                {"label": "TFC (incl. Non-energy use)", "method": "update",
-                 "args": [{"visible": tfc_vis}, {"title": "Supply vs Demand by sector (TFC)"}]},
-                {"label": "TFEC (excl. Non-energy use)", "method": "update",
-                 "args": [{"visible": tfec_vis}, {"title": "Supply vs Demand by sector (TFEC)"}]},
-            ],
-            "direction": "down", "showactive": True,
-            "x": 0.0, "xanchor": "left", "y": 1.22, "yanchor": "top",
-        }],
         meta={
             "trace_meta": trace_meta,
-            "stacked_area_note": (
-                stacked_area_dataset_note(stacked_sources, "demand")
-                + aggregate_only_tfec_note(stacked_sources, primary_source)
-            ),
+            "stacked_area_note": stacked_area_dataset_note(stacked_sources, "demand"),
         },
     )
     apply_chart_chrome(fig, base_year)
@@ -3670,7 +3888,6 @@ def build_total_demand_page(
         "demand_page_keys", ["industry", "transport", "buildings", "others", "non_energy"]
     )]
     supply_codes = [str(c) for c in config.get("supply_codes", ["01", "02", "03"])]
-    tfec_exclude_keys = [str(k) for k in config.get("tfec_exclude_page_keys", ["non_energy"])]
     sector_colors: dict[str, str] = config.get("sector_colors", {
         "industry": "#3b82f6",
         "transport": "#f97316",
@@ -3708,11 +3925,10 @@ def build_total_demand_page(
         {
             "chart_key": "chart__area__total_demand__sector",
             "title": "Supply vs Demand by sector",
-            "build": lambda: _build_td_sector_chart(demand_df, supply_df, overview_flow_df, series_labels, primary_source, primary_scenario, tfec_exclude_keys, sector_colors, base_year=base_year),
+            "build": lambda: _build_td_sector_chart(demand_df, supply_df, overview_flow_df, series_labels, primary_source, primary_scenario, sector_colors, base_year=base_year),
             "total_abs": demand_total_abs,
             "row_count": len(demand_df),
             "source_flow_labels": "; ".join(demand_page_keys),
-            "datasets": chart_dataset_tokens(demand_df, supply_df),
         },
         {
             "chart_key": "chart__area__total_demand__fuel",
@@ -3721,7 +3937,6 @@ def build_total_demand_page(
             "total_abs": demand_total_abs,
             "row_count": len(demand_df),
             "source_flow_labels": "; ".join(demand_page_keys),
-            "datasets": chart_dataset_tokens(demand_df, supply_df),
         },
     ]
     if not supply_detail_df.empty:
@@ -3736,7 +3951,6 @@ def build_total_demand_page(
             "total_abs": supply_total_abs,
             "row_count": len(supply_detail_df),
             "source_flow_labels": "; ".join(supply_codes),
-            "datasets": chart_dataset_tokens(supply_detail_df, demand_df),
         })
         chart_specs.append({
             "chart_key": "chart__area__total_demand__supply_fuel",
@@ -3748,7 +3962,6 @@ def build_total_demand_page(
             "total_abs": supply_total_abs,
             "row_count": len(supply_detail_df),
             "source_flow_labels": "; ".join(supply_codes),
-            "datasets": chart_dataset_tokens(supply_detail_df, demand_df),
         })
 
     for spec in chart_specs:
@@ -3761,7 +3974,7 @@ def build_total_demand_page(
             "chart_key": chart_key, "chart_type": "stacked_area",
             "title": title, "product_label": title, "section_label": "Overview",
             "total_abs_value": total_abs, "abs_diff": 0.0, "pct_diff": 0.0,
-            "datasets": spec["datasets"],
+            "datasets": chart_dataset_tokens_from_figure(fig),
             "stacked_area_note": stacked_area_note_from_figure(fig),
         })
         manifest_rows.append({
@@ -3781,7 +3994,10 @@ def build_total_demand_page(
         if not transformation_df.empty:
             chart_key = "chart__line__total_transformation_no_transfers"
             title = "Total transformation sector (excluding transfers)"
-            charts[chart_key] = _build_transformation_total_chart(transformation_df, series_labels, base_year=base_year)
+            transformation_figure = _build_transformation_total_chart(
+                transformation_df, series_labels, base_year=base_year
+            )
+            charts[chart_key] = transformation_figure
             total_abs = float(transformation_df["value"].abs().sum())
             chart_rows.append({
                 "chart_key": chart_key,
@@ -3792,7 +4008,7 @@ def build_total_demand_page(
                 "total_abs_value": total_abs,
                 "abs_diff": 0.0,
                 "pct_diff": 0.0,
-                "datasets": chart_dataset_tokens(transformation_df),
+                "datasets": chart_dataset_tokens_from_figure(transformation_figure),
             })
             manifest_rows.append({
                 "page_key": "total_demand",
@@ -3819,9 +4035,10 @@ def build_total_demand_page(
             continue
         flow_label = str(flow_df["common_flow_label"].mode().iloc[0])
         chart_key = f"chart__line__total_demand__{safe_slug(flow_code)}"
-        charts[chart_key] = _build_balance_flow_total_chart(
+        balance_figure = _build_balance_flow_total_chart(
             flow_df, flow_label, series_labels, base_year=base_year
         )
+        charts[chart_key] = balance_figure
         total_abs = float(flow_df["value"].abs().sum())
         chart_rows.append({
             "chart_key": chart_key,
@@ -3832,7 +4049,7 @@ def build_total_demand_page(
             "total_abs_value": total_abs,
             "abs_diff": 0.0,
             "pct_diff": 0.0,
-            "datasets": chart_dataset_tokens(flow_df),
+            "datasets": chart_dataset_tokens_from_figure(balance_figure),
         })
         manifest_rows.append({
             "page_key": "total_demand",
@@ -4017,7 +4234,7 @@ def _line_chart_manifest_and_rows(
             "product_label": product_display,
             "section_label": section_label,
             "flow_group_label": str(flow_label),
-            "datasets": chart_dataset_tokens(pair_rows),
+            "datasets": chart_dataset_tokens_from_figure(chart_figure),
             **metrics,
         })
     return charts, chart_rows, manifest_rows
@@ -4045,7 +4262,11 @@ def build_scope_specific_pages(
     if not config.get("enabled", False) or scope_df.empty:
         return [], []
 
-    assigned_scope_df = assign_pages(scope_df, template.get("sector_pages", []))
+    assigned_scope_df = assign_pages(
+        scope_df,
+        template.get("sector_pages", []),
+        template.get("routing_special_cases", []),
+    )
     manifest_rows: list[dict] = []
     page_rows: list[dict] = []
 
@@ -4161,6 +4382,33 @@ def _keep_one_measure_for_energy_balance_charts(df: pd.DataFrame) -> pd.DataFram
     return df[measures == dominant.iloc[0]].copy()
 
 
+def assign_bespoke_overview_rows(
+    assigned_df: pd.DataFrame,
+    total_demand_config: dict,
+) -> pd.DataFrame:
+    """Move configured balance totals onto the one bespoke overview page."""
+    out = assigned_df.copy()
+    overview_flow_codes = {
+        str(code) for code in total_demand_config.get("overview_flow_codes", [])
+    }
+    if not overview_flow_codes:
+        return out
+    overview_mask = out["common_flow_code"].astype(str).isin(overview_flow_codes)
+    out.loc[overview_mask, "_page_key"] = "total_demand"
+    out.loc[overview_mask, "_page_label"] = str(
+        total_demand_config.get("page_label", "Energy balance overview")
+    )
+    out.loc[overview_mask, "_section_key"] = "total_demand"
+    out.loc[overview_mask, "_section_label"] = "Energy balance totals"
+    out.loc[overview_mask, "_page_rule_priority"] = "bespoke"
+    out.loc[overview_mask, "_page_rule_note"] = (
+        "Configured top-level balance flow shown on the Energy balance overview page."
+    )
+    out.loc[overview_mask, "_routing_status"] = "bespoke_page"
+    out.loc[overview_mask, "_routing_candidates"] = "total_demand"
+    return out
+
+
 def render_dashboard(
     df: pd.DataFrame,
     template: dict,
@@ -4189,19 +4437,12 @@ def render_dashboard(
         scope_df = _keep_one_measure_for_energy_balance_charts(scope_df)
         scope_df = drop_esto_post_base_year_rows(scope_df, comparison_source, base_year)
         scope_df = drop_excluded_flow_rows(scope_df, excluded_flow_code_prefixes)
-    assigned_df = assign_pages(df, page_rules)
-    overview_flow_codes = {
-        str(code) for code in template.get("total_demand_page", {}).get("overview_flow_codes", [])
-    }
-    if overview_flow_codes:
-        overview_mask = assigned_df["common_flow_code"].astype(str).isin(overview_flow_codes)
-        assigned_df.loc[overview_mask, "_page_key"] = "total_demand"
-        assigned_df.loc[overview_mask, "_page_label"] = str(
-            template.get("total_demand_page", {}).get("page_label", "Energy balance overview")
-        )
-        assigned_df.loc[overview_mask, "_section_key"] = "total_demand"
-        assigned_df.loc[overview_mask, "_section_label"] = "Energy balance totals"
-        assigned_df.loc[overview_mask, "_page_rule_note"] = "Configured top-level balance flow shown on the Energy balance overview page."
+    routing_special_cases = template.get("routing_special_cases", [])
+    assigned_df = assign_pages(df, page_rules, routing_special_cases)
+    assigned_df = assign_bespoke_overview_rows(
+        assigned_df,
+        template.get("total_demand_page", {}),
+    )
     page_summary_df = build_page_assignment_summary(assigned_df)
     page_summary_df.to_csv(layout["supporting"] / "page_assignment_summary.csv", index=False)
 
@@ -4217,6 +4458,14 @@ def render_dashboard(
     hidden_page_keys = {
         str(key) for key in template.get("leap_demand_sector_coverage", {}).get("_hidden_page_keys", [])
     }
+    coverage_config = template.get("leap_demand_sector_coverage", {})
+    hidden_page_keys.update(
+        page_keys_without_required_source(
+            assigned_df,
+            coverage_config.get("require_primary_source_page_keys", []),
+            chart_config.get("primary_area_source_system", "LEAP"),
+        )
+    )
     for _, meta in page_meta.iterrows():
         page_key = safe_slug(meta["_page_key"])
         if page_key == "total_demand":
@@ -4229,7 +4478,7 @@ def render_dashboard(
 
     scope_config = template.get("scope_specific_pages", {})
     if scope_config.get("enabled", False) and scope_df is not None and not scope_df.empty:
-        scope_inventory_df = assign_pages(scope_df, page_rules)
+        scope_inventory_df = assign_pages(scope_df, page_rules, routing_special_cases)
         for scope_page in scope_config.get("pages", []):
             if not scope_page.get("enabled", True):
                 continue
@@ -4278,6 +4527,10 @@ def render_dashboard(
     for page_info in page_inventory:
         page_key = page_info["page_key"]
         page_label = page_info["page_label"]
+        # Bespoke pages own their complete bundle and manifest. They must not
+        # first pass through the generic builder and then overwrite its files.
+        if page_key == "total_demand":
+            continue
         page_df = assigned_df[assigned_df["_page_key"].apply(safe_slug) == page_key].copy()
         if page_df.empty:
             continue
@@ -4323,7 +4576,7 @@ def render_dashboard(
                 "title": str(area_spec["aggregate_flow_label"]),
                 "product_label": str(area_spec["aggregate_flow_label"]),
                 "section_label": "Overview",
-                "datasets": chart_dataset_tokens(area_df),
+                "datasets": chart_dataset_tokens_from_figure(figure),
                 "stacked_area_note": stacked_area_note_from_figure(figure),
                 **metrics,
             })
@@ -4407,7 +4660,7 @@ def render_dashboard(
                 "product_label": product_display,
                 "section_label": section_label,
                 "flow_group_label": str(flow_label),
-                "datasets": chart_dataset_tokens(pair_rows),
+                "datasets": chart_dataset_tokens_from_figure(chart_figure),
                 **metrics,
             })
 

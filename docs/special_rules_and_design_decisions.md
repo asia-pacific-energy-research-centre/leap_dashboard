@@ -431,16 +431,19 @@ four domestic demand placeholders and remain hidden when their LEAP branch is
 aggregate-only.
 
 Route the combined `Other sector including non-energy (all demand aggregate)`
-row to Other demand. Continue routing an exact code-17 row to Non-energy and
-keep that standalone page hidden while it has no usable standalone LEAP
-mapping. This is presentation routing only; the dashboard does not split or
-recalculate the upstream aggregate.
+row to Other demand through its exact, temporary routing special case.
+Continue routing an exact code-17 row to Non-energy. Hide the standalone page
+only while it has no usable standalone LEAP mapping; it must appear
+automatically when source-specific code-17 data becomes available. This is
+presentation routing only; the dashboard does not split or recalculate the
+upstream aggregate.
 
 ### Validation
 
 Regression tests require aggregate-only demand pages to remain visible, the
 unmapped Non-energy page to remain hidden, the combined placeholder to route to
-Other demand, and an exact code-17 row to retain its Non-energy assignment.
+Other demand, and an exact code-17 row to retain its Non-energy assignment and
+become visible once it contains LEAP data.
 
 ### History
 
@@ -449,6 +452,10 @@ Other demand, and an exact code-17 row to retain its Non-energy assignment.
   placeholder was assigned to the hidden Non-energy page.
 - 2026-08-03: Narrowed the exception after visual review showed that a global
   aggregate-page override also exposed Bunkers without a usable LEAP projection.
+- 2026-08-09: Replaced rule-order routing with boundary-safe, most-specific
+  page roots; isolated the combined placeholder as an exact special case; and
+  made Non-energy visibility depend on usable LEAP coverage rather than a
+  permanent skip list.
 
 ## DASH-013: Gas-works own use is shown only in the shared transformation boundary
 

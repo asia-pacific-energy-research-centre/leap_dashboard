@@ -171,36 +171,27 @@ scope selector:
 
 The intended user rule is conjunctive: when LEAP is selected, hide every chart
 that does not show LEAP; when LEAP and ESTO are both selected, retain only
-charts showing both. This is particularly useful on an aggregate-only Industry
-page, where the broad `14 Industry` chart may show LEAP while detailed ESTO or
-Ninth-only categories should be hidden.
+charts showing both. While Industry still uses an aggregate demand placeholder,
+the broad `14 Industry` chart may show LEAP while detailed ESTO or Ninth-only
+categories are hidden. This is transitional, not an enduring Industry rule:
+once detailed LEAP Industry categories are available, every detailed chart
+that actually contains a LEAP trace must remain visible under the LEAP filter.
 
-### Current implementation audit
+### Current implementation
 
-The current renderer retains a complete filter implementation but sets
-`SHOW_DATASET_FILTER = False`. Older published HTML may still show the control.
-When enabled, it:
+The renderer enables this control with `SHOW_DATASET_FILTER = True`. It:
 
-- writes a comma-separated `data-datasets` attribute on every chart card;
-- supplies one button for each dataset found among the page's chart records;
-- hides a card when it lacks any active dataset; and
-- saves active selections in browser local storage.
+- derives each card's comma-separated `data-datasets` membership from the
+  final Plotly figure's non-empty traces and `layout.meta.trace_meta`;
+- keeps the stored dashboard-wide selection when the current page has no
+  matching source button or chart;
+- applies conjunctive matching when more than one dataset is selected;
+- reports the visible and total chart counts;
+- explains a zero-result page and provides a one-click Clear action; and
+- exposes accessible pressed states and a live status message.
 
-The core conjunctive hide/show rule is correct, but four parts are not yet a
-reliable contract:
-
-1. **Membership comes from input rows, not final traces.** A chart can be tagged
-   with a source present in its input slice even when frontier selection or
-   chart construction does not render a trace for that source.
-2. **Unavailable page buttons erase persistent intent.** On load, stored
-   selections are intersected with the datasets available on the current page.
-   Navigating to a page without LEAP can therefore clear the user's LEAP-only
-   choice instead of showing that no charts match.
-3. **There is no empty-result explanation.** Filtering every card leaves empty
-   grids and headings rather than a useful message and a clear reset action.
-4. **There is no focused regression coverage.** Tests do not currently prove
-   membership accuracy, persistence, conjunctive selection, or the
-   aggregate-only Industry case.
+This keeps the filter tied to displayed traces after frontier selection and
+fallback, rather than to all input rows considered by a chart builder.
 
 ### Target filter contract
 
@@ -239,12 +230,13 @@ The filter must:
    matching.
 3. Add exact routing special cases and an explicit routing audit output.
 4. Separate ordinary routing, page visibility, and bespoke page inputs.
-5. Ensure every page has exactly one builder and validate manifest/bundle
-   equality.
+5. Ensure every page has exactly one builder and validate equality between
+   unsuppressed manifest rows and loadable bundle charts. Suppressed manifest
+   rows remain as intentional coverage/QA records and have no bundle entry.
 6. Record flow 13 as temporarily disabled with its upstream dependency.
 7. Derive chart dataset membership from final figure traces.
 8. Restore the chart filter with persistent selections, an empty state, and
-   focused Industry/LEAP tests.
+   focused temporary-placeholder Industry/LEAP tests.
 9. Run both `esto_leap_ninth` and `esto_leap` through routing, rendering,
    publication-readiness, and page-noise checks before enabling the new scope
    selector.
@@ -256,13 +248,17 @@ Completion requires automated checks that:
 - `14` matches `14` and `14.*`, but not `5.14`, `05.14`, or `114`;
 - the most-specific root wins for Power, Refining, and Other transformation;
 - exact `17` remains independent of the combined Other/non-energy placeholder;
-- every retained row is ordinary, special-case, ambiguous, unassigned, or
-  deliberately excluded, with no silent loss;
+- every retained row is ordinary, special-case, bespoke-page, ambiguous,
+  unassigned, or deliberately excluded, with no silent loss;
 - a bespoke page is rendered once;
-- manifest chart keys and final bundle keys match in both directions;
+- unsuppressed manifest chart keys and final bundle keys match in both
+  directions, while every bundle-absent manifest row is explicitly suppressed;
 - every `data-datasets` value equals the datasets represented by final chart
   traces;
-- selecting LEAP hides ESTO/Ninth-only Industry detail while retaining the
-  available LEAP-backed `14 Industry` chart;
+- while the aggregate placeholder is in use, selecting LEAP hides
+  ESTO/Ninth-only Industry detail while retaining the available LEAP-backed
+  `14 Industry` chart;
+- when detailed LEAP Industry rows become available, charts containing their
+  final LEAP traces remain visible without any Industry-specific exception;
 - a selected dataset remains selected on pages with zero matches; and
 - the filter behaves consistently in both initial comparison scopes.

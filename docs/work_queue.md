@@ -66,7 +66,7 @@ These later commits supersede the corresponding snapshot rows below:
 
 ## Post-snapshot active design work on 2026-08-08
 
-- **DASHQ-037 is `partial`.** The approved page-root routing and
+- **DASHQ-037 is `complete_on_master`.** The approved page-root routing and
   dataset-presence filter contract is documented in
   [`dashboard_page_routing_and_chart_visibility.md`](dashboard_page_routing_and_chart_visibility.md).
   Ordinary pages should own configured highest-level flow roots, nested roots
@@ -74,12 +74,16 @@ These later commits supersede the corresponding snapshot rows below:
   exact documented `routing_special_cases`. The migration must preserve exact
   code-boundary matching (`14` must not match `5.14`), keep exact code 17
   independent of the combined Other/non-energy placeholder, and render every
-  page through one builder. The chart filter is currently disabled and must not
-  be re-enabled until membership comes from final figure traces, selections
-  persist on pages with no matches, an explained empty state exists, and the
-  aggregate-only Industry/LEAP case has regression coverage. Flow 13 remains
-  intentionally disabled until non-energy use can be separated from aggregated
-  Other-sector LEAP demand.
+  page through one builder. The restored chart filter derives membership from
+  final figure traces, preserves selections on pages with no matches, explains
+  the empty state, and covers the temporary aggregate-placeholder Industry/LEAP
+  case. This rule will naturally retain detailed Industry charts once their
+  final figures contain LEAP traces. Flow 13 remains intentionally disabled
+  until non-energy use can be separated from aggregated Other-sector LEAP
+  demand. Verification: 67 focused dashboard tests and 164 repository tests
+  pass; the explicit USA-fixture render writes 501 charts with no loadable
+  manifest/bundle mismatch; all-economy publication readiness passes; and the
+  page-noise scan retains five pre-existing density/suppression review flags.
 
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were

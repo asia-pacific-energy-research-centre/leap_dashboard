@@ -20,6 +20,30 @@
       "10.01": "10.01 Own use"
     }
   },
+  "routing_special_cases": [
+    {
+      "case_id": "transfers_to_other_transformation",
+      "enabled": true,
+      "match": {"common_flow_code_prefixes": ["08"]},
+      "action": "route",
+      "page_key": "other_transformation",
+      "page_label": "Other transformation",
+      "section_key": "transfers",
+      "section_label": "Transfers",
+      "temporary": false,
+      "reason": "Transfers are routing operations shown as their own section under Other transformation."
+    },
+    {
+      "case_id": "combined_other_and_non_energy_placeholder",
+      "enabled": true,
+      "match": {"common_flow_code_exact": "16.03-16.05,17"},
+      "action": "route",
+      "page_key": "others",
+      "page_label": "Other demand",
+      "temporary": true,
+      "reason": "LEAP currently reports Other sector and non-energy as one inseparable aggregate; exact standalone code 17 remains owned by Non-energy."
+    }
+  ],
   "sector_pages": [
     {
       "page_key": "supply",
@@ -73,20 +97,7 @@
         "Electricity, CHP and heat plants",
         "Power sector"
       ],
-      "rule_note": "Electricity and heat output, plus directly related power-sector own-use rows. Also catches generated rollups such as 09.01.01,09.02.01 Electricity plants by label keyword. Priority 30 runs before the other_transformation 09-prefix rule (priority 50), so 09.01/09.02 rows are claimed here first-match-wins and never need to be excluded downstream."
-    },
-    {
-      "rule_id": "transfers_any_08_to_other_transformation",
-      "page_key": "other_transformation",
-      "page_label": "Other transformation",
-      "section_key": "transfers",
-      "section_label": "Transfers",
-      "priority": 35,
-      "flow_code_prefixes": [
-        "08"
-      ],
-      "flow_keywords": [],
-      "rule_note": "Transfers rule: any generated/common row containing an 08 transfer component is assigned to the Transfers section under Other transformation, regardless of whether the display label mentions refining or blending. Priority 35 runs before refining (40) and the other_transformation 09-prefix rule (50), so 08 rows are claimed here first-match-wins; refining's exclude_flow_code_prefixes:[\"08\"] below is a belt-and-braces guard against its own label-keyword match, not what makes this ordering work."
+      "rule_note": "Electricity and heat output, plus directly related power-sector own-use rows. The specific 09.01/09.02 roots take ownership ahead of the broader Other transformation root 09."
     },
     {
       "page_key": "refining",
@@ -99,7 +110,7 @@
       "flow_keywords": [
         "Oil refineries"
       ],
-      "rule_note": "Oil refining rows. Transfer rows beginning with 08 are intentionally kept in Other transformation > Transfers, even when their label mentions refinery or blending. This rule's own exclude_flow_code_prefixes:[\"08\"] exists only to stop this rule's own flow_keywords (e.g. label text mentioning refinery/blending) from grabbing an 08 row that the Transfers rule (priority 35) already claimed by prefix; priority ordering alone already prevents prefix-based reclaiming.",
+      "rule_note": "Oil refining rows. The specific 09.07 root takes ownership ahead of the broader Other transformation root 09; transfers use an explicit routing special case.",
       "exclude_flow_code_prefixes": [
         "08"
       ]
@@ -124,7 +135,7 @@
       "exclude_flow_code_prefixes": [
         "17"
       ],
-      "rule_note": "Transformation, energy own-use, extraction own-use, and losses not assigned to power/refining. Transfer rows beginning with 08 are handled by the higher-priority Transfers rule on this same page. Rows under 09.01/09.02 (power) and 09.07 (refining) are never seen here even though \"09\" is a prefix of this rule, because assign_pages() matches rules in ascending priority order and is first-match-wins (see sorted_page_rules/assign_pages in common_esto_dashboard_renderer.py) — those rows are already claimed by the priority-30 and priority-40 rules above before this priority-50 rule runs. Do NOT add exclude_flow_code_prefixes here for power/refining prefixes; it would be redundant and could mask a real ordering bug if it were ever needed."
+      "rule_note": "Transformation, energy own-use, extraction own-use, and losses not owned by a more-specific Power or Refining root. Transfers use an explicit routing special case."
     },
     {
       "page_key": "industry",
@@ -191,17 +202,6 @@
       "rule_note": "Other final demand rows outside buildings/industry/transport."
     },
     {
-      "rule_id": "all_demand_aggregate_other_sector_placeholder",
-      "page_key": "others",
-      "page_label": "Other demand",
-      "priority": 54,
-      "flow_code_prefixes": [],
-      "flow_keywords": [
-        "all demand aggregate"
-      ],
-      "rule_note": "Route the combined Other sector including non-energy LEAP placeholder to Other demand until separately modelled demand detail replaces it. Exact code-17 rows remain assigned by the Non-energy rule below."
-    },
-    {
       "page_key": "non_energy",
       "page_label": "Non-energy use",
       "priority": 55,
@@ -217,10 +217,11 @@
   "total_demand_page": {
     "enabled": true,
     "page_label": "Energy balance overview",
-    "overview_flow_codes": ["07", "12", "13"],
+    "overview_flow_codes": ["07", "12"],
     "demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"],
     "supply_codes": ["01", "02", "03"],
-    "tfec_exclude_page_keys": ["non_energy"],
+    "tfec_enabled": false,
+    "tfec_status": "Temporarily disabled because non-energy use cannot yet be separated from aggregated Other-sector LEAP demand.",
     "transformation_total": {
       "enabled": true,
       "source_aggregate_label": "Total transformation - no transfers",
@@ -258,8 +259,9 @@
       "others": ["Other sector"],
       "bunkers": ["Transport non road"]
     },
-    "always_skip_page_keys": ["non_energy"],
-    "_note": "page_leap_branches maps each sector page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. show_aggregate_only_page_keys keeps only the four domestic demand pages visible while they use placeholders; aggregate-only Bunkers remains hidden because it has no usable LEAP projection here. always_skip_page_keys remains for pages without a usable standalone LEAP mapping: exact non-energy rows stay hidden, while the combined Other sector including non-energy all-demand placeholder is routed to Other demand by its explicit higher-priority page rule."
+    "always_skip_page_keys": [],
+    "require_primary_source_page_keys": ["non_energy"],
+    "_note": "page_leap_branches maps each sector page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. show_aggregate_only_page_keys keeps only the four domestic demand pages visible while they use placeholders; aggregate-only Bunkers remains hidden because it has no usable LEAP projection here. Non-energy remains hidden until exact standalone rows include the configured primary source; the combined Other sector including non-energy placeholder is routed to Other demand by its explicit routing special case."
   },
   "scope_specific_pages": {
     "enabled": false,

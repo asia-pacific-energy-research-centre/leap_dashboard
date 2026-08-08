@@ -1,8 +1,10 @@
 import json
+import re
 from pathlib import Path
 
 import pandas as pd
 import pytest
+import plotly.graph_objects as go
 
 from codebase.common_esto_dashboard_data import (
     ALL_SCOPES,
@@ -20,8 +22,12 @@ from codebase.common_esto_dashboard_renderer import (
     apply_chart_chrome,
     assert_unique_line_trace_x,
     assign_pages,
+    assign_bespoke_overview_rows,
     build_area_chart,
     build_product_chart,
+    chart_dataset_tokens_from_figure,
+    code_expression_matches_prefix,
+    page_keys_without_required_source,
     color_for_code,
     color_for_plotting_name,
     drop_excluded_flow_rows,
@@ -304,6 +310,73 @@ def test_common_esto_dashboard_renders_core_pages_by_default(tmp_path: Path) -> 
     overview_rows = manifest[manifest["page_key"] == "total_demand"]
     assert "chart__line__total_transformation_no_transfers" in set(overview_rows["chart_key"])
     assert set(overview_rows["page_label"]) == {"Energy balance overview"}
+    for bundle_path in layout["chart_bundles"].glob("*__charts.json"):
+        page_key = bundle_path.name.removesuffix("__charts.json")
+        bundle_keys = set(json.loads(bundle_path.read_text(encoding="utf-8"))["charts"])
+        page_manifest = manifest[manifest["page_key"] == page_key]
+        suppressed = page_manifest["suppressed"].astype(str).str.casefold().isin(
+            {"true", "1", "yes"}
+        )
+        loadable_manifest_keys = set(page_manifest.loc[~suppressed, "chart_key"])
+        assert loadable_manifest_keys == bundle_keys
+
+
+def test_industry_filter_membership_tracks_temporary_leap_placeholder_detail(
+    tmp_path: Path,
+) -> None:
+    template = _load_template()
+    template["total_demand_page"] = {"enabled": False}
+    template["emissions_page"] = {"enabled": False}
+    template["scope_specific_pages"] = {"enabled": False}
+    rows = pd.DataFrame([
+        {
+            "comparison_scope": "esto_leap_ninth", "source_system": "LEAP",
+            "economy": "20_USA", "scenario": "Target", "year": 2030,
+            "common_flow_code": "14", "common_flow_name": "Industry sector",
+            "common_flow_label": "14 Industry sector", "common_product_code": "17",
+            "common_product_name": "Electricity", "common_product_label": "17 Electricity",
+            "value": 10.0,
+        },
+        {
+            "comparison_scope": "esto_leap_ninth", "source_system": "ESTO",
+            "economy": "20_USA", "scenario": "historical", "year": 2022,
+            "common_flow_code": "14", "common_flow_name": "Industry sector",
+            "common_flow_label": "14 Industry sector", "common_product_code": "17",
+            "common_product_name": "Electricity", "common_product_label": "17 Electricity",
+            "value": 9.0,
+        },
+        {
+            "comparison_scope": "esto_leap_ninth", "source_system": "ESTO",
+            "economy": "20_USA", "scenario": "historical", "year": 2022,
+            "common_flow_code": "14.03", "common_flow_name": "Manufacturing",
+            "common_flow_label": "14.03 Manufacturing", "common_product_code": "17",
+            "common_product_name": "Electricity", "common_product_label": "17 Electricity",
+            "value": 5.0,
+        },
+        {
+            "comparison_scope": "esto_leap_ninth", "source_system": "NINTH",
+            "economy": "20_USA", "scenario": "Target", "year": 2030,
+            "common_flow_code": "14.03", "common_flow_name": "Manufacturing",
+            "common_flow_label": "14.03 Manufacturing", "common_product_code": "17",
+            "common_product_name": "Electricity", "common_product_label": "17 Electricity",
+            "value": 6.0,
+        },
+    ])
+    layout = build_output_layout(tmp_path / "outputs", "20USA", clear_existing=True)
+
+    render_dashboard(rows, template, _load_series_config(), layout)
+
+    html = (layout["dashboards"] / "industry.html").read_text(encoding="utf-8")
+    cards = re.findall(
+        r'<figure class="chart-card"[^>]*data-datasets="([^"]*)"[^>]*>.*?'
+        r'<figcaption class="chart-caption">(.*?)</figcaption>',
+        html,
+        flags=re.DOTALL,
+    )
+    assert any("LEAP" in datasets and "Industry" in caption for datasets, caption in cards)
+    assert any("LEAP" not in datasets and "Electricity" in caption for datasets, caption in cards)
+    assert "Charts containing:" in html
+    assert "No charts on this page show every selected dataset" in html
 
 
 def test_common_esto_dashboard_excludes_electricity_and_heat_output_rows() -> None:
@@ -439,6 +512,116 @@ def test_power_sector_rollup_is_not_assigned_to_other_transformation() -> None:
     assert assigned.loc[0, "_section_key"] == "power"
 
 
+def test_page_root_prefix_matching_is_boundary_safe() -> None:
+    assert code_expression_matches_prefix("14", "14")
+    assert code_expression_matches_prefix("14.03.01", "14")
+    assert code_expression_matches_prefix("14.01,14.03", "14")
+    assert not code_expression_matches_prefix("5.14", "14")
+    assert not code_expression_matches_prefix("05.14", "14")
+    assert not code_expression_matches_prefix("114", "14")
+    assert not code_expression_matches_prefix("14A", "14")
+
+
+def test_most_specific_page_root_owns_nested_transformation_categories() -> None:
+    template = _load_template()
+    rows = pd.DataFrame([
+        {"common_flow_code": "09.01.03", "common_flow_label": "09.01.03 Power detail"},
+        {"common_flow_code": "09.07.01", "common_flow_label": "09.07.01 Refining detail"},
+        {"common_flow_code": "09.06.02", "common_flow_label": "09.06.02 Gas processing"},
+    ])
+
+    assigned = assign_pages(
+        rows,
+        template["sector_pages"],
+        template["routing_special_cases"],
+    )
+
+    assert assigned["_page_key"].tolist() == ["power", "refining", "other_transformation"]
+    assert assigned["_routing_status"].tolist() == ["page_root", "page_root", "page_root"]
+    assert assigned["_page_rule_priority"].tolist() == ["root:09.01", "root:09.07", "root:09"]
+
+
+def test_combined_placeholder_is_special_but_exact_17_keeps_its_page_root() -> None:
+    template = _load_template()
+    rows = pd.DataFrame([
+        {
+            "common_flow_code": "16.03-16.05,17",
+            "common_flow_label": "16.03-16.05,17 Other sector including non-energy",
+        },
+        {"common_flow_code": "17", "common_flow_label": "17 Non-energy use"},
+    ])
+
+    without_special_case = assign_pages(rows.iloc[[0]], template["sector_pages"])
+    assert without_special_case.iloc[0]["_routing_status"] == "ambiguous"
+
+    assigned = assign_pages(
+        rows,
+        template["sector_pages"],
+        template["routing_special_cases"],
+    )
+    assert assigned["_page_key"].tolist() == ["others", "non_energy"]
+    assert assigned["_routing_status"].tolist() == ["special_case", "page_root"]
+    assert assigned.iloc[0]["_routing_special_case"] == "combined_other_and_non_energy_placeholder"
+
+
+def test_energy_balance_totals_receive_bespoke_routing_status() -> None:
+    template = _load_template()
+    assigned = assign_pages(
+        pd.DataFrame([
+            {"common_flow_code": "07", "common_flow_label": "07 Total primary energy supply"},
+            {"common_flow_code": "12", "common_flow_label": "12 Total final consumption"},
+        ]),
+        template["sector_pages"],
+        template["routing_special_cases"],
+    )
+
+    routed = assign_bespoke_overview_rows(assigned, template["total_demand_page"])
+
+    assert set(routed["_page_key"]) == {"total_demand"}
+    assert set(routed["_routing_status"]) == {"bespoke_page"}
+
+
+def test_non_energy_page_appears_when_exact_17_has_leap_data() -> None:
+    template = _load_template()
+    rows = pd.DataFrame([
+        {
+            "common_flow_code": "17",
+            "common_flow_label": "17 Non-energy use",
+            "source_system": "ESTO",
+        },
+        {
+            "common_flow_code": "17",
+            "common_flow_label": "17 Non-energy use",
+            "source_system": "LEAP",
+        },
+    ])
+    assigned = assign_pages(
+        rows,
+        template["sector_pages"],
+        template["routing_special_cases"],
+    )
+    required_pages = template["leap_demand_sector_coverage"][
+        "require_primary_source_page_keys"
+    ]
+
+    assert page_keys_without_required_source(assigned.iloc[[0]], required_pages, "LEAP") == {
+        "non_energy"
+    }
+    assert page_keys_without_required_source(assigned, required_pages, "LEAP") == set()
+
+
+def test_chart_dataset_tokens_come_from_final_traces() -> None:
+    figure = go.Figure()
+    figure.add_trace(go.Scatter(x=[2022], y=[1.0], name="ESTO"))
+    figure.update_layout(meta={
+        "trace_meta": [
+            {"source_system": "ESTO", "tag": "esto", "metric": "both", "active_visible": True}
+        ]
+    })
+
+    assert chart_dataset_tokens_from_figure(figure) == "ESTO"
+
+
 def test_aggregate_only_demand_pages_remain_visible_but_unmapped_page_is_hidden() -> None:
     template = _load_template()
 
@@ -447,10 +630,7 @@ def test_aggregate_only_demand_pages_remain_visible_but_unmapped_page_is_hidden(
         {"Industry", "Buildings", "Other sector", "Transport non road"},
     )
 
-    assert filtered["leap_demand_sector_coverage"]["_hidden_page_keys"] == [
-        "bunkers",
-        "non_energy",
-    ]
+    assert filtered["leap_demand_sector_coverage"]["_hidden_page_keys"] == ["bunkers"]
 
 
 def test_aggregate_placeholder_overviews_require_leap_rows() -> None:
@@ -504,7 +684,11 @@ def test_all_demand_other_sector_placeholder_is_routed_before_non_energy() -> No
         },
     ])
 
-    assigned = assign_pages(df, template["sector_pages"])
+    assigned = assign_pages(
+        df,
+        template["sector_pages"],
+        template["routing_special_cases"],
+    )
 
     assert assigned.loc[0, "_page_key"] == "others"
     assert assigned.loc[1, "_page_key"] == "non_energy"
