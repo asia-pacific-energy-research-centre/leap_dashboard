@@ -28,12 +28,14 @@
 #   year. Default is False because ESTO is the preferred historical source.
 
 #%%
+import importlib.util
 import json
 import os
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
 
@@ -55,6 +57,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     filter_template_for_leap_demand_coverage,
     load_common_esto_data,
 )
+from common_esto_dashboard_emissions import set_leap_mappings_root  # noqa: E402
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
 from common_esto_dashboard_output_layout import build_output_layout, publish_to_docs  # noqa: E402
 from common_esto_dashboard_convergence import write_capacity_unmet_convergence_page  # noqa: E402
@@ -134,7 +137,12 @@ def _log_to_file(log_path):
 #%%
 # Stable paths.
 _DEFAULT_LEAP_MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
-_LEAP_MAPPINGS_REPO = _resolve(os.getenv("LEAP_MAPPINGS_ROOT", str(_DEFAULT_LEAP_MAPPINGS_ROOT)))
+_LEAP_MAPPINGS_REPO = _resolve(
+    os.getenv(
+        "COMMON_ESTO_MAPPINGS_ROOT",
+        os.getenv("LEAP_MAPPINGS_ROOT", str(_DEFAULT_LEAP_MAPPINGS_ROOT)),
+    )
+)
 _LEAP_MAPPINGS_CODEBASE = _LEAP_MAPPINGS_REPO / "codebase"
 _LEAP_MAPPINGS_RESULTS = _LEAP_MAPPINGS_REPO / "results" / "common_esto"
 ESTO_EXACT_ROWS_PATH = prefer_compressed_csv_path(
@@ -153,9 +161,18 @@ OUTPUT_CONTRACT_PATH = _resolve(
     os.getenv("COMMON_ESTO_OUTPUT_CONTRACT_PATH", str(DEFAULT_OUTPUT_CONTRACT_PATH))
 )
 COMMON_ROWS_PATH = _resolve(os.getenv("COMMON_ESTO_ROWS_PATH", str(_LEAP_MAPPINGS_RESULTS / "common_esto_rows.csv")))
+DATASET_REGISTRY_PATH = _resolve(
+    os.getenv(
+        "COMMON_ESTO_DATASET_REGISTRY_PATH",
+        str(_LEAP_MAPPINGS_REPO / "config" / "datasets" / "dataset_registry.csv"),
+    )
+)
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
 OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
+# The emissions page reads its 9th-fuel -> ESTO mapping contract and the
+# generated ESTO -> common axis map from the same sibling repository.
+set_leap_mappings_root(_LEAP_MAPPINGS_REPO)
 
 
 #%%
@@ -226,9 +243,26 @@ CAPACITY_UNMET_CONVERGENCE_PATH = _resolve(
 
 
 #%%
+# Dashboards are read by the APERC team in Tokyo, and a hosted render would
+# otherwise be stamped with whatever timezone the server happens to sit in.
+DASHBOARD_TIMEZONE = os.environ.get("COMMON_ESTO_DASHBOARD_TIMEZONE", "Asia/Tokyo")
+
+
+def _dashboard_timezone() -> timezone | ZoneInfo:
+    """Return the timezone dashboard timestamps are shown in.
+
+    Falls back to the machine's own zone if the tz database is unavailable,
+    which is better than failing a completed render over a label.
+    """
+    try:
+        return ZoneInfo(DASHBOARD_TIMEZONE)
+    except (ZoneInfoNotFoundError, ValueError):
+        return datetime.now().astimezone().tzinfo or timezone.utc
+
+
 def _dashboard_updated_label() -> str:
     """Return the human-facing timestamp shown in rendered dashboard headers."""
-    return datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z")
+    return datetime.now(_dashboard_timezone()).strftime("%Y-%m-%d %H:%M %Z")
 
 
 def _write_dashboard_metadata(
@@ -239,7 +273,9 @@ def _write_dashboard_metadata(
     metadata = {
         "economy": layout["root"].name,
         "dashboard_updated_label": updated_label,
-        "rendered_at_local": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "rendered_at_local": datetime.now(_dashboard_timezone()).isoformat(
+            timespec="seconds"
+        ),
         **selected_run_metadata(_LEAP_MAPPINGS_REPO),
     }
     (layout["supporting"] / "dashboard_metadata.json").write_text(
@@ -298,16 +334,19 @@ def _missing_leap_demand_branches(economy: str) -> list[str]:
     still only available via 'All demand aggregated'
     (config/all_demand_aggregated_components.json), resolved per economy.
     """
-    if str(_LEAP_MAPPINGS_CODEBASE) not in sys.path:
-        sys.path.insert(0, str(_LEAP_MAPPINGS_CODEBASE))
-    from mapping_tools.source_branch_preflight import (  # noqa: E402
-        get_demand_sectors_without_detail,
-        load_all_demand_aggregated_components,
+    module_path = _LEAP_MAPPINGS_CODEBASE / "mapping_tools" / "source_branch_preflight.py"
+    module_spec = importlib.util.spec_from_file_location(
+        "_leap_mappings_source_branch_preflight",
+        module_path,
     )
+    if module_spec is None or module_spec.loader is None:
+        raise ImportError(f"Could not load LEAP mappings preflight module: {module_path}")
+    preflight = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(preflight)
 
     components_path = _LEAP_MAPPINGS_REPO / "config" / "all_demand_aggregated_components.json"
-    components_df = load_all_demand_aggregated_components(components_path)
-    return get_demand_sectors_without_detail(components_df, economy)
+    components_df = preflight.load_all_demand_aggregated_components(components_path)
+    return preflight.get_demand_sectors_without_detail(components_df, economy)
 
 
 def run_dashboard_for_economy(economy: str) -> dict[str, object]:
@@ -324,6 +363,7 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         INPUT_DATA_PATH,
         wide_file_scope=WIDE_FILE_SCOPE,
         output_contract_path=OUTPUT_CONTRACT_PATH if USE_OUTPUT_CONTRACT else None,
+        dataset_registry_path=DATASET_REGISTRY_PATH,
     )
     raw_df["economy"] = raw_df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
@@ -374,7 +414,7 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
             {
                 "page_key": "mapping_diagnostics",
                 "page_label": "Mapping diagnostics",
-                "file": "mapping_diagnostics.html",
+                "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
             },
             {
                 "page_key": "mapping_tree_explorer",
@@ -383,27 +423,14 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
             },
         ],
     )
-    esto_exact_values = load_esto_exact_values_for_economy(
-        ESTO_EXACT_ROWS_PATH,
-        economy,
-        min_year=MIN_YEAR,
-        max_year=MAX_YEAR,
-    )
-    esto_extended_exact_values = load_esto_exact_values_for_economy(
-        ESTO_EXTENDED_EXACT_ROWS_PATH,
-        economy,
-        min_year=MIN_YEAR,
-        max_year=MAX_YEAR,
-        source_system="ESTO_EXTENDED_RAW",
-    )
-    mapping_diagnostics = write_mapping_diagnostics_page(
-        layout,
-        _LEAP_MAPPINGS_REPO,
-        dashboard_updated_label=dashboard_updated_label,
-        economy=economy,
-        comparison_data=scope_filtered_df,
-        esto_exact_values=pd.concat([esto_exact_values, esto_extended_exact_values], ignore_index=True),
-    )
+    mapping_diagnostics = {
+        "page": str(
+            OUTPUT_ROOT / "diagnostics" / "dashboards" / "mapping_diagnostics.html"
+        ),
+        "summary": str(
+            OUTPUT_ROOT / "diagnostics" / "supporting_files" / "mapping_diagnostics_summary.csv"
+        ),
+    }
     mapping_tree_explorer = render_full_tree_explorer(
         output_path=layout["dashboards"] / "mapping_tree_explorer.html",
         comparison_data=raw_df,
@@ -458,6 +485,54 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
     return result
 
 
+def run_shared_mapping_diagnostics() -> dict[str, str]:
+    """Render the one APEC-first diagnostics page linked by every economy."""
+    raw_df = load_common_esto_data(
+        INPUT_DATA_PATH,
+        wide_file_scope=WIDE_FILE_SCOPE,
+        output_contract_path=OUTPUT_CONTRACT_PATH if USE_OUTPUT_CONTRACT else None,
+        dataset_registry_path=DATASET_REGISTRY_PATH,
+    )
+    raw_df["economy"] = raw_df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
+    raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
+    if MIN_YEAR is not None:
+        raw_df = raw_df[raw_df["year"] >= MIN_YEAR]
+    if MAX_YEAR is not None:
+        raw_df = raw_df[raw_df["year"] <= MAX_YEAR]
+    layout = build_output_layout(
+        OUTPUT_ROOT,
+        "diagnostics",
+        clear_existing=CLEAR_EXISTING_OUTPUTS,
+    )
+    updated_label = _dashboard_updated_label()
+    esto_exact_values = load_esto_exact_values_for_economy(
+        ESTO_EXACT_ROWS_PATH,
+        "",
+        min_year=MIN_YEAR,
+        max_year=MAX_YEAR,
+    )
+    esto_extended_exact_values = load_esto_exact_values_for_economy(
+        ESTO_EXTENDED_EXACT_ROWS_PATH,
+        "",
+        min_year=MIN_YEAR,
+        max_year=MAX_YEAR,
+        source_system="ESTO_EXTENDED_RAW",
+    )
+    result = write_mapping_diagnostics_page(
+        layout,
+        _LEAP_MAPPINGS_REPO,
+        dashboard_updated_label=updated_label,
+        economy="00APEC",
+        comparison_data=raw_df,
+        esto_exact_values=pd.concat(
+            [esto_exact_values, esto_extended_exact_values], ignore_index=True
+        ),
+    )
+    if PUBLISH_TO_DOCS:
+        publish_to_docs(layout, REPO_ROOT / "docs")
+    return result
+
+
 def run_dashboard_workflow() -> dict[str, object]:
     """Run dashboard render once for all configured economies."""
     maybe_regen_common_esto_fast_path()
@@ -467,6 +542,7 @@ def run_dashboard_workflow() -> dict[str, object]:
         raise ValueError("ECONOMIES is empty. Provide a string or list with at least one economy code.")
 
     print(f"Configured economies: {', '.join(configured_economies)}")
+    shared_mapping_diagnostics = run_shared_mapping_diagnostics()
     economy_results: dict[str, dict[str, object]] = {}
     for idx, economy in enumerate(configured_economies, start=1):
         print("-" * 72)
@@ -481,6 +557,7 @@ def run_dashboard_workflow() -> dict[str, object]:
         "economies": configured_economies,
         "economy_results": economy_results,
         "total_chart_count": total_charts,
+        "mapping_diagnostics": shared_mapping_diagnostics,
     }
 
 

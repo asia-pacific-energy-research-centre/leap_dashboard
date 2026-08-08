@@ -13,8 +13,10 @@ from codebase.common_esto_dashboard_data import (
     filter_template_for_leap_demand_coverage,
     load_common_esto_data,
 )
+from codebase.common_esto_dashboard_emissions import select_emissions_component_rows
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
 from codebase.common_esto_dashboard_renderer import (
+    _build_td_fuel_chart,
     apply_chart_chrome,
     assert_unique_line_trace_x,
     assign_pages,
@@ -23,9 +25,11 @@ from codebase.common_esto_dashboard_renderer import (
     color_for_code,
     color_for_plotting_name,
     drop_excluded_flow_rows,
+    pick_area_specs,
     render_dashboard,
     select_transformation_total_rows,
     _build_section_aggregate_charts,
+    _build_td_fuel_chart,
     _build_supply_stack_chart,
     aggregate_only_tfec_note,
     _select_total_rows_by_source,
@@ -47,6 +51,161 @@ def _load_template() -> dict:
 def _load_series_config() -> dict:
     config_path = REPO_ROOT / "config" / "common_esto_dashboard" / "series_config.json"
     return json.loads(config_path.read_text(encoding="utf-8"))
+
+
+def test_emissions_components_keep_demand_sectors_and_combine_signed_transformation_use() -> None:
+    rows = pd.DataFrame([
+        {
+            "_page_key": "industry", "_page_label": "Industry",
+            "common_flow_code": "14", "common_flow_label": "14 Industry",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": 20.0,
+        },
+        {
+            "_page_key": "non_energy", "_page_label": "Non-energy use",
+            "common_flow_code": "17", "common_flow_label": "17 Non-energy use",
+            "common_product_label": "06 Crude oil", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": 8.0,
+        },
+        {
+            "_page_key": "others", "_page_label": "Other demand",
+            "common_flow_code": "16.03-16.05,17",
+            "common_flow_label": "16.03-16.05,17 Other sector including non-energy (all demand aggregate)",
+            "common_product_label": "07 Gasoline", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": 9.0,
+        },
+        {
+            "_page_key": "power", "_page_label": "Power",
+            "common_flow_code": "09.01.01", "common_flow_label": "09.01.01 Electricity plants",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": -30.0,
+        },
+        {
+            "_page_key": "power", "_page_label": "Power",
+            "common_flow_code": "09", "common_flow_label": "09 Total transformation sector",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": -37.0,
+        },
+        {
+            "_page_key": "power", "_page_label": "Power",
+            "common_flow_code": "09.01.01", "common_flow_label": "09.01.01 Electricity plants",
+            "common_product_label": "17 Electricity", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": 27.0,
+        },
+        {
+            "_page_key": "other_transformation", "_page_label": "Other transformation",
+            "common_flow_code": "08", "common_flow_label": "08 Transfers",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": -4.0,
+        },
+        {
+            "_page_key": "other_transformation", "_page_label": "Other transformation",
+            "common_flow_code": "10.01.17", "common_flow_label": "10.01.17 Non-specified own uses",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": -5.0,
+        },
+        {
+            "_page_key": "refining", "_page_label": "Refining",
+            "common_flow_code": "09.07", "common_flow_label": "09.07 Oil refineries",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": -7.0,
+        },
+        {
+            "_page_key": "refining", "_page_label": "Refining",
+            "common_flow_code": "09.07", "common_flow_label": "09.07 Oil refineries (including own use)",
+            "common_product_label": "01 Coal", "source_system": "LEAP",
+            "scenario": "Target", "year": 2030, "value": -7.0,
+        },
+    ])
+
+    selected, coverage, selection = select_emissions_component_rows(
+        rows,
+        {"demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"]},
+    )
+
+    assert coverage.empty
+    assert set(selected["_sector_label"]) == {"Industry", "Transformation and own use"}
+    assert set(selected["value"]) == {20.0, 30.0, 5.0, 7.0}
+    assert "08 Transfers" not in set(selected["common_flow_label"])
+    assert (selected["_sector_label"] == "Transformation and own use").sum() == 3
+    assert set(selection["emissions_component"]) == {"Final demand", "Transformation and own use"}
+
+
+def test_total_demand_sector_area_uses_non_overlapping_parent_child_frontier() -> None:
+    rows = pd.DataFrame([
+        {
+            "_page_key": "buildings", "_page_label": "Buildings",
+            "common_flow_code": "16.01-16.02", "common_flow_label": "16.01-16.02 Buildings",
+            "common_product_code": "01", "common_product_label": "01 Coal", "source_system": "ESTO",
+            "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            "scenario": "historical", "year": 2022, "value": 20.0,
+            "common_row_id": "buildings_parent", "is_non_expanding_rollup": True,
+        },
+        {
+            "_page_key": "buildings", "_page_label": "Buildings",
+            "common_flow_code": "16.01.99", "common_flow_label": "16.01.99 Commercial and public services unallocated",
+            "common_product_code": "01", "common_product_label": "01 Coal", "source_system": "ESTO",
+            "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            "scenario": "historical", "year": 2022, "value": 9.0,
+            "common_row_id": "buildings_commercial", "is_non_expanding_rollup": False,
+        },
+        {
+            "_page_key": "buildings", "_page_label": "Buildings",
+            "common_flow_code": "16.02", "common_flow_label": "16.02 Residential",
+            "common_product_code": "01", "common_product_label": "01 Coal", "source_system": "ESTO",
+            "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            "scenario": "historical", "year": 2022, "value": 11.0,
+            "common_row_id": "buildings_residential", "is_non_expanding_rollup": False,
+        },
+    ])
+
+    selected = _non_overlapping_common_row_frontier(rows)
+
+    assert selected["value"].sum() == 20.0
+
+
+def test_total_demand_fuel_area_uses_non_overlapping_parent_child_frontier() -> None:
+    rows = []
+    for source_system, scenario, year, parent_value, child_one, child_two in [
+        ("ESTO", "historical", 2022, 20.0, 9.0, 11.0),
+        ("LEAP", "Target", 2023, 21.0, None, None),
+    ]:
+        for product_code, value in [("01", parent_value), ("02", 1.0 if source_system == "LEAP" else 2.0)]:
+            rows.append({
+                "_page_key": "buildings", "_page_label": "Buildings",
+                "common_flow_code": "16.01-16.02", "common_flow_label": "16.01-16.02 Buildings",
+                "common_product_code": product_code, "common_product_label": f"{product_code} Fuel",
+                "source_system": source_system, "scenario": scenario, "year": year,
+                "value": value, "common_row_id": f"{source_system}_{product_code}_parent",
+                "is_non_expanding_rollup": True, "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            })
+        if source_system == "ESTO":
+            for flow_code, value, row_id in [
+                ("16.01.99", child_one, "commercial"),
+                ("16.02", child_two, "residential"),
+            ]:
+                rows.append({
+                    "_page_key": "buildings", "_page_label": "Buildings",
+                    "common_flow_code": flow_code, "common_flow_label": flow_code,
+                    "common_product_code": "01", "common_product_label": "01 Fuel",
+                    "source_system": source_system, "scenario": scenario, "year": year,
+                    "value": value, "common_row_id": row_id, "is_non_expanding_rollup": False,
+                    "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+                })
+
+    figure = _build_td_fuel_chart(
+        pd.DataFrame(rows),
+        pd.DataFrame(columns=["source_system", "scenario", "year", "value"]),
+        pd.DataFrame(columns=["source_system", "scenario", "year", "common_flow_code", "value"]),
+        {},
+        "LEAP",
+        "Target",
+        base_year=2022,
+    )
+    fuel_trace = next(trace for trace in figure.data if trace.name == "01 Fuel" and trace.visible)
+    values = dict(zip(fuel_trace.x, fuel_trace.y))
+    assert values[2022] == 20.0
+    assert values[2023] == 21.0
 
 
 def _build_common_esto_rows() -> pd.DataFrame:
@@ -186,6 +345,52 @@ def test_refinery_own_use_is_only_shown_in_the_inclusive_boundary() -> None:
     ]
 
 
+def test_gas_works_own_use_is_not_plotted_as_a_standalone_flow() -> None:
+    template = _load_template()
+    df = pd.DataFrame(
+        [
+            {"common_flow_code": "09.06.01", "common_flow_label": "09.06.01 Gas works plants (including own use)"},
+            {"common_flow_code": "10.01.02", "common_flow_label": "10.01.02 Gas works plants"},
+            {"common_flow_code": "10.01.06", "common_flow_label": "10.01.06 Coal mines"},
+        ]
+    )
+
+    filtered = drop_excluded_flow_rows(df, template["excluded_flow_code_prefixes"])
+
+    assert filtered["common_flow_code"].tolist() == ["09.06.01", "10.01.06"]
+
+
+def test_losses_and_own_use_area_cards_use_parent_hierarchy_labels() -> None:
+    template = _load_template()
+    page_df = pd.DataFrame(
+        [
+            {
+                "common_flow_code": "10.01.06",
+                "common_flow_label": "10.01.06 Coal mines",
+                "source_system": source_system,
+            }
+            for source_system in ["ESTO", "LEAP", "NINTH"]
+        ]
+        + [
+            {
+                "common_flow_code": "10.02",
+                "common_flow_label": "10.02 Transmission and distribution losses",
+                "source_system": source_system,
+            }
+            for source_system in ["ESTO", "LEAP", "NINTH"]
+        ]
+    )
+
+    specs = pick_area_specs(page_df, template)
+    labels_by_prefix = {
+        str(spec["aggregate_flow_prefix"]): str(spec["aggregate_flow_label"])
+        for spec in specs
+    }
+
+    assert labels_by_prefix["10"] == "10 Losses and own use"
+    assert labels_by_prefix["10.01"] == "10.01 Own use"
+
+
 def test_ninth_pre_base_year_rows_are_excluded_by_default() -> None:
     df = pd.DataFrame(
         [
@@ -239,10 +444,13 @@ def test_aggregate_only_demand_pages_remain_visible_but_unmapped_page_is_hidden(
 
     filtered = filter_template_for_leap_demand_coverage(
         template,
-        {"Industry", "Buildings", "Other sector"},
+        {"Industry", "Buildings", "Other sector", "Transport non road"},
     )
 
-    assert filtered["leap_demand_sector_coverage"]["_hidden_page_keys"] == ["non_energy"]
+    assert filtered["leap_demand_sector_coverage"]["_hidden_page_keys"] == [
+        "bunkers",
+        "non_energy",
+    ]
 
 
 def test_aggregate_placeholder_overviews_require_leap_rows() -> None:
@@ -867,6 +1075,66 @@ def test_non_expanding_frontier_does_not_fall_back_when_a_year_is_exact_zero() -
     assert selected[["year", "common_row_id"]].to_dict("records") == [
         {"year": 2023, "common_row_id": "refinery_including_own_use"},
     ]
+
+
+def test_area_charts_drop_zero_only_categories_and_align_esto_frontier() -> None:
+    common = {
+        "comparison_scope": "esto_leap_ninth",
+        "economy": "20_USA",
+        "common_flow_code": "16.02",
+        "common_flow_label": "16.02 Residential",
+        "is_non_expanding_rollup": False,
+    }
+    rows = pd.DataFrame([
+        {**common, "source_system": "ESTO", "scenario": "historical", "year": 2022,
+         "common_product_code": "07.01", "common_product_label": "07.01 Motor gasoline", "value": 10.0},
+        {**common, "source_system": "ESTO", "scenario": "historical", "year": 2022,
+         "common_product_code": "12.99", "common_product_label": "12.99 Solar nonspecified", "value": 0.0},
+        {**common, "source_system": "LEAP", "scenario": "Target", "year": 2023,
+         "common_product_code": "07.01", "common_product_label": "07.01 Motor gasoline", "value": 20.0},
+        {**common, "source_system": "LEAP", "scenario": "Target", "year": 2023,
+         "common_product_code": "12.99", "common_product_label": "12.99 Solar nonspecified", "value": 0.0},
+    ])
+    figure = build_area_chart(
+        rows,
+        {
+            "aggregate_flow_label": "16.02 Residential",
+            "source_flow_labels": ["16.02 Residential"],
+            "source_flow_labels_by_system": {},
+        },
+        {"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
+        {"chart_generation": {"comparison_source_system": "ESTO", "base_year": 2022,
+                               "primary_area_source_system": "LEAP", "primary_area_scenario": "Target"}},
+    )
+    area_names = {str(trace.name) for trace in figure.data if trace.stackgroup}
+    assert area_names == {"07.01 Motor gasoline"}
+    assert "12.99 Solar nonspecified" not in area_names
+
+
+def test_energy_balance_fuel_area_uses_esto_history_on_leap_category_frontier() -> None:
+    rows = pd.DataFrame([
+        {"source_system": "ESTO", "scenario": "historical", "year": 2022,
+         "common_product_label": "07.01 Motor gasoline", "value": 10.0},
+        {"source_system": "ESTO", "scenario": "historical", "year": 2022,
+         "common_product_label": "12.99 Solar nonspecified", "value": 0.0},
+        {"source_system": "LEAP", "scenario": "Target", "year": 2023,
+         "common_product_label": "07.01 Motor gasoline", "value": 20.0},
+        {"source_system": "LEAP", "scenario": "Target", "year": 2023,
+         "common_product_label": "12.99 Solar nonspecified", "value": 0.0},
+    ])
+    figure = _build_td_fuel_chart(
+        rows,
+        pd.DataFrame(columns=rows.columns),
+        pd.DataFrame(columns=rows.columns),
+        {"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
+        "LEAP",
+        "Target",
+        base_year=2022,
+    )
+    area_names = {str(trace.name) for trace in figure.data if trace.stackgroup}
+    assert area_names == {"07.01 Motor gasoline"}
+    motor = next(trace for trace in figure.data if trace.name == "07.01 Motor gasoline")
+    assert list(motor.x) == [2022, 2023]
 
 
 def test_leap_and_ninth_lines_include_available_base_year_values() -> None:

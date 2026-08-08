@@ -412,6 +412,10 @@ when their LEAP projection is still supplied by an `All demand aggregated`
 placeholder. These are transitional sector rows and should remain reviewable
 until detailed LEAP demand branches replace them upstream.
 
+Do not apply this exception to Bunkers. International bunkers are outside the
+four domestic demand placeholders and remain hidden when their LEAP branch is
+aggregate-only.
+
 Route the combined `Other sector including non-energy (all demand aggregate)`
 row to Other demand. Continue routing an exact code-17 row to Non-energy and
 keep that standalone page hidden while it has no usable standalone LEAP
@@ -429,6 +433,39 @@ Other demand, and an exact code-17 row to retain its Non-energy assignment.
 - 2026-08-03: Confirmed while reviewing China, where Industry and Buildings
   had valid LEAP placeholder rows but were hidden, and the combined Other-sector
   placeholder was assigned to the hidden Non-energy page.
+- 2026-08-03: Narrowed the exception after visual review showed that a global
+  aggregate-page override also exposed Bunkers without a usable LEAP projection.
+
+## DASH-013: Gas-works own use is shown only in the shared transformation boundary
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / comparison-boundary filtering
+**Affected areas:** Other transformation overview and detail charts
+
+### Current rule
+
+Do not plot `10.01.02 Gas works plants` as a standalone own-use comparison.
+LEAP does not expose that quantity separately in its balance results; it is
+already part of `09.06.01 Gas works plants (including own use)`, which is the
+valid shared comparison boundary. Keep the other code-10 own-use and loss rows
+available.
+
+Synthetic overview prefixes must use their configured ESTO hierarchy names:
+`10 Losses and own use` and `10.01 Own use`. They must not inherit the name of
+the first available descendant.
+
+### Validation
+
+Regression tests require the standalone `10.01.02` row to be filtered while
+retaining the boundary-adjusted transformation row and unrelated own-use rows.
+They also require the code-10 overview cards to use the hierarchy labels.
+
+### History
+
+- 2026-08-03: Confirmed after the China Other transformation overview labeled
+  both synthetic prefixes as Gas works plants and exposed the unextractable
+  own-use detail as a separate comparison.
 
 ## DASH-014: Aggregate charts choose one observed common-row frontier
 
@@ -663,6 +700,84 @@ while retaining Residential and Industry child detail groups.
   Construction, and Manufacturing to appear as ESTO/Ninth-only overview cards,
   while shallower Transport and Other-demand hierarchies happened not to expose
   equivalent child cards.
+
+## DASH-021: Emissions are derived from a declared factor set and a detail frontier
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Derived-quantity presentation
+**Affected areas:** Emissions page; `codebase/common_esto_dashboard_emissions.py`;
+`config/common_esto_dashboard/emissions_factor_sets.json`
+
+### Current rule
+
+The Emissions page is derived, not sourced. Every chart is
+`final energy demand x emissions factor`, applied to the same demand rows the
+sector pages plot, so LEAP, ESTO, and the 9th edition are compared on one
+consistent basis.
+
+Four rules make that derivation reproducible:
+
+1. **The factor axis is declared, not assumed.** A factor set names the axis its
+   factors are keyed on (`ninth_fuel`, `esto_product`, or `esto_product_flow`).
+   The loader resolves that axis onto `common_product_label` - and
+   `common_flow_label` when the set is keyed on product/flow pairs - using the
+   leap_mappings contract (`ninth_fuel_to_esto`) and the generated
+   `esto_to_common_esto_map.csv`. A new factor source with different mapping
+   requirements is a config entry, not a code change.
+2. **Subfuels collapse onto their parent fuel.** In a fuels/subfuels factor
+   file, any subfuel other than the placeholder replaces its parent fuel. A
+   parent row carrying the placeholder stands in for that fuel's
+   `<fuel>_unallocated` code only when no explicit unallocated subfuel row
+   already supplies it; otherwise it is a fuel-level aggregate over rows already
+   present and is dropped so its members are not counted twice. Aggregates with
+   no mappable code at all (`19_total`, `20_total_renewables`) are dropped and
+   reported.
+3. **A blank factor means no emissions, not missing data.** Blanks resolve to
+   zero, so electricity, heat, hydrogen, and the renewable carriers contribute
+   nothing at the point of final use rather than dropping out of a total.
+4. **Only one non-overlapping frontier is summed.** Sector pages carry a whole
+   flow hierarchy plus generated rollups that span several pages
+   (`16.03-16.05,17 Other sector including non-energy`). A row that covers
+   another row of the same source and scenario on both axes is dropped, keeping
+   the detail. Detail is preferred over aggregate because the aggregates overlap
+   each other - `16 Other sector` and `16.03-16.05,17` share `16.03-16.05` - so
+   no set of aggregates is guaranteed to partition demand.
+
+Scope is deliberately final energy demand only. Combustion in transformation
+and the power sector is excluded, which is why electricity carries a zero
+factor here rather than an implied grid intensity. Adding transformation page
+keys to `emissions_page.demand_page_keys` would double count against the fuels
+those inputs produce.
+
+Conflicts are resolved by declared strategy and reported, never silently
+averaged. Several 9th fuels mapping to one ESTO product resolve by
+`prefer_specific_then_mean`, which drops residual `_unallocated` contributors
+when a specific one exists; ESTO components disagreeing under one common fuel
+resolve by `component_conflict_resolution`. Both land in
+`supporting_files/emissions_factor_conflicts.csv`.
+
+### Validation
+
+`supporting_files/` must contain `emissions_factor_resolution.csv` (one factor
+per common fuel with its contributing 9th fuels and ESTO components),
+`emissions_factor_conflicts.csv`, `emissions_dropped_factor_rows.csv`,
+`emissions_axis_values_without_factor.csv` (expected empty), and
+`emissions_frontier_coverage_check.csv`.
+
+The coverage check compares every dropped aggregate against the detail retained
+inside it; a gap above `emissions_page.frontier_coverage_tolerance_pj` means the
+detail is incomplete and that source's emissions are understated, and the page
+says so in its note. Base-year totals for LEAP, ESTO, and the 9th edition must
+agree where all three report the same demand: for 20USA at 2022 all three read
+3,443 Mt CO2e.
+
+### History
+
+- 2026-08-06: Added the Emissions page. The first implementation summed every
+  demand row and reported 4,838 Mt CO2e for 20USA 2022 against 3,443 for LEAP;
+  the gap was parent and child flows counted together, which is what rule 4
+  above now prevents.
 
 ## End-to-end run report
 

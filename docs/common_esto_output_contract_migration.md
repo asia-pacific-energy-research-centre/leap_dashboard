@@ -68,6 +68,11 @@ byte-identical chart manifests and sign-semantics summaries for all seven
 economies, plus identical render counts, 69 page-noise rows, and all seven
 flags. Nothing was suppressed to make the gate pass.
 
+Run 1's isolated retry also resolved a Python package-name collision between
+the dashboard and mappings `codebase` packages by loading the mappings
+preflight module from its configured file path under a unique module name.
+The corresponding regression test remains part of the dashboard boundary suite.
+
 The Stage 3 manifest status was `completed`. It also retained non-blocking QA
 findings: Common ESTO flow-hierarchy mismatches for ESTO Extended (85), LEAP
 (8), and 9th (202), product checks with no eligible parent/child cases, and

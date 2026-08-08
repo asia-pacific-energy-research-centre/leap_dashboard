@@ -2,8 +2,8 @@
 """Check Common ESTO dashboard files before manually publishing to docs."""
 
 #%%
-import csv
 import json
+import csv
 import os
 from pathlib import Path
 
@@ -42,6 +42,7 @@ EXPECTED_PAGE_KEYS = [
     "buildings",
     "others",
     "non_energy",
+    "emissions",
 ]
 DIAGNOSTIC_PAGE_KEYS = [
     "transport_leap_vs_ninth",

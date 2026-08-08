@@ -1,0 +1,54 @@
+source_system,scenario,common_flow_label,common_product_label
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),07.10 Refinery gas (not liquefied)
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),17 Electricity
+ESTO,historical,14.03.11 Non-specified industry,07.06 Kerosene
+ESTO,historical,14.03.11 Non-specified industry,07.07 Gas/diesel oil
+ESTO,historical,14.03.11 Non-specified industry,17 Electricity
+ESTO,historical,15.01 Domestic air transport,07.04-07.05 Petroleum products
+ESTO,historical,15.02 Road,07.01 Motor gasoline
+ESTO,historical,15.02 Road,07.07 Gas/diesel oil
+ESTO,historical,16.01.99 Commercial and public services unallocated,17 Electricity
+ESTO,historical,16.02 Residential,07.06 Kerosene
+ESTO,historical,16.02 Residential,07.07 Gas/diesel oil
+ESTO,historical,16.02 Residential,07.09 LPG
+ESTO,historical,16.02 Residential,08.01 Natural gas
+ESTO,historical,16.02 Residential,17 Electricity
+ESTO,historical,16.03 Agriculture,07.07 Gas/diesel oil
+ESTO,historical,16.05 Non-specified others,07.07 Gas/diesel oil
+ESTO,historical,17 Non-energy use,07.07 Gas/diesel oil
+ESTO,historical,17 Non-energy use,07.12-07.17 Petroleum products
+ESTO,historical,17 Non-energy use,08.01 Natural gas
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),17 Electricity
+NINTH,reference,14.03.11 Non-specified industry,07.06 Kerosene
+NINTH,reference,14.03.11 Non-specified industry,07.07 Gas/diesel oil
+NINTH,reference,14.03.11 Non-specified industry,08.99 Gas nonspecified
+NINTH,reference,14.03.11 Non-specified industry,17 Electricity
+NINTH,reference,15.01 Domestic air transport,07.04-07.05 Petroleum products
+NINTH,reference,15.02 Road,07.01 Motor gasoline
+NINTH,reference,15.02 Road,07.07 Gas/diesel oil
+NINTH,reference,15.02 Road,17 Electricity
+NINTH,reference,16.01.01 Datacentres,17 Electricity
+NINTH,reference,16.01.99 Commercial and public services unallocated,17 Electricity
+NINTH,reference,16.02 Residential,07.09 LPG
+NINTH,reference,16.02 Residential,08.01 Natural gas
+NINTH,reference,16.02 Residential,17 Electricity
+NINTH,reference,17 Non-energy use,07.07 Gas/diesel oil
+NINTH,reference,17 Non-energy use,07.12-07.17 Petroleum products
+NINTH,reference,17 Non-energy use,08.01 Natural gas
+NINTH,target,14.03.02 Chemical (incl. petrochemical),17 Electricity
+NINTH,target,14.03.11 Non-specified industry,07.06 Kerosene
+NINTH,target,14.03.11 Non-specified industry,07.07 Gas/diesel oil
+NINTH,target,14.03.11 Non-specified industry,08.99 Gas nonspecified
+NINTH,target,14.03.11 Non-specified industry,17 Electricity
+NINTH,target,15.01 Domestic air transport,07.04-07.05 Petroleum products
+NINTH,target,15.02 Road,07.01 Motor gasoline
+NINTH,target,15.02 Road,07.07 Gas/diesel oil
+NINTH,target,15.02 Road,17 Electricity
+NINTH,target,16.01.01 Datacentres,17 Electricity
+NINTH,target,16.01.99 Commercial and public services unallocated,17 Electricity
+NINTH,target,16.02 Residential,07.09 LPG
+NINTH,target,16.02 Residential,08.01 Natural gas
+NINTH,target,16.02 Residential,17 Electricity
+NINTH,target,17 Non-energy use,07.07 Gas/diesel oil
+NINTH,target,17 Non-energy use,07.12-07.17 Petroleum products
+NINTH,target,17 Non-energy use,08.01 Natural gas

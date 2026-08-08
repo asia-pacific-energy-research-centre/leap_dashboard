@@ -3,7 +3,7 @@
   "default_comparison_scope": "esto_leap_ninth",
   "dashboard_mode": "auto_tree",
   "default_chart_type": "line",
-  "excluded_flow_code_prefixes": ["06", "10.01.11", "11", "18", "19"],
+  "excluded_flow_code_prefixes": ["06", "10.01.02", "10.01.11", "11", "13", "18", "19"],
   "chart_generation": {
     "deep_chain_min_depth": 3,
     "top_levels_for_deep_chains": 2,
@@ -14,7 +14,11 @@
     "base_year": 2022,
     "comparison_source_system": "ESTO",
     "ninth_source_system": "NINTH",
-    "suppression_threshold": 1.0
+    "suppression_threshold": 1.0,
+    "area_chart_flow_labels": {
+      "10": "10 Losses and own use",
+      "10.01": "10.01 Own use"
+    }
   },
   "sector_pages": [
     {
@@ -231,9 +235,22 @@
     },
     "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports). Bunkers (04,05) and stock changes (06) are excluded because they are not recorded in LEAP projection scenarios."
   },
+  "emissions_page": {
+    "enabled": true,
+    "page_key": "emissions",
+    "page_label": "Emissions",
+    "factor_sets_config_path": "config/common_esto_dashboard/emissions_factor_sets.json",
+    "factor_set_key": "",
+    "demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"],
+    "suppression_threshold": 0.1,
+    "frontier_coverage_tolerance_pj": 10.0,
+    "sector_colors": {},
+    "aggregate_flow_code": "12",
+    "_note": "The Emissions page contains exactly two charts: emissions by fuel and emissions by major sector. Final demand is split into Industry, Transport, Buildings, and Other demand. Transformation inputs and own use are selected from the lowest available signed flow frontier and combined into one Transformation and own use sector: negative rows are fuel consumption and are made positive, while positive outputs and transfers are excluded. Non-energy and mixed Other-sector/non-energy aggregates are excluded from combustion emissions until they can be separated. Sources with no sector detail use their declared aggregate_flow_code TFC row without inventing a sector split. Factors and their mapping axis live in factor_sets_config_path; leave factor_set_key empty to use the active factor set. frontier_coverage_tolerance_pj is the PJ gap above which the page warns that retained detail does not add back to a reported aggregate."
+  },
   "leap_demand_sector_coverage": {
     "enabled": true,
-    "hide_aggregate_only_pages": false,
+    "show_aggregate_only_page_keys": ["industry", "transport", "buildings", "others"],
     "page_leap_branches": {
       "industry": ["Industry"],
       "transport": ["Passenger road", "Freight road", "Transport non road"],
@@ -242,7 +259,7 @@
       "bunkers": ["Transport non road"]
     },
     "always_skip_page_keys": ["non_energy"],
-    "_note": "page_leap_branches maps each sector page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. With hide_aggregate_only_pages=false, those placeholder-backed pages stay visible until real LEAP detail replaces them. Set it true only when aggregate-backed standalone pages should be suppressed. always_skip_page_keys remains for pages without a usable standalone LEAP mapping: exact non-energy rows stay hidden, while the combined Other sector including non-energy all-demand placeholder is routed to Other demand by its explicit higher-priority page rule."
+    "_note": "page_leap_branches maps each sector page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. show_aggregate_only_page_keys keeps only the four domestic demand pages visible while they use placeholders; aggregate-only Bunkers remains hidden because it has no usable LEAP projection here. always_skip_page_keys remains for pages without a usable standalone LEAP mapping: exact non-energy rows stay hidden, while the combined Other sector including non-energy all-demand placeholder is routed to Other demand by its explicit higher-priority page rule."
   },
   "scope_specific_pages": {
     "enabled": false,

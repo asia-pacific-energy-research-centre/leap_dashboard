@@ -51,7 +51,8 @@ These later commits supersede the corresponding snapshot rows below:
 - **DASHQ-027 is complete in the current checkout.** Aggregate-backed Industry,
   Buildings, Transport, and Other demand pages remain visible until detailed
   LEAP demand replaces the placeholders. The combined Other-sector/non-energy
-  placeholder routes to Other demand without changing exact code-17 routing.
+  placeholder routes to Other demand without changing exact code-17 routing;
+  aggregate-only Bunkers remains hidden.
 - **The two-run Common ESTO v1 production soak is complete in isolated
   worktrees.** Run 1 passed on 2026-07-28. Run 2 passed on 2026-08-03 against
   mapping run `common_esto_20260803T053714732123Z` and dashboard commit
