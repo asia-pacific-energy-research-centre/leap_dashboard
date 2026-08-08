@@ -211,6 +211,34 @@ decisions can be made without review.
 | DASHQ-027 | P1 | 2026-08-03 to 2026-08-10 | `not_started` | DASHQ-026, `leap_mappings` MAPQ-033 | Converge the shared consumer loader and fixtures | Keep dashboard-only diagnostic labels and contract-to-render adaptation local, but generate/reference-test the shared load core and corrupt/valid fixtures with mappings and initialisation. Add required-member, required-column, key-uniqueness, enum, and boolean checks. Complete when all three repositories pass the same fixture matrix and report the same schema/build identity without importing a sibling checkout at runtime. |
 | DASHQ-017 | P0 | 2026-08-18 to 2026-08-24 | `not_started` | all above | Run the clean-checkout handover rehearsal | A colleague or clean agent session follows the runbook from a fresh checkout of all three repositories, records every missing assumption, and renders one economy end to end. Complete when the rehearsal succeeds without undocumented local knowledge and the queue is frozen with owner, risk, next action, and last-verified date on every remaining item. |
 
+### DASHQ-026 production-soak evidence
+
+**Run 1 passed on 2026-07-28; Run 2 is still required.** The selected strict
+contract was run ID `common_esto_20260728T035935111268Z` from mappings revision
+`86b1162`, with 3,952,646 facts. The all-economy render completed 21/21
+economies with status `ok`, 6,510 charts, 1,020,120 visible rows, zero stderr,
+and a passing publication-readiness check. It wrote only to
+`outputs/common_esto_contract_soak_run_1_20260728`; tracked serving assets were
+not published.
+
+Page-noise review found five `high_suppressed_share` rows: `04CHL`
+other transformation (28/95), `12NZ` other transformation (17/61) and refining
+(11/30), `14PE` other transformation (12/43), and `18CT` other transformation
+(21/67). A targeted control rendered those four economies from the preserved
+same-generation 975,673,793-byte legacy comparison. All four chart manifests,
+sign-semantics summaries, chart counts, visible-row counts, and all 24
+page-noise rows matched the contract render exactly, including all five flags.
+The flags therefore describe this producer generation's low-magnitude page
+structure; they are not contract-reader regressions and were not suppressed.
+
+The first isolated attempt is retained as failure evidence. It failed before
+rendering because dashboard's already-loaded `codebase` package masked
+`leap_mappings/codebase`. The retry loads the self-contained mappings preflight
+module by its configured file path under a unique module name; a regression
+test recreates the package collision. The 975,673,793-byte legacy file remains
+available as rollback. Do not change the default or remove it until a second
+dated all-economy contract candidate independently passes the same gates.
+
 ## Deferred by decision — not queue items
 
 These are deliberately out of scope. They are recorded here so they are not

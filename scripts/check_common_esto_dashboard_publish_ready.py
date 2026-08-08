@@ -4,6 +4,7 @@
 #%%
 import json
 import csv
+import os
 from pathlib import Path
 
 
@@ -23,7 +24,9 @@ def _resolve(path: str | Path) -> Path:
 
 #%%
 # User-tuned constants.
-DASHBOARD_OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
+DASHBOARD_OUTPUT_ROOT = _resolve(
+    os.getenv("COMMON_ESTO_DASHBOARD_OUTPUT_ROOT", "outputs/common_esto_dashboard")
+)
 DASHBOARD_ROOT = DASHBOARD_OUTPUT_ROOT / "20USA"
 CHECK_ALL_RENDERED_DASHBOARDS = True
 EXPECTED_PAGE_KEYS = [
