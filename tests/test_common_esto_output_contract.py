@@ -161,7 +161,7 @@ def test_contract_matches_legacy_for_dense_and_sparse_economies(tmp_path: Path) 
 
     pd.testing.assert_frame_equal(
         _sorted(contract),
-        _sorted(legacy)[CONTRACT_JOINED_COLUMNS],
+        _sorted(legacy)[CONTRACT_JOINED_COLUMNS + ["measure", "unit"]],
         check_dtype=False,
     )
     assert len(filter_common_esto_data(contract, "esto_leap_ninth", "20USA")) == 4

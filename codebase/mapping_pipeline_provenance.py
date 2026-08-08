@@ -158,6 +158,31 @@ def selected_run_manifest(mappings_root: Path) -> dict:
     return manifest
 
 
+def selected_run_metadata(mappings_root: Path) -> dict[str, object]:
+    """Return compact selected-run identity for rendered dashboard metadata."""
+    manifest = selected_run_manifest(mappings_root)
+    status = str(manifest.get("status", "")).strip()
+    latest_stage3 = manifest.get("_latest_stage3_manifest", {})
+    if (
+        not status
+        and isinstance(latest_stage3, dict)
+        and str(latest_stage3.get("run_id", "")).strip()
+        == str(manifest.get("run_id", "")).strip()
+    ):
+        status = str(latest_stage3.get("status", "")).strip()
+    return {
+        "mapping_run_id": str(manifest.get("run_id", "")).strip(),
+        "mapping_run_timestamp_utc": str(
+            manifest.get("run_timestamp_utc", "")
+        ).strip(),
+        "mapping_run_status": status,
+        "mapping_manifest_kind": str(
+            manifest.get("_manifest_kind", "")
+        ).strip(),
+        "mapping_manifest_path": str(manifest.get("_path", "")).strip(),
+    }
+
+
 def manifest_artifact_paths(manifest: dict, mappings_root: Path) -> list[Path]:
     """Return data members whose mtimes represent the selected run snapshot."""
     if manifest.get("_manifest_kind") == "output_contract":

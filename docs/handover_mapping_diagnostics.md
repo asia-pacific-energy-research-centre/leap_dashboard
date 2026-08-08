@@ -1,6 +1,6 @@
 # Handover: Mapping diagnostics development
 
-Updated: 2026-07-27
+Updated: 2026-07-30
 
 ## Purpose
 
@@ -57,15 +57,46 @@ tolerance; red means a mismatch; unavailable values are not treated as failures.
 
 ## ESTO Extended behaviour
 
-The diagnostics page now uses ordinary ESTO by default.
+The diagnostics page uses ordinary ESTO by default. The full-tree SVG has an
+**ESTO basis** selector:
 
-- **Include ESTO Extended** is a checkbox above the SVG.
-- When enabled, `ESTO_EXTENDED` becomes available in the Dataset selector.
-- Selecting a source displays that source alone. Ordinary and Extended ESTO are
-  never summed together for a reconciliation check.
+- **Original ESTO only** excludes Extended-only nodes and values.
+- **ESTO + ESTO Extended** makes both datasets available, but the Dataset
+  selector still displays one source at a time.
+- **Compare ESTO vs Extended** locks the Dataset selector and displays the two
+  sources side by side. It does not add their values.
+- Ordinary and Extended ESTO are never summed together for a reconciliation
+  check.
 - The page includes separately labelled raw helper values (`ESTO_RAW` and
   `ESTO_EXTENDED_RAW`) so rollup contributors can be shown even when they do
   not exist as standalone Common ESTO flow labels.
+
+```mermaid
+flowchart TD
+    OPEN["Open Mapping diagnostics"]
+    BASIS{"Choose ESTO basis"}
+    ORDINARY["Original: show ordinary ESTO only"]
+    PLUS["Plus: make ESTO and ESTO_EXTENDED selectable"]
+    COMPARE["Compare: show ESTO and ESTO_EXTENDED side by side"]
+    SELECT["For Original or Plus, select one source system"]
+    FILTER["Apply scenario, year, and diagram-boundary filters"]
+    VALUES["Show separate Common ESTO values plus labelled raw helpers"]
+    CHECK["Compare target with contributors within tolerance"]
+    RESULT["Green match, red mismatch, or unavailable"]
+
+    OPEN --> BASIS
+    BASIS -- "Original" --> ORDINARY
+    BASIS -- "Plus" --> PLUS
+    BASIS -- "Compare" --> COMPARE
+    ORDINARY --> SELECT
+    PLUS --> SELECT
+    SELECT --> FILTER --> VALUES --> CHECK --> RESULT
+    COMPARE --> FILTER
+```
+
+The basis control changes visibility and comparison presentation, not
+aggregation. Raw helper values provide evidence without becoming extra
+contributors to either Common ESTO total.
 
 The page payload is deliberately limited to flow labels that appear in the SVG
 or rollup boundaries. Do not embed all Common ESTO comparison rows in the HTML:
@@ -362,8 +393,11 @@ next agent should:
    year, validation axis, and status.
 4. Keep raw parent/child values visually distinct from mapped Common ESTO
    frontiers. Do not imply that a source-data contradiction is a missing map.
-5. Preserve the existing reviewed-exception section. Exceptions must remain
-   visible and must not silently disappear from the evidence.
+5. Preserve the reviewed-exception section using the explicit confirmation
+   fields independently of numerical status. Confirmed rows remain failures
+   and remain in numerical totals; show confirmed and unconfirmed failures
+   separately without implying that confirmation proves the mapping correct
+   or proves causation.
 
 Useful current helpers are `_paired_anchor_aggregate_summary()`,
 `_paired_tree_html()`, and the summary functions near the top of
@@ -406,10 +440,19 @@ The next agent should make its relationship to the diagnostics page clearer:
 - Browser automation may be blocked for `file:///` dashboard outputs. Static
   HTML checks, focused tests, and manual refresh in the in-app browser are the
   current verification route.
-- The earlier rendered artifacts may contain stale values from before the
-  `leap_mappings` Stage 3 rebuild after commit `eb3a293`. The current mapping
-  outputs have been rebuilt, but each dashboard economy must be rerendered to
-  consume them.
+- The 2026-07-30 production render uses mapping run
+  `common_esto_20260729T175438145911Z`. Its anchor artifacts include
+  `exception_review_status`, `exception_id`, and
+  `source_non_additivity_observed`; diagnostics retain every numerical failure
+  while separating confirmed from unconfirmed review status.
+- Every production economy output now records the selected upstream run ID,
+  timestamp, manifest kind/path, and matching Stage 3 status in
+  `supporting_files/dashboard_metadata.json`. A blank or mismatched upstream
+  status must not be silently replaced with the status of another run.
+- The 2026-07-30 all-economy audit rendered all 21 available economies and
+  passed automated publication readiness. Page-noise review retained one
+  warning for `02BD` “Other transformation” (27 charts, 25.93% suppressed);
+  this remains presentation review, not a mapping failure.
 
 ## Additive review: full-tree explorer implementation (2026-07-27)
 

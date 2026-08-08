@@ -54,8 +54,11 @@ presents the largest available count with no unit and no scope, which reads as
 4. Keep raw parent/child source values visually distinct from mapped Common ESTO
    frontier values. A raw source contradiction (parent is 0 while children are
    non-zero) must not be presented as a missing map.
-5. Preserve the reviewed-exception section. Exceptions must stay visible and
-   must not silently disappear from the evidence.
+5. Preserve the reviewed-exception section using the explicit confirmation
+   fields independently of numerical status. Confirmed source issues remain
+   failures, stay in numerical totals, and are shown separately from
+   unconfirmed failures. Confirmation must not be described as proof that the
+   mapping is correct or that the source issue caused the anchor failure.
 6. Handle a skipped or errored anchor run defensively. If
    `source_parent_anchor_validation_summary.csv` reports `skipped` or an error,
    show that reason prominently. Never render `Failed anchor checks: 0` for a run
@@ -76,6 +79,8 @@ presents the largest available count with no unit and no scope, which reads as
   records actually rendered. Do not embed all Common ESTO comparison rows.
 - Do not change mapping workbook rows from this repo.
 - Do not treat parent, child, and generated rollup rows as one additive total.
+- Apply the selected economy consistently to failure tables, reviewed-issue
+  tables, exception candidates, and summary cards.
 
 ## Validation
 

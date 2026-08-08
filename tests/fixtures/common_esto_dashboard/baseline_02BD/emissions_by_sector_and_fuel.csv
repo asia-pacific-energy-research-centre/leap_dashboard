@@ -1,0 +1,1211 @@
+source_system,scenario,year,_page_label,common_product_label,emissions_value
+ESTO,historical,2010,Buildings,07.09 LPG,0.04097083
+ESTO,historical,2010,Buildings,08.01 Natural gas,0.059634681733648
+ESTO,historical,2010,Buildings,17 Electricity,0.0
+ESTO,historical,2010,Industry,07.06 Kerosene,0.0113015387345679
+ESTO,historical,2010,Industry,07.07 Gas/diesel oil,0.3264178038057
+ESTO,historical,2010,Industry,17 Electricity,0.0
+ESTO,historical,2010,Non-energy use,08.01 Natural gas,0.0080921114005
+ESTO,historical,2010,Transport,07.01 Motor gasoline,0.7281689876999999
+ESTO,historical,2010,Transport,07.07 Gas/diesel oil,0.4465438563736799
+ESTO,historical,2011,Buildings,07.09 LPG,0.0436819846
+ESTO,historical,2011,Buildings,08.01 Natural gas,0.059820814320316
+ESTO,historical,2011,Buildings,17 Electricity,0.0
+ESTO,historical,2011,Industry,07.06 Kerosene,0.0095802911478419
+ESTO,historical,2011,Industry,07.07 Gas/diesel oil,0.398587927743
+ESTO,historical,2011,Industry,17 Electricity,0.0
+ESTO,historical,2011,Transport,07.01 Motor gasoline,0.7597627191
+ESTO,historical,2011,Transport,07.07 Gas/diesel oil,0.5239502610508799
+ESTO,historical,2012,Buildings,07.06 Kerosene,5.444039144e-06
+ESTO,historical,2012,Buildings,07.07 Gas/diesel oil,0.0006602315346
+ESTO,historical,2012,Buildings,07.09 LPG,0.0442129711
+ESTO,historical,2012,Buildings,08.01 Natural gas,0.055753160957056
+ESTO,historical,2012,Buildings,17 Electricity,0.0
+ESTO,historical,2012,Industry,07.06 Kerosene,0.0217020173587099
+ESTO,historical,2012,Industry,07.07 Gas/diesel oil,0.44816812968888
+ESTO,historical,2012,Industry,17 Electricity,0.0
+ESTO,historical,2012,Transport,07.01 Motor gasoline,0.8180210115
+ESTO,historical,2012,Transport,07.07 Gas/diesel oil,0.5237774597109599
+ESTO,historical,2013,Buildings,07.06 Kerosene,2.077330726e-06
+ESTO,historical,2013,Buildings,07.07 Gas/diesel oil,0.00062733110796
+ESTO,historical,2013,Buildings,07.09 LPG,0.0446125203
+ESTO,historical,2013,Buildings,08.01 Natural gas,0.050567085236834
+ESTO,historical,2013,Buildings,17 Electricity,0.0
+ESTO,historical,2013,Industry,07.06 Kerosene,0.0221354631595039
+ESTO,historical,2013,Industry,07.07 Gas/diesel oil,0.3559397123100599
+ESTO,historical,2013,Industry,17 Electricity,0.0
+ESTO,historical,2013,Other demand,07.07 Gas/diesel oil,0.05494719519162
+ESTO,historical,2013,Transport,07.01 Motor gasoline,0.8327790702
+ESTO,historical,2013,Transport,07.07 Gas/diesel oil,0.49330973804076
+ESTO,historical,2014,Buildings,07.09 LPG,0.0453175366
+ESTO,historical,2014,Buildings,08.01 Natural gas,0.04221894335847
+ESTO,historical,2014,Buildings,17 Electricity,0.0
+ESTO,historical,2014,Industry,07.06 Kerosene,0.017927865590038
+ESTO,historical,2014,Industry,07.07 Gas/diesel oil,0.31323066072786
+ESTO,historical,2014,Industry,17 Electricity,0.0
+ESTO,historical,2014,Other demand,07.07 Gas/diesel oil,0.08613754064694
+ESTO,historical,2014,Transport,07.01 Motor gasoline,0.856363662
+ESTO,historical,2014,Transport,07.07 Gas/diesel oil,0.49637948122638
+ESTO,historical,2015,Buildings,07.09 LPG,0.0464708153
+ESTO,historical,2015,Buildings,08.01 Natural gas,0.041925776119794
+ESTO,historical,2015,Buildings,17 Electricity,0.0
+ESTO,historical,2015,Industry,07.07 Gas/diesel oil,0.3833944514405999
+ESTO,historical,2015,Industry,17 Electricity,0.0
+ESTO,historical,2015,Transport,07.01 Motor gasoline,0.8693616393
+ESTO,historical,2015,Transport,07.07 Gas/diesel oil,0.48639294204012
+ESTO,historical,2016,Buildings,07.06 Kerosene,3.080180042e-06
+ESTO,historical,2016,Buildings,07.07 Gas/diesel oil,0.0005204047213799
+ESTO,historical,2016,Buildings,07.09 LPG,0.0520826138
+ESTO,historical,2016,Buildings,08.01 Natural gas,0.03591915749867
+ESTO,historical,2016,Buildings,17 Electricity,0.0
+ESTO,historical,2016,Industry,07.06 Kerosene,0.0183719129407439
+ESTO,historical,2016,Industry,07.07 Gas/diesel oil,0.29795167295622
+ESTO,historical,2016,Industry,17 Electricity,0.0
+ESTO,historical,2016,Non-energy use,07.07 Gas/diesel oil,0.04630371959286
+ESTO,historical,2016,Other demand,07.07 Gas/diesel oil,5.112904139999999e-06
+ESTO,historical,2016,Transport,07.01 Motor gasoline,0.8365245966
+ESTO,historical,2016,Transport,07.07 Gas/diesel oil,0.4531625478329399
+ESTO,historical,2017,Buildings,07.06 Kerosene,5.01424658e-07
+ESTO,historical,2017,Buildings,07.07 Gas/diesel oil,0.0006603797347199
+ESTO,historical,2017,Buildings,07.09 LPG,0.0485611921
+ESTO,historical,2017,Buildings,08.01 Natural gas,0.045759333255156
+ESTO,historical,2017,Buildings,17 Electricity,0.0
+ESTO,historical,2017,Industry,07.06 Kerosene,0.01848537817764
+ESTO,historical,2017,Industry,07.07 Gas/diesel oil,0.4060337240719799
+ESTO,historical,2017,Industry,07.10 Refinery gas (not liquefied),0.0008457407999999
+ESTO,historical,2017,Industry,17 Electricity,0.0
+ESTO,historical,2017,Other demand,07.07 Gas/diesel oil,0.07768013029884
+ESTO,historical,2017,Transport,07.01 Motor gasoline,0.8752062627
+ESTO,historical,2017,Transport,07.07 Gas/diesel oil,0.45536294911464
+ESTO,historical,2018,Buildings,07.07 Gas/diesel oil,0.00051180911442
+ESTO,historical,2018,Buildings,07.09 LPG,0.0506055059
+ESTO,historical,2018,Buildings,08.01 Natural gas,0.05039856736753
+ESTO,historical,2018,Buildings,17 Electricity,0.0
+ESTO,historical,2018,Industry,07.06 Kerosene,0.0133537982276679
+ESTO,historical,2018,Industry,07.07 Gas/diesel oil,0.37442004497388
+ESTO,historical,2018,Industry,17 Electricity,0.0
+ESTO,historical,2018,Non-energy use,07.12-07.17 Petroleum products,0.0149254193
+ESTO,historical,2018,Other demand,07.07 Gas/diesel oil,0.0932722649240399
+ESTO,historical,2018,Transport,07.01 Motor gasoline,0.8774698779000001
+ESTO,historical,2018,Transport,07.07 Gas/diesel oil,0.4758857758322999
+ESTO,historical,2019,Buildings,07.07 Gas/diesel oil,0.00051180911442
+ESTO,historical,2019,Buildings,07.09 LPG,0.0496867699
+ESTO,historical,2019,Buildings,08.01 Natural gas,0.047111066470452
+ESTO,historical,2019,Buildings,17 Electricity,0.0
+ESTO,historical,2019,Industry,07.06 Kerosene,0.009852922897606
+ESTO,historical,2019,Industry,07.07 Gas/diesel oil,0.37070859526866
+ESTO,historical,2019,Industry,07.10 Refinery gas (not liquefied),0.0242638847999999
+ESTO,historical,2019,Industry,17 Electricity,0.0
+ESTO,historical,2019,Non-energy use,07.12-07.17 Petroleum products,0.0274367031
+ESTO,historical,2019,Other demand,07.07 Gas/diesel oil,4.14960336e-06
+ESTO,historical,2019,Transport,07.01 Motor gasoline,0.8861030639999999
+ESTO,historical,2019,Transport,07.07 Gas/diesel oil,0.4359691109111399
+ESTO,historical,2020,Buildings,07.06 Kerosene,2.077330726e-06
+ESTO,historical,2020,Buildings,07.07 Gas/diesel oil,0.0004622361742799
+ESTO,historical,2020,Buildings,07.09 LPG,0.0496174861
+ESTO,historical,2020,Buildings,08.01 Natural gas,0.046398287493296
+ESTO,historical,2020,Buildings,17 Electricity,0.0
+ESTO,historical,2020,Industry,07.06 Kerosene,0.01501444506287
+ESTO,historical,2020,Industry,07.07 Gas/diesel oil,0.35141590364706
+ESTO,historical,2020,Industry,07.10 Refinery gas (not liquefied),0.0061564032
+ESTO,historical,2020,Industry,17 Electricity,0.0
+ESTO,historical,2020,Non-energy use,07.12-07.17 Petroleum products,0.0150760508
+ESTO,historical,2020,Other demand,07.07 Gas/diesel oil,0.0500565171315599
+ESTO,historical,2020,Transport,07.01 Motor gasoline,0.8426171753999999
+ESTO,historical,2020,Transport,07.07 Gas/diesel oil,0.37921305915486
+ESTO,historical,2021,Buildings,07.09 LPG,0.0474028023
+ESTO,historical,2021,Buildings,08.01 Natural gas,0.046651681373338
+ESTO,historical,2021,Buildings,17 Electricity,0.0
+ESTO,historical,2021,Industry,07.06 Kerosene,0.0136512146819559
+ESTO,historical,2021,Industry,07.07 Gas/diesel oil,0.37616273018496
+ESTO,historical,2021,Industry,17 Electricity,0.0
+ESTO,historical,2021,Non-energy use,07.12-07.17 Petroleum products,0.013418298
+ESTO,historical,2021,Transport,07.01 Motor gasoline,0.7891723224
+ESTO,historical,2021,Transport,07.07 Gas/diesel oil,0.3585062419882199
+ESTO,historical,2022,Buildings,07.09 LPG,0.0461361329
+ESTO,historical,2022,Buildings,08.01 Natural gas,0.03879753695073
+ESTO,historical,2022,Buildings,17 Electricity,0.0
+ESTO,historical,2022,Industry,07.06 Kerosene,0.0102360829684119
+ESTO,historical,2022,Industry,07.07 Gas/diesel oil,0.39554308217754
+ESTO,historical,2022,Industry,17 Electricity,0.0
+ESTO,historical,2022,Non-energy use,07.07 Gas/diesel oil,0.00051180911442
+ESTO,historical,2022,Non-energy use,07.12-07.17 Petroleum products,0.012938183
+ESTO,historical,2022,Transport,07.01 Motor gasoline,0.8293293855
+ESTO,historical,2022,Transport,07.04-07.05 Petroleum products,0.010271467167894
+ESTO,historical,2022,Transport,07.07 Gas/diesel oil,0.3611686571440199
+NINTH,reference,2022,Buildings,07.09 LPG,0.0461361585498864
+NINTH,reference,2022,Buildings,08.01 Natural gas,0.0387975615000732
+NINTH,reference,2022,Buildings,17 Electricity,0.0
+NINTH,reference,2022,Industry,07.06 Kerosene,0.0102360820554534
+NINTH,reference,2022,Industry,07.07 Gas/diesel oil,0.3955430973982635
+NINTH,reference,2022,Industry,17 Electricity,0.0
+NINTH,reference,2022,Non-energy use,07.07 Gas/diesel oil,0.0005117868911537
+NINTH,reference,2022,Non-energy use,07.12-07.17 Petroleum products,0.0129381819028384
+NINTH,reference,2022,Transport,07.01 Motor gasoline,0.8293294056733184
+NINTH,reference,2022,Transport,07.04-07.05 Petroleum products,0.0102714573175286
+NINTH,reference,2022,Transport,07.07 Gas/diesel oil,0.3611686832151029
+NINTH,reference,2023,Buildings,07.09 LPG,0.0465101471075
+NINTH,reference,2023,Buildings,08.01 Natural gas,0.039112061978112
+NINTH,reference,2023,Buildings,17 Electricity,0.0
+NINTH,reference,2023,Industry,07.06 Kerosene,0.0105516572735
+NINTH,reference,2023,Industry,07.07 Gas/diesel oil,0.4077375677563615
+NINTH,reference,2023,Industry,17 Electricity,0.0
+NINTH,reference,2023,Non-energy use,07.07 Gas/diesel oil,0.0005282312305824
+NINTH,reference,2023,Non-energy use,07.12-07.17 Petroleum products,0.0133539015284839
+NINTH,reference,2023,Non-energy use,08.01 Natural gas,1.9168636759367377
+NINTH,reference,2023,Transport,07.01 Motor gasoline,0.904685149940104
+NINTH,reference,2023,Transport,07.04-07.05 Petroleum products,0.0114506854558335
+NINTH,reference,2023,Transport,07.07 Gas/diesel oil,0.4851639211476423
+NINTH,reference,2023,Transport,17 Electricity,0.0
+NINTH,reference,2024,Buildings,07.09 LPG,0.0476093703722
+NINTH,reference,2024,Buildings,08.01 Natural gas,0.0387450399880831
+NINTH,reference,2024,Buildings,17 Electricity,0.0
+NINTH,reference,2024,Industry,07.06 Kerosene,0.0108014627603982
+NINTH,reference,2024,Industry,07.07 Gas/diesel oil,0.4173905614994272
+NINTH,reference,2024,Industry,17 Electricity,0.0
+NINTH,reference,2024,Non-energy use,07.07 Gas/diesel oil,0.0005445061374986
+NINTH,reference,2024,Non-energy use,07.12-07.17 Petroleum products,0.013765337830923
+NINTH,reference,2024,Non-energy use,08.01 Natural gas,1.943922518966642
+NINTH,reference,2024,Transport,07.01 Motor gasoline,0.9124837069449928
+NINTH,reference,2024,Transport,07.04-07.05 Petroleum products,0.0116500996329103
+NINTH,reference,2024,Transport,07.07 Gas/diesel oil,0.4963079364367853
+NINTH,reference,2024,Transport,17 Electricity,0.0
+NINTH,reference,2025,Buildings,07.09 LPG,0.0486857781282
+NINTH,reference,2025,Buildings,08.01 Natural gas,0.0383683170571018
+NINTH,reference,2025,Buildings,17 Electricity,0.0
+NINTH,reference,2025,Industry,07.06 Kerosene,0.0109983399601845
+NINTH,reference,2025,Industry,07.07 Gas/diesel oil,0.4249982982280592
+NINTH,reference,2025,Industry,17 Electricity,0.0
+NINTH,reference,2025,Non-energy use,07.07 Gas/diesel oil,0.0005611996965064
+NINTH,reference,2025,Non-energy use,07.12-07.17 Petroleum products,0.0141873578294459
+NINTH,reference,2025,Non-energy use,08.01 Natural gas,2.6734961917345434
+NINTH,reference,2025,Transport,07.01 Motor gasoline,0.918930757178014
+NINTH,reference,2025,Transport,07.04-07.05 Petroleum products,0.0118545108519443
+NINTH,reference,2025,Transport,07.07 Gas/diesel oil,0.5072891332276936
+NINTH,reference,2025,Transport,17 Electricity,0.0
+NINTH,reference,2026,Buildings,07.09 LPG,0.0497424271288
+NINTH,reference,2026,Buildings,08.01 Natural gas,0.0379861364808246
+NINTH,reference,2026,Buildings,17 Electricity,0.0
+NINTH,reference,2026,Industry,07.06 Kerosene,0.0111168203222121
+NINTH,reference,2026,Industry,07.07 Gas/diesel oil,0.4295766211765648
+NINTH,reference,2026,Industry,17 Electricity,0.0
+NINTH,reference,2026,Non-energy use,07.07 Gas/diesel oil,0.0005742587694253
+NINTH,reference,2026,Non-energy use,07.12-07.17 Petroleum products,0.0145174965333234
+NINTH,reference,2026,Non-energy use,08.01 Natural gas,2.716420768329093
+NINTH,reference,2026,Transport,07.01 Motor gasoline,0.9236119927630848
+NINTH,reference,2026,Transport,07.04-07.05 Petroleum products,0.0120204885366517
+NINTH,reference,2026,Transport,07.07 Gas/diesel oil,0.5159523364169878
+NINTH,reference,2026,Transport,17 Electricity,0.0
+NINTH,reference,2027,Buildings,07.09 LPG,0.0507785966458
+NINTH,reference,2027,Buildings,08.01 Natural gas,0.0375994959029892
+NINTH,reference,2027,Buildings,17 Electricity,0.0
+NINTH,reference,2027,Industry,07.06 Kerosene,0.0113371268592656
+NINTH,reference,2027,Industry,07.07 Gas/diesel oil,0.4380897153048764
+NINTH,reference,2027,Industry,17 Electricity,0.0
+NINTH,reference,2027,Non-energy use,07.07 Gas/diesel oil,0.0014231090426679
+NINTH,reference,2027,Non-energy use,07.12-07.17 Petroleum products,0.0359767785769262
+NINTH,reference,2027,Non-energy use,08.01 Natural gas,2.7538242731817677
+NINTH,reference,2027,Transport,07.01 Motor gasoline,0.927440810813077
+NINTH,reference,2027,Transport,07.04-07.05 Petroleum products,0.0122469558736041
+NINTH,reference,2027,Transport,07.07 Gas/diesel oil,0.5271435629705621
+NINTH,reference,2027,Transport,17 Electricity,0.0
+NINTH,reference,2028,Buildings,07.09 LPG,0.0517963813468
+NINTH,reference,2028,Buildings,08.01 Natural gas,0.0372113520156126
+NINTH,reference,2028,Buildings,17 Electricity,0.0
+NINTH,reference,2028,Industry,07.06 Kerosene,0.011391439434138
+NINTH,reference,2028,Industry,07.07 Gas/diesel oil,0.440188464023021
+NINTH,reference,2028,Industry,08.99 Gas nonspecified,0.0007721952896241
+NINTH,reference,2028,Industry,17 Electricity,0.0
+NINTH,reference,2028,Non-energy use,07.07 Gas/diesel oil,0.001434683374334
+NINTH,reference,2028,Non-energy use,07.12-07.17 Petroleum products,0.0362693824147497
+NINTH,reference,2028,Non-energy use,08.01 Natural gas,2.797320687453474
+NINTH,reference,2028,Transport,07.01 Motor gasoline,0.9294203054721708
+NINTH,reference,2028,Transport,07.04-07.05 Petroleum products,0.0123981294433409
+NINTH,reference,2028,Transport,07.07 Gas/diesel oil,0.53421116375476
+NINTH,reference,2028,Transport,17 Electricity,0.0
+NINTH,reference,2029,Buildings,07.09 LPG,0.0527950236532
+NINTH,reference,2029,Buildings,08.01 Natural gas,0.0368223783852916
+NINTH,reference,2029,Buildings,17 Electricity,0.0
+NINTH,reference,2029,Industry,07.06 Kerosene,0.0114173820843903
+NINTH,reference,2029,Industry,07.07 Gas/diesel oil,0.4411909409648779
+NINTH,reference,2029,Industry,08.99 Gas nonspecified,0.0015566901438273
+NINTH,reference,2029,Industry,17 Electricity,0.0
+NINTH,reference,2029,Non-energy use,07.07 Gas/diesel oil,0.0014450127102887
+NINTH,reference,2029,Non-energy use,07.12-07.17 Petroleum products,0.0365305122518507
+NINTH,reference,2029,Non-energy use,08.01 Natural gas,2.820729228677189
+NINTH,reference,2029,Transport,07.01 Motor gasoline,0.929957010404807
+NINTH,reference,2029,Transport,07.04-07.05 Petroleum products,0.0125348224495881
+NINTH,reference,2029,Transport,07.07 Gas/diesel oil,0.5400973368624321
+NINTH,reference,2029,Transport,17 Electricity,0.0
+NINTH,reference,2030,Buildings,07.09 LPG,0.0537762937093
+NINTH,reference,2030,Buildings,08.01 Natural gas,0.0364349278109466
+NINTH,reference,2030,Buildings,17 Electricity,0.0
+NINTH,reference,2030,Industry,07.06 Kerosene,0.0114200810895155
+NINTH,reference,2030,Industry,07.07 Gas/diesel oil,0.4412952360302464
+NINTH,reference,2030,Industry,08.99 Gas nonspecified,0.0023489142920459
+NINTH,reference,2030,Industry,17 Electricity,0.0
+NINTH,reference,2030,Non-energy use,07.07 Gas/diesel oil,0.0014543127352631
+NINTH,reference,2030,Non-energy use,07.12-07.17 Petroleum products,0.036765620686436
+NINTH,reference,2030,Non-energy use,08.01 Natural gas,2.844137769900904
+NINTH,reference,2030,Transport,07.01 Motor gasoline,0.9291550885890034
+NINTH,reference,2030,Transport,07.04-07.05 Petroleum products,0.0126596570993121
+NINTH,reference,2030,Transport,07.07 Gas/diesel oil,0.5449307367847441
+NINTH,reference,2030,Transport,17 Electricity,0.0
+NINTH,reference,2031,Buildings,07.09 LPG,0.0547358780622
+NINTH,reference,2031,Buildings,08.01 Natural gas,0.0360471237641999
+NINTH,reference,2031,Buildings,17 Electricity,0.0
+NINTH,reference,2031,Industry,07.06 Kerosene,0.0114030894783381
+NINTH,reference,2031,Industry,07.07 Gas/diesel oil,0.4406386455028883
+NINTH,reference,2031,Industry,08.99 Gas nonspecified,0.0031451725392594
+NINTH,reference,2031,Industry,17 Electricity,0.0
+NINTH,reference,2031,Non-energy use,07.07 Gas/diesel oil,0.001462726374833
+NINTH,reference,2031,Non-energy use,07.12-07.17 Petroleum products,0.036978320935509
+NINTH,reference,2031,Non-energy use,08.01 Natural gas,2.8675463111246184
+NINTH,reference,2031,Transport,07.01 Motor gasoline,0.926638006266069
+NINTH,reference,2031,Transport,07.04-07.05 Petroleum products,0.0127738063982561
+NINTH,reference,2031,Transport,07.07 Gas/diesel oil,0.5487880215018449
+NINTH,reference,2031,Transport,17 Electricity,0.0
+NINTH,reference,2032,Buildings,07.09 LPG,0.0556740898141
+NINTH,reference,2032,Buildings,08.01 Natural gas,0.0356602942488864
+NINTH,reference,2032,Buildings,17 Electricity,0.0
+NINTH,reference,2032,Industry,07.06 Kerosene,0.0113954872805572
+NINTH,reference,2032,Industry,07.07 Gas/diesel oil,0.4403448810683124
+NINTH,reference,2032,Industry,08.99 Gas nonspecified,0.0039515218140787
+NINTH,reference,2032,Industry,17 Electricity,0.0
+NINTH,reference,2032,Non-energy use,07.07 Gas/diesel oil,0.0014718439840611
+NINTH,reference,2032,Non-energy use,07.12-07.17 Petroleum products,0.0372088178254276
+NINTH,reference,2032,Non-energy use,08.01 Natural gas,2.890954852348333
+NINTH,reference,2032,Transport,07.01 Motor gasoline,0.9225770774000166
+NINTH,reference,2032,Transport,07.04-07.05 Petroleum products,0.0128939460932906
+NINTH,reference,2032,Transport,07.07 Gas/diesel oil,0.552416793117169
+NINTH,reference,2032,Transport,17 Electricity,0.0
+NINTH,reference,2033,Buildings,07.09 LPG,0.0565897788413
+NINTH,reference,2033,Buildings,08.01 Natural gas,0.0352747477469515
+NINTH,reference,2033,Buildings,17 Electricity,0.0
+NINTH,reference,2033,Industry,07.06 Kerosene,0.0113813705832712
+NINTH,reference,2033,Industry,07.07 Gas/diesel oil,0.4397993830799892
+NINTH,reference,2033,Industry,08.99 Gas nonspecified,0.0047634464756882
+NINTH,reference,2033,Industry,17 Electricity,0.0
+NINTH,reference,2033,Non-energy use,07.07 Gas/diesel oil,0.0014807821116919
+NINTH,reference,2033,Non-energy use,07.12-07.17 Petroleum products,0.0374347773471675
+NINTH,reference,2033,Non-energy use,08.01 Natural gas,2.9085112582661194
+NINTH,reference,2033,Transport,07.01 Motor gasoline,0.9169367284859672
+NINTH,reference,2033,Transport,07.04-07.05 Petroleum products,0.0130108046092746
+NINTH,reference,2033,Transport,07.07 Gas/diesel oil,0.5554351246189276
+NINTH,reference,2033,Transport,17 Electricity,0.0
+NINTH,reference,2034,Buildings,07.09 LPG,0.0574786940968
+NINTH,reference,2034,Buildings,08.01 Natural gas,0.0348889091997343
+NINTH,reference,2034,Buildings,17 Electricity,0.0
+NINTH,reference,2034,Industry,07.06 Kerosene,0.0113491736678673
+NINTH,reference,2034,Industry,07.07 Gas/diesel oil,0.4385552285708209
+NINTH,reference,2034,Industry,08.99 Gas nonspecified,0.0055739926309796
+NINTH,reference,2034,Industry,17 Electricity,0.0
+NINTH,reference,2034,Non-energy use,07.07 Gas/diesel oil,0.0014888549050779
+NINTH,reference,2034,Non-energy use,07.12-07.17 Petroleum products,0.0376388608653222
+NINTH,reference,2034,Non-energy use,08.01 Natural gas,2.926067664744884
+NINTH,reference,2034,Transport,07.01 Motor gasoline,0.9096856402426472
+NINTH,reference,2034,Transport,07.04-07.05 Petroleum products,0.013116968333332
+NINTH,reference,2034,Transport,07.07 Gas/diesel oil,0.557553258726296
+NINTH,reference,2034,Transport,17 Electricity,0.0
+NINTH,reference,2035,Buildings,07.09 LPG,0.0583399523068
+NINTH,reference,2035,Buildings,08.01 Natural gas,0.0345033854735167
+NINTH,reference,2035,Buildings,17 Electricity,0.0
+NINTH,reference,2035,Industry,07.06 Kerosene,0.0113005200949895
+NINTH,reference,2035,Industry,07.07 Gas/diesel oil,0.436675155236967
+NINTH,reference,2035,Industry,08.99 Gas nonspecified,0.0063802246397758
+NINTH,reference,2035,Industry,17 Electricity,0.0
+NINTH,reference,2035,Non-energy use,07.07 Gas/diesel oil,0.0014961120912166
+NINTH,reference,2035,Non-energy use,07.12-07.17 Petroleum products,0.0378223254987232
+NINTH,reference,2035,Non-energy use,08.01 Natural gas,2.9494762059685984
+NINTH,reference,2035,Transport,07.01 Motor gasoline,0.9008618501839324
+NINTH,reference,2035,Transport,07.04-07.05 Petroleum products,0.0132130101789359
+NINTH,reference,2035,Transport,07.07 Gas/diesel oil,0.5588099738069323
+NINTH,reference,2035,Transport,17 Electricity,0.0
+NINTH,reference,2036,Buildings,07.09 LPG,0.0591734246211
+NINTH,reference,2036,Buildings,08.01 Natural gas,0.0341191834120796
+NINTH,reference,2036,Buildings,17 Electricity,0.0
+NINTH,reference,2036,Industry,07.06 Kerosene,0.0112361360602817
+NINTH,reference,2036,Industry,07.07 Gas/diesel oil,0.4341872247599216
+NINTH,reference,2036,Industry,08.99 Gas nonspecified,0.0071790251709246
+NINTH,reference,2036,Industry,17 Electricity,0.0
+NINTH,reference,2036,Non-energy use,07.07 Gas/diesel oil,0.0015025538196639
+NINTH,reference,2036,Non-energy use,07.12-07.17 Petroleum products,0.0379851750282068
+NINTH,reference,2036,Non-energy use,08.01 Natural gas,2.9670326118863843
+NINTH,reference,2036,Transport,07.01 Motor gasoline,0.8908208338691023
+NINTH,reference,2036,Transport,07.04-07.05 Petroleum products,0.0132990652624068
+NINTH,reference,2036,Transport,07.07 Gas/diesel oil,0.5590471118366405
+NINTH,reference,2036,Transport,17 Electricity,0.0
+NINTH,reference,2037,Buildings,07.09 LPG,0.0599766984112
+NINTH,reference,2037,Buildings,08.01 Natural gas,0.0337359492064346
+NINTH,reference,2037,Buildings,17 Electricity,0.0
+NINTH,reference,2037,Industry,07.06 Kerosene,0.0111643539955847
+NINTH,reference,2037,Industry,07.07 Gas/diesel oil,0.4314134193083733
+NINTH,reference,2037,Industry,08.99 Gas nonspecified,0.0079728420922733
+NINTH,reference,2037,Industry,17 Electricity,0.0
+NINTH,reference,2037,Non-energy use,07.07 Gas/diesel oil,0.0015086435074881
+NINTH,reference,2037,Non-energy use,07.12-07.17 Petroleum products,0.0381391248267708
+NINTH,reference,2037,Non-energy use,08.01 Natural gas,2.978736882498242
+NINTH,reference,2037,Transport,07.01 Motor gasoline,0.879658306519504
+NINTH,reference,2037,Transport,07.04-07.05 Petroleum products,0.0133797245355642
+NINTH,reference,2037,Transport,07.07 Gas/diesel oil,0.558462131282082
+NINTH,reference,2037,Transport,17 Electricity,0.0
+NINTH,reference,2038,Buildings,07.09 LPG,0.0607454630006
+NINTH,reference,2038,Buildings,08.01 Natural gas,0.0333523393697466
+NINTH,reference,2038,Buildings,17 Electricity,0.0
+NINTH,reference,2038,Industry,07.06 Kerosene,0.0110863653276296
+NINTH,reference,2038,Industry,07.07 Gas/diesel oil,0.4283997780423288
+NINTH,reference,2038,Industry,08.99 Gas nonspecified,0.0087609330987025
+NINTH,reference,2038,Industry,17 Electricity,0.0
+NINTH,reference,2038,Non-energy use,07.07 Gas/diesel oil,0.0015144337760539
+NINTH,reference,2038,Non-energy use,07.12-07.17 Petroleum products,0.0382855051840343
+NINTH,reference,2038,Non-energy use,08.01 Natural gas,3.0021454237219563
+NINTH,reference,2038,Transport,07.01 Motor gasoline,0.8674313707982936
+NINTH,reference,2038,Transport,07.04-07.05 Petroleum products,0.0134551900755917
+NINTH,reference,2038,Transport,07.07 Gas/diesel oil,0.5570861244670277
+NINTH,reference,2038,Transport,17 Electricity,0.0
+NINTH,reference,2039,Buildings,07.09 LPG,0.0614842000037
+NINTH,reference,2039,Buildings,08.01 Natural gas,0.0329718657381189
+NINTH,reference,2039,Buildings,17 Electricity,0.0
+NINTH,reference,2039,Industry,07.06 Kerosene,0.0110059720229965
+NINTH,reference,2039,Industry,07.07 Gas/diesel oil,0.4252932167083741
+NINTH,reference,2039,Industry,08.99 Gas nonspecified,0.0095451464969099
+NINTH,reference,2039,Industry,17 Electricity,0.0
+NINTH,reference,2039,Non-energy use,07.07 Gas/diesel oil,0.0015201447658548
+NINTH,reference,2039,Non-energy use,07.12-07.17 Petroleum products,0.0384298813417029
+NINTH,reference,2039,Non-energy use,08.01 Natural gas,3.013849694333814
+NINTH,reference,2039,Transport,07.01 Motor gasoline,0.8542658740369641
+NINTH,reference,2039,Transport,07.04-07.05 Petroleum products,0.0135281986938596
+NINTH,reference,2039,Transport,07.07 Gas/diesel oil,0.5550201880692314
+NINTH,reference,2039,Transport,17 Electricity,0.0
+NINTH,reference,2040,Buildings,07.09 LPG,0.0621886417151
+NINTH,reference,2040,Buildings,08.01 Natural gas,0.0325931464538038
+NINTH,reference,2040,Buildings,17 Electricity,0.0
+NINTH,reference,2040,Industry,07.06 Kerosene,0.0109228458845178
+NINTH,reference,2040,Industry,07.07 Gas/diesel oil,0.4220810530982643
+NINTH,reference,2040,Industry,08.99 Gas nonspecified,0.0103245771488437
+NINTH,reference,2040,Industry,17 Electricity,0.0
+NINTH,reference,2040,Non-energy use,07.07 Gas/diesel oil,0.0015257479887826
+NINTH,reference,2040,Non-energy use,07.12-07.17 Petroleum products,0.0385715331087471
+NINTH,reference,2040,Non-energy use,08.01 Natural gas,3.0314061002516
+NINTH,reference,2040,Transport,07.01 Motor gasoline,0.8402149843417323
+NINTH,reference,2040,Transport,07.04-07.05 Petroleum products,0.0135981127155037
+NINTH,reference,2040,Transport,07.07 Gas/diesel oil,0.5522659316304024
+NINTH,reference,2040,Transport,17 Electricity,0.0
+NINTH,reference,2041,Buildings,07.09 LPG,0.062859903238
+NINTH,reference,2041,Buildings,08.01 Natural gas,0.0322176888653858
+NINTH,reference,2041,Buildings,17 Electricity,0.0
+NINTH,reference,2041,Industry,07.06 Kerosene,0.0108372316496305
+NINTH,reference,2041,Industry,07.07 Gas/diesel oil,0.4187727443659572
+NINTH,reference,2041,Industry,08.99 Gas nonspecified,0.0110987886022941
+NINTH,reference,2041,Industry,17 Electricity,0.0
+NINTH,reference,2041,Non-energy use,07.07 Gas/diesel oil,0.0015312504658832
+NINTH,reference,2041,Non-energy use,07.12-07.17 Petroleum products,0.0387106379800799
+NINTH,reference,2041,Non-energy use,08.01 Natural gas,3.0431103708634573
+NINTH,reference,2041,Transport,07.01 Motor gasoline,0.8253676529966565
+NINTH,reference,2041,Transport,07.04-07.05 Petroleum products,0.0136651749156372
+NINTH,reference,2041,Transport,07.07 Gas/diesel oil,0.5490538554135163
+NINTH,reference,2041,Transport,17 Electricity,0.0
+NINTH,reference,2042,Buildings,07.09 LPG,0.0635021422945
+NINTH,reference,2042,Buildings,08.01 Natural gas,0.0318484004670887
+NINTH,reference,2042,Buildings,17 Electricity,0.0
+NINTH,reference,2042,Industry,07.06 Kerosene,0.0107496686403987
+NINTH,reference,2042,Industry,07.07 Gas/diesel oil,0.4153891310164901
+NINTH,reference,2042,Industry,08.99 Gas nonspecified,0.0118677309864142
+NINTH,reference,2042,Industry,17 Electricity,0.0
+NINTH,reference,2042,Non-energy use,07.07 Gas/diesel oil,0.0015366792979377
+NINTH,reference,2042,Non-energy use,07.12-07.17 Petroleum products,0.0388478810745302
+NINTH,reference,2042,Non-energy use,08.01 Natural gas,3.054814642036293
+NINTH,reference,2042,Transport,07.01 Motor gasoline,0.8098287806232786
+NINTH,reference,2042,Transport,07.04-07.05 Petroleum products,0.0137301038337747
+NINTH,reference,2042,Transport,07.07 Gas/diesel oil,0.545426174276962
+NINTH,reference,2042,Transport,17 Electricity,0.0
+NINTH,reference,2043,Buildings,07.09 LPG,0.0641105097127
+NINTH,reference,2043,Buildings,08.01 Natural gas,0.0314835239384151
+NINTH,reference,2043,Buildings,17 Electricity,0.0
+NINTH,reference,2043,Industry,07.06 Kerosene,0.0106597686884647
+NINTH,reference,2043,Industry,07.07 Gas/diesel oil,0.4119152134324679
+NINTH,reference,2043,Industry,08.99 Gas nonspecified,0.0126304140038844
+NINTH,reference,2043,Industry,17 Electricity,0.0
+NINTH,reference,2043,Non-energy use,07.07 Gas/diesel oil,0.0015420016389187
+NINTH,reference,2043,Non-energy use,07.12-07.17 Petroleum products,0.038982432031094
+NINTH,reference,2043,Non-energy use,08.01 Natural gas,3.0665189126481502
+NINTH,reference,2043,Transport,07.01 Motor gasoline,0.7936460965014945
+NINTH,reference,2043,Transport,07.04-07.05 Petroleum products,0.0137921655836966
+NINTH,reference,2043,Transport,07.07 Gas/diesel oil,0.5413952257880205
+NINTH,reference,2043,Transport,17 Electricity,0.0
+NINTH,reference,2044,Buildings,07.09 LPG,0.0646868257383
+NINTH,reference,2044,Buildings,08.01 Natural gas,0.0311246536356779
+NINTH,reference,2044,Buildings,17 Electricity,0.0
+NINTH,reference,2044,Industry,07.06 Kerosene,0.0105678163049185
+NINTH,reference,2044,Industry,07.07 Gas/diesel oil,0.4083619857029543
+NINTH,reference,2044,Industry,08.99 Gas nonspecified,0.013386559199512
+NINTH,reference,2044,Industry,17 Electricity,0.0
+NINTH,reference,2044,Non-energy use,07.07 Gas/diesel oil,0.0015472283867963
+NINTH,reference,2044,Non-energy use,07.12-07.17 Petroleum products,0.0391145663549089
+NINTH,reference,2044,Non-energy use,08.01 Natural gas,3.0782231832600075
+NINTH,reference,2044,Transport,07.01 Motor gasoline,0.7769003282925154
+NINTH,reference,2044,Transport,07.04-07.05 Petroleum products,0.013851689338289
+NINTH,reference,2044,Transport,07.07 Gas/diesel oil,0.5369864918770096
+NINTH,reference,2044,Transport,17 Electricity,0.0
+NINTH,reference,2045,Buildings,07.09 LPG,0.0652259234909
+NINTH,reference,2045,Buildings,08.01 Natural gas,0.0307699579087604
+NINTH,reference,2045,Buildings,17 Electricity,0.0
+NINTH,reference,2045,Industry,07.06 Kerosene,0.0104734083038128
+NINTH,reference,2045,Industry,07.07 Gas/diesel oil,0.4047138679002418
+NINTH,reference,2045,Industry,08.99 Gas nonspecified,0.0141350383722056
+NINTH,reference,2045,Industry,17 Electricity,0.0
+NINTH,reference,2045,Non-energy use,07.07 Gas/diesel oil,0.001552323970499
+NINTH,reference,2045,Non-energy use,07.12-07.17 Petroleum products,0.0392433847947448
+NINTH,reference,2045,Non-energy use,08.01 Natural gas,3.089927453871865
+NINTH,reference,2045,Transport,07.01 Motor gasoline,0.7596331274627378
+NINTH,reference,2045,Transport,07.04-07.05 Petroleum products,0.0139078993489107
+NINTH,reference,2045,Transport,07.07 Gas/diesel oil,0.532206425086547
+NINTH,reference,2045,Transport,17 Electricity,0.0
+NINTH,reference,2046,Buildings,07.09 LPG,0.0657283470187
+NINTH,reference,2046,Buildings,08.01 Natural gas,0.0304203808279761
+NINTH,reference,2046,Buildings,17 Electricity,0.0
+NINTH,reference,2046,Industry,07.06 Kerosene,0.0103767014821971
+NINTH,reference,2046,Industry,07.07 Gas/diesel oil,0.4009769189822669
+NINTH,reference,2046,Industry,08.99 Gas nonspecified,0.0148753760587126
+NINTH,reference,2046,Industry,17 Electricity,0.0
+NINTH,reference,2046,Non-energy use,07.07 Gas/diesel oil,0.0015572899727643
+NINTH,reference,2046,Non-energy use,07.12-07.17 Petroleum products,0.0393689273628499
+NINTH,reference,2046,Non-energy use,08.01 Natural gas,3.1016317244837226
+NINTH,reference,2046,Transport,07.01 Motor gasoline,0.7419145406903164
+NINTH,reference,2046,Transport,07.04-07.05 Petroleum products,0.0139609173082303
+NINTH,reference,2046,Transport,07.07 Gas/diesel oil,0.5270955652061682
+NINTH,reference,2046,Transport,17 Electricity,0.0
+NINTH,reference,2047,Buildings,07.09 LPG,0.0661936387204999
+NINTH,reference,2047,Buildings,08.01 Natural gas,0.0300763292708573
+NINTH,reference,2047,Buildings,17 Electricity,0.0
+NINTH,reference,2047,Industry,07.06 Kerosene,0.0102777517170215
+NINTH,reference,2047,Industry,07.07 Gas/diesel oil,0.3971532981484024
+NINTH,reference,2047,Industry,08.99 Gas nonspecified,0.015606979148489
+NINTH,reference,2047,Industry,17 Electricity,0.0
+NINTH,reference,2047,Non-energy use,07.07 Gas/diesel oil,0.001562121154855
+NINTH,reference,2047,Non-energy use,07.12-07.17 Petroleum products,0.0394910616218084
+NINTH,reference,2047,Non-energy use,08.01 Natural gas,3.11333599509558
+NINTH,reference,2047,Transport,07.01 Motor gasoline,0.7237465648841485
+NINTH,reference,2047,Transport,07.04-07.05 Petroleum products,0.0140107029385812
+NINTH,reference,2047,Transport,07.07 Gas/diesel oil,0.52168713471934
+NINTH,reference,2047,Transport,17 Electricity,0.0
+NINTH,reference,2048,Buildings,07.09 LPG,0.0666215072005
+NINTH,reference,2048,Buildings,08.01 Natural gas,0.0297382407443487
+NINTH,reference,2048,Buildings,17 Electricity,0.0
+NINTH,reference,2048,Industry,07.06 Kerosene,0.0101766274968959
+NINTH,reference,2048,Industry,07.07 Gas/diesel oil,0.393245651938284
+NINTH,reference,2048,Industry,08.99 Gas nonspecified,0.016329276758502
+NINTH,reference,2048,Industry,17 Electricity,0.0
+NINTH,reference,2048,Non-energy use,07.07 Gas/diesel oil,0.0015668131043092
+NINTH,reference,2048,Non-energy use,07.12-07.17 Petroleum products,0.0396096760227762
+NINTH,reference,2048,Non-energy use,08.01 Natural gas,3.119188130401509
+NINTH,reference,2048,Transport,07.01 Motor gasoline,0.7051728164527382
+NINTH,reference,2048,Transport,07.04-07.05 Petroleum products,0.0140572372199927
+NINTH,reference,2048,Transport,07.07 Gas/diesel oil,0.5160057640007002
+NINTH,reference,2048,Transport,17 Electricity,0.0
+NINTH,reference,2049,Buildings,07.09 LPG,0.0670135784195
+NINTH,reference,2049,Buildings,08.01 Natural gas,0.0294073468762204
+NINTH,reference,2049,Buildings,17 Electricity,0.0
+NINTH,reference,2049,Industry,07.06 Kerosene,0.0100735672479504
+NINTH,reference,2049,Industry,07.07 Gas/diesel oil,0.3892631936240881
+NINTH,reference,2049,Industry,08.99 Gas nonspecified,0.0170419919501191
+NINTH,reference,2049,Industry,17 Electricity,0.0
+NINTH,reference,2049,Non-energy use,07.07 Gas/diesel oil,0.0015713738823203
+NINTH,reference,2049,Non-energy use,07.12-07.17 Petroleum products,0.0397249743560206
+NINTH,reference,2049,Non-energy use,08.01 Natural gas,3.130892401013366
+NINTH,reference,2049,Transport,07.01 Motor gasoline,0.686250684971371
+NINTH,reference,2049,Transport,07.04-07.05 Petroleum products,0.0141007889934335
+NINTH,reference,2049,Transport,07.07 Gas/diesel oil,0.5100944145663475
+NINTH,reference,2049,Transport,17 Electricity,0.0
+NINTH,reference,2050,Buildings,07.09 LPG,0.0673635814364
+NINTH,reference,2050,Buildings,08.01 Natural gas,0.0290813697581496
+NINTH,reference,2050,Buildings,17 Electricity,0.0
+NINTH,reference,2050,Industry,07.06 Kerosene,0.0099680980963853
+NINTH,reference,2050,Industry,07.07 Gas/diesel oil,0.3851876503972911
+NINTH,reference,2050,Industry,08.99 Gas nonspecified,0.0177436483148831
+NINTH,reference,2050,Industry,17 Electricity,0.0
+NINTH,reference,2050,Non-energy use,07.07 Gas/diesel oil,0.0015757591420633
+NINTH,reference,2050,Non-energy use,07.12-07.17 Petroleum products,0.0398358355156688
+NINTH,reference,2050,Non-energy use,08.01 Natural gas,3.130892401013366
+NINTH,reference,2050,Transport,07.01 Motor gasoline,0.6673116554072746
+NINTH,reference,2050,Transport,07.04-07.05 Petroleum products,0.0141404220238222
+NINTH,reference,2050,Transport,07.07 Gas/diesel oil,0.5042577318328467
+NINTH,reference,2050,Transport,17 Electricity,0.0
+NINTH,reference,2051,Buildings,07.09 LPG,0.0676762907127
+NINTH,reference,2051,Buildings,08.01 Natural gas,0.0287628468630998
+NINTH,reference,2051,Buildings,17 Electricity,0.0
+NINTH,reference,2051,Industry,07.06 Kerosene,0.0098607329340516
+NINTH,reference,2051,Industry,07.07 Gas/diesel oil,0.3810388414455771
+NINTH,reference,2051,Industry,08.99 Gas nonspecified,0.0184344266881506
+NINTH,reference,2051,Industry,17 Electricity,0.0
+NINTH,reference,2051,Non-energy use,07.07 Gas/diesel oil,0.0015799967990609
+NINTH,reference,2051,Non-energy use,07.12-07.17 Petroleum products,0.0399429652175507
+NINTH,reference,2051,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,reference,2051,Transport,07.01 Motor gasoline,0.6486273947008152
+NINTH,reference,2051,Transport,07.04-07.05 Petroleum products,0.0141768720019432
+NINTH,reference,2051,Transport,07.07 Gas/diesel oil,0.4985498434697553
+NINTH,reference,2051,Transport,17 Electricity,0.0
+NINTH,reference,2052,Buildings,07.09 LPG,0.0679478842183
+NINTH,reference,2052,Buildings,08.01 Natural gas,0.0284505356242252
+NINTH,reference,2052,Buildings,17 Electricity,0.0
+NINTH,reference,2052,Industry,07.06 Kerosene,0.0097512236079903
+NINTH,reference,2052,Industry,07.07 Gas/diesel oil,0.3768071776322544
+NINTH,reference,2052,Industry,08.99 Gas nonspecified,0.0191131817657541
+NINTH,reference,2052,Industry,17 Electricity,0.0
+NINTH,reference,2052,Non-energy use,07.07 Gas/diesel oil,0.001584058098324
+NINTH,reference,2052,Non-energy use,07.12-07.17 Petroleum products,0.0400456365237852
+NINTH,reference,2052,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,reference,2052,Transport,07.01 Motor gasoline,0.6302391654207177
+NINTH,reference,2052,Transport,07.04-07.05 Petroleum products,0.0142095724043156
+NINTH,reference,2052,Transport,07.07 Gas/diesel oil,0.4929579614245342
+NINTH,reference,2052,Transport,17 Electricity,0.0
+NINTH,reference,2053,Buildings,07.09 LPG,0.0681825947643
+NINTH,reference,2053,Buildings,08.01 Natural gas,0.0281465628223051
+NINTH,reference,2053,Buildings,17 Electricity,0.0
+NINTH,reference,2053,Industry,07.06 Kerosene,0.0096400155239036
+NINTH,reference,2053,Industry,07.07 Gas/diesel oil,0.372509870342501
+NINTH,reference,2053,Industry,08.99 Gas nonspecified,0.0197800829125001
+NINTH,reference,2053,Industry,17 Electricity,0.0
+NINTH,reference,2053,Non-energy use,07.07 Gas/diesel oil,0.0015879671447036
+NINTH,reference,2053,Non-energy use,07.12-07.17 Petroleum products,0.0401444588148585
+NINTH,reference,2053,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,reference,2053,Transport,07.01 Motor gasoline,0.6122141368629822
+NINTH,reference,2053,Transport,07.04-07.05 Petroleum products,0.014239159981133
+NINTH,reference,2053,Transport,07.07 Gas/diesel oil,0.4874871000762741
+NINTH,reference,2053,Transport,17 Electricity,0.0
+NINTH,reference,2054,Buildings,07.09 LPG,0.0683774711637
+NINTH,reference,2054,Buildings,08.01 Natural gas,0.0278499824796996
+NINTH,reference,2054,Buildings,17 Electricity,0.0
+NINTH,reference,2054,Industry,07.06 Kerosene,0.0095269364776531
+NINTH,reference,2054,Industry,07.07 Gas/diesel oil,0.3681402652570369
+NINTH,reference,2054,Industry,08.99 Gas nonspecified,0.0204341208062042
+NINTH,reference,2054,Industry,17 Electricity,0.0
+NINTH,reference,2054,Non-energy use,07.07 Gas/diesel oil,0.0015917006011586
+NINTH,reference,2054,Non-energy use,07.12-07.17 Petroleum products,0.0402388421208325
+NINTH,reference,2054,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,reference,2054,Transport,07.01 Motor gasoline,0.5945844908560609
+NINTH,reference,2054,Transport,07.04-07.05 Petroleum products,0.0142651943814819
+NINTH,reference,2054,Transport,07.07 Gas/diesel oil,0.482125714881424
+NINTH,reference,2054,Transport,17 Electricity,0.0
+NINTH,reference,2055,Buildings,07.09 LPG,0.0685349384126
+NINTH,reference,2055,Buildings,08.01 Natural gas,0.0275620298705373
+NINTH,reference,2055,Buildings,17 Electricity,0.0
+NINTH,reference,2055,Industry,07.06 Kerosene,0.0094122641934887
+NINTH,reference,2055,Industry,07.07 Gas/diesel oil,0.3637090942075668
+NINTH,reference,2055,Industry,08.99 Gas nonspecified,0.0210752116154097
+NINTH,reference,2055,Industry,17 Electricity,0.0
+NINTH,reference,2055,Non-energy use,07.07 Gas/diesel oil,0.001595270396527
+NINTH,reference,2055,Non-energy use,07.12-07.17 Petroleum products,0.0403290880076086
+NINTH,reference,2055,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,reference,2055,Transport,07.01 Motor gasoline,0.5773892579703229
+NINTH,reference,2055,Transport,07.04-07.05 Petroleum products,0.0142880298118745
+NINTH,reference,2055,Transport,07.07 Gas/diesel oil,0.4768736787237332
+NINTH,reference,2055,Transport,17 Electricity,0.0
+NINTH,reference,2056,Buildings,07.09 LPG,0.0686537476358
+NINTH,reference,2056,Buildings,08.01 Natural gas,0.0272823874811229
+NINTH,reference,2056,Buildings,17 Electricity,0.0
+NINTH,reference,2056,Industry,07.06 Kerosene,0.0092959679837794
+NINTH,reference,2056,Industry,07.07 Gas/diesel oil,0.359215171361413
+NINTH,reference,2056,Industry,08.99 Gas nonspecified,0.0217026386667024
+NINTH,reference,2056,Industry,17 Electricity,0.0
+NINTH,reference,2056,Non-energy use,07.07 Gas/diesel oil,0.0015986640742176
+NINTH,reference,2056,Non-energy use,07.12-07.17 Petroleum products,0.040414881567467
+NINTH,reference,2056,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,reference,2056,Transport,07.01 Motor gasoline,0.5606433245692565
+NINTH,reference,2056,Transport,07.04-07.05 Petroleum products,0.0143074729850813
+NINTH,reference,2056,Transport,07.07 Gas/diesel oil,0.4717254691464704
+NINTH,reference,2056,Transport,17 Electricity,0.0
+NINTH,reference,2057,Buildings,07.09 LPG,0.0687362836978
+NINTH,reference,2057,Buildings,08.01 Natural gas,0.0270121476483244
+NINTH,reference,2057,Buildings,17 Electricity,0.0
+NINTH,reference,2057,Industry,07.06 Kerosene,0.009178309763815
+NINTH,reference,2057,Industry,07.07 Gas/diesel oil,0.3546686176598146
+NINTH,reference,2057,Industry,08.99 Gas nonspecified,0.0223163674432253
+NINTH,reference,2057,Industry,17 Electricity,0.0
+NINTH,reference,2057,Non-energy use,07.07 Gas/diesel oil,0.0016018932142364
+NINTH,reference,2057,Non-energy use,07.12-07.17 Petroleum products,0.040496515547692
+NINTH,reference,2057,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,reference,2057,Transport,07.01 Motor gasoline,0.5443574229835945
+NINTH,reference,2057,Transport,07.04-07.05 Petroleum products,0.0143238612391296
+NINTH,reference,2057,Transport,07.07 Gas/diesel oil,0.4666869292584143
+NINTH,reference,2057,Transport,17 Electricity,0.0
+NINTH,reference,2058,Buildings,07.09 LPG,0.0687822009999
+NINTH,reference,2058,Buildings,08.01 Natural gas,0.0267512606694679
+NINTH,reference,2058,Buildings,17 Electricity,0.0
+NINTH,reference,2058,Industry,07.06 Kerosene,0.0090593267457214
+NINTH,reference,2058,Industry,07.07 Gas/diesel oil,0.3500708710552497
+NINTH,reference,2058,Industry,08.99 Gas nonspecified,0.0229158795830195
+NINTH,reference,2058,Industry,17 Electricity,0.0
+NINTH,reference,2058,Non-energy use,07.07 Gas/diesel oil,0.0016049512729479
+NINTH,reference,2058,Non-energy use,07.12-07.17 Petroleum products,0.0405738245225086
+NINTH,reference,2058,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,reference,2058,Transport,07.01 Motor gasoline,0.5285386147656115
+NINTH,reference,2058,Transport,07.04-07.05 Petroleum products,0.0143371275546819
+NINTH,reference,2058,Transport,07.07 Gas/diesel oil,0.4617523558748009
+NINTH,reference,2058,Transport,17 Electricity,0.0
+NINTH,reference,2059,Buildings,07.09 LPG,0.0687955198954999
+NINTH,reference,2059,Buildings,08.01 Natural gas,0.0265013282496815
+NINTH,reference,2059,Buildings,17 Electricity,0.0
+NINTH,reference,2059,Industry,07.06 Kerosene,0.0089393955702587
+NINTH,reference,2059,Industry,07.07 Gas/diesel oil,0.3454364857152188
+NINTH,reference,2059,Industry,08.99 Gas nonspecified,0.0235015471287636
+NINTH,reference,2059,Industry,17 Electricity,0.0
+NINTH,reference,2059,Non-energy use,07.07 Gas/diesel oil,0.0016078610697066
+NINTH,reference,2059,Non-energy use,07.12-07.17 Petroleum products,0.0406473853745247
+NINTH,reference,2059,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,reference,2059,Transport,07.01 Motor gasoline,0.5132017075810874
+NINTH,reference,2059,Transport,07.04-07.05 Petroleum products,0.0143478384660543
+NINTH,reference,2059,Transport,07.07 Gas/diesel oil,0.4569256140054584
+NINTH,reference,2059,Transport,17 Electricity,0.0
+NINTH,reference,2060,Buildings,07.09 LPG,0.0687765396048
+NINTH,reference,2060,Buildings,08.01 Natural gas,0.0262624413796387
+NINTH,reference,2060,Buildings,17 Electricity,0.0
+NINTH,reference,2060,Industry,07.06 Kerosene,0.0088185940978344
+NINTH,reference,2060,Industry,07.07 Gas/diesel oil,0.3407684703247496
+NINTH,reference,2060,Industry,08.99 Gas nonspecified,0.0240730613809376
+NINTH,reference,2060,Industry,17 Electricity,0.0
+NINTH,reference,2060,Non-energy use,07.07 Gas/diesel oil,0.0016106208517229
+NINTH,reference,2060,Non-energy use,07.12-07.17 Petroleum products,0.0407171537925049
+NINTH,reference,2060,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,reference,2060,Transport,07.01 Motor gasoline,0.498342082864831
+NINTH,reference,2060,Transport,07.04-07.05 Petroleum products,0.0143560154988343
+NINTH,reference,2060,Transport,07.07 Gas/diesel oil,0.4522015298948516
+NINTH,reference,2060,Transport,17 Electricity,0.0
+NINTH,target,2022,Buildings,07.09 LPG,0.0461361585498864
+NINTH,target,2022,Buildings,08.01 Natural gas,0.0387975615000732
+NINTH,target,2022,Buildings,17 Electricity,0.0
+NINTH,target,2022,Industry,07.06 Kerosene,0.0102360820554534
+NINTH,target,2022,Industry,07.07 Gas/diesel oil,0.3955430973982635
+NINTH,target,2022,Industry,17 Electricity,0.0
+NINTH,target,2022,Non-energy use,07.07 Gas/diesel oil,0.0005117868911537
+NINTH,target,2022,Non-energy use,07.12-07.17 Petroleum products,0.0129381819028384
+NINTH,target,2022,Transport,07.01 Motor gasoline,0.8293294056733184
+NINTH,target,2022,Transport,07.04-07.05 Petroleum products,0.0102714573175286
+NINTH,target,2022,Transport,07.07 Gas/diesel oil,0.3611686832151029
+NINTH,target,2023,Buildings,07.09 LPG,0.0465101471075
+NINTH,target,2023,Buildings,08.01 Natural gas,0.039112061978112
+NINTH,target,2023,Buildings,17 Electricity,0.0
+NINTH,target,2023,Industry,07.06 Kerosene,0.0105516572735
+NINTH,target,2023,Industry,07.07 Gas/diesel oil,0.4077375677563615
+NINTH,target,2023,Industry,17 Electricity,0.0
+NINTH,target,2023,Non-energy use,07.07 Gas/diesel oil,0.0005282312305824
+NINTH,target,2023,Non-energy use,07.12-07.17 Petroleum products,0.0133539015284839
+NINTH,target,2023,Non-energy use,08.01 Natural gas,1.9168636759367377
+NINTH,target,2023,Transport,07.01 Motor gasoline,0.903153916578077
+NINTH,target,2023,Transport,07.04-07.05 Petroleum products,0.0114392576260372
+NINTH,target,2023,Transport,07.07 Gas/diesel oil,0.484724559101526
+NINTH,target,2023,Transport,17 Electricity,0.0
+NINTH,target,2024,Buildings,07.09 LPG,0.0476093703722
+NINTH,target,2024,Buildings,08.01 Natural gas,0.0387450399880831
+NINTH,target,2024,Buildings,17 Electricity,0.0
+NINTH,target,2024,Industry,07.06 Kerosene,0.0107418688580054
+NINTH,target,2024,Industry,07.07 Gas/diesel oil,0.4150877315093202
+NINTH,target,2024,Industry,17 Electricity,0.0
+NINTH,target,2024,Non-energy use,07.07 Gas/diesel oil,0.0005445061374986
+NINTH,target,2024,Non-energy use,07.12-07.17 Petroleum products,0.013765337830923
+NINTH,target,2024,Non-energy use,08.01 Natural gas,1.943922518966642
+NINTH,target,2024,Transport,07.01 Motor gasoline,0.9083488304081356
+NINTH,target,2024,Transport,07.04-07.05 Petroleum products,0.0116268575446669
+NINTH,target,2024,Transport,07.07 Gas/diesel oil,0.4948156297488582
+NINTH,target,2024,Transport,17 Electricity,0.0
+NINTH,target,2025,Buildings,07.09 LPG,0.0486857781282
+NINTH,target,2025,Buildings,08.01 Natural gas,0.0383683170571018
+NINTH,target,2025,Buildings,17 Electricity,0.0
+NINTH,target,2025,Industry,07.06 Kerosene,0.0108489790437526
+NINTH,target,2025,Industry,07.07 Gas/diesel oil,0.4192266876454487
+NINTH,target,2025,Industry,17 Electricity,0.0
+NINTH,target,2025,Non-energy use,07.07 Gas/diesel oil,0.0005611996965064
+NINTH,target,2025,Non-energy use,07.12-07.17 Petroleum products,0.0141873578294459
+NINTH,target,2025,Non-energy use,08.01 Natural gas,2.6734961917345434
+NINTH,target,2025,Transport,07.01 Motor gasoline,0.9112386855660846
+NINTH,target,2025,Transport,07.04-07.05 Petroleum products,0.0118190537144038
+NINTH,target,2025,Transport,07.07 Gas/diesel oil,0.504110700133908
+NINTH,target,2025,Transport,17 Electricity,0.0
+NINTH,target,2026,Buildings,07.09 LPG,0.0497424271288
+NINTH,target,2026,Buildings,08.01 Natural gas,0.0379861364808246
+NINTH,target,2026,Buildings,17 Electricity,0.0
+NINTH,target,2026,Industry,07.06 Kerosene,0.0108759064690764
+NINTH,target,2026,Industry,07.07 Gas/diesel oil,0.4202672183055037
+NINTH,target,2026,Industry,17 Electricity,0.0
+NINTH,target,2026,Non-energy use,07.07 Gas/diesel oil,0.0005742587694253
+NINTH,target,2026,Non-energy use,07.12-07.17 Petroleum products,0.0145174965333234
+NINTH,target,2026,Non-energy use,08.01 Natural gas,2.716420768329093
+NINTH,target,2026,Transport,07.01 Motor gasoline,0.9114212303268916
+NINTH,target,2026,Transport,07.04-07.05 Petroleum products,0.0119725743419894
+NINTH,target,2026,Transport,07.07 Gas/diesel oil,0.510514189842758
+NINTH,target,2026,Transport,17 Electricity,0.0
+NINTH,target,2027,Buildings,07.09 LPG,0.0507785966458
+NINTH,target,2027,Buildings,08.01 Natural gas,0.0375994959029892
+NINTH,target,2027,Buildings,17 Electricity,0.0
+NINTH,target,2027,Industry,07.06 Kerosene,0.0109993905444643
+NINTH,target,2027,Industry,07.07 Gas/diesel oil,0.4250388949483519
+NINTH,target,2027,Industry,17 Electricity,0.0
+NINTH,target,2027,Non-energy use,07.07 Gas/diesel oil,0.0014231090426679
+NINTH,target,2027,Non-energy use,07.12-07.17 Petroleum products,0.0359767785769262
+NINTH,target,2027,Non-energy use,08.01 Natural gas,2.7538242731817677
+NINTH,target,2027,Transport,07.01 Motor gasoline,0.909700847751282
+NINTH,target,2027,Transport,07.04-07.05 Petroleum products,0.0121859651788139
+NINTH,target,2027,Transport,07.07 Gas/diesel oil,0.5185781306639784
+NINTH,target,2027,Transport,17 Electricity,0.0
+NINTH,target,2028,Buildings,07.09 LPG,0.0517963813468
+NINTH,target,2028,Buildings,08.01 Natural gas,0.0372113520156126
+NINTH,target,2028,Buildings,17 Electricity,0.0
+NINTH,target,2028,Industry,07.06 Kerosene,0.0108940308666769
+NINTH,target,2028,Industry,07.07 Gas/diesel oil,0.4209675820117098
+NINTH,target,2028,Industry,08.99 Gas nonspecified,0.0030396534148055
+NINTH,target,2028,Industry,17 Electricity,0.0
+NINTH,target,2028,Non-energy use,07.07 Gas/diesel oil,0.001434683374334
+NINTH,target,2028,Non-energy use,07.12-07.17 Petroleum products,0.0362693824147497
+NINTH,target,2028,Non-energy use,08.01 Natural gas,2.797320687453474
+NINTH,target,2028,Transport,07.01 Motor gasoline,0.9041154830620453
+NINTH,target,2028,Transport,07.04-07.05 Petroleum products,0.0123240741312562
+NINTH,target,2028,Transport,07.07 Gas/diesel oil,0.522090489407073
+NINTH,target,2028,Transport,17 Electricity,0.0
+NINTH,target,2029,Buildings,07.09 LPG,0.0527950236532
+NINTH,target,2029,Buildings,08.01 Natural gas,0.0368223783852916
+NINTH,target,2029,Buildings,17 Electricity,0.0
+NINTH,target,2029,Industry,07.06 Kerosene,0.0107622185547391
+NINTH,target,2029,Industry,07.07 Gas/diesel oil,0.4158740853147632
+NINTH,target,2029,Industry,08.99 Gas nonspecified,0.0060763019245498
+NINTH,target,2029,Industry,17 Electricity,0.0
+NINTH,target,2029,Non-energy use,07.07 Gas/diesel oil,0.0014414001785129
+NINTH,target,2029,Non-energy use,07.12-07.17 Petroleum products,0.0364391859712211
+NINTH,target,2029,Non-energy use,08.01 Natural gas,2.820729228677189
+NINTH,target,2029,Transport,07.01 Motor gasoline,0.8949719771208271
+NINTH,target,2029,Transport,07.04-07.05 Petroleum products,0.0124475155755155
+NINTH,target,2029,Transport,07.07 Gas/diesel oil,0.5238169412612464
+NINTH,target,2029,Transport,17 Electricity,0.0
+NINTH,target,2030,Buildings,07.09 LPG,0.0537762937093
+NINTH,target,2030,Buildings,08.01 Natural gas,0.0364349278109466
+NINTH,target,2030,Buildings,17 Electricity,0.0
+NINTH,target,2030,Industry,07.06 Kerosene,0.0106098436417622
+NINTH,target,2030,Industry,07.07 Gas/diesel oil,0.4099860077555795
+NINTH,target,2030,Industry,08.99 Gas nonspecified,0.009092217034279
+NINTH,target,2030,Industry,17 Electricity,0.0
+NINTH,target,2030,Non-energy use,07.07 Gas/diesel oil,0.0014470502610414
+NINTH,target,2030,Non-energy use,07.12-07.17 Petroleum products,0.0365820223681331
+NINTH,target,2030,Non-energy use,08.01 Natural gas,2.844137769900904
+NINTH,target,2030,Transport,07.01 Motor gasoline,0.8823012413020843
+NINTH,target,2030,Transport,07.04-07.05 Petroleum products,0.0125589343456645
+NINTH,target,2030,Transport,07.07 Gas/diesel oil,0.5238754872062551
+NINTH,target,2030,Transport,17 Electricity,0.0
+NINTH,target,2031,Buildings,07.09 LPG,0.0547358780622
+NINTH,target,2031,Buildings,08.01 Natural gas,0.0360471237641999
+NINTH,target,2031,Buildings,17 Electricity,0.0
+NINTH,target,2031,Industry,07.06 Kerosene,0.010441055728332
+NINTH,target,2031,Industry,07.07 Gas/diesel oil,0.4034636983680729
+NINTH,target,2031,Industry,08.99 Gas nonspecified,0.012073615585077
+NINTH,target,2031,Industry,17 Electricity,0.0
+NINTH,target,2031,Non-energy use,07.07 Gas/diesel oil,0.0014517833302862
+NINTH,target,2031,Non-energy use,07.12-07.17 Petroleum products,0.036701676294224
+NINTH,target,2031,Non-energy use,08.01 Natural gas,2.8675463111246184
+NINTH,target,2031,Transport,07.01 Motor gasoline,0.8670601815576674
+NINTH,target,2031,Transport,07.04-07.05 Petroleum products,0.0126595285683613
+NINTH,target,2031,Transport,07.07 Gas/diesel oil,0.5220838390337834
+NINTH,target,2031,Transport,17 Electricity,0.0
+NINTH,target,2032,Buildings,07.09 LPG,0.0556740898141
+NINTH,target,2032,Buildings,08.01 Natural gas,0.0356602942488864
+NINTH,target,2032,Buildings,17 Electricity,0.0
+NINTH,target,2032,Industry,07.06 Kerosene,0.0102828311447065
+NINTH,target,2032,Industry,07.07 Gas/diesel oil,0.3973495775987459
+NINTH,target,2032,Industry,08.99 Gas nonspecified,0.0150442966034562
+NINTH,target,2032,Industry,17 Electricity,0.0
+NINTH,target,2032,Non-energy use,07.07 Gas/diesel oil,0.0014571806464372
+NINTH,target,2032,Non-energy use,07.12-07.17 Petroleum products,0.0368381226537442
+NINTH,target,2032,Non-energy use,08.01 Natural gas,2.890954852348333
+NINTH,target,2032,Transport,07.01 Motor gasoline,0.8494291319871974
+NINTH,target,2032,Transport,07.04-07.05 Petroleum products,0.0127658403748153
+NINTH,target,2032,Transport,07.07 Gas/diesel oil,0.5190650854314849
+NINTH,target,2032,Transport,17 Electricity,0.0
+NINTH,target,2033,Buildings,07.09 LPG,0.0565897788413
+NINTH,target,2033,Buildings,08.01 Natural gas,0.0352747477469515
+NINTH,target,2033,Buildings,17 Electricity,0.0
+NINTH,target,2033,Industry,07.06 Kerosene,0.0101206022870298
+NINTH,target,2033,Industry,07.07 Gas/diesel oil,0.3910807235093402
+NINTH,target,2033,Industry,08.99 Gas nonspecified,0.0179873598465845
+NINTH,target,2033,Industry,17 Electricity,0.0
+NINTH,target,2033,Non-energy use,07.07 Gas/diesel oil,0.0014623646530946
+NINTH,target,2033,Non-energy use,07.12-07.17 Petroleum products,0.0369691764620359
+NINTH,target,2033,Non-energy use,08.01 Natural gas,2.9085112582661194
+NINTH,target,2033,Transport,07.01 Motor gasoline,0.8294572216264804
+NINTH,target,2033,Transport,07.04-07.05 Petroleum products,0.012868682035682
+NINTH,target,2033,Transport,07.07 Gas/diesel oil,0.5144921089483684
+NINTH,target,2033,Transport,17 Electricity,0.0
+NINTH,target,2034,Buildings,07.09 LPG,0.0574786940968
+NINTH,target,2034,Buildings,08.01 Natural gas,0.0348889091997343
+NINTH,target,2034,Buildings,17 Electricity,0.0
+NINTH,target,2034,Industry,07.06 Kerosene,0.0099444388592067
+NINTH,target,2034,Industry,07.07 Gas/diesel oil,0.3842734091959215
+NINTH,target,2034,Industry,08.99 Gas nonspecified,0.0208773208303032
+NINTH,target,2034,Industry,17 Electricity,0.0
+NINTH,target,2034,Non-energy use,07.07 Gas/diesel oil,0.0014666611972534
+NINTH,target,2034,Non-energy use,07.12-07.17 Petroleum products,0.0370777948554364
+NINTH,target,2034,Non-energy use,08.01 Natural gas,2.926067664744884
+NINTH,target,2034,Transport,07.01 Motor gasoline,0.8072035734363501
+NINTH,target,2034,Transport,07.04-07.05 Petroleum products,0.0129607382975488
+NINTH,target,2034,Transport,07.07 Gas/diesel oil,0.5081635933710802
+NINTH,target,2034,Transport,17 Electricity,0.0
+NINTH,target,2035,Buildings,07.09 LPG,0.0583399523068
+NINTH,target,2035,Buildings,08.01 Natural gas,0.0345033854735167
+NINTH,target,2035,Buildings,17 Electricity,0.0
+NINTH,target,2035,Industry,07.06 Kerosene,0.0097563890959142
+NINTH,target,2035,Industry,07.07 Gas/diesel oil,0.3770067826258343
+NINTH,target,2035,Industry,08.99 Gas nonspecified,0.0237044467119865
+NINTH,target,2035,Industry,17 Electricity,0.0
+NINTH,target,2035,Non-energy use,07.07 Gas/diesel oil,0.0014701256781884
+NINTH,target,2035,Non-energy use,07.12-07.17 Petroleum products,0.0371653783502658
+NINTH,target,2035,Non-energy use,08.01 Natural gas,2.9494762059685984
+NINTH,target,2035,Transport,07.01 Motor gasoline,0.7827869414071305
+NINTH,target,2035,Transport,07.04-07.05 Petroleum products,0.0130426066568559
+NINTH,target,2035,Transport,07.07 Gas/diesel oil,0.5001352460382344
+NINTH,target,2035,Transport,17 Electricity,0.0
+NINTH,target,2036,Buildings,07.09 LPG,0.0591734246211
+NINTH,target,2036,Buildings,08.01 Natural gas,0.0341191834120796
+NINTH,target,2036,Buildings,17 Electricity,0.0
+NINTH,target,2036,Industry,07.06 Kerosene,0.0095576426902632
+NINTH,target,2036,Industry,07.07 Gas/diesel oil,0.3693268159684673
+NINTH,target,2036,Industry,08.99 Gas nonspecified,0.0264586496886326
+NINTH,target,2036,Industry,17 Electricity,0.0
+NINTH,target,2036,Non-energy use,07.07 Gas/diesel oil,0.0014727643795548
+NINTH,target,2036,Non-energy use,07.12-07.17 Petroleum products,0.0372320857999027
+NINTH,target,2036,Non-energy use,08.01 Natural gas,2.9670326118863843
+NINTH,target,2036,Transport,07.01 Motor gasoline,0.7557244024481319
+NINTH,target,2036,Transport,07.04-07.05 Petroleum products,0.013114450569112
+NINTH,target,2036,Transport,07.07 Gas/diesel oil,0.4902769044816448
+NINTH,target,2036,Transport,17 Electricity,0.0
+NINTH,target,2037,Buildings,07.09 LPG,0.0599766984112
+NINTH,target,2037,Buildings,08.01 Natural gas,0.0337359492064346
+NINTH,target,2037,Buildings,17 Electricity,0.0
+NINTH,target,2037,Industry,07.06 Kerosene,0.009355716057865
+NINTH,target,2037,Industry,07.07 Gas/diesel oil,0.36152395886032
+NINTH,target,2037,Industry,08.99 Gas nonspecified,0.0291505142902534
+NINTH,target,2037,Industry,17 Electricity,0.0
+NINTH,target,2037,Non-energy use,07.07 Gas/diesel oil,0.001475036500671
+NINTH,target,2037,Non-energy use,07.12-07.17 Petroleum products,0.0372895259509007
+NINTH,target,2037,Non-energy use,08.01 Natural gas,2.978736882498242
+NINTH,target,2037,Transport,07.01 Motor gasoline,0.7260649984111093
+NINTH,target,2037,Transport,07.04-07.05 Petroleum products,0.0131808224931758
+NINTH,target,2037,Transport,07.07 Gas/diesel oil,0.4787405973167928
+NINTH,target,2037,Transport,17 Electricity,0.0
+NINTH,target,2038,Buildings,07.09 LPG,0.0607454630006
+NINTH,target,2038,Buildings,08.01 Natural gas,0.0333523393697466
+NINTH,target,2038,Buildings,17 Electricity,0.0
+NINTH,target,2038,Industry,07.06 Kerosene,0.0091518045888484
+NINTH,target,2038,Industry,07.07 Gas/diesel oil,0.3536444036151676
+NINTH,target,2038,Industry,08.99 Gas nonspecified,0.0317787229905319
+NINTH,target,2038,Industry,17 Electricity,0.0
+NINTH,target,2038,Non-energy use,07.07 Gas/diesel oil,0.0014769960389746
+NINTH,target,2038,Non-energy use,07.12-07.17 Petroleum products,0.0373390638805648
+NINTH,target,2038,Non-energy use,08.01 Natural gas,3.0021454237219563
+NINTH,target,2038,Transport,07.01 Motor gasoline,0.6938737025910142
+NINTH,target,2038,Transport,07.04-07.05 Petroleum products,0.0132419374590512
+NINTH,target,2038,Transport,07.07 Gas/diesel oil,0.4655684727192343
+NINTH,target,2038,Transport,17 Electricity,0.0
+NINTH,target,2039,Buildings,07.09 LPG,0.0614842000037
+NINTH,target,2039,Buildings,08.01 Natural gas,0.0329718657381189
+NINTH,target,2039,Buildings,17 Electricity,0.0
+NINTH,target,2039,Industry,07.06 Kerosene,0.0089491640888661
+NINTH,target,2039,Industry,07.07 Gas/diesel oil,0.3458139612069195
+NINTH,target,2039,Industry,08.99 Gas nonspecified,0.0343513265082418
+NINTH,target,2039,Industry,17 Electricity,0.0
+NINTH,target,2039,Non-energy use,07.07 Gas/diesel oil,0.001478859434961
+NINTH,target,2039,Non-energy use,07.12-07.17 Petroleum products,0.0373861712931351
+NINTH,target,2039,Non-energy use,08.01 Natural gas,3.013849694333814
+NINTH,target,2039,Transport,07.01 Motor gasoline,0.6592430658587553
+NINTH,target,2039,Transport,07.04-07.05 Petroleum products,0.0133005017420977
+NINTH,target,2039,Transport,07.07 Gas/diesel oil,0.4508278205715417
+NINTH,target,2039,Transport,17 Electricity,0.0
+NINTH,target,2040,Buildings,07.09 LPG,0.0621886417151
+NINTH,target,2040,Buildings,08.01 Natural gas,0.0325931464538038
+NINTH,target,2040,Buildings,17 Electricity,0.0
+NINTH,target,2040,Industry,07.06 Kerosene,0.0087475538756902
+NINTH,target,2040,Industry,07.07 Gas/diesel oil,0.3380233311831738
+NINTH,target,2040,Industry,08.99 Gas nonspecified,0.0368662961562721
+NINTH,target,2040,Industry,17 Electricity,0.0
+NINTH,target,2040,Non-energy use,07.07 Gas/diesel oil,0.0014805997047899
+NINTH,target,2040,Non-energy use,07.12-07.17 Petroleum products,0.0374301660260891
+NINTH,target,2040,Non-energy use,08.01 Natural gas,3.0314061002516
+NINTH,target,2040,Transport,07.01 Motor gasoline,0.6222509493400401
+NINTH,target,2040,Transport,07.04-07.05 Petroleum products,0.0133558964670875
+NINTH,target,2040,Transport,07.07 Gas/diesel oil,0.4345367292754854
+NINTH,target,2040,Transport,17 Electricity,0.0
+NINTH,target,2041,Buildings,07.09 LPG,0.062859903238
+NINTH,target,2041,Buildings,08.01 Natural gas,0.0322176888653858
+NINTH,target,2041,Buildings,17 Electricity,0.0
+NINTH,target,2041,Industry,07.06 Kerosene,0.0085472014769218
+NINTH,target,2041,Industry,07.07 Gas/diesel oil,0.3302813056747138
+NINTH,target,2041,Industry,08.99 Gas nonspecified,0.0393233300073586
+NINTH,target,2041,Industry,17 Electricity,0.0
+NINTH,target,2041,Non-energy use,07.07 Gas/diesel oil,0.0014822245101441
+NINTH,target,2041,Non-energy use,07.12-07.17 Petroleum products,0.0374712417699061
+NINTH,target,2041,Non-energy use,08.01 Natural gas,3.0431103708634573
+NINTH,target,2041,Transport,07.01 Motor gasoline,0.5844674102594957
+NINTH,target,2041,Transport,07.04-07.05 Petroleum products,0.0134083691482695
+NINTH,target,2041,Transport,07.07 Gas/diesel oil,0.417530649620891
+NINTH,target,2041,Transport,17 Electricity,0.0
+NINTH,target,2042,Buildings,07.09 LPG,0.0635021422945
+NINTH,target,2042,Buildings,08.01 Natural gas,0.0318484004670887
+NINTH,target,2042,Buildings,17 Electricity,0.0
+NINTH,target,2042,Industry,07.06 Kerosene,0.0083485515883936
+NINTH,target,2042,Industry,07.07 Gas/diesel oil,0.322605068635916
+NINTH,target,2042,Industry,08.99 Gas nonspecified,0.0417234979600171
+NINTH,target,2042,Industry,17 Electricity,0.0
+NINTH,target,2042,Non-energy use,07.07 Gas/diesel oil,0.0014837608287843
+NINTH,target,2042,Non-energy use,07.12-07.17 Petroleum products,0.0375100805334053
+NINTH,target,2042,Non-energy use,08.01 Natural gas,3.054814642036293
+NINTH,target,2042,Transport,07.01 Motor gasoline,0.5462366300932195
+NINTH,target,2042,Transport,07.04-07.05 Petroleum products,0.0134586326881111
+NINTH,target,2042,Transport,07.07 Gas/diesel oil,0.3999368164731702
+NINTH,target,2042,Transport,17 Electricity,0.0
+NINTH,target,2043,Buildings,07.09 LPG,0.0641105097127
+NINTH,target,2043,Buildings,08.01 Natural gas,0.0314835239384151
+NINTH,target,2043,Buildings,17 Electricity,0.0
+NINTH,target,2043,Industry,07.06 Kerosene,0.0081513142474929
+NINTH,target,2043,Industry,07.07 Gas/diesel oil,0.3149834153197504
+NINTH,target,2043,Industry,08.99 Gas nonspecified,0.0440645596357229
+NINTH,target,2043,Industry,17 Electricity,0.0
+NINTH,target,2043,Non-energy use,07.07 Gas/diesel oil,0.0014851776351366
+NINTH,target,2043,Non-energy use,07.12-07.17 Petroleum products,0.0375458979773915
+NINTH,target,2043,Non-energy use,08.01 Natural gas,3.0665189126481502
+NINTH,target,2043,Transport,07.01 Motor gasoline,0.5078945242075239
+NINTH,target,2043,Transport,07.04-07.05 Petroleum products,0.0135059748728356
+NINTH,target,2043,Transport,07.07 Gas/diesel oil,0.3818792819464036
+NINTH,target,2043,Transport,17 Electricity,0.0
+NINTH,target,2044,Buildings,07.09 LPG,0.0646868257383
+NINTH,target,2044,Buildings,08.01 Natural gas,0.0311246536356779
+NINTH,target,2044,Buildings,17 Electricity,0.0
+NINTH,target,2044,Industry,07.06 Kerosene,0.0079557250075409
+NINTH,target,2044,Industry,07.07 Gas/diesel oil,0.3074254479872043
+NINTH,target,2044,Industry,08.99 Gas nonspecified,0.0463468108454152
+NINTH,target,2044,Industry,17 Electricity,0.0
+NINTH,target,2044,Non-energy use,07.07 Gas/diesel oil,0.0014864862437074
+NINTH,target,2044,Non-energy use,07.12-07.17 Petroleum products,0.0375789801372157
+NINTH,target,2044,Non-energy use,08.01 Natural gas,3.0782231832600075
+NINTH,target,2044,Transport,07.01 Motor gasoline,0.4697647226831594
+NINTH,target,2044,Transport,07.04-07.05 Petroleum products,0.013550726306269
+NINTH,target,2044,Transport,07.07 Gas/diesel oil,0.3634882733058985
+NINTH,target,2044,Transport,17 Electricity,0.0
+NINTH,target,2045,Buildings,07.09 LPG,0.0652259234909
+NINTH,target,2045,Buildings,08.01 Natural gas,0.0307699579087604
+NINTH,target,2045,Buildings,17 Electricity,0.0
+NINTH,target,2045,Industry,07.06 Kerosene,0.0077614968883848
+NINTH,target,2045,Industry,07.07 Gas/diesel oil,0.2999200771395858
+NINTH,target,2045,Industry,08.99 Gas nonspecified,0.0485676223107429
+NINTH,target,2045,Industry,17 Electricity,0.0
+NINTH,target,2045,Non-energy use,07.07 Gas/diesel oil,0.0014876533270698
+NINTH,target,2045,Non-energy use,07.12-07.17 Petroleum products,0.0376084844818922
+NINTH,target,2045,Non-energy use,08.01 Natural gas,3.089927453871865
+NINTH,target,2045,Transport,07.01 Motor gasoline,0.4321450154620277
+NINTH,target,2045,Transport,07.04-07.05 Petroleum products,0.0135921364541547
+NINTH,target,2045,Transport,07.07 Gas/diesel oil,0.3448789669783441
+NINTH,target,2045,Transport,17 Electricity,0.0
+NINTH,target,2046,Buildings,07.09 LPG,0.0657283470187
+NINTH,target,2046,Buildings,08.01 Natural gas,0.0304203808279761
+NINTH,target,2046,Buildings,17 Electricity,0.0
+NINTH,target,2046,Industry,07.06 Kerosene,0.0075687708271472
+NINTH,target,2046,Industry,07.07 Gas/diesel oil,0.2924727488748946
+NINTH,target,2046,Industry,08.99 Gas nonspecified,0.0507266734001401
+NINTH,target,2046,Industry,17 Electricity,0.0
+NINTH,target,2046,Non-energy use,07.07 Gas/diesel oil,0.001488681411928
+NINTH,target,2046,Non-energy use,07.12-07.17 Petroleum products,0.0376344748875426
+NINTH,target,2046,Non-energy use,08.01 Natural gas,3.1016317244837226
+NINTH,target,2046,Transport,07.01 Motor gasoline,0.3953214161187006
+NINTH,target,2046,Transport,07.04-07.05 Petroleum products,0.0136303339842815
+NINTH,target,2046,Transport,07.07 Gas/diesel oil,0.3262096076058745
+NINTH,target,2046,Transport,17 Electricity,0.0
+NINTH,target,2047,Buildings,07.09 LPG,0.0661936387204999
+NINTH,target,2047,Buildings,08.01 Natural gas,0.0300763292708573
+NINTH,target,2047,Buildings,17 Electricity,0.0
+NINTH,target,2047,Industry,07.06 Kerosene,0.0073776084977227
+NINTH,target,2047,Industry,07.07 Gas/diesel oil,0.2850858463982621
+NINTH,target,2047,Industry,08.99 Gas nonspecified,0.0528232586758086
+NINTH,target,2047,Industry,17 Electricity,0.0
+NINTH,target,2047,Non-energy use,07.07 Gas/diesel oil,0.0014895665002444
+NINTH,target,2047,Non-energy use,07.12-07.17 Petroleum products,0.037656850282136
+NINTH,target,2047,Non-energy use,08.01 Natural gas,3.11333599509558
+NINTH,target,2047,Transport,07.01 Motor gasoline,0.3593838101936251
+NINTH,target,2047,Transport,07.04-07.05 Petroleum products,0.0136652890933823
+NINTH,target,2047,Transport,07.07 Gas/diesel oil,0.3076087622459996
+NINTH,target,2047,Transport,17 Electricity,0.0
+NINTH,target,2048,Buildings,07.09 LPG,0.0666215072005
+NINTH,target,2048,Buildings,08.01 Natural gas,0.0297382407443487
+NINTH,target,2048,Buildings,17 Electricity,0.0
+NINTH,target,2048,Industry,07.06 Kerosene,0.0071880784548648
+NINTH,target,2048,Industry,07.07 Gas/diesel oil,0.2777620188052507
+NINTH,target,2048,Industry,08.99 Gas nonspecified,0.0548567721914211
+NINTH,target,2048,Industry,17 Electricity,0.0
+NINTH,target,2048,Non-energy use,07.07 Gas/diesel oil,0.0014903054249708
+NINTH,target,2048,Non-energy use,07.12-07.17 Petroleum products,0.0376755306014024
+NINTH,target,2048,Non-energy use,08.01 Natural gas,3.119188130401509
+NINTH,target,2048,Transport,07.01 Motor gasoline,0.3244710733975449
+NINTH,target,2048,Transport,07.04-07.05 Petroleum products,0.0136969928291115
+NINTH,target,2048,Transport,07.07 Gas/diesel oil,0.2892046147245065
+NINTH,target,2048,Transport,17 Electricity,0.0
+NINTH,target,2049,Buildings,07.09 LPG,0.0670135784195
+NINTH,target,2049,Buildings,08.01 Natural gas,0.0294073468762204
+NINTH,target,2049,Buildings,17 Electricity,0.0
+NINTH,target,2049,Industry,07.06 Kerosene,0.007000364806079
+NINTH,target,2049,Industry,07.07 Gas/diesel oil,0.2705083803855506
+NINTH,target,2049,Industry,08.99 Gas nonspecified,0.0568276100028862
+NINTH,target,2049,Industry,17 Electricity,0.0
+NINTH,target,2049,Non-energy use,07.07 Gas/diesel oil,0.0014909068908737
+NINTH,target,2049,Non-energy use,07.12-07.17 Petroleum products,0.0376907359053947
+NINTH,target,2049,Non-energy use,08.01 Natural gas,3.130892401013366
+NINTH,target,2049,Transport,07.01 Motor gasoline,0.29073261817265
+NINTH,target,2049,Transport,07.04-07.05 Petroleum products,0.0137257164980848
+NINTH,target,2049,Transport,07.07 Gas/diesel oil,0.2710989294384726
+NINTH,target,2049,Transport,17 Electricity,0.0
+NINTH,target,2050,Buildings,07.09 LPG,0.0673635814364
+NINTH,target,2050,Buildings,08.01 Natural gas,0.0290813697581496
+NINTH,target,2050,Buildings,17 Electricity,0.0
+NINTH,target,2050,Industry,07.06 Kerosene,0.0068141552450793
+NINTH,target,2050,Industry,07.07 Gas/diesel oil,0.2633128629870005
+NINTH,target,2050,Industry,08.99 Gas nonspecified,0.0587321901826032
+NINTH,target,2050,Industry,17 Electricity,0.0
+NINTH,target,2050,Non-energy use,07.07 Gas/diesel oil,0.0014913299210439
+NINTH,target,2050,Non-energy use,07.12-07.17 Petroleum products,0.037701430281096
+NINTH,target,2050,Non-energy use,08.01 Natural gas,3.130892401013366
+NINTH,target,2050,Transport,07.01 Motor gasoline,0.258309546382634
+NINTH,target,2050,Transport,07.04-07.05 Petroleum products,0.0137505584920628
+NINTH,target,2050,Transport,07.07 Gas/diesel oil,0.2534313085952452
+NINTH,target,2050,Transport,17 Electricity,0.0
+NINTH,target,2051,Buildings,07.09 LPG,0.0676762907127
+NINTH,target,2051,Buildings,08.01 Natural gas,0.0287628468630998
+NINTH,target,2051,Buildings,17 Electricity,0.0
+NINTH,target,2051,Industry,07.06 Kerosene,0.0066298222764796
+NINTH,target,2051,Industry,07.07 Gas/diesel oil,0.2561898609479834
+NINTH,target,2051,Industry,08.99 Gas nonspecified,0.0605724849571964
+NINTH,target,2051,Industry,17 Electricity,0.0
+NINTH,target,2051,Non-energy use,07.07 Gas/diesel oil,0.0014916021729447
+NINTH,target,2051,Non-energy use,07.12-07.17 Petroleum products,0.0377083129204849
+NINTH,target,2051,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,target,2051,Transport,07.01 Motor gasoline,0.2275003189694075
+NINTH,target,2051,Transport,07.04-07.05 Petroleum products,0.0137722450265655
+NINTH,target,2051,Transport,07.07 Gas/diesel oil,0.2363944535828511
+NINTH,target,2051,Transport,17 Electricity,0.0
+NINTH,target,2052,Buildings,07.09 LPG,0.0679478842183
+NINTH,target,2052,Buildings,08.01 Natural gas,0.0284505356242252
+NINTH,target,2052,Buildings,17 Electricity,0.0
+NINTH,target,2052,Industry,07.06 Kerosene,0.0064472128477397
+NINTH,target,2052,Industry,07.07 Gas/diesel oil,0.2491334600060403
+NINTH,target,2052,Industry,08.99 Gas nonspecified,0.062346087626737
+NINTH,target,2052,Industry,17 Electricity,0.0
+NINTH,target,2052,Non-energy use,07.07 Gas/diesel oil,0.0014916976677913
+NINTH,target,2052,Non-energy use,07.12-07.17 Petroleum products,0.0377107270692611
+NINTH,target,2052,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,target,2052,Transport,07.01 Motor gasoline,0.1985108484332929
+NINTH,target,2052,Transport,07.04-07.05 Petroleum products,0.0137902356563199
+NINTH,target,2052,Transport,07.07 Gas/diesel oil,0.2200698677349972
+NINTH,target,2052,Transport,17 Electricity,0.0
+NINTH,target,2053,Buildings,07.09 LPG,0.0681825947643
+NINTH,target,2053,Buildings,08.01 Natural gas,0.0281465628223051
+NINTH,target,2053,Buildings,17 Electricity,0.0
+NINTH,target,2053,Industry,07.06 Kerosene,0.0062666365799339
+NINTH,target,2053,Industry,07.07 Gas/diesel oil,0.242155624551265
+NINTH,target,2053,Industry,08.99 Gas nonspecified,0.0640549225712648
+NINTH,target,2053,Industry,17 Electricity,0.0
+NINTH,target,2053,Non-energy use,07.07 Gas/diesel oil,0.0014916403454948
+NINTH,target,2053,Non-energy use,07.12-07.17 Petroleum products,0.0377092779381625
+NINTH,target,2053,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,target,2053,Transport,07.01 Motor gasoline,0.1714949107150094
+NINTH,target,2053,Transport,07.04-07.05 Petroleum products,0.0138051587108606
+NINTH,target,2053,Transport,07.07 Gas/diesel oil,0.2045236782175348
+NINTH,target,2053,Transport,17 Electricity,0.0
+NINTH,target,2054,Buildings,07.09 LPG,0.0683774711637
+NINTH,target,2054,Buildings,08.01 Natural gas,0.0278499824796996
+NINTH,target,2054,Buildings,17 Electricity,0.0
+NINTH,target,2054,Industry,07.06 Kerosene,0.0060879894600069
+NINTH,target,2054,Industry,07.07 Gas/diesel oil,0.2352523353069625
+NINTH,target,2054,Industry,08.99 Gas nonspecified,0.0656970735544848
+NINTH,target,2054,Industry,17 Electricity,0.0
+NINTH,target,2054,Non-energy use,07.07 Gas/diesel oil,0.0014914094604848
+NINTH,target,2054,Non-energy use,07.12-07.17 Petroleum products,0.0377034410706886
+NINTH,target,2054,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,target,2054,Transport,07.01 Motor gasoline,0.1465511029829629
+NINTH,target,2054,Transport,07.04-07.05 Petroleum products,0.0138165968038999
+NINTH,target,2054,Transport,07.07 Gas/diesel oil,0.1897905688627957
+NINTH,target,2054,Transport,17 Electricity,0.0
+NINTH,target,2055,Buildings,07.09 LPG,0.0685349384126
+NINTH,target,2055,Buildings,08.01 Natural gas,0.0275620298705373
+NINTH,target,2055,Buildings,17 Electricity,0.0
+NINTH,target,2055,Industry,07.06 Kerosene,0.0059114585032208
+NINTH,target,2055,Industry,07.07 Gas/diesel oil,0.2284308189244688
+NINTH,target,2055,Industry,08.99 Gas nonspecified,0.0672736375663511
+NINTH,target,2055,Industry,17 Electricity,0.0
+NINTH,target,2055,Non-energy use,07.07 Gas/diesel oil,0.0014910174415218
+NINTH,target,2055,Non-energy use,07.12-07.17 Petroleum products,0.0376935306709884
+NINTH,target,2055,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,target,2055,Transport,07.01 Motor gasoline,0.1236937395206955
+NINTH,target,2055,Transport,07.04-07.05 Petroleum products,0.0138249030365525
+NINTH,target,2055,Transport,07.07 Gas/diesel oil,0.1759017296099156
+NINTH,target,2055,Transport,17 Electricity,0.0
+NINTH,target,2056,Buildings,07.09 LPG,0.0686537476358
+NINTH,target,2056,Buildings,08.01 Natural gas,0.0272823874811229
+NINTH,target,2056,Buildings,17 Electricity,0.0
+NINTH,target,2056,Industry,07.06 Kerosene,0.0057370291010942
+NINTH,target,2056,Industry,07.07 Gas/diesel oil,0.2216905109022458
+NINTH,target,2056,Industry,08.99 Gas nonspecified,0.0687836790048576
+NINTH,target,2056,Industry,17 Electricity,0.0
+NINTH,target,2056,Non-energy use,07.07 Gas/diesel oil,0.0014904538647019
+NINTH,target,2056,Non-energy use,07.12-07.17 Petroleum products,0.037679283218509
+NINTH,target,2056,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,target,2056,Transport,07.01 Motor gasoline,0.102981652827676
+NINTH,target,2056,Transport,07.04-07.05 Petroleum products,0.0138298999023041
+NINTH,target,2056,Transport,07.07 Gas/diesel oil,0.1628742251281357
+NINTH,target,2056,Transport,17 Electricity,0.0
+NINTH,target,2057,Buildings,07.09 LPG,0.0687362836978
+NINTH,target,2057,Buildings,08.01 Natural gas,0.0270121476483244
+NINTH,target,2057,Buildings,17 Electricity,0.0
+NINTH,target,2057,Industry,07.06 Kerosene,0.005564866324386
+NINTH,target,2057,Industry,07.07 Gas/diesel oil,0.2150377899112531
+NINTH,target,2057,Industry,08.99 Gas nonspecified,0.070228439721317
+NINTH,target,2057,Industry,17 Electricity,0.0
+NINTH,target,2057,Non-energy use,07.07 Gas/diesel oil,0.0014897307699454
+NINTH,target,2057,Non-energy use,07.12-07.17 Petroleum products,0.0376610030873568
+NINTH,target,2057,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,target,2057,Transport,07.01 Motor gasoline,0.0844659875379766
+NINTH,target,2057,Transport,07.04-07.05 Petroleum products,0.0138319230233867
+NINTH,target,2057,Transport,07.07 Gas/diesel oil,0.1507028392245322
+NINTH,target,2057,Transport,17 Electricity,0.0
+NINTH,target,2058,Buildings,07.09 LPG,0.0687822009999
+NINTH,target,2058,Buildings,08.01 Natural gas,0.0267512606694679
+NINTH,target,2058,Buildings,17 Electricity,0.0
+NINTH,target,2058,Industry,07.06 Kerosene,0.0053949910609202
+NINTH,target,2058,Industry,07.07 Gas/diesel oil,0.2084734630996281
+NINTH,target,2058,Industry,08.99 Gas nonspecified,0.0716076190420046
+NINTH,target,2058,Industry,17 Electricity,0.0
+NINTH,target,2058,Non-energy use,07.07 Gas/diesel oil,0.0014888432706619
+NINTH,target,2058,Non-energy use,07.12-07.17 Petroleum products,0.0376385667425261
+NINTH,target,2058,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,target,2058,Transport,07.01 Motor gasoline,0.0681538427069365
+NINTH,target,2058,Transport,07.04-07.05 Petroleum products,0.0138309166215153
+NINTH,target,2058,Transport,07.07 Gas/diesel oil,0.139360917620236
+NINTH,target,2058,Transport,17 Electricity,0.0
+NINTH,target,2059,Buildings,07.09 LPG,0.0687955198954999
+NINTH,target,2059,Buildings,08.01 Natural gas,0.0265013282496815
+NINTH,target,2059,Buildings,17 Electricity,0.0
+NINTH,target,2059,Industry,07.06 Kerosene,0.0052276221208628
+NINTH,target,2059,Industry,07.07 Gas/diesel oil,0.2020059857386679
+NINTH,target,2059,Industry,08.99 Gas nonspecified,0.0729236918528559
+NINTH,target,2059,Industry,17 Electricity,0.0
+NINTH,target,2059,Non-energy use,07.07 Gas/diesel oil,0.0014878137057528
+NINTH,target,2059,Non-energy use,07.12-07.17 Petroleum products,0.0376125389205866
+NINTH,target,2059,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,target,2059,Transport,07.01 Motor gasoline,0.0540021813039726
+NINTH,target,2059,Transport,07.04-07.05 Petroleum products,0.01382743573318
+NINTH,target,2059,Transport,07.07 Gas/diesel oil,0.12883361039791
+NINTH,target,2059,Transport,17 Electricity,0.0
+NINTH,target,2060,Buildings,07.09 LPG,0.0687765396048
+NINTH,target,2060,Buildings,08.01 Natural gas,0.0262624413796387
+NINTH,target,2060,Buildings,17 Electricity,0.0
+NINTH,target,2060,Industry,07.06 Kerosene,0.0050627917319591
+NINTH,target,2060,Industry,07.07 Gas/diesel oil,0.1956366031742135
+NINTH,target,2060,Industry,08.99 Gas nonspecified,0.0741769708371483
+NINTH,target,2060,Industry,17 Electricity,0.0
+NINTH,target,2060,Non-energy use,07.07 Gas/diesel oil,0.0014866415162075
+NINTH,target,2060,Non-energy use,07.12-07.17 Petroleum products,0.0375829054895163
+NINTH,target,2060,Non-energy use,08.01 Natural gas,3.142596671625223
+NINTH,target,2060,Transport,07.01 Motor gasoline,0.0419213692232884
+NINTH,target,2060,Transport,07.04-07.05 Petroleum products,0.0138215084804219
+NINTH,target,2060,Transport,07.07 Gas/diesel oil,0.1190807717833645
+NINTH,target,2060,Transport,17 Electricity,0.0

@@ -117,6 +117,12 @@ def write_economy_comparison_fixture(
         source_path,
         output_contract_path=output_contract_path,
     )
+    # Fixtures represent legacy-shaped raw input data that other tests feed
+    # back into load_common_esto_data themselves (which adds measure/unit
+    # fresh at that point) - writing those derived columns into the fixture
+    # file would change its schema for no reason and is not what "the latest
+    # common ESTO dashboard inputs" means.
+    source = source.drop(columns=[c for c in ("measure", "unit") if c in source.columns])
     full_fixture = filter_common_esto_data(
         source,
         comparison_scope=ALL_SCOPES,

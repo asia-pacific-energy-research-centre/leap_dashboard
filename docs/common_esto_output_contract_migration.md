@@ -16,6 +16,29 @@ The legacy long and wide CSV adapters remain the production default. Set
 `COMMON_ESTO_OUTPUT_CONTRACT_PATH` to an alternate manifest. A selected invalid
 contract fails without falling back to legacy data.
 
+```mermaid
+flowchart TD
+    START["Dashboard input loading"]
+    OPTIN{"COMMON_ESTO_USE_OUTPUT_CONTRACT enabled?"}
+    LEGACY["Load explicit legacy long or wide CSV"]
+    MANIFEST["Read the selected v1 manifest"]
+    VALIDATE["Validate version, members, hashes, schemas, keys, numeric values, and membership"]
+    VALID{"Contract valid?"}
+    NORMALIZE["Reconstruct the normalized comparison frame"]
+    STOP["Stop with a contract error; do not fall back"]
+    RENDER["Continue through shared filtering and rendering"]
+
+    START --> OPTIN
+    OPTIN -- "No: current production default" --> LEGACY --> NORMALIZE
+    OPTIN -- "Yes" --> MANIFEST --> VALIDATE --> VALID
+    VALID -- "Yes" --> NORMALIZE --> RENDER
+    VALID -- "No" --> STOP
+```
+
+Both routes converge on the same normalized frame. The strict stop is
+intentional: silent fallback would make a run appear contract-backed when it
+actually consumed an unrelated legacy file.
+
 The producer and consumer implementations are integrated on the local
 `master` branches. The recorded `20USA`/`02BD` legacy-versus-contract
 equivalence run passed. Existing mapping result files predate contract

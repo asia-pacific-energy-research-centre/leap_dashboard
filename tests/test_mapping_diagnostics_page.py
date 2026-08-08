@@ -3,16 +3,123 @@ from pathlib import Path
 import pandas as pd
 
 from codebase.common_esto_dashboard_mapping_diagnostics import (
+    _aggregate_stage_validation_to_apec,
+    _anchor_value_summary,
+    _context_value_formatter,
     _mapping_cardinality_diagnostics,
     _mapped_target_structure_html,
     _paired_anchor_aggregate_summary,
+    _reviewed_anchor_exceptions,
     _rollup_boundary_details_html,
     _rollup_graph_data,
     _transformation_rollup_diagram_html,
+    _exception_candidate_controls_html,
     load_esto_exact_values_for_economy,
     prefer_compressed_csv_path,
     write_mapping_diagnostics_page,
 )
+
+
+def test_stage_validation_is_recalculated_on_apec_sum() -> None:
+    detail = pd.DataFrame([
+        {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2030, "other_axis_value": "Gas", "parent_code": "09_total", "parent_value": 4.0, "children_sum": 3.0},
+        {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "20USA", "scenario": "reference", "year": 2030, "other_axis_value": "Gas", "parent_code": "09_total", "parent_value": 6.0, "children_sum": 5.0},
+    ])
+
+    result = _aggregate_stage_validation_to_apec(detail)
+
+    assert result.iloc[0]["economy"] == "00APEC"
+    assert result.iloc[0]["parent_value"] == 10.0
+    assert result.iloc[0]["children_sum"] == 8.0
+    assert result.iloc[0]["status"] == "failed"
+    assert result.iloc[0]["related_economy_count"] == 2
+
+
+def test_exception_controls_offer_all_and_related_economies() -> None:
+    apec = pd.DataFrame([{
+        "status": "failed", "source_system": "NINTH", "validation_axis": "flow",
+        "comparison_scope": "esto_leap_ninth", "economy": "00APEC",
+        "scenario": "reference", "year": 2030, "other_axis_value": "Gas",
+        "parent_code": "09_total", "parent_value": 10.0,
+        "source_non_additivity_observed": True,
+    }])
+    examples = pd.DataFrame([
+        {**apec.iloc[0].to_dict(), "economy": "01AUS"},
+        {**apec.iloc[0].to_dict(), "economy": "20USA"},
+    ])
+
+    html = _exception_candidate_controls_html(apec, examples)
+
+    assert '<option value="all">all</option>' in html
+    assert '<option value="01AUS">01AUS</option>' in html
+    assert '<option value="20USA">20USA</option>' in html
+    assert "source_mismatch_allowed" in html
+
+
+def test_anchor_review_split_keeps_confirmed_failures_and_filters_economy() -> None:
+    anchor = pd.DataFrame([
+        {
+            "status": "failed", "source_system": "NINTH", "validation_axis": "flow",
+            "economy": "20USA", "scenario": "reference", "year": 2030,
+            "other_axis_value": "Gas", "parent_code": "09_total",
+            "parent_value": 10.0, "frontier_sum": 7.0, "difference": 3.0,
+            "abs_error": 3.0, "reason": "difference_exceeds_tolerance",
+            "known_data_quality_exception": True,
+            "exception_review_status": "confirmed", "exception_id": "SRC-001",
+            "source_non_additivity_observed": True,
+        },
+        {
+            "status": "failed", "source_system": "LEAP", "validation_axis": "flow",
+            "economy": "20_USA", "scenario": "reference", "year": 2030,
+            "other_axis_value": "Coal", "parent_code": "Oil Refining",
+            "parent_value": 4.0, "frontier_sum": 0.0, "difference": 4.0,
+            "abs_error": 4.0, "reason": "frontier_rows_absent",
+            "known_data_quality_exception": False,
+            "exception_review_status": "",
+            "source_non_additivity_observed": False,
+        },
+        {
+            "status": "failed", "source_system": "NINTH", "validation_axis": "flow",
+            "economy": "01AUS", "scenario": "reference", "year": 2030,
+            "other_axis_value": "Gas", "parent_code": "other_economy_parent",
+            "parent_value": 99.0, "frontier_sum": 0.0, "difference": 99.0,
+            "abs_error": 99.0, "reason": "difference_exceeds_tolerance",
+            "known_data_quality_exception": True,
+            "exception_review_status": "confirmed", "exception_id": "SRC-002",
+            "source_non_additivity_observed": True,
+        },
+    ])
+
+    summary = _anchor_value_summary(anchor, "20_USA")
+    reviewed = _reviewed_anchor_exceptions(anchor, "20USA")
+
+    assert int(summary["failed_checks"].sum()) == 2
+    assert int(summary["confirmed_issue_failed"].sum()) == 1
+    assert int(summary["unconfirmed_failed"].sum()) == 1
+    assert int(summary["source_non_additivity_observed"].sum()) == 1
+    assert reviewed["exception_id"].tolist() == ["SRC-001"]
+    assert reviewed["status"].tolist() == ["failed"]
+
+
+def test_legacy_anchor_flag_is_not_relabelled_as_an_explicit_confirmation() -> None:
+    legacy = pd.DataFrame([
+        {
+            "status": "skipped",
+            "known_data_quality_exception": True,
+            "economy": "20USA",
+        },
+    ])
+
+    assert _reviewed_anchor_exceptions(legacy, "20USA").empty
+
+
+def test_context_value_formatter_uses_at_most_two_decimal_places() -> None:
+    scale_label, format_value = _context_value_formatter([12_345.6789, 1_234.5678])
+
+    assert scale_label.startswith("Values in thousands")
+    assert format_value(12_345.6789) == "12.35"
+    assert format_value(1_234.5678) == "1.23"
+    assert format_value(0) == "0"
 
 
 def test_exact_value_loader_prefers_gzip_and_keeps_plain_csv_fallback(tmp_path: Path) -> None:
@@ -101,10 +208,12 @@ def test_transformation_rollup_diagram_keeps_boundary_modes_distinct() -> None:
 
 def test_rollup_graph_data_includes_every_flow_root_and_mode() -> None:
     tree = pd.DataFrame([
-        {"axis": "flow", "code": "09 Total transformation sector", "parent_code": ""},
-        {"axis": "flow", "code": "09.06 Gas processing plants", "parent_code": "09 Total transformation sector"},
-        {"axis": "flow", "code": "14 Industry sector", "parent_code": ""},
-        {"axis": "flow", "code": "14.03 Manufacturing", "parent_code": "14 Industry sector"},
+        {"axis": "flow", "code": "09 Total transformation sector", "label": "09 Total transformation sector", "level": 1, "parent_code": ""},
+        {"axis": "flow", "code": "09.06 Gas processing plants", "label": "09.06 Gas processing plants", "level": 2, "parent_code": "09 Total transformation sector"},
+        {"axis": "flow", "code": "14 Industry sector", "label": "14 Industry sector", "level": 1, "parent_code": ""},
+        {"axis": "flow", "code": "14.03 Manufacturing", "label": "14.03 Manufacturing", "level": 2, "parent_code": "14 Industry sector"},
+        {"axis": "flow", "code": "10.01.06 Coal mines", "label": "10.01.06 Coal mines", "level": 3, "parent_code": ""},
+        {"axis": "flow", "code": "09.06 inclusive", "label": "09.06 inclusive", "level": 0, "parent_code": ""},
     ])
     rollups = pd.DataFrame([
         {"source_system": "ESTO", "rollup_mode": "NON_EXPANDING", "rollup_id": "gas", "rolled_flow_label": "09.06 inclusive", "input_flow": "09.06 Gas processing plants"},
@@ -112,14 +221,31 @@ def test_rollup_graph_data_includes_every_flow_root_and_mode() -> None:
         {"source_system": "ESTO", "rollup_mode": "DETACHED", "rollup_id": "coal", "rolled_flow_label": "09.08 inclusive", "input_flow": "09.08 Coal transformation"},
     ])
 
-    graph = _rollup_graph_data(tree, rollups)
+    validation = pd.DataFrame([
+        {
+            "validation_axis": "flow", "source_system": "ESTO", "economy": "20USA",
+            "parent_code": "14 Industry sector", "status": "failed",
+            "reason": "difference_exceeds_tolerance",
+        },
+    ])
+    graph = _rollup_graph_data(tree, rollups, validation=validation, economy="20_USA")
 
     assert {sector["root"] for sector in graph["sectors"]} == {"09 Total transformation sector", "14 Industry sector"}
     assert {node["code"] for node in graph["nodes"]} == {
         "09 Total transformation sector", "09.06 Gas processing plants",
-        "14 Industry sector", "14.03 Manufacturing",
+        "14 Industry sector", "14.03 Manufacturing", "10.01.06 Coal mines",
+        "09.06 inclusive",
     }
     assert {boundary["mode"] for boundary in graph["all_boundaries"]} == {"NON_EXPANDING", "EXPANDING", "DETACHED"}
+    industry = next(node for node in graph["nodes"] if node["code"] == "14 Industry sector")
+    assert industry["validation"]["ESTO"]["failed"] == 1
+    assert industry["validation"]["ESTO"]["reasons"] == ["difference_exceeds_tolerance"]
+    assert all("id" in boundary for boundary in graph["all_boundaries"])
+    node_by_code = {node["code"]: node for node in graph["nodes"]}
+    assert node_by_code["14.03 Manufacturing"]["flow_code"] == "14.03"
+    assert node_by_code["14.03 Manufacturing"]["flow_label"] == "Manufacturing"
+    assert node_by_code["09.06 inclusive"]["is_ordinary_hierarchy"] is False
+    assert node_by_code["10.01.06 Coal mines"]["structural_flags"] == ["ORPHANED_HIERARCHY_ROW"]
 
 
 def test_rollup_boundary_details_show_parent_children_components_and_mode_meaning() -> None:
@@ -172,14 +298,15 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     pd.DataFrame([
         {"axis": "flow", "code": "09 Total", "label": "09 Total", "level": 1, "parent_code": ""},
         {"axis": "flow", "code": "09.00 Total", "label": "09.00 Total", "level": 2, "parent_code": "09 Total"},
-        {"axis": "flow", "code": "09 Extra", "label": "09 Extra", "level": 1, "parent_code": ""},
+        {"axis": "flow", "code": "09 Extra", "label": "09 Extra", "level": 3, "parent_code": ""},
     ]).to_csv(tree_root / "common_esto_tree.csv", index=False)
     pd.DataFrame([
         {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "parent_code": "09_total"},
     ]).to_csv(tree_root / "common_esto_validation.csv", index=False)
     pd.DataFrame([
-        {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "reason": "difference_exceeds_tolerance", "parent_code": "09_total", "parent_value": 10.0, "frontier_sum": 7.0, "difference": 3.0, "abs_error": 3.0},
-        {"status": "failed", "source_system": "LEAP", "validation_axis": "flow", "reason": "frontier_rows_absent", "parent_code": "Oil Refining", "parent_value": 4.0, "frontier_sum": 0.0, "difference": 4.0, "abs_error": 4.0},
+        {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "difference_exceeds_tolerance", "parent_code": "09_total", "parent_value": 10.0, "frontier_sum": 7.0, "difference": 3.0, "abs_error": 3.0, "known_data_quality_exception": True, "exception_review_status": "confirmed", "exception_id": "SRC-001", "exception_issue_class": "confirmed_source_non_additivity", "source_non_additivity_observed": True, "data_quality_exception_notes": "Reviewed source total."},
+        {"status": "failed", "source_system": "LEAP", "validation_axis": "flow", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "frontier_rows_absent", "parent_code": "Oil Refining", "parent_value": 4.0, "frontier_sum": 0.0, "difference": 4.0, "abs_error": 4.0, "known_data_quality_exception": False, "exception_review_status": "", "exception_id": "", "exception_issue_class": "", "source_non_additivity_observed": False, "data_quality_exception_notes": ""},
+        {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "economy": "20USA", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "difference_exceeds_tolerance", "parent_code": "other_economy_parent", "parent_value": 999.0, "frontier_sum": 0.0, "difference": 999.0, "abs_error": 999.0, "known_data_quality_exception": True, "exception_review_status": "confirmed", "exception_id": "SRC-OTHER", "exception_issue_class": "confirmed_source_non_additivity", "source_non_additivity_observed": True, "data_quality_exception_notes": "Must not leak."},
     ]).to_csv(tree_root / "source_parent_anchor_validation.csv", index=False)
     pd.DataFrame([
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "parent_code": "09_total", "child_code": "09_child", "raw_child_total": 7.0},
@@ -231,7 +358,10 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Raw source contradiction" in html
     assert "09_total" in html
     assert "absolute mismatch total" in html
-    assert "Largest summed anchor mismatches" in html
+    assert "Hierarchy validation: failures and reviewed exceptions" in html
+    assert "Final output hierarchy" in html
+    assert "Source / mapping anchor" in html
+    assert "A failure means the difference exceeded tolerance" in html
     assert "09 Child" in html
     assert ">7<" in html
     assert "NINTH flow tree: original vs mapped representation" in html
@@ -254,21 +384,51 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "optional-zero" in html
     assert "onchange=\"document.body.classList.toggle('show-zero-children', this.checked)\"" in html
     assert "Missing source mapping" not in html
-    assert "Reviewed source-hierarchy exceptions" in html
-    assert "Leaf-reconciliation candidates awaiting review" in html
+    assert "Confirmed source issues attached to anchor evidence" in html
+    assert "Confirmed source issues among failed anchor rows" in html
+    assert "Unconfirmed failed anchor rows" in html
+    assert "SRC-001" in html
+    assert "other_economy_parent" not in html
+    assert "SRC-OTHER" not in html
+    assert "skipped from actionable failures" not in html
+    assert "Exception candidates awaiting review" in html
     assert "direct_children_incomplete_but_leaves_reconcile" in html
     assert "Direct mapping coverage review" in html
     assert "Dataset<select id=\"rollup-source\"" in html
     assert "ROLLUP_VALUES=" in html
     assert "ESTO_RAW" in html
     assert "ESTO_EXTENDED_RAW" in html
-    assert 'id="include-esto-extended"' in html
-    assert "Include ESTO Extended" in html
+    assert 'id="rollup-basis"' in html
+    assert "Original ESTO only" in html
+    assert "ESTO + ESTO Extended" in html
+    assert "Compare ESTO vs Extended" in html
+    assert "rowsForSource(rawSource).forEach(row => result.add(row.common_flow_label))" in html
+    assert "const codeAvailableForBasis = code =>" in html
+    assert "descendant !== code && estoRows.has(descendant)" in html
+    assert "boundary.inputs.every(input => codeAvailableForBasis(input))" in html
+    assert 'id="rollup-sector"' in html
+    assert 'id="rollup-mode"' not in html
+    assert 'id="show-special-rollups"' in html
+    assert "Show NON_EXPANDING and DETACHED rollups" in html
+    assert "boundary.mode === 'EXPANDING' || showSpecialRollups.checked" in html
+    assert "const specialBoundaries = filteredBoundaries.filter" in html
+    assert 'class="edge rollup${detachedClass}"' in html
+    assert "belongsToMajor(boundary.label)" in html
+    assert 'id="rollup-status"' in html
+    assert 'id="rollup-search"' in html
+    assert 'id="rollup-summary-table"' not in html
+    assert "Rows in the current graph" not in html
+    assert "EXPANDING rollups appear in the hierarchy view by default" in html
+    assert "Rollup display child" in html
+    assert "REGISTERED ROLLUP COMPOSITION" not in html
+    assert "Normal hierarchy child" in html
+    assert "Registered rollup composition target" in html
+    assert "Registered rollup input" in html
+    assert "ORPHANED_HIERARCHY_ROW" in html
+    assert "intentional DETACHED" in html
     assert "value-pass" in html
-    assert '<details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2>' in html
     assert '<details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2>' in html
-    assert '<details class="panel collapsed-panel"><summary><h2>Largest summed anchor mismatches</h2>' in html
-    assert '<details class="panel collapsed-panel"><summary><h2>Reviewed source-hierarchy exceptions</h2>' in html
+    assert '<details class="panel collapsed-panel"><summary><h2>Hierarchy validation: failures and reviewed exceptions</h2>' in html
     assert Path(result["summary"]).exists()
 
 

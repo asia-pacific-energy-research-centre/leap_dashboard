@@ -16,6 +16,8 @@ import pandas as pd
 # Stable paths.
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MODULE_ROOT = REPO_ROOT / "codebase"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 if str(MODULE_ROOT) not in sys.path:
     sys.path.insert(0, str(MODULE_ROOT))
 
@@ -31,6 +33,11 @@ from common_esto_dashboard_data import (  # noqa: E402
 )
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
 from common_esto_dashboard_output_layout import build_output_layout  # noqa: E402
+from common_esto_dashboard_mapping_diagnostics import (  # noqa: E402
+    load_esto_exact_values_for_economy,
+    write_mapping_diagnostics_page,
+)
+from mapping_pipeline_provenance import selected_run_metadata  # noqa: E402
 
 # The workflow module runs its full render (plus upstream data refresh and docs
 # publish) at import time unless this env override is set first.
@@ -50,7 +57,10 @@ def _resolve(path: str | Path) -> Path:
 #%%
 # User-tuned constants.
 LEAP_MAPPINGS_ROOT = _resolve(
-    os.getenv("COMMON_ESTO_MAPPINGS_ROOT", REPO_ROOT.parent / "leap_mappings")
+    os.getenv(
+        "COMMON_ESTO_MAPPINGS_ROOT",
+        os.getenv("LEAP_MAPPINGS_ROOT", REPO_ROOT.parent / "leap_mappings"),
+    )
 )
 INPUT_DATA_PATH = _resolve(
     os.getenv(
@@ -69,6 +79,15 @@ COMMON_ROWS_PATH = _resolve(
         "COMMON_ESTO_COMMON_ROWS_PATH",
         LEAP_MAPPINGS_ROOT / "results" / "common_esto" / "common_esto_rows.csv",
     )
+)
+ESTO_EXACT_ROWS_PATH = _resolve(
+    LEAP_MAPPINGS_ROOT / "results" / "mapping_relationships" / "esto_results_exact_rows.csv.gz"
+)
+ESTO_EXTENDED_EXACT_ROWS_PATH = _resolve(
+    LEAP_MAPPINGS_ROOT
+    / "results"
+    / "mapping_relationships"
+    / "esto_extended_results_exact_rows.csv.gz"
 )
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
@@ -130,12 +149,17 @@ def _metadata_path(economy: str) -> Path:
     return OUTPUT_ROOT / economy / "supporting_files" / "dashboard_metadata.json"
 
 
-def _write_dashboard_metadata(layout: dict[str, Path], updated_label: str) -> None:
+def _write_dashboard_metadata(
+    layout: dict[str, Path],
+    updated_label: str,
+    mapping_metadata: dict[str, object],
+) -> None:
     """Write lightweight render metadata for summary scripts and manual inspection."""
     metadata = {
         "economy": layout["root"].name,
         "dashboard_updated_label": updated_label,
         "rendered_at_local": datetime.now().astimezone().isoformat(timespec="seconds"),
+        **mapping_metadata,
     }
     (layout["supporting"] / "dashboard_metadata.json").write_text(
         json.dumps(metadata, indent=2),
@@ -160,6 +184,7 @@ def _render_one_economy(
     template: dict,
     series_config: dict,
     economy: str,
+    mapping_metadata: dict[str, object],
 ) -> dict[str, object]:
     """Render one economy dashboard and return a summary row."""
     result: dict[str, object] = {
@@ -205,8 +230,19 @@ def _render_one_economy(
             layout,
             scope_df=scope_visible_df,
             dashboard_updated_label=dashboard_updated_label,
+            additional_pages=[
+                {
+                    "page_key": "mapping_diagnostics",
+                    "page_label": "Mapping diagnostics",
+                    "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
+                },
+            ],
         )
-        _write_dashboard_metadata(layout, dashboard_updated_label)
+        _write_dashboard_metadata(
+            layout,
+            dashboard_updated_label,
+            mapping_metadata,
+        )
 
         result.update({
             "status": "ok",
@@ -257,6 +293,36 @@ def _write_summary(summary_rows: list[dict[str, object]]) -> pd.DataFrame:
     return summary_df
 
 
+def _render_shared_mapping_diagnostics(raw_df: pd.DataFrame) -> dict[str, str]:
+    """Render one APEC-first diagnostics page for every economy dashboard."""
+    scoped = raw_df.copy()
+    if MIN_YEAR is not None:
+        scoped = scoped[scoped["year"] >= MIN_YEAR]
+    if MAX_YEAR is not None:
+        scoped = scoped[scoped["year"] <= MAX_YEAR]
+    layout = build_output_layout(
+        OUTPUT_ROOT, "diagnostics", clear_existing=CLEAR_EXISTING_OUTPUTS
+    )
+    exact = load_esto_exact_values_for_economy(
+        ESTO_EXACT_ROWS_PATH, "", min_year=MIN_YEAR, max_year=MAX_YEAR
+    )
+    extended = load_esto_exact_values_for_economy(
+        ESTO_EXTENDED_EXACT_ROWS_PATH,
+        "",
+        min_year=MIN_YEAR,
+        max_year=MAX_YEAR,
+        source_system="ESTO_EXTENDED_RAW",
+    )
+    return write_mapping_diagnostics_page(
+        layout,
+        LEAP_MAPPINGS_ROOT,
+        dashboard_updated_label=_dashboard_updated_label(),
+        economy="00APEC",
+        comparison_data=scoped,
+        esto_exact_values=pd.concat([exact, extended], ignore_index=True),
+    )
+
+
 def render_all_economies() -> pd.DataFrame:
     """Load data once, render selected economies, and write render_summary.csv."""
     template = load_json(TEMPLATE_PATH)
@@ -268,6 +334,10 @@ def render_all_economies() -> pd.DataFrame:
     )
     raw_df = _normalise_economy_column(raw_df)
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
+    mapping_metadata = selected_run_metadata(LEAP_MAPPINGS_ROOT)
+    if RENDER_DASHBOARDS:
+        shared_diagnostics = _render_shared_mapping_diagnostics(raw_df)
+        print(f"Shared APEC diagnostics: {shared_diagnostics['page']}")
 
     requested_economies = [_dashboard_economy(e) for e in ECONOMIES_TO_RENDER]
     economies = requested_economies or _available_economies(raw_df)
@@ -275,7 +345,13 @@ def render_all_economies() -> pd.DataFrame:
     for economy in economies:
         if RENDER_DASHBOARDS:
             print(f"Rendering {economy}...")
-            row = _render_one_economy(raw_df, template, series_config, economy)
+            row = _render_one_economy(
+                raw_df,
+                template,
+                series_config,
+                economy,
+                mapping_metadata,
+            )
         else:
             print(f"Summarising existing output for {economy}...")
             row = _summarise_existing_economy(raw_df, economy)

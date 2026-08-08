@@ -1,0 +1,557 @@
+source_system,scenario,common_flow_label,common_product_label
+ESTO,historical,14.01 Mining and quarrying,07.01 Motor gasoline
+ESTO,historical,14.01 Mining and quarrying,07.07 Gas/diesel oil
+ESTO,historical,14.01 Mining and quarrying,07.08 Fuel oil
+ESTO,historical,14.01 Mining and quarrying,08.01 Natural gas
+ESTO,historical,14.01 Mining and quarrying,16.06 Biodiesel
+ESTO,historical,14.01 Mining and quarrying,17 Electricity
+ESTO,historical,14.02 Construction,07.01 Motor gasoline
+ESTO,historical,14.02 Construction,07.07 Gas/diesel oil
+ESTO,historical,14.02 Construction,07.09 LPG
+ESTO,historical,14.02 Construction,08.01 Natural gas
+ESTO,historical,14.02 Construction,16.06 Biodiesel
+ESTO,historical,14.02 Construction,17 Electricity
+ESTO,historical,14.03.01 Iron and steel,01.02-01.04 Coal
+ESTO,historical,14.03.01 Iron and steel,02.01-02.08 Coal products
+ESTO,historical,14.03.01 Iron and steel,07.07 Gas/diesel oil
+ESTO,historical,14.03.01 Iron and steel,07.08 Fuel oil
+ESTO,historical,14.03.01 Iron and steel,07.09 LPG
+ESTO,historical,14.03.01 Iron and steel,08.01 Natural gas
+ESTO,historical,14.03.01 Iron and steel,15.05 Other biomass
+ESTO,historical,14.03.01 Iron and steel,16.06 Biodiesel
+ESTO,historical,14.03.01 Iron and steel,17 Electricity
+ESTO,historical,14.03.01 Iron and steel,18 Heat
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),01.02-01.04 Coal
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),01.05 Lignite
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),07.07 Gas/diesel oil
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),07.08 Fuel oil
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),07.09 LPG
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),07.12-07.17 Petroleum products
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),08.01 Natural gas
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),15.05 Other biomass
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),16.01 Biogas
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),16.02 Industrial waste
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),16.06 Biodiesel
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),16.08 Other liquid biofuels
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),17 Electricity
+ESTO,historical,14.03.02 Chemical (incl. petrochemical),18 Heat
+ESTO,historical,14.03.03 Non ferrous metals,07.07 Gas/diesel oil
+ESTO,historical,14.03.03 Non ferrous metals,07.09 LPG
+ESTO,historical,14.03.03 Non ferrous metals,07.12-07.17 Petroleum products
+ESTO,historical,14.03.03 Non ferrous metals,08.01 Natural gas
+ESTO,historical,14.03.03 Non ferrous metals,16.06 Biodiesel
+ESTO,historical,14.03.03 Non ferrous metals,17 Electricity
+ESTO,historical,14.03.03 Non ferrous metals,18 Heat
+ESTO,historical,14.03.04 Non-metallic mineral products,01.02-01.04 Coal
+ESTO,historical,14.03.04 Non-metallic mineral products,01.05 Lignite
+ESTO,historical,14.03.04 Non-metallic mineral products,07.07 Gas/diesel oil
+ESTO,historical,14.03.04 Non-metallic mineral products,07.08 Fuel oil
+ESTO,historical,14.03.04 Non-metallic mineral products,07.09 LPG
+ESTO,historical,14.03.04 Non-metallic mineral products,07.12-07.17 Petroleum products
+ESTO,historical,14.03.04 Non-metallic mineral products,08.01 Natural gas
+ESTO,historical,14.03.04 Non-metallic mineral products,15.05 Other biomass
+ESTO,historical,14.03.04 Non-metallic mineral products,16.02 Industrial waste
+ESTO,historical,14.03.04 Non-metallic mineral products,16.06 Biodiesel
+ESTO,historical,14.03.04 Non-metallic mineral products,17 Electricity
+ESTO,historical,14.03.04 Non-metallic mineral products,18 Heat
+ESTO,historical,14.03.05 Transportation equipment,01.02-01.04 Coal
+ESTO,historical,14.03.05 Transportation equipment,07.07 Gas/diesel oil
+ESTO,historical,14.03.05 Transportation equipment,07.08 Fuel oil
+ESTO,historical,14.03.05 Transportation equipment,07.09 LPG
+ESTO,historical,14.03.05 Transportation equipment,08.01 Natural gas
+ESTO,historical,14.03.05 Transportation equipment,16.01 Biogas
+ESTO,historical,14.03.05 Transportation equipment,16.06 Biodiesel
+ESTO,historical,14.03.05 Transportation equipment,17 Electricity
+ESTO,historical,14.03.05 Transportation equipment,18 Heat
+ESTO,historical,14.03.06 Machinery,01.02-01.04 Coal
+ESTO,historical,14.03.06 Machinery,07.07 Gas/diesel oil
+ESTO,historical,14.03.06 Machinery,07.08 Fuel oil
+ESTO,historical,14.03.06 Machinery,07.09 LPG
+ESTO,historical,14.03.06 Machinery,07.12-07.17 Petroleum products
+ESTO,historical,14.03.06 Machinery,08.01 Natural gas
+ESTO,historical,14.03.06 Machinery,15.05 Other biomass
+ESTO,historical,14.03.06 Machinery,16.06 Biodiesel
+ESTO,historical,14.03.06 Machinery,17 Electricity
+ESTO,historical,14.03.06 Machinery,18 Heat
+ESTO,historical,"14.03.07 Food, beverages and tobacco",01.02-01.04 Coal
+ESTO,historical,"14.03.07 Food, beverages and tobacco",01.05 Lignite
+ESTO,historical,"14.03.07 Food, beverages and tobacco",07.07 Gas/diesel oil
+ESTO,historical,"14.03.07 Food, beverages and tobacco",07.08 Fuel oil
+ESTO,historical,"14.03.07 Food, beverages and tobacco",07.09 LPG
+ESTO,historical,"14.03.07 Food, beverages and tobacco",08.01 Natural gas
+ESTO,historical,"14.03.07 Food, beverages and tobacco",15.05 Other biomass
+ESTO,historical,"14.03.07 Food, beverages and tobacco",16.01 Biogas
+ESTO,historical,"14.03.07 Food, beverages and tobacco",16.02 Industrial waste
+ESTO,historical,"14.03.07 Food, beverages and tobacco",16.06 Biodiesel
+ESTO,historical,"14.03.07 Food, beverages and tobacco",17 Electricity
+ESTO,historical,"14.03.07 Food, beverages and tobacco",18 Heat
+ESTO,historical,"14.03.08 Pulp, paper and printing",01.02-01.04 Coal
+ESTO,historical,"14.03.08 Pulp, paper and printing",07.07 Gas/diesel oil
+ESTO,historical,"14.03.08 Pulp, paper and printing",07.08 Fuel oil
+ESTO,historical,"14.03.08 Pulp, paper and printing",07.09 LPG
+ESTO,historical,"14.03.08 Pulp, paper and printing",07.12-07.17 Petroleum products
+ESTO,historical,"14.03.08 Pulp, paper and printing",08.01 Natural gas
+ESTO,historical,"14.03.08 Pulp, paper and printing",15.05 Other biomass
+ESTO,historical,"14.03.08 Pulp, paper and printing",16.01 Biogas
+ESTO,historical,"14.03.08 Pulp, paper and printing",16.02 Industrial waste
+ESTO,historical,"14.03.08 Pulp, paper and printing",16.06 Biodiesel
+ESTO,historical,"14.03.08 Pulp, paper and printing",16.08 Other liquid biofuels
+ESTO,historical,"14.03.08 Pulp, paper and printing",17 Electricity
+ESTO,historical,"14.03.08 Pulp, paper and printing",18 Heat
+ESTO,historical,14.03.09 Wood and wood products,01.02-01.04 Coal
+ESTO,historical,14.03.09 Wood and wood products,07.07 Gas/diesel oil
+ESTO,historical,14.03.09 Wood and wood products,07.08 Fuel oil
+ESTO,historical,14.03.09 Wood and wood products,07.09 LPG
+ESTO,historical,14.03.09 Wood and wood products,08.01 Natural gas
+ESTO,historical,14.03.09 Wood and wood products,15.05 Other biomass
+ESTO,historical,14.03.09 Wood and wood products,16.02 Industrial waste
+ESTO,historical,14.03.09 Wood and wood products,16.06 Biodiesel
+ESTO,historical,14.03.09 Wood and wood products,17 Electricity
+ESTO,historical,14.03.09 Wood and wood products,18 Heat
+ESTO,historical,14.03.10 Textiles and leather,01.02-01.04 Coal
+ESTO,historical,14.03.10 Textiles and leather,07.07 Gas/diesel oil
+ESTO,historical,14.03.10 Textiles and leather,07.08 Fuel oil
+ESTO,historical,14.03.10 Textiles and leather,07.09 LPG
+ESTO,historical,14.03.10 Textiles and leather,08.01 Natural gas
+ESTO,historical,14.03.10 Textiles and leather,17 Electricity
+ESTO,historical,14.03.10 Textiles and leather,18 Heat
+ESTO,historical,14.03.11 Non-specified industry,01.02-01.04 Coal
+ESTO,historical,14.03.11 Non-specified industry,02.01-02.08 Coal products
+ESTO,historical,14.03.11 Non-specified industry,07.01 Motor gasoline
+ESTO,historical,14.03.11 Non-specified industry,07.06 Kerosene
+ESTO,historical,14.03.11 Non-specified industry,07.07 Gas/diesel oil
+ESTO,historical,14.03.11 Non-specified industry,07.08 Fuel oil
+ESTO,historical,14.03.11 Non-specified industry,07.09 LPG
+ESTO,historical,14.03.11 Non-specified industry,07.12-07.17 Petroleum products
+ESTO,historical,14.03.11 Non-specified industry,08.01 Natural gas
+ESTO,historical,14.03.11 Non-specified industry,15.05 Other biomass
+ESTO,historical,14.03.11 Non-specified industry,16.01 Biogas
+ESTO,historical,14.03.11 Non-specified industry,16.02 Industrial waste
+ESTO,historical,14.03.11 Non-specified industry,16.03 Municipal solid waste (renewable)
+ESTO,historical,14.03.11 Non-specified industry,16.04 Municipal solid waste (non-renewable)
+ESTO,historical,14.03.11 Non-specified industry,16.06 Biodiesel
+ESTO,historical,14.03.11 Non-specified industry,17 Electricity
+ESTO,historical,14.03.11 Non-specified industry,18 Heat
+ESTO,historical,15.01 Domestic air transport,07.02 Aviation gasoline
+ESTO,historical,15.01 Domestic air transport,07.04-07.05 Petroleum products
+ESTO,historical,15.02 Road,07.01 Motor gasoline
+ESTO,historical,15.02 Road,07.07 Gas/diesel oil
+ESTO,historical,15.02 Road,07.09 LPG
+ESTO,historical,15.02 Road,08.01 Natural gas
+ESTO,historical,15.02 Road,16.05 Biogasoline
+ESTO,historical,15.02 Road,16.06 Biodiesel
+ESTO,historical,15.02 Road,17 Electricity
+ESTO,historical,15.03 Rail,07.07 Gas/diesel oil
+ESTO,historical,15.03 Rail,16.06 Biodiesel
+ESTO,historical,15.03 Rail,17 Electricity
+ESTO,historical,15.04 Domestic navigation,07.01 Motor gasoline
+ESTO,historical,15.04 Domestic navigation,07.07 Gas/diesel oil
+ESTO,historical,15.04 Domestic navigation,07.08 Fuel oil
+ESTO,historical,15.04 Domestic navigation,16.06 Biodiesel
+ESTO,historical,15.05 Pipeline transport,08.01 Natural gas
+ESTO,historical,15.06 Non-specified transport,07.07 Gas/diesel oil
+ESTO,historical,16.01.99 Commercial and public services unallocated,01.02-01.04 Coal
+ESTO,historical,16.01.99 Commercial and public services unallocated,07.01 Motor gasoline
+ESTO,historical,16.01.99 Commercial and public services unallocated,07.06 Kerosene
+ESTO,historical,16.01.99 Commercial and public services unallocated,07.07 Gas/diesel oil
+ESTO,historical,16.01.99 Commercial and public services unallocated,07.08 Fuel oil
+ESTO,historical,16.01.99 Commercial and public services unallocated,07.09 LPG
+ESTO,historical,16.01.99 Commercial and public services unallocated,08.01 Natural gas
+ESTO,historical,16.01.99 Commercial and public services unallocated,12.99 Solar nonspecified
+ESTO,historical,16.01.99 Commercial and public services unallocated,15.05 Other biomass
+ESTO,historical,16.01.99 Commercial and public services unallocated,16.01 Biogas
+ESTO,historical,16.01.99 Commercial and public services unallocated,16.02 Industrial waste
+ESTO,historical,16.01.99 Commercial and public services unallocated,16.03 Municipal solid waste (renewable)
+ESTO,historical,16.01.99 Commercial and public services unallocated,16.04 Municipal solid waste (non-renewable)
+ESTO,historical,16.01.99 Commercial and public services unallocated,16.06 Biodiesel
+ESTO,historical,16.01.99 Commercial and public services unallocated,17 Electricity
+ESTO,historical,16.01.99 Commercial and public services unallocated,18 Heat
+ESTO,historical,16.02 Residential,07.06 Kerosene
+ESTO,historical,16.02 Residential,07.07 Gas/diesel oil
+ESTO,historical,16.02 Residential,07.09 LPG
+ESTO,historical,16.02 Residential,08.01 Natural gas
+ESTO,historical,16.02 Residential,11 Geothermal
+ESTO,historical,16.02 Residential,12.99 Solar nonspecified
+ESTO,historical,16.02 Residential,15.05 Other biomass
+ESTO,historical,16.02 Residential,16.06 Biodiesel
+ESTO,historical,16.02 Residential,17 Electricity
+ESTO,historical,16.03 Agriculture,07.01 Motor gasoline
+ESTO,historical,16.03 Agriculture,07.06 Kerosene
+ESTO,historical,16.03 Agriculture,07.07 Gas/diesel oil
+ESTO,historical,16.03 Agriculture,07.08 Fuel oil
+ESTO,historical,16.03 Agriculture,07.09 LPG
+ESTO,historical,16.03 Agriculture,08.01 Natural gas
+ESTO,historical,16.03 Agriculture,15.05 Other biomass
+ESTO,historical,16.03 Agriculture,16.01 Biogas
+ESTO,historical,16.03 Agriculture,16.06 Biodiesel
+ESTO,historical,16.03 Agriculture,17 Electricity
+ESTO,historical,16.05 Non-specified others,17 Electricity
+ESTO,historical,17 Non-energy use,06.02 Natural gas liquids
+ESTO,historical,17 Non-energy use,07.03 Naphtha
+ESTO,historical,17 Non-energy use,07.07 Gas/diesel oil
+ESTO,historical,17 Non-energy use,07.09 LPG
+ESTO,historical,17 Non-energy use,07.10 Refinery gas (not liquefied)
+ESTO,historical,17 Non-energy use,07.11 Ethane
+ESTO,historical,17 Non-energy use,07.12-07.17 Petroleum products
+ESTO,historical,17 Non-energy use,08.01 Natural gas
+NINTH,reference,14.01 Mining and quarrying,07.01 Motor gasoline
+NINTH,reference,14.01 Mining and quarrying,07.07 Gas/diesel oil
+NINTH,reference,14.01 Mining and quarrying,07.08 Fuel oil
+NINTH,reference,14.01 Mining and quarrying,08.01 Natural gas
+NINTH,reference,14.01 Mining and quarrying,16.06 Biodiesel
+NINTH,reference,14.01 Mining and quarrying,17 Electricity
+NINTH,reference,14.02 Construction,07.07 Gas/diesel oil
+NINTH,reference,14.02 Construction,07.09 LPG
+NINTH,reference,14.02 Construction,08.01 Natural gas
+NINTH,reference,14.02 Construction,16.06 Biodiesel
+NINTH,reference,14.02 Construction,17 Electricity
+NINTH,reference,14.03.01 Iron and steel,01.02-01.04 Coal
+NINTH,reference,14.03.01 Iron and steel,02.01-02.08 Coal products
+NINTH,reference,14.03.01 Iron and steel,07.07 Gas/diesel oil
+NINTH,reference,14.03.01 Iron and steel,07.08 Fuel oil
+NINTH,reference,14.03.01 Iron and steel,07.09 LPG
+NINTH,reference,14.03.01 Iron and steel,08.01 Natural gas
+NINTH,reference,14.03.01 Iron and steel,16.06 Biodiesel
+NINTH,reference,14.03.01 Iron and steel,16.12 Hydrogen
+NINTH,reference,14.03.01 Iron and steel,17 Electricity
+NINTH,reference,14.03.01 Iron and steel,18 Heat
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),01.02-01.04 Coal
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),01.05 Lignite
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),07.07 Gas/diesel oil
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),07.08 Fuel oil
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),07.09 LPG
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),07.12-07.17 Petroleum products
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),08.01 Natural gas
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),15.05 Other biomass
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),16.01 Biogas
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),16.02 Industrial waste
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),16.06 Biodiesel
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),16.08 Other liquid biofuels
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),17 Electricity
+NINTH,reference,14.03.02 Chemical (incl. petrochemical),18 Heat
+NINTH,reference,14.03.03 Non ferrous metals,07.07 Gas/diesel oil
+NINTH,reference,14.03.03 Non ferrous metals,07.09 LPG
+NINTH,reference,14.03.03 Non ferrous metals,07.12-07.17 Petroleum products
+NINTH,reference,14.03.03 Non ferrous metals,08.01 Natural gas
+NINTH,reference,14.03.03 Non ferrous metals,16.06 Biodiesel
+NINTH,reference,14.03.03 Non ferrous metals,17 Electricity
+NINTH,reference,14.03.03 Non ferrous metals,18 Heat
+NINTH,reference,14.03.04 Non-metallic mineral products,01.02-01.04 Coal
+NINTH,reference,14.03.04 Non-metallic mineral products,07.07 Gas/diesel oil
+NINTH,reference,14.03.04 Non-metallic mineral products,07.08 Fuel oil
+NINTH,reference,14.03.04 Non-metallic mineral products,07.09 LPG
+NINTH,reference,14.03.04 Non-metallic mineral products,07.12-07.17 Petroleum products
+NINTH,reference,14.03.04 Non-metallic mineral products,08.01 Natural gas
+NINTH,reference,14.03.04 Non-metallic mineral products,15.05 Other biomass
+NINTH,reference,14.03.04 Non-metallic mineral products,16.06 Biodiesel
+NINTH,reference,14.03.04 Non-metallic mineral products,17 Electricity
+NINTH,reference,14.03.04 Non-metallic mineral products,18 Heat
+NINTH,reference,14.03.05 Transportation equipment,07.07 Gas/diesel oil
+NINTH,reference,14.03.05 Transportation equipment,07.08 Fuel oil
+NINTH,reference,14.03.05 Transportation equipment,07.09 LPG
+NINTH,reference,14.03.05 Transportation equipment,08.01 Natural gas
+NINTH,reference,14.03.05 Transportation equipment,16.01 Biogas
+NINTH,reference,14.03.05 Transportation equipment,16.06 Biodiesel
+NINTH,reference,14.03.05 Transportation equipment,17 Electricity
+NINTH,reference,14.03.05 Transportation equipment,18 Heat
+NINTH,reference,14.03.06 Machinery,01.02-01.04 Coal
+NINTH,reference,14.03.06 Machinery,07.07 Gas/diesel oil
+NINTH,reference,14.03.06 Machinery,07.09 LPG
+NINTH,reference,14.03.06 Machinery,07.12-07.17 Petroleum products
+NINTH,reference,14.03.06 Machinery,08.01 Natural gas
+NINTH,reference,14.03.06 Machinery,16.06 Biodiesel
+NINTH,reference,14.03.06 Machinery,17 Electricity
+NINTH,reference,14.03.06 Machinery,18 Heat
+NINTH,reference,"14.03.07 Food, beverages and tobacco",01.02-01.04 Coal
+NINTH,reference,"14.03.07 Food, beverages and tobacco",01.05 Lignite
+NINTH,reference,"14.03.07 Food, beverages and tobacco",07.07 Gas/diesel oil
+NINTH,reference,"14.03.07 Food, beverages and tobacco",07.08 Fuel oil
+NINTH,reference,"14.03.07 Food, beverages and tobacco",07.09 LPG
+NINTH,reference,"14.03.07 Food, beverages and tobacco",08.01 Natural gas
+NINTH,reference,"14.03.07 Food, beverages and tobacco",15.05 Other biomass
+NINTH,reference,"14.03.07 Food, beverages and tobacco",16.01 Biogas
+NINTH,reference,"14.03.07 Food, beverages and tobacco",16.02 Industrial waste
+NINTH,reference,"14.03.07 Food, beverages and tobacco",16.06 Biodiesel
+NINTH,reference,"14.03.07 Food, beverages and tobacco",17 Electricity
+NINTH,reference,"14.03.07 Food, beverages and tobacco",18 Heat
+NINTH,reference,"14.03.08 Pulp, paper and printing",01.02-01.04 Coal
+NINTH,reference,"14.03.08 Pulp, paper and printing",07.07 Gas/diesel oil
+NINTH,reference,"14.03.08 Pulp, paper and printing",07.08 Fuel oil
+NINTH,reference,"14.03.08 Pulp, paper and printing",07.09 LPG
+NINTH,reference,"14.03.08 Pulp, paper and printing",07.12-07.17 Petroleum products
+NINTH,reference,"14.03.08 Pulp, paper and printing",08.01 Natural gas
+NINTH,reference,"14.03.08 Pulp, paper and printing",15.05 Other biomass
+NINTH,reference,"14.03.08 Pulp, paper and printing",16.01 Biogas
+NINTH,reference,"14.03.08 Pulp, paper and printing",16.02 Industrial waste
+NINTH,reference,"14.03.08 Pulp, paper and printing",16.06 Biodiesel
+NINTH,reference,"14.03.08 Pulp, paper and printing",16.08 Other liquid biofuels
+NINTH,reference,"14.03.08 Pulp, paper and printing",17 Electricity
+NINTH,reference,"14.03.08 Pulp, paper and printing",18 Heat
+NINTH,reference,14.03.09 Wood and wood products,07.07 Gas/diesel oil
+NINTH,reference,14.03.09 Wood and wood products,07.08 Fuel oil
+NINTH,reference,14.03.09 Wood and wood products,07.09 LPG
+NINTH,reference,14.03.09 Wood and wood products,08.01 Natural gas
+NINTH,reference,14.03.09 Wood and wood products,15.05 Other biomass
+NINTH,reference,14.03.09 Wood and wood products,16.06 Biodiesel
+NINTH,reference,14.03.09 Wood and wood products,17 Electricity
+NINTH,reference,14.03.09 Wood and wood products,18 Heat
+NINTH,reference,14.03.10 Textiles and leather,01.02-01.04 Coal
+NINTH,reference,14.03.10 Textiles and leather,08.01 Natural gas
+NINTH,reference,14.03.10 Textiles and leather,17 Electricity
+NINTH,reference,14.03.10 Textiles and leather,18 Heat
+NINTH,reference,14.03.11 Non-specified industry,01.02-01.04 Coal
+NINTH,reference,14.03.11 Non-specified industry,02.01-02.08 Coal products
+NINTH,reference,14.03.11 Non-specified industry,07.07 Gas/diesel oil
+NINTH,reference,14.03.11 Non-specified industry,07.09 LPG
+NINTH,reference,14.03.11 Non-specified industry,07.12-07.17 Petroleum products
+NINTH,reference,14.03.11 Non-specified industry,08.01 Natural gas
+NINTH,reference,14.03.11 Non-specified industry,15.05 Other biomass
+NINTH,reference,14.03.11 Non-specified industry,16.01 Biogas
+NINTH,reference,14.03.11 Non-specified industry,16.06 Biodiesel
+NINTH,reference,14.03.11 Non-specified industry,17 Electricity
+NINTH,reference,14.03.11 Non-specified industry,18 Heat
+NINTH,reference,15.01 Domestic air transport,07.02 Aviation gasoline
+NINTH,reference,15.01 Domestic air transport,07.04-07.05 Petroleum products
+NINTH,reference,15.01 Domestic air transport,16.07 Bio jet kerosene
+NINTH,reference,15.01 Domestic air transport,16.11 E-fuel
+NINTH,reference,15.01 Domestic air transport,17 Electricity
+NINTH,reference,15.02 Road,07.01 Motor gasoline
+NINTH,reference,15.02 Road,07.07 Gas/diesel oil
+NINTH,reference,15.02 Road,07.09 LPG
+NINTH,reference,15.02 Road,08.01 Natural gas
+NINTH,reference,15.02 Road,16.05 Biogasoline
+NINTH,reference,15.02 Road,16.06 Biodiesel
+NINTH,reference,15.02 Road,16.12 Hydrogen
+NINTH,reference,15.02 Road,17 Electricity
+NINTH,reference,15.03 Rail,07.07 Gas/diesel oil
+NINTH,reference,15.03 Rail,16.06 Biodiesel
+NINTH,reference,15.03 Rail,17 Electricity
+NINTH,reference,15.04 Domestic navigation,07.01 Motor gasoline
+NINTH,reference,15.04 Domestic navigation,07.07 Gas/diesel oil
+NINTH,reference,15.04 Domestic navigation,07.08 Fuel oil
+NINTH,reference,15.04 Domestic navigation,08.02 LNG
+NINTH,reference,15.04 Domestic navigation,16.05 Biogasoline
+NINTH,reference,15.04 Domestic navigation,16.06 Biodiesel
+NINTH,reference,15.04 Domestic navigation,17 Electricity
+NINTH,reference,15.05 Pipeline transport,08.01 Natural gas
+NINTH,reference,16.01.01 Datacentres,17 Electricity
+NINTH,reference,16.01.99 Commercial and public services unallocated,01.02-01.04 Coal
+NINTH,reference,16.01.99 Commercial and public services unallocated,07.01 Motor gasoline
+NINTH,reference,16.01.99 Commercial and public services unallocated,07.06 Kerosene
+NINTH,reference,16.01.99 Commercial and public services unallocated,07.07 Gas/diesel oil
+NINTH,reference,16.01.99 Commercial and public services unallocated,07.08 Fuel oil
+NINTH,reference,16.01.99 Commercial and public services unallocated,07.09 LPG
+NINTH,reference,16.01.99 Commercial and public services unallocated,08.01 Natural gas
+NINTH,reference,16.01.99 Commercial and public services unallocated,12.99 Solar nonspecified
+NINTH,reference,16.01.99 Commercial and public services unallocated,15.05 Other biomass
+NINTH,reference,16.01.99 Commercial and public services unallocated,16.01 Biogas
+NINTH,reference,16.01.99 Commercial and public services unallocated,16.03 Municipal solid waste (renewable)
+NINTH,reference,16.01.99 Commercial and public services unallocated,16.04 Municipal solid waste (non-renewable)
+NINTH,reference,16.01.99 Commercial and public services unallocated,16.06 Biodiesel
+NINTH,reference,16.01.99 Commercial and public services unallocated,17 Electricity
+NINTH,reference,16.01.99 Commercial and public services unallocated,18 Heat
+NINTH,reference,16.02 Residential,07.06 Kerosene
+NINTH,reference,16.02 Residential,07.07 Gas/diesel oil
+NINTH,reference,16.02 Residential,07.09 LPG
+NINTH,reference,16.02 Residential,08.01 Natural gas
+NINTH,reference,16.02 Residential,11 Geothermal
+NINTH,reference,16.02 Residential,12.99 Solar nonspecified
+NINTH,reference,16.02 Residential,15.05 Other biomass
+NINTH,reference,16.02 Residential,16.06 Biodiesel
+NINTH,reference,16.02 Residential,17 Electricity
+NINTH,reference,16.03-16.04 Agriculture and fishing,07.01 Motor gasoline
+NINTH,reference,16.03-16.04 Agriculture and fishing,07.07 Gas/diesel oil
+NINTH,reference,16.03-16.04 Agriculture and fishing,07.08 Fuel oil
+NINTH,reference,16.03-16.04 Agriculture and fishing,07.09 LPG
+NINTH,reference,16.03-16.04 Agriculture and fishing,08.01 Natural gas
+NINTH,reference,16.03-16.04 Agriculture and fishing,15.05 Other biomass
+NINTH,reference,16.03-16.04 Agriculture and fishing,16.01 Biogas
+NINTH,reference,16.03-16.04 Agriculture and fishing,16.06 Biodiesel
+NINTH,reference,16.03-16.04 Agriculture and fishing,17 Electricity
+NINTH,reference,16.05 Non-specified others,17 Electricity
+NINTH,reference,17 Non-energy use,07.03 Naphtha
+NINTH,reference,17 Non-energy use,07.07 Gas/diesel oil
+NINTH,reference,17 Non-energy use,07.09 LPG
+NINTH,reference,17 Non-energy use,07.10 Refinery gas (not liquefied)
+NINTH,reference,17 Non-energy use,07.11 Ethane
+NINTH,reference,17 Non-energy use,07.12-07.17 Petroleum products
+NINTH,reference,17 Non-energy use,08.01 Natural gas
+NINTH,reference,17 Non-energy use,16.12 Hydrogen
+NINTH,target,14.01 Mining and quarrying,07.01 Motor gasoline
+NINTH,target,14.01 Mining and quarrying,07.07 Gas/diesel oil
+NINTH,target,14.01 Mining and quarrying,07.08 Fuel oil
+NINTH,target,14.01 Mining and quarrying,08.01 Natural gas
+NINTH,target,14.01 Mining and quarrying,16.06 Biodiesel
+NINTH,target,14.01 Mining and quarrying,17 Electricity
+NINTH,target,14.02 Construction,07.07 Gas/diesel oil
+NINTH,target,14.02 Construction,07.09 LPG
+NINTH,target,14.02 Construction,08.01 Natural gas
+NINTH,target,14.02 Construction,16.06 Biodiesel
+NINTH,target,14.02 Construction,17 Electricity
+NINTH,target,14.03.01 Iron and steel,01.02-01.04 Coal
+NINTH,target,14.03.01 Iron and steel,02.01-02.08 Coal products
+NINTH,target,14.03.01 Iron and steel,07.07 Gas/diesel oil
+NINTH,target,14.03.01 Iron and steel,07.08 Fuel oil
+NINTH,target,14.03.01 Iron and steel,07.09 LPG
+NINTH,target,14.03.01 Iron and steel,08.01 Natural gas
+NINTH,target,14.03.01 Iron and steel,16.06 Biodiesel
+NINTH,target,14.03.01 Iron and steel,17 Electricity
+NINTH,target,14.03.01 Iron and steel,18 Heat
+NINTH,target,14.03.02 Chemical (incl. petrochemical),01.02-01.04 Coal
+NINTH,target,14.03.02 Chemical (incl. petrochemical),01.05 Lignite
+NINTH,target,14.03.02 Chemical (incl. petrochemical),07.07 Gas/diesel oil
+NINTH,target,14.03.02 Chemical (incl. petrochemical),07.08 Fuel oil
+NINTH,target,14.03.02 Chemical (incl. petrochemical),07.09 LPG
+NINTH,target,14.03.02 Chemical (incl. petrochemical),07.12-07.17 Petroleum products
+NINTH,target,14.03.02 Chemical (incl. petrochemical),08.01 Natural gas
+NINTH,target,14.03.02 Chemical (incl. petrochemical),15.05 Other biomass
+NINTH,target,14.03.02 Chemical (incl. petrochemical),16.01 Biogas
+NINTH,target,14.03.02 Chemical (incl. petrochemical),16.02 Industrial waste
+NINTH,target,14.03.02 Chemical (incl. petrochemical),16.06 Biodiesel
+NINTH,target,14.03.02 Chemical (incl. petrochemical),16.08 Other liquid biofuels
+NINTH,target,14.03.02 Chemical (incl. petrochemical),17 Electricity
+NINTH,target,14.03.02 Chemical (incl. petrochemical),18 Heat
+NINTH,target,14.03.03 Non ferrous metals,07.07 Gas/diesel oil
+NINTH,target,14.03.03 Non ferrous metals,07.09 LPG
+NINTH,target,14.03.03 Non ferrous metals,07.12-07.17 Petroleum products
+NINTH,target,14.03.03 Non ferrous metals,08.01 Natural gas
+NINTH,target,14.03.03 Non ferrous metals,16.06 Biodiesel
+NINTH,target,14.03.03 Non ferrous metals,17 Electricity
+NINTH,target,14.03.03 Non ferrous metals,18 Heat
+NINTH,target,14.03.04 Non-metallic mineral products,01.02-01.04 Coal
+NINTH,target,14.03.04 Non-metallic mineral products,07.07 Gas/diesel oil
+NINTH,target,14.03.04 Non-metallic mineral products,07.08 Fuel oil
+NINTH,target,14.03.04 Non-metallic mineral products,07.09 LPG
+NINTH,target,14.03.04 Non-metallic mineral products,07.12-07.17 Petroleum products
+NINTH,target,14.03.04 Non-metallic mineral products,08.01 Natural gas
+NINTH,target,14.03.04 Non-metallic mineral products,15.05 Other biomass
+NINTH,target,14.03.04 Non-metallic mineral products,16.06 Biodiesel
+NINTH,target,14.03.04 Non-metallic mineral products,17 Electricity
+NINTH,target,14.03.04 Non-metallic mineral products,18 Heat
+NINTH,target,14.03.05 Transportation equipment,07.07 Gas/diesel oil
+NINTH,target,14.03.05 Transportation equipment,07.08 Fuel oil
+NINTH,target,14.03.05 Transportation equipment,07.09 LPG
+NINTH,target,14.03.05 Transportation equipment,08.01 Natural gas
+NINTH,target,14.03.05 Transportation equipment,16.01 Biogas
+NINTH,target,14.03.05 Transportation equipment,16.06 Biodiesel
+NINTH,target,14.03.05 Transportation equipment,17 Electricity
+NINTH,target,14.03.05 Transportation equipment,18 Heat
+NINTH,target,14.03.06 Machinery,01.02-01.04 Coal
+NINTH,target,14.03.06 Machinery,07.07 Gas/diesel oil
+NINTH,target,14.03.06 Machinery,07.09 LPG
+NINTH,target,14.03.06 Machinery,07.12-07.17 Petroleum products
+NINTH,target,14.03.06 Machinery,08.01 Natural gas
+NINTH,target,14.03.06 Machinery,16.06 Biodiesel
+NINTH,target,14.03.06 Machinery,17 Electricity
+NINTH,target,14.03.06 Machinery,18 Heat
+NINTH,target,"14.03.07 Food, beverages and tobacco",01.02-01.04 Coal
+NINTH,target,"14.03.07 Food, beverages and tobacco",01.05 Lignite
+NINTH,target,"14.03.07 Food, beverages and tobacco",07.07 Gas/diesel oil
+NINTH,target,"14.03.07 Food, beverages and tobacco",07.08 Fuel oil
+NINTH,target,"14.03.07 Food, beverages and tobacco",07.09 LPG
+NINTH,target,"14.03.07 Food, beverages and tobacco",08.01 Natural gas
+NINTH,target,"14.03.07 Food, beverages and tobacco",15.05 Other biomass
+NINTH,target,"14.03.07 Food, beverages and tobacco",16.01 Biogas
+NINTH,target,"14.03.07 Food, beverages and tobacco",16.02 Industrial waste
+NINTH,target,"14.03.07 Food, beverages and tobacco",16.06 Biodiesel
+NINTH,target,"14.03.07 Food, beverages and tobacco",17 Electricity
+NINTH,target,"14.03.07 Food, beverages and tobacco",18 Heat
+NINTH,target,"14.03.08 Pulp, paper and printing",01.02-01.04 Coal
+NINTH,target,"14.03.08 Pulp, paper and printing",07.07 Gas/diesel oil
+NINTH,target,"14.03.08 Pulp, paper and printing",07.08 Fuel oil
+NINTH,target,"14.03.08 Pulp, paper and printing",07.09 LPG
+NINTH,target,"14.03.08 Pulp, paper and printing",07.12-07.17 Petroleum products
+NINTH,target,"14.03.08 Pulp, paper and printing",08.01 Natural gas
+NINTH,target,"14.03.08 Pulp, paper and printing",15.05 Other biomass
+NINTH,target,"14.03.08 Pulp, paper and printing",16.01 Biogas
+NINTH,target,"14.03.08 Pulp, paper and printing",16.02 Industrial waste
+NINTH,target,"14.03.08 Pulp, paper and printing",16.06 Biodiesel
+NINTH,target,"14.03.08 Pulp, paper and printing",16.08 Other liquid biofuels
+NINTH,target,"14.03.08 Pulp, paper and printing",17 Electricity
+NINTH,target,"14.03.08 Pulp, paper and printing",18 Heat
+NINTH,target,14.03.09 Wood and wood products,07.07 Gas/diesel oil
+NINTH,target,14.03.09 Wood and wood products,07.08 Fuel oil
+NINTH,target,14.03.09 Wood and wood products,07.09 LPG
+NINTH,target,14.03.09 Wood and wood products,08.01 Natural gas
+NINTH,target,14.03.09 Wood and wood products,15.05 Other biomass
+NINTH,target,14.03.09 Wood and wood products,16.06 Biodiesel
+NINTH,target,14.03.09 Wood and wood products,17 Electricity
+NINTH,target,14.03.09 Wood and wood products,18 Heat
+NINTH,target,14.03.10 Textiles and leather,01.02-01.04 Coal
+NINTH,target,14.03.10 Textiles and leather,08.01 Natural gas
+NINTH,target,14.03.10 Textiles and leather,17 Electricity
+NINTH,target,14.03.10 Textiles and leather,18 Heat
+NINTH,target,14.03.11 Non-specified industry,01.02-01.04 Coal
+NINTH,target,14.03.11 Non-specified industry,02.01-02.08 Coal products
+NINTH,target,14.03.11 Non-specified industry,07.07 Gas/diesel oil
+NINTH,target,14.03.11 Non-specified industry,07.09 LPG
+NINTH,target,14.03.11 Non-specified industry,07.12-07.17 Petroleum products
+NINTH,target,14.03.11 Non-specified industry,08.01 Natural gas
+NINTH,target,14.03.11 Non-specified industry,15.05 Other biomass
+NINTH,target,14.03.11 Non-specified industry,16.01 Biogas
+NINTH,target,14.03.11 Non-specified industry,16.06 Biodiesel
+NINTH,target,14.03.11 Non-specified industry,17 Electricity
+NINTH,target,14.03.11 Non-specified industry,18 Heat
+NINTH,target,15.01 Domestic air transport,07.02 Aviation gasoline
+NINTH,target,15.01 Domestic air transport,07.04-07.05 Petroleum products
+NINTH,target,15.01 Domestic air transport,17 Electricity
+NINTH,target,15.02 Road,07.01 Motor gasoline
+NINTH,target,15.02 Road,07.07 Gas/diesel oil
+NINTH,target,15.02 Road,07.09 LPG
+NINTH,target,15.02 Road,08.01 Natural gas
+NINTH,target,15.02 Road,16.05 Biogasoline
+NINTH,target,15.02 Road,16.06 Biodiesel
+NINTH,target,15.02 Road,17 Electricity
+NINTH,target,15.03 Rail,07.07 Gas/diesel oil
+NINTH,target,15.03 Rail,16.06 Biodiesel
+NINTH,target,15.03 Rail,17 Electricity
+NINTH,target,15.04 Domestic navigation,07.01 Motor gasoline
+NINTH,target,15.04 Domestic navigation,07.07 Gas/diesel oil
+NINTH,target,15.04 Domestic navigation,07.08 Fuel oil
+NINTH,target,15.04 Domestic navigation,08.02 LNG
+NINTH,target,15.04 Domestic navigation,16.05 Biogasoline
+NINTH,target,15.04 Domestic navigation,16.06 Biodiesel
+NINTH,target,15.04 Domestic navigation,17 Electricity
+NINTH,target,15.05 Pipeline transport,08.01 Natural gas
+NINTH,target,16.01.01 Datacentres,17 Electricity
+NINTH,target,16.01.99 Commercial and public services unallocated,01.02-01.04 Coal
+NINTH,target,16.01.99 Commercial and public services unallocated,07.01 Motor gasoline
+NINTH,target,16.01.99 Commercial and public services unallocated,07.06 Kerosene
+NINTH,target,16.01.99 Commercial and public services unallocated,07.07 Gas/diesel oil
+NINTH,target,16.01.99 Commercial and public services unallocated,07.08 Fuel oil
+NINTH,target,16.01.99 Commercial and public services unallocated,07.09 LPG
+NINTH,target,16.01.99 Commercial and public services unallocated,08.01 Natural gas
+NINTH,target,16.01.99 Commercial and public services unallocated,12.99 Solar nonspecified
+NINTH,target,16.01.99 Commercial and public services unallocated,15.05 Other biomass
+NINTH,target,16.01.99 Commercial and public services unallocated,16.01 Biogas
+NINTH,target,16.01.99 Commercial and public services unallocated,16.03 Municipal solid waste (renewable)
+NINTH,target,16.01.99 Commercial and public services unallocated,16.04 Municipal solid waste (non-renewable)
+NINTH,target,16.01.99 Commercial and public services unallocated,16.06 Biodiesel
+NINTH,target,16.01.99 Commercial and public services unallocated,17 Electricity
+NINTH,target,16.01.99 Commercial and public services unallocated,18 Heat
+NINTH,target,16.02 Residential,07.06 Kerosene
+NINTH,target,16.02 Residential,07.07 Gas/diesel oil
+NINTH,target,16.02 Residential,07.09 LPG
+NINTH,target,16.02 Residential,08.01 Natural gas
+NINTH,target,16.02 Residential,11 Geothermal
+NINTH,target,16.02 Residential,12.99 Solar nonspecified
+NINTH,target,16.02 Residential,15.05 Other biomass
+NINTH,target,16.02 Residential,16.06 Biodiesel
+NINTH,target,16.02 Residential,17 Electricity
+NINTH,target,16.03-16.04 Agriculture and fishing,07.01 Motor gasoline
+NINTH,target,16.03-16.04 Agriculture and fishing,07.07 Gas/diesel oil
+NINTH,target,16.03-16.04 Agriculture and fishing,07.08 Fuel oil
+NINTH,target,16.03-16.04 Agriculture and fishing,07.09 LPG
+NINTH,target,16.03-16.04 Agriculture and fishing,08.01 Natural gas
+NINTH,target,16.03-16.04 Agriculture and fishing,15.05 Other biomass
+NINTH,target,16.03-16.04 Agriculture and fishing,16.01 Biogas
+NINTH,target,16.03-16.04 Agriculture and fishing,16.06 Biodiesel
+NINTH,target,16.03-16.04 Agriculture and fishing,17 Electricity
+NINTH,target,16.05 Non-specified others,17 Electricity
+NINTH,target,17 Non-energy use,07.03 Naphtha
+NINTH,target,17 Non-energy use,07.07 Gas/diesel oil
+NINTH,target,17 Non-energy use,07.09 LPG
+NINTH,target,17 Non-energy use,07.10 Refinery gas (not liquefied)
+NINTH,target,17 Non-energy use,07.11 Ethane
+NINTH,target,17 Non-energy use,07.12-07.17 Petroleum products
+NINTH,target,17 Non-energy use,08.01 Natural gas

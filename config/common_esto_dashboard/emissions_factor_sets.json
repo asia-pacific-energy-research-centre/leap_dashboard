@@ -1,0 +1,38 @@
+{
+  "_note": "Emissions factor sets for the dashboard Emissions page. Each factor set declares which axis its factors are keyed on; the loader resolves that axis onto the dashboard's common ESTO product/flow axes using leap_mappings outputs. Add a new entry and point active_factor_set at it to switch factor sources; nothing else in the dashboard needs to change.",
+  "active_factor_set": "ninth_edition_co2e_energy_weighted",
+  "mapping_sources": {
+    "_note": "Paths are resolved against the leap_mappings repository root (LEAP_MAPPINGS_ROOT, default ../leap_mappings). leap_mappings owns these mappings; the dashboard only reads them.",
+    "ninth_fuel_to_esto_workbook": "config/outlook_mappings_single_axis.xlsx",
+    "ninth_fuel_to_esto_sheet": "ninth_fuel_to_esto",
+    "esto_to_common_map": "results/common_esto/common_esto_rows.csv"
+  },
+  "factor_sets": [
+    {
+      "key": "ninth_edition_co2e_energy_weighted",
+      "label": "9th edition CO2e emissions factors (energy-weighted)",
+      "source_note": "9th edition energy-weighted CO2e factors by fuel/subfuel, 2025-04-03 extract.",
+      "path": "config/9th_edition_co2_emissions_factors_by_fuel_energy_weighted_20250403_122429.csv",
+      "mapping_axis": "ninth_fuel",
+      "factor_column": "CO2e emissions factor",
+      "unit_column": "Unit",
+      "gas_column": "Gas",
+      "gases": ["CARBON DIOXIDE"],
+      "emissions_unit": "Mt CO2e",
+      "blank_factor_means": "zero",
+      "ninth_fuel_axis": {
+        "_note": "The factor file is keyed on fuels + subfuels. Rows are collapsed to one 9th-edition fuel code: any subfuel other than the placeholder replaces its parent fuel. A parent row whose subfuel is the placeholder stands in for that fuel's '<fuel>_unallocated' 9th code, but only when no explicit unallocated subfuel row already supplies it - otherwise the parent row is a pure fuel-level aggregate and is dropped so its members are not double counted.",
+        "fuel_column": "fuels",
+        "subfuel_column": "subfuels",
+        "subfuel_placeholder": "x",
+        "unallocated_suffix": "_unallocated",
+        "drop_unresolved_rows": true
+      },
+      "ninth_conflict_resolution": "prefer_specific_then_mean",
+      "component_conflict_resolution": "mean",
+      "esto_product_factor_overrides": {
+        "_note": "Optional {esto_product: factor} escape hatch applied after the 9th-fuel join and before the common-axis collapse. Keys starting with _ are ignored."
+      }
+    }
+  ]
+}

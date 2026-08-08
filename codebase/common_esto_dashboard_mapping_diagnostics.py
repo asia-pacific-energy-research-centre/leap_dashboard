@@ -14,9 +14,14 @@ from pathlib import Path
 
 import pandas as pd
 
+from codebase.mapping_diagnostics_contract import (
+    load_mapping_diagnostics_contract,
+)
+
 
 #%%
 DIAGNOSTIC_PAGE_NAME = "mapping_diagnostics.html"
+APEC_ECONOMY = "00APEC"
 MAX_TABLE_ROWS = 30
 MAX_TREE_CHILDREN = 10
 MAX_TREE_DEPTH = 3
@@ -66,7 +71,11 @@ def load_esto_exact_values_for_economy(
     economy_key = str(economy).replace("_", "")
     selected_chunks: list[pd.DataFrame] = []
     for chunk in pd.read_csv(esto_exact_rows_path, usecols=columns, chunksize=250_000):
-        selected = chunk[chunk["economy"].astype(str).str.replace("_", "", regex=False).eq(economy_key)].copy()
+        selected = chunk.copy()
+        if economy_key:
+            selected = selected[
+                selected["economy"].astype(str).str.replace("_", "", regex=False).eq(economy_key)
+            ].copy()
         if min_year is not None:
             selected = selected[selected["year"] >= min_year]
         if max_year is not None:
@@ -220,8 +229,9 @@ def _three_significant_figures(value: float) -> str:
 def _context_value_formatter(values: list[float]) -> tuple[str, callable]:
     """Return one readable scale for a whole anchor case, not per-value rounding.
 
-    A shared scale keeps displayed siblings additive. Six decimal places after
-    scaling preserve useful source precision while avoiding floating-point noise.
+    A shared scale keeps the displayed values comparable. Two decimal places
+    after scaling keep the diagnostic trees readable; calculations continue to
+    use the unrounded values.
     """
     magnitude = max((abs(float(value)) for value in values), default=0.0)
     if magnitude >= 1_000_000:
@@ -235,7 +245,7 @@ def _context_value_formatter(values: list[float]) -> tuple[str, callable]:
         scaled = float(value) / divisor
         if scaled == 0:
             return "0"
-        return f"{scaled:,.6f}".rstrip("0").rstrip(".")
+        return f"{scaled:,.2f}".rstrip("0").rstrip(".")
 
     return label, format_value
 
@@ -350,12 +360,24 @@ def _mapped_target_structure_html(
     return body, note, detail_matches_total
 
 
-def _anchor_value_summary(anchor: pd.DataFrame) -> pd.DataFrame:
-    """Sum failed parent/child comparisons across all economies, scenarios, and years."""
-    required = {"status", "source_system", "validation_axis", "parent_code"}
-    if anchor.empty or not required.issubset(anchor.columns):
+def _value_failure_summary(
+    failures_source: pd.DataFrame,
+    comparison_value_column: str,
+    economy: str = "",
+    include_anchor_review_split: bool = False,
+) -> pd.DataFrame:
+    """Rank failed parent/comparison checks without double-counting scopes."""
+    required = {
+        "status",
+        "source_system",
+        "validation_axis",
+        "parent_code",
+        comparison_value_column,
+    }
+    if failures_source.empty or not required.issubset(failures_source.columns):
         return pd.DataFrame()
-    failures = anchor[anchor["status"].astype(str).eq("failed")].copy()
+    failures = _filter_dashboard_economy(failures_source, economy)
+    failures = failures[failures["status"].astype(str).eq("failed")].copy()
     if failures.empty:
         return pd.DataFrame()
     context_columns = [
@@ -369,41 +391,200 @@ def _anchor_value_summary(anchor: pd.DataFrame) -> pd.DataFrame:
             failures.sort_values("_scope_priority", kind="mergesort")
             .drop_duplicates(context_columns, keep="first")
         )
-    value_columns = ["parent_value", "frontier_sum", "difference", "abs_error"]
+    if "reason" not in failures.columns:
+        failures["reason"] = ""
+    value_columns = [
+        "parent_value",
+        comparison_value_column,
+        "difference",
+        "abs_error",
+    ]
     for column in value_columns:
         failures[column] = pd.to_numeric(failures.get(column, 0), errors="coerce").fillna(0.0)
+    aggregations: dict[str, tuple[str, object]] = {
+        "failed_checks": ("status", "size"),
+        "parent_total": ("parent_value", "sum"),
+        "children_total": (comparison_value_column, "sum"),
+        "net_difference": ("difference", "sum"),
+        "absolute_mismatch_total": ("abs_error", "sum"),
+        "failure_reasons": (
+            "reason",
+            lambda values: "; ".join(
+                sorted(set(values.dropna().astype(str)) - {"", "nan"})
+            ),
+        ),
+    }
+    if include_anchor_review_split and _has_explicit_anchor_review_fields(failures):
+        failures["_confirmed_issue_failed"] = _confirmed_source_issue_mask(failures)
+        failures["_unconfirmed_failed"] = ~failures["_confirmed_issue_failed"]
+        failures["_source_non_additivity_observed"] = (
+            failures.get(
+                "source_non_additivity_observed",
+                pd.Series(False, index=failures.index),
+            )
+            .astype(str)
+            .str.lower()
+            .eq("true")
+        )
+        aggregations.update({
+            "confirmed_issue_failed": ("_confirmed_issue_failed", "sum"),
+            "unconfirmed_failed": ("_unconfirmed_failed", "sum"),
+            "source_non_additivity_observed": (
+                "_source_non_additivity_observed",
+                "sum",
+            ),
+        })
     summary = (
         failures.groupby(["source_system", "validation_axis", "parent_code"], dropna=False)
-        .agg(
-            failed_checks=("status", "size"),
-            parent_total=("parent_value", "sum"),
-            children_total=("frontier_sum", "sum"),
-            net_difference=("difference", "sum"),
-            absolute_mismatch_total=("abs_error", "sum"),
-        )
+        .agg(**aggregations)
         .reset_index()
         .sort_values("absolute_mismatch_total", ascending=False, kind="mergesort")
     )
     return summary
 
 
-def _reviewed_anchor_exceptions(anchor: pd.DataFrame, economy: str) -> pd.DataFrame:
-    """Show reviewed source-data exceptions that were skipped, not hidden."""
-    required = {"status", "known_data_quality_exception"}
-    if anchor.empty or not required.issubset(anchor.columns):
-        return pd.DataFrame()
-    flagged = anchor[
-        anchor["status"].astype(str).eq("skipped")
-        & anchor["known_data_quality_exception"].astype(str).str.lower().eq("true")
+def _filter_dashboard_economy(frame: pd.DataFrame, economy: str) -> pd.DataFrame:
+    """Limit an artifact to the dashboard economy when the artifact has that axis."""
+    if frame.empty or not economy or "economy" not in frame.columns:
+        return frame.copy()
+    economy_key = str(economy).replace("_", "").strip()
+    economy_values = (
+        frame["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
+    )
+    return frame[economy_values.eq(economy_key)].copy()
+
+
+def _aggregate_stage_validation_to_apec(frame: pd.DataFrame) -> pd.DataFrame:
+    """Recalculate final-output hierarchy checks after summing economies."""
+    if frame.empty or not {"parent_value", "children_sum", "economy"}.issubset(frame.columns):
+        return frame.copy()
+    keys = [
+        column for column in [
+            "run_id", "validation_axis", "comparison_scope", "source_system",
+            "scenario", "other_axis_value", "parent_code", "year",
+        ] if column in frame.columns
+    ]
+    working = frame.copy()
+    working["parent_value"] = pd.to_numeric(working["parent_value"], errors="coerce").fillna(0.0)
+    working["children_sum"] = pd.to_numeric(working["children_sum"], errors="coerce").fillna(0.0)
+    result = working.groupby(keys, dropna=False, as_index=False).agg(
+        parent_value=("parent_value", "sum"),
+        children_sum=("children_sum", "sum"),
+        related_economy_count=("economy", "nunique"),
+    )
+    result["economy"] = APEC_ECONOMY
+    result["difference"] = result["parent_value"] - result["children_sum"]
+    result["abs_error"] = result["difference"].abs()
+    failed = result["abs_error"] > 0.01 * result["parent_value"].abs().clip(lower=1.0)
+    result["status"] = failed.map({True: "failed", False: "passed"})
+    result["reason"] = failed.map({True: "difference_exceeds_tolerance", False: "within_tolerance"})
+    return result
+
+
+def _exception_candidate_controls_html(
+    apec_anchor: pd.DataFrame,
+    economy_examples: pd.DataFrame,
+) -> str:
+    """Render reviewed-exception candidate controls for eligible source issues."""
+    if apec_anchor.empty or "source_non_additivity_observed" not in apec_anchor.columns:
+        return '<p class="empty-state">No exception-eligible APEC source issues.</p>'
+    candidates = apec_anchor[
+        apec_anchor["status"].astype(str).eq("failed")
+        & apec_anchor["source_non_additivity_observed"].astype(str).str.lower().eq("true")
     ].copy()
-    if economy and "economy" in flagged.columns:
-        flagged = flagged[
-            flagged["economy"].astype(str).str.replace("_", "", regex=False).eq(economy)
-        ]
+    if candidates.empty:
+        return '<p class="empty-state">No exception-eligible APEC source issues.</p>'
+    issue_columns = [
+        "validation_axis", "comparison_scope", "source_system", "scenario", "year",
+        "other_axis_value", "parent_code",
+    ]
+    examples = economy_examples.copy()
+    cards: list[str] = []
+    for number, row in enumerate(candidates.head(MAX_TABLE_ROWS).to_dict("records"), start=1):
+        related = examples.copy()
+        for column in issue_columns:
+            if column in related.columns:
+                related = related[related[column].astype(str).eq(str(row.get(column, "")))]
+        economies = sorted(set(related.get("economy", pd.Series(dtype=str)).astype(str)) - {"", APEC_ECONOMY})
+        economy_options = ''.join(
+            f'<option value="{escape(value)}">{escape(value)}</option>' for value in ["all", *economies]
+        )
+        payload = {
+            "source_system": row.get("source_system", ""),
+            "validation_axis": row.get("validation_axis", ""),
+            "parent_code": row.get("parent_code", ""),
+            "other_axis_value": row.get("other_axis_value", ""),
+            "scenario": row.get("scenario", ""),
+            "year": row.get("year", ""),
+            "parent_value": row.get("parent_value", ""),
+        }
+        encoded = escape(json.dumps(payload, ensure_ascii=False), quote=True)
+        cards.append(
+            f'<div class="exception-candidate" data-exception-payload="{encoded}">'
+            f'<strong>{escape(str(row.get("source_system", "")))} — '
+            f'{escape(str(row.get("parent_code", "")))}</strong>'
+            f'<span>{escape(str(row.get("other_axis_value", "")))}; '
+            f'{len(economies)} related economies</span>'
+            f'<label>Economy<select class="exception-economy">{economy_options}</select></label>'
+            '<label>Scenario<select class="exception-scenario"><option value="current">Current</option><option value="all">all</option></select></label>'
+            '<label>Year<select class="exception-year"><option value="current">Current</option><option value="all">all</option></select></label>'
+            '<label>Issue class<select class="exception-class"><option value="confirmed_source_non_additivity">confirmed_source_non_additivity</option><option value="confirmed_source_hierarchy_condition">confirmed_source_hierarchy_condition</option></select></label>'
+            f'<button type="button" class="prepare-exception" data-number="{number}">Prepare candidate row</button>'
+            '</div>'
+        )
+    return (
+        '<p class="subtle">These controls prepare a candidate for the '
+        '<code>source_mismatch_allowed</code> sheet. They do not approve or edit the workbook; '
+        'a reviewer must confirm the row.</p>'
+        + ''.join(cards)
+        + '<label>Prepared candidate row<textarea id="exception-candidate-output" rows="5" readonly></textarea></label>'
+        + '<button type="button" id="download-exception-candidate">Download candidate CSV</button>'
+    )
+
+
+def _confirmed_source_issue_mask(frame: pd.DataFrame) -> pd.Series:
+    """Identify explicit user confirmations without reinterpreting check status."""
+    if not _has_explicit_anchor_review_fields(frame):
+        return pd.Series(False, index=frame.index)
+    confirmed = (
+        frame["known_data_quality_exception"].astype(str).str.lower().eq("true")
+    )
+    confirmed &= (
+        frame["exception_review_status"].astype(str).str.lower().eq("confirmed")
+    )
+    return confirmed
+
+
+def _has_explicit_anchor_review_fields(frame: pd.DataFrame) -> bool:
+    """Return whether the artifact can distinguish confirmed review metadata."""
+    return {
+        "known_data_quality_exception",
+        "exception_review_status",
+    }.issubset(frame.columns)
+
+
+def _anchor_value_summary(anchor: pd.DataFrame, economy: str = "") -> pd.DataFrame:
+    """Sum failed source-to-mapped-frontier comparisons."""
+    return _value_failure_summary(
+        anchor,
+        "frontier_sum",
+        economy=economy,
+        include_anchor_review_split=True,
+    )
+
+
+def _reviewed_anchor_exceptions(anchor: pd.DataFrame, economy: str) -> pd.DataFrame:
+    """Show explicit source-issue confirmations independently of check status."""
+    if anchor.empty or "known_data_quality_exception" not in anchor.columns:
+        return pd.DataFrame()
+    scoped = _filter_dashboard_economy(anchor, economy)
+    flagged = scoped[_confirmed_source_issue_mask(scoped)].copy()
     columns = [
-        "source_system", "validation_axis", "parent_code", "other_axis_value", "economy",
-        "scenario", "year", "parent_value", "reason", "exception_resolution",
-        "data_quality_exception_notes",
+        "source_system", "validation_axis", "parent_code", "other_axis_value",
+        "economy", "scenario", "year", "status", "parent_value", "frontier_sum",
+        "difference", "abs_error", "reason", "source_non_additivity_observed",
+        "exception_id", "exception_review_status", "exception_issue_class",
+        "exception_resolution", "data_quality_exception_notes",
     ]
     return flagged.loc[:, [column for column in columns if column in flagged.columns]]
 
@@ -640,6 +821,23 @@ def _paired_tree_html(
             'This is a contradiction within the original source hierarchy, not evidence that a mapping row is missing.</p>'
             if float(row.parent_total) == 0 and float(row.children_total) != 0 else ""
         )
+        # Built here rather than nested in the card f-string: a replacement
+        # field cannot contain a backslash before Python 3.12, and the
+        # deployed Space runs an older interpreter than a maintainer's
+        # checkout.
+        detail_shortfall_note = (
+            ""
+            if detail_matches_total
+            else (
+                '<p class="source-warning">The mapped rows shown above add to '
+                f"{format_value(displayed_mapped_total)}, but the validator used "
+                f"{format_value(float(row.mapped_frontier_total))}. The unshown "
+                "contribution is "
+                f"{format_value(float(row.mapped_frontier_total) - displayed_mapped_total)}"
+                ". Do not use this card to diagnose the anchor difference until "
+                "that contribution is listed.</p>"
+            )
+        )
         cards.append(
             f'<article class="paired-case"><h3>{escape(source_system)} | {escape(str(row.validation_axis))} | '
             f'{escape(str(row.other_axis_value))}</h3><p class="subtle">{escape(str(row.scenarios))}; checked years: '
@@ -657,7 +855,7 @@ def _paired_tree_html(
             f'{mapped_branch_html}'
             f'<li class="tree-total"><span>{"Unique mapped comparison total" if detail_matches_total else "Validator mapped total (detail incomplete)"}</span><strong>{format_value(float(row.mapped_frontier_total))}</strong></li>'
             f'<li class="tree-residual"><span>Anchor difference (parent − mapped total)</span><strong>{format_value(float(row.mapped_difference))}</strong></li>'
-            f'</ul>{mapped_structure_note}{"" if detail_matches_total else f"<p class=\"source-warning\">The mapped rows shown above add to {format_value(displayed_mapped_total)}, but the validator used {format_value(float(row.mapped_frontier_total))}. The unshown contribution is {format_value(float(row.mapped_frontier_total) - displayed_mapped_total)}. Do not use this card to diagnose the anchor difference until that contribution is listed.</p>"}</section></div></article>'
+            f'</ul>{mapped_structure_note}{detail_shortfall_note}</section></div></article>'
         )
     return "".join(cards)
 
@@ -874,19 +1072,68 @@ def _rollup_boundary_details_html(
 def _rollup_graph_data(
     common_esto_tree: pd.DataFrame,
     rollup_catalogue: pd.DataFrame,
+    validation: pd.DataFrame | None = None,
+    economy: str = "",
 ) -> dict[str, object]:
-    """Return mapping-owned all-sector hierarchy and ESTO rollup inputs for the SVG."""
+    """Return mapping-owned hierarchy, rollup, and read-only QA metadata."""
     if common_esto_tree.empty or "axis" not in common_esto_tree.columns:
         return {"sectors": [], "boundaries": [], "parent": "", "children": []}
     tree = common_esto_tree[common_esto_tree["axis"].astype(str).eq("flow")].copy()
     if "level" not in tree.columns:
-        tree["level"] = 0
+        tree["level"] = tree["parent_code"].fillna("").astype(str).ne("").map({False: 1, True: 2})
+    if "label" not in tree.columns:
+        tree["label"] = tree["code"]
     tree["level"] = pd.to_numeric(tree["level"], errors="coerce").fillna(0).astype(int)
-    nodes = tree.sort_values(["level", "code"], kind="mergesort")[["code", "parent_code", "level"]].assign(
+    duplicate_codes = set(tree.loc[tree["code"].astype(str).duplicated(keep=False), "code"].astype(str))
+    tree_codes = set(tree["code"].astype(str))
+    validation_by_code: dict[str, dict[str, dict[str, object]]] = {}
+    if validation is not None and not validation.empty:
+        required = {"validation_axis", "source_system", "parent_code", "status"}
+        if required.issubset(validation.columns):
+            validation_rows = validation[
+                validation["validation_axis"].astype(str).eq("flow")
+            ].copy()
+            economy_key = str(economy).replace("_", "")
+            if economy_key and "economy" in validation_rows.columns:
+                validation_rows = validation_rows[
+                    validation_rows["economy"].astype(str).str.replace("_", "", regex=False).eq(economy_key)
+                ]
+            for (code, source), group in validation_rows.groupby(
+                ["parent_code", "source_system"], dropna=False, sort=False
+            ):
+                statuses = group["status"].astype(str)
+                reasons = sorted(
+                    set(group.get("reason", pd.Series(dtype=str)).dropna().astype(str)) - {"", "nan"}
+                )
+                validation_by_code.setdefault(str(code), {})[str(source)] = {
+                    "failed": int(statuses.eq("failed").sum()),
+                    "passed": int(statuses.eq("passed").sum()),
+                    "reasons": reasons[:4],
+                }
+    nodes = tree.sort_values(["level", "code"], kind="mergesort")[["code", "label", "parent_code", "level"]].assign(
         parent_code=lambda frame: frame["parent_code"].fillna("").astype(str),
         code=lambda frame: frame["code"].astype(str),
+        label=lambda frame: frame["label"].fillna("").astype(str),
     ).to_dict("records")
-    roots = tree[tree["parent_code"].fillna("").astype(str).eq("")]["code"].astype(str).tolist()
+    for node in nodes:
+        display_value = node["label"] or node["code"]
+        display_parts = display_value.split(" ", 1)
+        node["flow_code"] = display_parts[0]
+        node["flow_label"] = display_parts[1] if len(display_parts) > 1 else ""
+        node["is_ordinary_hierarchy"] = node["level"] > 0
+        flags = []
+        if node["code"] in duplicate_codes:
+            flags.append("DUPLICATE_FLOW_CODE")
+        if node["parent_code"] and node["parent_code"] not in tree_codes:
+            flags.append("ORPHAN_PARENT")
+        if node["level"] > 1 and not node["parent_code"]:
+            flags.append("ORPHANED_HIERARCHY_ROW")
+        node["structural_flags"] = flags
+        node["validation"] = validation_by_code.get(node["code"], {})
+    roots = tree[
+        tree["parent_code"].fillna("").astype(str).eq("")
+        & tree["level"].eq(1)
+    ]["code"].astype(str).tolist()
     sectors = []
     for root in roots:
         children = tree[tree["parent_code"].fillna("").astype(str).eq(root)]["code"].astype(str).tolist()
@@ -897,12 +1144,34 @@ def _rollup_graph_data(
     catalogue = rollup_catalogue[rollup_catalogue["source_system"].astype(str).eq("ESTO")].copy()
     id_column = "rollup_id" if "rollup_id" in catalogue.columns else "non_expanding_rollup_id"
     boundaries = []
-    for _, group in catalogue.groupby(id_column, dropna=False, sort=True):
+    for rollup_id, group in catalogue.groupby(id_column, dropna=False, sort=True):
         first = group.iloc[0]
+        modes = sorted(set(group["rollup_mode"].dropna().astype(str)) - {"", "nan"})
+        labels = sorted(set(group["rolled_flow_label"].dropna().astype(str)) - {"", "nan"})
+        inputs = [value for value in group["input_flow"].dropna().astype(str) if value not in {"", "nan"}]
+        flags = []
+        if len(modes) != 1:
+            flags.append("INCONSISTENT_ROLLUP_MODE")
+        if len(labels) != 1:
+            flags.append("INCONSISTENT_ROLLUP_TARGET")
+        if len(inputs) != len(set(inputs)):
+            flags.append("DUPLICATE_ROLLUP_INPUT")
+        if not labels or not inputs:
+            flags.append("INCOMPLETE_ROLLUP")
+        parent_values = set(group.get("parent_flow_label", pd.Series(dtype=str)).dropna().astype(str))
         boundaries.append({
+            "id": str(rollup_id),
             "label": str(first["rolled_flow_label"]),
             "mode": str(first["rollup_mode"]),
-            "inputs": sorted(set(group["input_flow"].dropna().astype(str)) - {"", "nan"}),
+            "inputs": sorted(set(inputs)),
+            "parent": sorted(parent_values - {"", "nan"})[0] if parent_values - {"", "nan"} else "",
+            "children": sorted({
+                child.strip()
+                for value in group.get("child_flow_labels", pd.Series(dtype=str)).dropna().astype(str)
+                for child in value.split(";")
+                if child.strip()
+            }),
+            "structural_flags": flags,
         })
     legacy_boundaries = [boundary for boundary in boundaries if boundary["label"].startswith("09")]
     return {
@@ -968,6 +1237,9 @@ def write_mapping_diagnostics_page(
     anchor_child_values_path = tree_root / "source_parent_anchor_child_values.csv"
     anchor_child_context_values_path = tree_root / "source_parent_anchor_child_context_values.csv"
     anchor_mapped_component_context_values_path = tree_root / "source_parent_anchor_mapped_component_context_values.csv"
+    anchor_economy_examples_path = tree_root / "source_parent_anchor_economy_examples.csv"
+    anchor_economy_child_context_values_path = tree_root / "source_parent_anchor_economy_child_context_values.csv"
+    anchor_economy_mapped_component_context_values_path = tree_root / "source_parent_anchor_economy_mapped_component_context_values.csv"
     leaf_reconciliation_candidates_path = tree_root / "source_parent_anchor_leaf_reconciliation_candidates.csv"
     stage_path = tree_root / "common_esto_validation.csv"
     partial_path = results_root / "common_esto" / "qa_common_esto_unresolved_partial_coverage.csv"
@@ -984,11 +1256,25 @@ def write_mapping_diagnostics_page(
     anchor_child_values = _read_csv(anchor_child_values_path)
     anchor_child_context_values = _read_csv(anchor_child_context_values_path)
     anchor_mapped_component_context_values = _read_csv(anchor_mapped_component_context_values_path)
+    anchor_economy_examples = _read_csv(anchor_economy_examples_path)
+    anchor_economy_child_context_values = _read_csv(anchor_economy_child_context_values_path)
+    anchor_economy_mapped_component_context_values = _read_csv(
+        anchor_economy_mapped_component_context_values_path
+    )
     leaf_reconciliation_candidates = _read_csv(leaf_reconciliation_candidates_path)
     stage = _read_csv(stage_path)
     ninth_tree = _read_csv(tree_root / "ninth_tree.csv")
     leap_tree = _read_csv(tree_root / "leap_tree.csv")
     common_esto_tree = _read_csv(tree_root / "common_esto_tree.csv")
+    contract_selection = load_mapping_diagnostics_contract(mappings_root)
+    contract_note = "Legacy tree artifacts (no canonical contract selected)"
+    if contract_selection is not None:
+        common_esto_tree = contract_selection["tree"]
+        stage = contract_selection["validation"]
+        contract_note = (
+            "Canonical hierarchy contract build: "
+            f"{str(contract_selection['build_id'])[:16]}"
+        )
     source_tree = _read_csv(tree_root / "all_dataset_trees.csv")
     partial = _read_csv(partial_path)
     unmapped = _read_csv(unmapped_path)
@@ -997,8 +1283,16 @@ def write_mapping_diagnostics_page(
     source_to_common = _read_csv(source_to_common_path)
     many_to_many = _read_csv(many_to_many_path)
     rollup_catalogue = _read_csv(rollup_catalogue_path)
+    # The hierarchy contract owns ordinary parent/child structure and value
+    # conformance. Registered rollup modes and membership remain authoritative
+    # in the mapping pipeline's rollup catalogue.
     rollup_boundary_register = _rollup_boundary_details_html(rollup_catalogue, common_esto_tree)
-    rollup_graph_data = _rollup_graph_data(common_esto_tree, rollup_catalogue)
+    rollup_graph_data = _rollup_graph_data(
+        common_esto_tree,
+        rollup_catalogue,
+        validation=stage,
+        economy=economy,
+    )
     transformation_graph_json = json.dumps(rollup_graph_data, ensure_ascii=False).replace("</", "<\\/")
     displayed_rollup_flows = {
         str(node.get("code", "")).strip()
@@ -1037,21 +1331,62 @@ def write_mapping_diagnostics_page(
             )["value"].sum().reset_index().to_dict("records"))
     rollup_value_json = json.dumps(rollup_value_records, ensure_ascii=False).replace("</", "<\\/")
 
-    stage_summary = _failure_summary(stage, ["source_system", "validation_axis", "parent_code"])
-    anchor_summary = _failure_summary(anchor, ["source_system", "validation_axis", "reason", "parent_code"])
-    anchor_value_summary = _anchor_value_summary(anchor)
     dashboard_economy = str(economy).replace("_", "").strip()
-    reviewed_anchor_exceptions = _reviewed_anchor_exceptions(anchor, dashboard_economy)
+    if dashboard_economy == APEC_ECONOMY:
+        stage = _aggregate_stage_validation_to_apec(stage)
+    scoped_stage = _filter_dashboard_economy(stage, dashboard_economy)
+    scoped_anchor = _filter_dashboard_economy(anchor, dashboard_economy)
+    scoped_leaf_reconciliation_candidates = _filter_dashboard_economy(
+        leaf_reconciliation_candidates,
+        dashboard_economy,
+    )
+    scoped_economy_examples = anchor_economy_examples.copy()
+    exception_candidate_controls = _exception_candidate_controls_html(
+        scoped_anchor,
+        scoped_economy_examples,
+    )
+
+    stage_value_summary = _value_failure_summary(scoped_stage, "children_sum")
+    if not stage_value_summary.empty:
+        stage_value_summary.insert(0, "check_layer", "Final output hierarchy")
+    anchor_value_summary = _anchor_value_summary(scoped_anchor)
+    anchor_failure_summary = anchor_value_summary.copy()
+    if not anchor_failure_summary.empty:
+        anchor_failure_summary.insert(0, "check_layer", "Source / mapping anchor")
+    hierarchy_failure_display = pd.concat(
+        [stage_value_summary, anchor_failure_summary],
+        ignore_index=True,
+    )
+    if "absolute_mismatch_total" in hierarchy_failure_display.columns:
+        hierarchy_failure_display = hierarchy_failure_display.sort_values(
+            "absolute_mismatch_total",
+            ascending=False,
+            kind="mergesort",
+        )
+    reviewed_anchor_exceptions = _reviewed_anchor_exceptions(
+        scoped_anchor,
+        dashboard_economy,
+    )
     ninth_paired_summary = _paired_anchor_aggregate_summary(
         anchor_child_context_values, "NINTH", dashboard_economy
     )
     leap_paired_summary = _paired_anchor_aggregate_summary(
         anchor_child_context_values, "LEAP", dashboard_economy
     )
-    anchor_value_display = anchor_value_summary.copy()
+    for column in [
+        "confirmed_issue_failed",
+        "unconfirmed_failed",
+        "source_non_additivity_observed",
+    ]:
+        if column in hierarchy_failure_display.columns:
+            hierarchy_failure_display[column] = hierarchy_failure_display[column].map(
+                lambda value: "" if pd.isna(value) else int(value)
+            )
     for column in ["parent_total", "children_total", "net_difference", "absolute_mismatch_total"]:
-        if column in anchor_value_display.columns:
-            anchor_value_display[column] = anchor_value_display[column].map(_three_significant_figures)
+        if column in hierarchy_failure_display.columns:
+            hierarchy_failure_display[column] = hierarchy_failure_display[column].map(
+                _three_significant_figures
+            )
     coverage_summary = (
         coverage.groupby([column for column in ["coverage_status", "mapping_status"] if column in coverage.columns], dropna=False)
         .size().reset_index(name="rows").sort_values("rows", ascending=False, kind="mergesort")
@@ -1089,11 +1424,54 @@ def write_mapping_diagnostics_page(
                 "n_targets_for_source", "n_sources_for_target", "cardinality",
             ])
         )
+    stage_failed = (
+        scoped_stage["status"].astype(str).eq("failed")
+        if "status" in scoped_stage.columns
+        else pd.Series(False, index=scoped_stage.index)
+    )
+    anchor_failed = (
+        scoped_anchor["status"].astype(str).eq("failed")
+        if "status" in scoped_anchor.columns
+        else pd.Series(False, index=scoped_anchor.index)
+    )
+    has_anchor_review_fields = _has_explicit_anchor_review_fields(scoped_anchor)
+    anchor_confirmed = _confirmed_source_issue_mask(scoped_anchor)
+    anchor_review_metrics = (
+        [
+            {
+                "metric": "Confirmed source issues among failed anchor rows",
+                "rows": int((anchor_failed & anchor_confirmed).sum()),
+            },
+            {
+                "metric": "Unconfirmed failed anchor rows",
+                "rows": int((anchor_failed & ~anchor_confirmed).sum()),
+            },
+        ]
+        if has_anchor_review_fields
+        else [
+            {
+                "metric": "Failed anchor rows without explicit review fields",
+                "rows": int(anchor_failed.sum()),
+            },
+        ]
+    )
+    reviewed_anchor_note = (
+        "These exact contexts were confirmed by a person in the exception workbook. "
+        "Confirmation records a known source-data condition; it does not turn a failed "
+        "check into a pass, prove the mapping is correct, or prove the source issue "
+        "caused the mapped-anchor failure."
+        if has_anchor_review_fields
+        else (
+            "This anchor artifact predates the explicit confirmation fields, so legacy "
+            "flags are not relabelled as confirmed source issues. Rerun the mapping "
+            "validation to populate the current review classification."
+        )
+    )
     summary = pd.DataFrame([
-        {"metric": "Stage 3 failed hierarchy checks", "rows": int(len(stage[stage.get("status", "").astype(str).eq("failed")])) if not stage.empty else 0},
-        {"metric": "Failed anchor checks", "rows": int(len(anchor[anchor.get("status", "").astype(str).eq("failed")])) if not anchor.empty else 0},
-        {"metric": "Reviewed anchor exceptions (skipped but flagged)", "rows": int(len(reviewed_anchor_exceptions))},
-        {"metric": "Leaf-reconciliation exception candidates", "rows": int(len(leaf_reconciliation_candidates))},
+        {"metric": "Failed final-output hierarchy detail rows", "rows": int(stage_failed.sum())},
+        {"metric": "Failed anchor detail rows", "rows": int(anchor_failed.sum())},
+        *anchor_review_metrics,
+        {"metric": "Leaf-reconciliation exception candidates", "rows": int(len(scoped_leaf_reconciliation_candidates))},
         {"metric": "Actionable partial-coverage rows", "rows": int(len(partial))},
         {"metric": "Non-zero unmapped LEAP branches", "rows": int(len(unmapped))},
         {"metric": "LEAP source-presence conflicts", "rows": int(len(conflicts))},
@@ -1108,25 +1486,26 @@ def write_mapping_diagnostics_page(
     artifact_notes = "<br>".join(escape(_artifact_note(path)) for path in [anchor_path, stage_path, partial_path, unmapped_path, conflicts_path, coverage_path, source_to_common_path, many_to_many_path])
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mapping diagnostics</title><style>
+<title>APEC-wide mapping diagnostics</title><style>
 body {{ font-family: Inter,Segoe UI,Arial,sans-serif; margin:0; background:#f4f6f8; color:#172033; }}
 .shell {{ max-width:1600px; margin:auto; padding:20px; }} header {{ background:white; border:1px solid #d9e1ea; border-radius:12px; padding:18px 22px; }}
 h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b7a; }} .metrics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:16px 0; }}
 .metric-card,.panel {{ background:white; border:1px solid #d9e1ea; border-radius:10px; padding:14px; }} .metric-card span {{ display:block; color:#5f6b7a; font-size:13px; }} .metric-card strong {{ font-size:28px; }} .collapsed-panel summary {{ cursor:pointer; display:flex; align-items:center; justify-content:space-between; }} .collapsed-panel summary h2 {{ margin:0; }} .collapsed-panel summary span {{ color:#1b5e9a; font-size:0; }} .collapsed-panel[open] summary span::after {{ content:'Hide'; font-size:13px; }} .collapsed-panel:not([open]) summary span::after {{ content:'Show'; font-size:13px; }} .collapsed-panel > div {{ margin-top:14px; }}
+.exception-candidate {{ display:grid; grid-template-columns:minmax(260px,2fr) repeat(4,minmax(150px,1fr)) auto; gap:10px; align-items:end; border-top:1px solid #d9e1ea; padding:12px 0; }} .exception-candidate span {{ color:#5f6b7a; }} .exception-candidate label {{ display:grid; gap:4px; font-size:12px; }} .exception-candidate select,.exception-candidate button,textarea {{ font:inherit; padding:7px; }} #exception-candidate-output {{ width:100%; box-sizing:border-box; margin-top:8px; }} @media (max-width:1100px) {{ .exception-candidate {{ grid-template-columns:1fr 1fr; }} }}
 .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:16px; }} .guide-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; }} .guide-card {{ border-radius:8px; padding:10px; font-size:13px; line-height:1.4; }} .guide-card strong {{ display:block; margin-bottom:3px; }} .guide-good {{ background:#e8f5e9; color:#176b35; }} .guide-warning {{ background:#fff4e5; color:#8a4b08; }} .guide-neutral {{ background:#e8f0fa; color:#294f78; }} .flow {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }} .flow div {{ background:#e8f0fa; border:1px solid #adc4df; border-radius:8px; padding:10px; font-size:13px; }} .arrow {{ color:#53718f; font-size:22px; }}
 .paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .value-tree li.tree-category {{ display:block; border-bottom:0; color:#5f6b7a; font-size:12px; font-weight:600; padding-top:10px; }} .value-tree li.tree-structural {{ color:#5f6b7a; font-style:italic; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .helper-note,.source-warning {{ font-size:12px; line-height:1.4; margin:10px 0 0; padding:8px; border-radius:6px; }} .helper-note {{ background:#e8f5e9; color:#176b35; }} .source-warning {{ background:#fff4e5; color:#8a4b08; }} .value-tree li.optional-zero {{ display:none; }} body.show-zero-children .value-tree li.optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
 .transformation-diagram {{ display:grid; grid-template-columns:minmax(260px,0.8fr) minmax(520px,2fr); gap:16px; }} .ordinary-hierarchy,.rollup-boundaries {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .ordinary-hierarchy h3,.rollup-boundaries h3,.rollup-boundary h3,.rollup-boundary h4 {{ margin:0 0 8px; }} .tree-root {{ background:#dceaf8; border:1px solid #8eb2d4; border-radius:6px; font-weight:600; padding:8px; }} .ordinary-hierarchy ul,.rollup-boundary ul {{ list-style:none; padding-left:12px; margin:8px 0; }} .ordinary-hierarchy li,.rollup-boundary li {{ margin:5px 0; }} .solid-edge {{ color:#2d6a9f; font-weight:700; margin-right:4px; }} .dashed-edge {{ color:#7c5b00; font-weight:700; margin-left:6px; }} .rollup-boundary {{ border:1px solid #d9e1ea; border-left:5px solid #3d7fb1; border-radius:8px; padding:10px; margin-top:10px; background:#fff; }} .rollup-boundary.detached {{ border-left-color:#9b5c00; background:#fffaf0; }} .mode-pill {{ display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#dceaf8; color:#174b73; }} .detached .mode-pill {{ background:#ffe7ba; color:#754300; }} .boundary-columns {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px; }} .artifact-id {{ margin:8px 0 0; color:#5f6b7a; font-family:ui-monospace,monospace; font-size:11px; }} .rollup-controls {{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:12px 0; }} .rollup-controls label {{ display:grid; gap:3px; color:#5f6b7a; font-size:12px; }} .rollup-controls select {{ min-width:140px; padding:6px; }} .rollup-value {{ float:right; font-variant-numeric:tabular-nums; color:#5f6b7a; }} .rollup-check.value-pass,.rollup-boundary.value-pass {{ background:#ecf8ef; border-color:#5dae70; }} .rollup-check.value-fail,.rollup-boundary.value-fail {{ background:#fff0f0; border-color:#c95d5d; }} .rollup-check.value-pass .rollup-value,.rollup-boundary.value-pass .rollup-value {{ color:#176b35; }} .rollup-check.value-fail .rollup-value,.rollup-boundary.value-fail .rollup-value {{ color:#9b1c1c; }} @media (max-width:760px) {{ .paired-trees,.transformation-diagram,.boundary-columns {{ grid-template-columns:1fr; }} }}
-.rollup-graph-toolbar {{ display:flex; align-items:center; gap:8px; margin:12px 0 8px; }} .rollup-graph-toolbar button {{ padding:5px 10px; cursor:pointer; }} .rollup-graph-help {{ color:#5f6b7a; font-size:12px; }} .rollup-graph-wrap {{ height:720px; overflow:hidden; border:1px solid #d9e1ea; border-radius:8px; background:#fbfdff; cursor:grab; touch-action:none; }} .rollup-graph-wrap.dragging {{ cursor:grabbing; }} #rollup-graph {{ width:max-content; transform-origin:0 0; }} #rollup-graph text {{ font-family:Inter,Segoe UI,Arial,sans-serif; font-size:12px; fill:#172033; }} #rollup-graph .node rect {{ fill:#fff; stroke:#8eb2d4; stroke-width:1.5; rx:8; }} #rollup-graph .node.boundary rect {{ fill:#edf5fc; }} #rollup-graph .node.expanding rect {{ fill:#e9f6ee; stroke:#438a5b; }} #rollup-graph .node.detached rect {{ fill:#fff5df; stroke:#b77b13; }} #rollup-graph .node.value-pass rect {{ fill:#ecf8ef; stroke:#5dae70; }} #rollup-graph .node.value-fail rect {{ fill:#fff0f0; stroke:#c95d5d; }} #rollup-graph .edge {{ stroke:#53718f; stroke-width:1.6; marker-end:url(#arrow); }} #rollup-graph .edge.dashed {{ stroke:#987216; stroke-dasharray:6 5; }} #rollup-graph .mode {{ font-size:10px; font-weight:700; fill:#335b7d; }} #rollup-graph .value {{ font-size:11px; font-weight:700; fill:#5f6b7a; }}
+.rollup-explainer {{ display:grid; grid-template-columns:repeat(4,minmax(180px,1fr)); gap:8px; margin:10px 0 14px; }} .rollup-explainer div {{ border:1px solid #d9e1ea; border-radius:7px; padding:9px; font-size:12px; line-height:1.4; }} .rollup-explainer strong {{ display:block; margin-bottom:3px; }} .rollup-filter-grid {{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:8px 0; }} .rollup-filter-grid label {{ display:grid; gap:3px; color:#5f6b7a; font-size:12px; }} .rollup-filter-grid select,.rollup-filter-grid input {{ min-width:150px; padding:6px; }} .rollup-filter-grid input {{ min-width:230px; }} .rollup-filter-grid .special-rollup-toggle {{ align-self:center; display:flex; align-items:center; gap:7px; max-width:210px; color:#334155; }} .rollup-filter-grid .special-rollup-toggle input {{ min-width:0; width:auto; padding:0; }} .basis-state {{ align-self:center; border-radius:999px; background:#e8f0fa; color:#174b73; font-size:12px; font-weight:700; padding:6px 10px; }} .rollup-legend {{ display:flex; flex-wrap:wrap; gap:12px; margin:8px 0; color:#445266; font-size:12px; }} .legend-line {{ display:inline-block; width:28px; border-top:3px solid #53718f; margin-right:5px; vertical-align:middle; }} .legend-line.rollup {{ border-color:#987216; border-top-style:dotted; }} .legend-line.detached {{ border-color:#9b5c00; border-top-style:dashed; }} .rollup-graph-toolbar {{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:10px 0 8px; }} .rollup-graph-toolbar button {{ padding:5px 10px; cursor:pointer; }} .rollup-graph-help {{ color:#5f6b7a; font-size:12px; }} .rollup-graph-wrap {{ height:620px; overflow:auto; border:1px solid #d9e1ea; border-radius:8px; background:#fbfdff; }} #rollup-graph {{ min-height:200px; }} #rollup-graph svg {{ display:block; }} #rollup-graph text {{ font-family:Inter,Segoe UI,Arial,sans-serif; font-size:13px; fill:#172033; pointer-events:none; }} #rollup-graph .node {{ cursor:pointer; }} #rollup-graph .node rect {{ fill:#fff; stroke:#8eb2d4; stroke-width:1.6; rx:8; }} #rollup-graph .node.root rect {{ fill:#edf5fc; stroke:#3d7fb1; }} #rollup-graph .node.extended-only rect {{ fill:#f1edff; stroke:#7656b5; }} #rollup-graph .node.boundary rect {{ fill:#edf5fc; stroke-width:2.2; }} #rollup-graph .node.expanding rect {{ fill:#e9f6ee; stroke:#438a5b; }} #rollup-graph .node.non_expanding rect {{ fill:#eaf3ff; stroke:#356c9b; stroke-dasharray:5 3; }} #rollup-graph .node.detached rect {{ fill:#fff5df; stroke:#b77b13; stroke-dasharray:2 3; }} #rollup-graph .node.selected rect {{ stroke:#13233a; stroke-width:4; }} #rollup-graph .node.neighbour rect {{ stroke-width:3; }} #rollup-graph .node.issue rect {{ fill:#fff0f0; stroke:#c95d5d; }} #rollup-graph .node.value-pass rect {{ filter:drop-shadow(0 0 2px #5dae70); }} #rollup-graph .node.value-fail rect {{ fill:#fff0f0; stroke:#c95d5d; }} #rollup-graph .edge {{ fill:none; stroke:#53718f; stroke-width:1.8; marker-end:url(#hierarchy-arrow); }} #rollup-graph .edge.rollup {{ stroke:#987216; stroke-width:2.2; stroke-dasharray:3 5; marker-end:url(#rollup-arrow); }} #rollup-graph .edge.detached {{ stroke:#9b5c00; stroke-dasharray:10 5; }} #rollup-graph .edge.dimmed,.node.dimmed {{ opacity:.16; }} #rollup-graph .mode {{ font-size:10px; font-weight:800; letter-spacing:.4px; fill:#335b7d; }} #rollup-graph .value {{ font-size:11px; font-weight:700; fill:#5f6b7a; }} #rollup-graph .origin {{ font-size:10px; fill:#7656b5; }} .graph-empty {{ padding:34px; color:#5f6b7a; text-align:center; }} .rollup-summary {{ margin-top:14px; }} .rollup-summary h3 {{ margin-bottom:6px; }} .rollup-summary-status {{ color:#5f6b7a; font-size:12px; margin:0 0 8px; }} #rollup-summary-table tr.issue-row td {{ background:#fff4f4; }} #rollup-summary-table tr.detached-row td {{ background:#fffaf0; }} @media (max-width:900px) {{ .rollup-explainer {{ grid-template-columns:1fr 1fr; }} }} @media (max-width:620px) {{ .rollup-explainer {{ grid-template-columns:1fr; }} }}
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
-</style></head><body><div class="shell"><header><a href="index.html">← Dashboard overview</a><h1>Mapping diagnostics</h1><p class="subtle">Read-only inspection of hierarchy/anchor validation and direct mapping coverage. Updated: {escape(dashboard_updated_label)}</p></header>
+</style></head><body><div class="shell"><header><a href="#" onclick="history.back();return false;">← Back to economy dashboard</a><h1>APEC-wide mapping diagnostics</h1><p class="subtle">Structural checks start from the summed APEC balance. Economy evidence is calculated only for failed APEC anchors. Updated: {escape(dashboard_updated_label)}<br>{escape(contract_note)}</p></header>
 <section class="panel"><h2>How to read a hierarchy case</h2><div class="guide-grid"><div class="guide-card guide-good"><strong>Manual LEAP roll-up</strong>Only constructed LEAP subtotal branches receive this label; they are compared with their immediate source-tree children.</div><div class="guide-card guide-good"><strong>One-to-many fan-out</strong>One raw parent can reach several ESTO components. Those routes are not additional source-tree parents.</div><div class="guide-card guide-neutral"><strong>De-duplicated frontier</strong>Mapped component rows can overlap. The frontier counts each Common ESTO row once, so do not add the displayed component rows.</div><div class="guide-card guide-warning"><strong>Raw source contradiction</strong>If a raw parent is 0 while its children are non-zero, the original source hierarchy disagrees with itself. It is not, by itself, a missing mapping.</div></div></section>
 <div class="metrics">{cards}</div>
 <section class="panel"><h2>How the anchor validator connects the hierarchies</h2><div class="flow"><div>Raw source parent</div><span class="arrow">→</span><div>Raw source child tree</div><span class="arrow">→</span><div>Mapped Common ESTO frontier</div><span class="arrow">→</span><div>Comparison values</div><span class="arrow">→</span><div>Passed / failed / skipped reason</div></div><p class="subtle">The tables below match each raw parent/children context to its branch-level summed absolute mismatch and rank. This makes the materiality ranking and the exact source evidence visible together.</p></section>
 <details class="panel collapsed-panel"><summary><h2>All rollup boundaries</h2><span></span></summary><div><p class="subtle">Mapping-owned rollup edges across every ESTO flow. Green means a rolled value equals its contributors within tolerance; red means it does not. Values aggregate all products for the chosen source, scenario, and year.</p><div class="rollup-controls"><label>Dataset<select id="rollup-source"></select></label><label>Scenario<select id="rollup-scenario"></select></label><label>Year<select id="rollup-year"></select></label></div>{rollup_boundary_register}</div></details>
-<section class="panel"><h2>All sector rollup structure</h2><p class="subtle">Every top-level ESTO flow sector and its direct ordinary children are shown. Dotted arrows are every registered ESTO rollup composition. The same source, scenario, and year selection above controls node values and green/red reconciliation status.</p><div class="rollup-graph-toolbar"><button type="button" id="rollup-zoom-out">−</button><button type="button" id="rollup-zoom-reset">Reset view</button><button type="button" id="rollup-zoom-in">+</button><span class="rollup-graph-help">Scroll to zoom; drag to pan.</span></div><div class="rollup-graph-wrap"><div id="rollup-graph"></div></div></section>
-<details class="panel collapsed-panel"><summary><h2>Stage 3 hierarchy failures</h2><span></span></summary><div>{_table_html(stage_summary, ['source_system','validation_axis','parent_code','rows'])}</div></details>
-<details class="panel collapsed-panel"><summary><h2>Largest summed anchor mismatches</h2><span></span></summary><div><p class="subtle">Parent and children totals are sums across all failed rows; net difference is parent minus children, while absolute mismatch does not allow opposite signs to cancel.</p>{_table_html(anchor_value_display, ['source_system','validation_axis','parent_code','failed_checks','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Failure reasons</h3>{_table_html(anchor_summary, ['source_system','validation_axis','reason','parent_code','rows'])}</div></details>
-<details class="panel collapsed-panel"><summary><h2>Reviewed source-hierarchy exceptions</h2><span></span></summary><div><p class="subtle">These are known source-data conditions from the exception workbook. They are skipped from actionable anchor failures but remain visible here with their review notes.</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','reason','exception_resolution','data_quality_exception_notes'])}<h3>Leaf-reconciliation candidates awaiting review</h3><p class="subtle">These are not exceptions yet. Their immediate children do not reconcile, while their descendant leaves do; review before copying an enabled row into <code>source_mismatch_allowed</code>.</p>{_table_html(leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>
+<section class="panel"><h2>All sector rollup structure</h2><p class="subtle">Start with the collapsed major-sector overview, choose a sector, or search for a flow. The graph never treats rollup composition as an ordinary hierarchy branch.</p><div class="rollup-explainer"><div><strong>Normal hierarchy</strong>A solid blue arrow means the child has the displayed parent in the ESTO flow tree.</div><div><strong>Registered rollup</strong>A dotted ochre arrow means the input contributes to a compiled comparison boundary; it is not another parent-child edge.</div><div><strong>NON_EXPANDING vs DETACHED</strong>NON_EXPANDING replaces a comparison frontier without adding another hierarchy branch. DETACHED remains outside ordinary ancestor totals and is intentional, not an orphan.</div><div><strong>ESTO Extended</strong>Extended-only rows are purple. “ESTO + Extended” makes both datasets selectable; “Compare” shows both values side by side without adding them.</div></div><div class="rollup-filter-grid"><label>ESTO basis<select id="rollup-basis"><option value="original">Original ESTO only</option><option value="plus">ESTO + ESTO Extended</option><option value="compare">Compare ESTO vs Extended</option></select></label><label>Major sector<select id="rollup-sector"></select></label><label>Rollup type<select id="rollup-mode"><option value="NONE" selected>Hierarchy only</option><option value="ALL">All rollup types</option><option value="EXPANDING">EXPANDING</option><option value="NON_EXPANDING">NON_EXPANDING</option><option value="DETACHED">DETACHED</option></select></label><label>Validation/status<select id="rollup-status"><option value="ALL">All statuses</option><option value="ISSUES">Issues only</option><option value="PASS">Reconciled only</option><option value="UNAVAILABLE">Unavailable only</option></select></label><label>Search for a flow<input id="rollup-search" type="search" placeholder="Code or label" autocomplete="off"></label><span class="basis-state" id="rollup-basis-state">Showing original ESTO only</span></div><div class="rollup-legend"><span><i class="legend-line"></i>normal hierarchy</span><span><i class="legend-line rollup"></i>rollup composition</span><span><i class="legend-line detached"></i>intentional DETACHED boundary</span><span>Purple node = Extended-only addition; red = orphan, duplicate, inconsistency, or failed validation.</span></div><div class="rollup-graph-toolbar"><button type="button" id="rollup-fit">Fit width</button><button type="button" id="rollup-zoom-out">−</button><button type="button" id="rollup-zoom-reset">100%</button><button type="button" id="rollup-zoom-in">+</button><button type="button" id="rollup-clear-selection">Clear selection</button><span class="rollup-graph-help">Click a node to highlight its parent, children, and rollup relationships. Choose a major sector (or click one) to expand it.</span></div><div class="rollup-graph-wrap"><div id="rollup-graph"></div></div><div class="rollup-summary"><h3>Rows in the current graph</h3><p class="rollup-summary-status" id="rollup-summary-status"></p><div class="table-scroll"><table id="rollup-summary-table"><thead><tr><th>Flow code</th><th>Flow label</th><th>Parent flow</th><th>Relationship type</th><th>Rollup type</th><th>Original / Extended</th><th>Child count</th><th>Rollup membership</th><th>Validation / status</th></tr></thead><tbody></tbody></table></div></div></section>
+<details class="panel collapsed-panel"><summary><h2>Hierarchy validation: failures and reviewed exceptions</h2><span></span></summary><div><p class="subtle">Each check compares one APEC parent with the rows that should account for it in the same scenario, year, and opposite-axis category. A failure means the difference exceeded tolerance or the comparison frontier was incomplete; it does not automatically mean a mapping is missing.</p><div class="guide-grid"><div class="guide-card guide-neutral"><strong>Final output hierarchy</strong>Checks whether each Common ESTO parent equals the sum of its declared output children after summing economies.</div><div class="guide-card guide-neutral"><strong>Source / mapping anchor</strong>Checks whether an APEC raw-source parent equals its de-duplicated mapped Common ESTO frontier.</div><div class="guide-card guide-warning"><strong>How to interpret a failure</strong>Review the APEC mismatch first, then open related economy evidence. Causes include incomplete mapped coverage, a raw source contradiction, or a hierarchy rule that needs review.</div></div><h3>Failed APEC checks ranked by materiality</h3><p class="subtle">Confirmed source issues remain in numerical failure totals; review metadata never turns a failed check into a pass.</p>{_table_html(hierarchy_failure_display, ['check_layer','source_system','validation_axis','parent_code','failure_reasons','failed_checks','confirmed_issue_failed','unconfirmed_failed','source_non_additivity_observed','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Confirmed source issues attached to anchor evidence</h3><p class="subtle">{escape(reviewed_anchor_note)}</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','status','parent_value','frontier_sum','difference','abs_error','reason','source_non_additivity_observed','exception_id','exception_review_status','exception_issue_class','exception_resolution','data_quality_exception_notes'])}<h3>Exception candidates awaiting review</h3><p class="subtle">These are not confirmed issues. Their immediate children fail to reconcile while all descendant leaves reconcile; review the source hierarchy before confirming an exact context.</p>{_table_html(scoped_leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>
+<details class="panel collapsed-panel"><summary><h2>Related economy evidence</h2><span></span></summary><div><p class="subtle">Economies are calculated only after an APEC anchor fails. Failed examples are shown first; passing related contexts remain available as supporting evidence.</p>{_table_html(scoped_economy_examples, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','status','parent_value','frontier_sum','difference','abs_error','reason','attribution_status','known_data_quality_exception','exception_id'])}</div></details>
+<details class="panel collapsed-panel"><summary><h2>Prepare reviewed source exception</h2><span></span></summary><div>{exception_candidate_controls}</div></details>
 <label class="zero-toggle"><input id="show-zero-children" type="checkbox" autocomplete="off" onchange="document.body.classList.toggle('show-zero-children', this.checked)"> Show zero-value children and mapped components</label>
 <section class="panel"><h2>NINTH flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, common_esto_tree, 'NINTH', anchor_mapped_component_context_values, dashboard_economy)}</section>
 <section class="panel"><h2>LEAP flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(leap_paired_summary, leap_tree, common_esto_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy)}</section>
@@ -1143,9 +1522,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     rollup_controls_html = (
         '<div class="rollup-controls"><label>Dataset<select id="rollup-source"></select></label>'
         '<label>Scenario<select id="rollup-scenario"></select></label>'
-        '<label>Year<select id="rollup-year"></select></label>'
-        '<label id="include-esto-extended-control"><input id="include-esto-extended" type="checkbox"> '
-        'Include ESTO Extended</label></div>'
+        '<label>Year<select id="rollup-year"></select></label></div>'
     )
     graph_heading_html = '<section class="panel"><h2>All sector rollup structure</h2>'
     html = html.replace('String(x)===String(selected)));', 'String(x)===String(selected))));')
@@ -1153,6 +1530,39 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
         'unique(ROLLUP_VALUES.map(r=>r.source_system))',
         "unique(ROLLUP_VALUES.filter(r=>r.source_system!=='ESTO_RAW').map(r=>r.source_system))",
     )
+    html = html.replace(
+        "Start with the collapsed major-sector overview, choose a sector, or search for a flow. "
+        "The graph never treats rollup composition as an ordinary hierarchy branch.",
+        "Start with the collapsed major-sector overview, choose a sector, or search for a flow. "
+        "EXPANDING rollups appear in the hierarchy view by default. Tick the special-rollup "
+        "checkbox to add NON_EXPANDING and DETACHED targets and display relationships; detailed "
+        "rule definitions remain in the tables on this page.",
+    )
+    html = html.replace(
+        '<label>Rollup type<select id="rollup-mode"><option value="NONE" selected>Hierarchy only</option>'
+        '<option value="ALL">All rollup types</option><option value="EXPANDING">EXPANDING</option>'
+        '<option value="NON_EXPANDING">NON_EXPANDING</option><option value="DETACHED">DETACHED</option>'
+        '</select></label>',
+        '<label class="special-rollup-toggle"><input id="show-special-rollups" '
+        'type="checkbox" autocomplete="off"> Show NON_EXPANDING and DETACHED rollups</label>',
+    )
+    html = html.replace(
+        "A dotted ochre arrow means the input contributes to a compiled comparison boundary; "
+        "it is not another parent-child edge.",
+        "A dotted ochre arrow shows display membership in a compiled comparison boundary; "
+        "the target box identifies its rollup mode.",
+    )
+    html = html.replace("rollup composition</span>", "rollup display relationship</span>")
+    html = html.replace("<th>Parent flow</th>", "<th>Displayed parent</th>")
+    html = html.replace("<th>Child count</th>", "<th>Displayed children</th>")
+    rollup_summary_start = html.find('<div class="rollup-summary">')
+    if rollup_summary_start >= 0:
+        rollup_summary_end = html.find("</section>", rollup_summary_start)
+        if rollup_summary_end >= 0:
+            html = (
+                html[:rollup_summary_start]
+                + html[rollup_summary_end:]
+            )
     html = html.replace(existing_rollup_controls_html, "", 1)
     html = html.replace(graph_heading_html, graph_heading_html + rollup_controls_html, 1)
 
@@ -1308,6 +1718,630 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
         '    svg += `<text class="mode" x="30" y="${cursorY}">ORDINARY ESTO FLOW HIERARCHY',
         '    renderFullHierarchy();\n    svg += `<text class="mode" x="30" y="${cursorY}">ORDINARY ESTO FLOW HIERARCHY',
     )
+    # The first graph renderer is retained above only while the surrounding
+    # legacy inline page template is progressively split up. This focused
+    # renderer replaces its output and deliberately keeps hierarchy and rollup
+    # composition as separate visual layers.
+    all_sector_graph_script = """
+<script>
+(() => {
+  const graph = ROLLUP_GRAPH;
+  const nodes = graph.nodes || [];
+  const ordinaryNodes = nodes.filter(node => node.is_ordinary_hierarchy);
+  const boundaries = graph.all_boundaries || [];
+  const nodeByCode = new Map(nodes.map(node => [node.code, node]));
+  const showSpecialRollups = document.querySelector('#show-special-rollups');
+  const activeBoundaries = () => boundaries.filter(
+    boundary => boundary.mode === 'EXPANDING' || showSpecialRollups.checked
+  );
+  const hierarchyBoundaries = () => activeBoundaries().filter(
+    boundary => boundary.mode === 'EXPANDING'
+  );
+  const boundariesForTarget = code => activeBoundaries().filter(
+    boundary => boundary.label === code
+  );
+  const rollupModesFor = code => uniqueSorted(
+    boundariesForTarget(code).map(boundary => boundary.mode)
+  );
+  const displayParentFor = code => {
+    const ordinaryParent = nodeByCode.get(code)?.parent_code || '';
+    if (ordinaryParent) return ordinaryParent;
+    const inputBoundary = hierarchyBoundaries().find(boundary => boundary.inputs.includes(code));
+    if (inputBoundary) return inputBoundary.label;
+    const targetBoundary = boundariesForTarget(code)
+      .filter(boundary => boundary.mode === 'EXPANDING')
+      .find(boundary => boundary.parent);
+    return targetBoundary?.parent || '';
+  };
+  const displayChildrenFor = code => nodes
+    .filter(node => displayParentFor(node.code) === code)
+    .map(node => node.code);
+  const roots = ordinaryNodes
+    .filter(node => !node.parent_code && Number(node.level) === 1)
+    .map(node => node.code)
+    .sort();
+  const basis = document.querySelector('#rollup-basis');
+  const sector = document.querySelector('#rollup-sector');
+  const status = document.querySelector('#rollup-status');
+  const search = document.querySelector('#rollup-search');
+  const basisState = document.querySelector('#rollup-basis-state');
+  const viewport = document.querySelector('.rollup-graph-wrap');
+  const canvas = document.querySelector('#rollup-graph');
+  const tableBody = document.querySelector('#rollup-summary-table tbody');
+  const tableStatus = document.querySelector('#rollup-summary-status');
+  let selectedCode = '';
+  let zoom = 1;
+  let naturalSize = {width: 1260, height: 400};
+
+  const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[char]));
+  const uniqueSorted = values => [...new Set(values)].filter(Boolean).sort();
+  const sourceOptions = () => uniqueSorted(
+    ROLLUP_VALUES
+      .filter(row => !['ESTO_RAW', 'ESTO_EXTENDED_RAW'].includes(row.source_system))
+      .map(row => row.source_system)
+  );
+  const rowsForSource = source => ROLLUP_VALUES.filter(row =>
+    row.source_system === source
+    && row.scenario === rc.value
+    && String(row.year) === String(ry.value)
+  );
+  const valuesForSource = source => {
+    const values = new Map();
+    rowsForSource(source).forEach(row => {
+      values.set(row.common_flow_label, (values.get(row.common_flow_label) || 0) + Number(row.value));
+    });
+    const rawSource = source === 'ESTO'
+      ? 'ESTO_RAW'
+      : source === 'ESTO_EXTENDED' ? 'ESTO_EXTENDED_RAW' : '';
+    if (rawSource) {
+      rowsForSource(rawSource).forEach(row => {
+        if (!values.has(row.common_flow_label)) {
+          values.set(row.common_flow_label, Number(row.value));
+        }
+      });
+    }
+    return values;
+  };
+  const commonRowsForSource = source => {
+    const result = new Set();
+    rowsForSource(source).forEach(row => result.add(row.common_flow_label));
+    const rawSource = source === 'ESTO'
+      ? 'ESTO_RAW'
+      : source === 'ESTO_EXTENDED' ? 'ESTO_EXTENDED_RAW' : '';
+    if (rawSource) {
+      rowsForSource(rawSource).forEach(row => result.add(row.common_flow_label));
+    }
+    return result;
+  };
+  const formatValue = value => value === undefined
+    ? '—'
+    : Number(value).toLocaleString(undefined, {maximumFractionDigits:2});
+  const displayedValue = code => {
+    if (basis.value === 'compare') {
+      const esto = valuesForSource('ESTO').get(code);
+      const extended = valuesForSource('ESTO_EXTENDED').get(code);
+      return `E ${formatValue(esto)} | X ${formatValue(extended)}`;
+    }
+    return formatValue(valuesForSource(rs.value).get(code));
+  };
+  const originFor = code => {
+    const inEsto = commonRowsForSource('ESTO').has(code);
+    const inExtended = commonRowsForSource('ESTO_EXTENDED').has(code);
+    if (inEsto && inExtended) return 'Original ESTO + Extended';
+    if (inEsto) return 'Original ESTO';
+    if (inExtended) return 'ESTO Extended addition';
+    return 'No selected-period ESTO row';
+  };
+  const validationSources = () => basis.value === 'compare'
+    ? ['ESTO', 'ESTO_EXTENDED']
+    : [rs.value];
+  const nodeStatus = node => {
+    const flags = [...(node.structural_flags || [])].filter(flag =>
+      flag !== 'ORPHANED_HIERARCHY_ROW' || !displayParentFor(node.code)
+    );
+    let failed = 0;
+    let passed = 0;
+    const reasons = [];
+    validationSources().forEach(source => {
+      const result = (node.validation || {})[source];
+      if (!result) return;
+      failed += Number(result.failed || 0);
+      passed += Number(result.passed || 0);
+      (result.reasons || []).forEach(reason => reasons.push(reason));
+    });
+    if (failed) flags.push(`FAILED_HIERARCHY_CHECKS:${failed}`);
+    if (flags.length) return {kind:'issue', label:uniqueSorted([...flags, ...reasons]).join('; ')};
+    if (passed) return {kind:'pass', label:`Passed hierarchy checks: ${passed}`};
+    const hasValue = basis.value === 'compare'
+      ? valuesForSource('ESTO').has(node.code) || valuesForSource('ESTO_EXTENDED').has(node.code)
+      : valuesForSource(rs.value).has(node.code);
+    return hasValue
+      ? {kind:'info', label:'No parent-boundary validation for this row'}
+      : {kind:'unavailable', label:'Value / validation unavailable'};
+  };
+  const boundaryStatus = boundary => {
+    const flags = [...(boundary.structural_flags || [])];
+    const sources = basis.value === 'compare' ? ['ESTO', 'ESTO_EXTENDED'] : [rs.value];
+    let anyAvailable = false;
+    let anyFailure = false;
+    sources.forEach(source => {
+      const values = valuesForSource(source);
+      const target = values.get(boundary.label);
+      const inputs = boundary.inputs.map(input => values.get(input));
+      if (target === undefined || inputs.some(value => value === undefined)) return;
+      anyAvailable = true;
+      const sum = inputs.reduce((total, value) => total + value, 0);
+      if (Math.abs(target - sum) > 0.01 * Math.max(Math.abs(target), 1)) anyFailure = true;
+    });
+    if (flags.length || anyFailure) {
+      return {kind:'issue', label:uniqueSorted([
+        ...flags,
+        ...(anyFailure ? ['ROLLUP_RECONCILIATION_MISMATCH'] : []),
+      ]).join('; ')};
+    }
+    if (anyAvailable) {
+      return {
+        kind:'pass',
+        label:boundary.mode === 'DETACHED'
+          ? 'Reconciled; intentional DETACHED boundary'
+          : 'Rollup reconciled',
+      };
+    }
+    return {
+      kind:'unavailable',
+      label:boundary.mode === 'DETACHED'
+        ? 'Intentional DETACHED boundary; values unavailable'
+        : 'Rollup values unavailable',
+    };
+  };
+  const statusMatches = itemStatus => (
+    status.value === 'ALL'
+    || (status.value === 'ISSUES' && itemStatus.kind === 'issue')
+    || (status.value === 'PASS' && itemStatus.kind === 'pass')
+    || (status.value === 'UNAVAILABLE' && itemStatus.kind === 'unavailable')
+  );
+  const descendants = root => {
+    const result = new Set();
+    const visit = code => {
+      if (result.has(code)) return;
+      result.add(code);
+      displayChildrenFor(code).forEach(visit);
+    };
+    visit(root);
+    return result;
+  };
+  const codeAvailableForBasis = code => {
+    if (basis.value !== 'original') return true;
+    const estoRows = commonRowsForSource('ESTO');
+    if (estoRows.has(code)) return true;
+    // Keep value-less structural ancestors when they lead to an original ESTO
+    // row, but do not let contract-only or Extended-only leaves masquerade as
+    // original ESTO categories.
+    return [...descendants(code)].some(descendant => (
+      descendant !== code && estoRows.has(descendant)
+    ));
+  };
+  const boundaryAvailableForBasis = boundary => (
+    basis.value !== 'original'
+    || (
+      codeAvailableForBasis(boundary.label)
+      && boundary.inputs.every(input => codeAvailableForBasis(input))
+    )
+  );
+  const ancestors = code => {
+    const result = [];
+    let parent = displayParentFor(code);
+    while (parent && nodeByCode.has(parent)) {
+      result.push(parent);
+      parent = displayParentFor(parent);
+    }
+    return result;
+  };
+  const rollupMembership = code => activeBoundaries().filter(
+    boundary => boundary.label === code || boundary.inputs.includes(code)
+  );
+  const nodeAllowedByRollupMode = node => (
+    node.is_ordinary_hierarchy
+    || activeBoundaries().some(
+      boundary => boundary.label === node.code || boundary.inputs.includes(node.code)
+    )
+  );
+  const visibleSets = () => {
+    let visibleCodes = sector.value === 'ALL'
+      ? new Set(status.value === 'ALL' ? roots : ordinaryNodes.map(node => node.code))
+      : new Set([...descendants(sector.value)].filter(code => nodeByCode.has(code)));
+    visibleCodes = new Set([...visibleCodes].filter(code => codeAvailableForBasis(code)));
+    const query = search.value.trim().toLowerCase();
+    if (query) {
+      const matches = nodes
+        .filter(node => nodeAllowedByRollupMode(node) && node.code.toLowerCase().includes(query))
+        .map(node => node.code);
+      const neighbourhood = new Set();
+      matches.forEach(code => {
+        neighbourhood.add(code);
+        ancestors(code).forEach(parent => neighbourhood.add(parent));
+        displayChildrenFor(code).forEach(child => neighbourhood.add(child));
+        rollupMembership(code).forEach(boundary => {
+          neighbourhood.add(boundary.label);
+          boundary.inputs.forEach(input => neighbourhood.add(input));
+        });
+      });
+      visibleCodes = new Set([...neighbourhood].filter(code =>
+        nodeByCode.has(code)
+        && codeAvailableForBasis(code)
+      ));
+      if (!selectedCode && matches.length) selectedCode = matches[0];
+    }
+    visibleCodes = new Set([...visibleCodes].filter(code =>
+      nodeAllowedByRollupMode(nodeByCode.get(code))
+      && statusMatches(nodeStatus(nodeByCode.get(code)))
+    ));
+    const filteredBoundaries = activeBoundaries().filter(boundary => {
+      if (!boundaryAvailableForBasis(boundary)) return false;
+      if (!statusMatches(boundaryStatus(boundary))) return false;
+      if (query) {
+        return boundary.label.toLowerCase().includes(query)
+          || boundary.inputs.some(input => input.toLowerCase().includes(query))
+          || boundary.inputs.some(input => visibleCodes.has(input));
+      }
+      if (sector.value !== 'ALL') {
+        const sectorCodes = descendants(sector.value);
+        const majorCode = String(sector.value).match(/^([0-9]{2})/)?.[1] || '';
+        const belongsToMajor = value => (
+          majorCode
+          && (
+            String(value).startsWith(`${majorCode}.`)
+            || String(value).startsWith(`${majorCode} `)
+            || String(value).startsWith(`${majorCode}-`)
+          )
+        );
+        return sectorCodes.has(boundary.label)
+          || boundary.inputs.some(input => sectorCodes.has(input))
+          || belongsToMajor(boundary.label);
+      }
+      return true;
+    });
+    return {visibleCodes, filteredBoundaries};
+  };
+  const wrapText = (label, x, y, width = 29) => {
+    const words = String(label).split(' ');
+    const lines = [];
+    let line = '';
+    words.forEach(word => {
+      if (`${line} ${word}`.trim().length > width && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = `${line} ${word}`.trim();
+      }
+    });
+    if (line) lines.push(line);
+    const shown = lines.slice(0, 2);
+    if (lines.length > 2) shown[1] = `${shown[1].slice(0, Math.max(0, width - 1))}…`;
+    return shown.map((text, index) =>
+      `<tspan x="${x}" y="${y + index * 15}">${escapeHtml(text)}</tspan>`
+    ).join('');
+  };
+  const nodeSvg = (code, x, y, extraClass = '', subtitle = '') => {
+    const node = nodeByCode.get(code);
+    const origin = originFor(code);
+    const statusResult = node ? nodeStatus(node) : {kind:'info', label:''};
+    const classes = [
+      'node',
+      extraClass,
+      rollupModesFor(code).map(value => value.toLowerCase()).join(' '),
+      roots.includes(code) ? 'root' : '',
+      origin === 'ESTO Extended addition' ? 'extended-only' : '',
+      statusResult.kind === 'issue' ? 'issue' : '',
+    ].filter(Boolean).join(' ');
+    return `<g class="${classes}" data-code="${escapeHtml(code)}" transform="translate(${x} ${y})">
+      <rect width="250" height="72"/>
+      <text>${wrapText(code, 11, 19)}</text>
+      ${subtitle ? `<text class="mode" x="11" y="49">${escapeHtml(subtitle)}</text>` : ''}
+      <text class="value" x="11" y="64">${escapeHtml(displayedValue(code))}</text>
+    </g>`;
+  };
+  const renderGraph = () => {
+    const {visibleCodes, filteredBoundaries} = visibleSets();
+    const positions = new Map();
+    let hierarchyHeight = 70;
+    if (sector.value === 'ALL' && !search.value.trim()) {
+      [...visibleCodes].sort().forEach((code, index) => {
+        positions.set(code, {x:30 + (index % 4) * 300, y:42 + Math.floor(index / 4) * 92});
+      });
+      hierarchyHeight = 65 + Math.ceil(Math.max(visibleCodes.size, 1) / 4) * 92;
+    } else {
+      const depthFor = code => {
+        if (sector.value !== 'ALL' && descendants(sector.value).has(code)) {
+          let depth = 0;
+          let cursor = code;
+          while (cursor !== sector.value && displayParentFor(cursor)) {
+            depth += 1;
+            cursor = displayParentFor(cursor);
+          }
+          return depth;
+        }
+        return ancestors(code).length;
+      };
+      const byDepth = new Map();
+      [...visibleCodes].sort().forEach(code => {
+        const depth = depthFor(code);
+        byDepth.set(depth, [...(byDepth.get(depth) || []), code]);
+      });
+      [...byDepth.keys()].sort((a, b) => a - b).forEach(depth => {
+        byDepth.get(depth).forEach((code, index) => {
+          positions.set(code, {x:30 + depth * 290, y:42 + index * 92});
+        });
+      });
+      hierarchyHeight = 75 + Math.max(1, ...[...byDepth.values()].map(values => values.length)) * 92;
+    }
+    const specialBoundaries = filteredBoundaries.filter(
+      boundary => boundary.mode === 'NON_EXPANDING' || boundary.mode === 'DETACHED'
+    );
+    if (specialBoundaries.length) {
+      const ordinaryRight = Math.max(
+        300,
+        ...[...positions.values()].map(position => position.x + 250),
+      );
+      const inputX = ordinaryRight + 70;
+      const targetX = inputX + 310;
+      const specialTargets = new Set(specialBoundaries.map(boundary => boundary.label));
+      let externalInputIndex = 0;
+      specialBoundaries.forEach((boundary, index) => {
+        positions.set(boundary.label, {x:targetX, y:42 + index * 104});
+        boundary.inputs.forEach(input => {
+          if (positions.has(input) || specialTargets.has(input)) return;
+          positions.set(input, {x:inputX, y:42 + externalInputIndex * 92});
+          externalInputIndex += 1;
+        });
+      });
+    }
+    let width = Math.max(1260, ...[...positions.values()].map(position => position.x + 280), 1260);
+    const height = Math.max(
+      230,
+      hierarchyHeight + 35,
+      ...[...positions.values()].map(position => position.y + 110),
+    );
+    naturalSize = {width, height};
+    let svg = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+      <defs>
+        <marker id="hierarchy-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#53718f"/></marker>
+        <marker id="rollup-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#987216"/></marker>
+      </defs>
+      <text class="mode" x="30" y="22">${sector.value === 'ALL' ? 'MAJOR SECTORS — COLLAPSED' : 'NORMAL ESTO HIERARCHY — SOLID BLUE EDGES'}</text>`;
+    positions.forEach((position, code) => {
+      const parent = displayParentFor(code);
+      if (positions.has(parent)) {
+        const parentPosition = positions.get(parent);
+        const relationshipClass = nodeByCode.get(code)?.parent_code === parent ? '' : ' rollup';
+        svg += `<path class="edge${relationshipClass}" data-a="${escapeHtml(parent)}" data-b="${escapeHtml(code)}" d="M${parentPosition.x + 250} ${parentPosition.y + 36} C${parentPosition.x + 270} ${parentPosition.y + 36},${position.x - 20} ${position.y + 36},${position.x} ${position.y + 36}"/>`;
+      }
+    });
+    specialBoundaries.forEach(boundary => {
+      const targetPosition = positions.get(boundary.label);
+      if (!targetPosition) return;
+      boundary.inputs.forEach(input => {
+        const inputPosition = positions.get(input);
+        if (!inputPosition) return;
+        const detachedClass = boundary.mode === 'DETACHED' ? ' detached' : '';
+        svg += `<path class="edge rollup${detachedClass}" data-a="${escapeHtml(input)}" data-b="${escapeHtml(boundary.label)}" d="M${inputPosition.x + 250} ${inputPosition.y + 36} C${inputPosition.x + 270} ${inputPosition.y + 36},${targetPosition.x - 20} ${targetPosition.y + 36},${targetPosition.x} ${targetPosition.y + 36}"/>`;
+      });
+    });
+    positions.forEach((position, code) => {
+      svg += nodeSvg(code, position.x, position.y, '', rollupModesFor(code).join(', '));
+    });
+    svg += '</svg>';
+    canvas.innerHTML = visibleCodes.size || filteredBoundaries.length
+      ? svg
+      : '<div class="graph-empty">No hierarchy rows or rollups match the selected filters.</div>';
+    applyZoom();
+    bindNodeSelection();
+    renderTable(visibleCodes, filteredBoundaries);
+    applySelectionHighlight();
+  };
+  const tableCell = value => `<td>${escapeHtml(value || '—')}</td>`;
+  const splitFlow = value => {
+    const parts = String(value || '').split(/ (.+)/);
+    return {code:parts[0] || '', label:parts[1] || ''};
+  };
+  const renderTable = (visibleCodes, filteredBoundaries) => {
+    if (!tableBody || !tableStatus) return;
+    const rows = [];
+    [...visibleCodes].sort().forEach(code => {
+      const node = nodeByCode.get(code);
+      const memberships = rollupMembership(code);
+      const result = nodeStatus(node);
+      rows.push({
+        code:node.flow_code,
+        label:node.flow_label,
+        parent:displayParentFor(code),
+        relationship:node.parent_code
+          ? 'Normal hierarchy child'
+          : (displayParentFor(code) ? 'Rollup display child' : 'Hierarchy root'),
+        rollupType:uniqueSorted(memberships.map(item => item.mode)).join(', '),
+        origin:originFor(code),
+        childCount:displayChildrenFor(code).length,
+        membership:memberships.map(item => `${item.id} (${item.label === code ? 'target' : 'input'})`).join('; '),
+        validation:result.label,
+        kind:result.kind,
+        detached:false,
+      });
+    });
+    filteredBoundaries.forEach(boundary => {
+      const result = boundaryStatus(boundary);
+      const boundaryFlow = splitFlow(boundary.label);
+      rows.push({
+        code:boundaryFlow.code,
+        label:boundaryFlow.label,
+        parent:boundary.parent,
+        relationship:'Registered rollup composition target',
+        rollupType:boundary.mode,
+        origin:originFor(boundary.label),
+        childCount:boundary.children.length,
+        membership:`${boundary.id}; inputs: ${boundary.inputs.join(', ')}`,
+        validation:result.label,
+        kind:result.kind,
+        detached:boundary.mode === 'DETACHED',
+      });
+      boundary.inputs
+        .filter(input => !visibleCodes.has(input))
+        .forEach(input => {
+          const inputFlow = splitFlow(input);
+          rows.push({
+            code:inputFlow.code,
+            label:inputFlow.label,
+            parent:'',
+            relationship:'Registered rollup input',
+            rollupType:boundary.mode,
+            origin:originFor(input),
+            childCount:0,
+            membership:`${boundary.id} (input to ${boundary.label})`,
+            validation:result.kind === 'issue'
+              ? `Related rollup issue: ${result.label}`
+              : (boundary.mode === 'DETACHED' ? 'Intentional DETACHED input' : 'Registered rollup input'),
+            kind:result.kind,
+            detached:boundary.mode === 'DETACHED',
+          });
+        });
+    });
+    tableBody.innerHTML = rows.map(row =>
+      `<tr class="${row.kind === 'issue' ? 'issue-row' : ''} ${row.detached ? 'detached-row' : ''}">`
+      + tableCell(row.code) + tableCell(row.label) + tableCell(row.parent)
+      + tableCell(row.relationship) + tableCell(row.rollupType) + tableCell(row.origin)
+      + tableCell(String(row.childCount)) + tableCell(row.membership) + tableCell(row.validation)
+      + '</tr>'
+    ).join('');
+    const issueCount = rows.filter(row => row.kind === 'issue').length;
+    const detachedCount = rows.filter(row => row.detached).length;
+    tableStatus.textContent = `${rows.length} rows; ${issueCount} genuine issue flags; ${detachedCount} intentional DETACHED boundaries.`;
+  };
+  const relatedCodes = code => {
+    const related = new Set([code]);
+    const displayedParent = displayParentFor(code);
+    if (displayedParent) related.add(displayedParent);
+    displayChildrenFor(code).forEach(child => related.add(child));
+    rollupMembership(code).forEach(boundary => {
+      related.add(boundary.label);
+      boundary.inputs.forEach(input => related.add(input));
+    });
+    return related;
+  };
+  const applySelectionHighlight = () => {
+    const elements = canvas.querySelectorAll('[data-code]');
+    const edges = canvas.querySelectorAll('.edge');
+    if (!selectedCode) {
+      elements.forEach(element => element.classList.remove('selected', 'neighbour', 'dimmed'));
+      edges.forEach(edge => edge.classList.remove('dimmed'));
+      return;
+    }
+    const related = relatedCodes(selectedCode);
+    elements.forEach(element => {
+      const code = element.dataset.code;
+      element.classList.toggle('selected', code === selectedCode);
+      element.classList.toggle('neighbour', code !== selectedCode && related.has(code));
+      element.classList.toggle('dimmed', !related.has(code));
+    });
+    edges.forEach(edge => {
+      edge.classList.toggle('dimmed', !related.has(edge.dataset.a) || !related.has(edge.dataset.b));
+    });
+  };
+  const bindNodeSelection = () => {
+    canvas.querySelectorAll('[data-code]').forEach(element => {
+      element.addEventListener('click', event => {
+        event.stopPropagation();
+        const code = element.dataset.code;
+        if (roots.includes(code) && sector.value === 'ALL' && !search.value.trim()) {
+          sector.value = code;
+          selectedCode = code;
+          renderGraph();
+          return;
+        }
+        if (roots.includes(code) && sector.value === code && selectedCode === code) {
+          sector.value = 'ALL';
+          selectedCode = '';
+          renderGraph();
+          return;
+        }
+        selectedCode = selectedCode === code ? '' : code;
+        applySelectionHighlight();
+      });
+    });
+  };
+  const applyZoom = () => {
+    const svg = canvas.querySelector('svg');
+    if (!svg) return;
+    svg.style.width = `${naturalSize.width * zoom}px`;
+    svg.style.height = `${naturalSize.height * zoom}px`;
+  };
+  const fitWidth = () => {
+    zoom = Math.min(1, Math.max(0.45, (viewport.clientWidth - 20) / naturalSize.width));
+    applyZoom();
+    viewport.scrollTo({left:0, top:0});
+  };
+  const refreshSelectors = () => {
+    const allSources = sourceOptions();
+    const availableSources = basis.value === 'original'
+      ? allSources.filter(source => source !== 'ESTO_EXTENDED')
+      : allSources;
+    if (basis.value === 'compare') {
+      rs.disabled = true;
+      fill(rs, ['ESTO vs ESTO_EXTENDED'], 'ESTO vs ESTO_EXTENDED');
+    } else {
+      const selectedSource = availableSources.includes(rs.value)
+        ? rs.value
+        : (availableSources.includes('ESTO') ? 'ESTO' : availableSources[0]);
+      rs.disabled = false;
+      fill(rs, availableSources, selectedSource);
+    }
+    const selectedSources = basis.value === 'compare' ? ['ESTO', 'ESTO_EXTENDED'] : [rs.value];
+    const sourceRows = ROLLUP_VALUES.filter(row => selectedSources.includes(row.source_system));
+    const scenarios = uniqueSorted(sourceRows.map(row => row.scenario));
+    const selectedScenario = scenarios.includes(rc.value) ? rc.value : scenarios[0];
+    fill(rc, scenarios, selectedScenario);
+    const years = uniqueSorted(
+      sourceRows.filter(row => row.scenario === rc.value).map(row => row.year)
+    ).sort((a, b) => Number(a) - Number(b));
+    const selectedYear = years.some(year => String(year) === String(ry.value)) ? ry.value : years.at(-1);
+    fill(ry, years, selectedYear);
+    basisState.textContent = basis.value === 'original'
+      ? 'Showing original ESTO only'
+      : basis.value === 'plus'
+        ? 'Showing ESTO plus ESTO Extended (one selected dataset at a time)'
+        : 'Comparing ESTO with ESTO Extended (values are not added)';
+    renderGraph();
+  };
+
+  fill(sector, ['ALL', ...roots], 'ALL');
+  sector.options[0].text = 'All major sectors (collapsed)';
+  basis.addEventListener('change', refreshSelectors);
+  rs.addEventListener('change', refreshSelectors);
+  rc.addEventListener('change', refreshSelectors);
+  ry.addEventListener('change', renderGraph);
+  sector.addEventListener('change', () => { selectedCode = ''; renderGraph(); });
+  status.addEventListener('change', renderGraph);
+  search.addEventListener('input', renderGraph);
+  showSpecialRollups.addEventListener('change', () => {
+    selectedCode = '';
+    renderGraph();
+    fitWidth();
+  });
+  document.querySelector('#rollup-clear-selection').onclick = () => {
+    selectedCode = '';
+    search.value = '';
+    applySelectionHighlight();
+    renderGraph();
+  };
+  document.querySelector('#rollup-zoom-in').onclick = () => { zoom = Math.min(1.8, zoom * 1.15); applyZoom(); };
+  document.querySelector('#rollup-zoom-out').onclick = () => { zoom = Math.max(0.4, zoom / 1.15); applyZoom(); };
+  document.querySelector('#rollup-zoom-reset').onclick = () => { zoom = 1; applyZoom(); };
+  document.querySelector('#rollup-fit').onclick = fitWidth;
+  refreshSelectors();
+  fitWidth();
+})();
+</script>
+"""
     raw_esto_context_script = """
 <script>
 (() => {
@@ -1379,9 +2413,58 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 })();
 </script>
 """
+    # Value painting and Extended-source selection are handled together by the
+    # focused renderer so graph and table cannot drift onto different filters.
+    raw_esto_context_script = ""
+    extended_source_control_script = ""
+    exception_candidate_script = r"""
+<script>
+(() => {
+  let prepared = null;
+  const output = document.querySelector('#exception-candidate-output');
+  const csvValue = value => `"${String(value ?? '').replaceAll('"', '""')}"`;
+  document.querySelectorAll('.prepare-exception').forEach(button => {
+    button.addEventListener('click', () => {
+      const card = button.closest('.exception-candidate');
+      const base = JSON.parse(card.dataset.exceptionPayload);
+      const economy = card.querySelector('.exception-economy').value;
+      const scenarioMode = card.querySelector('.exception-scenario').value;
+      const yearMode = card.querySelector('.exception-year').value;
+      prepared = {
+        enabled: true,
+        review_status: 'needs_review',
+        exception_id: '',
+        issue_class: card.querySelector('.exception-class').value,
+        source_system: base.source_system,
+        validation_axis: base.validation_axis,
+        parent_code: base.parent_code,
+        other_axis_value: base.other_axis_value,
+        economy,
+        scenario: scenarioMode === 'all' ? 'all' : base.scenario,
+        year: yearMode === 'all' ? 'all' : base.year,
+        parent_value: base.parent_value,
+        notes: ''
+      };
+      output.value = JSON.stringify(prepared, null, 2);
+    });
+  });
+  document.querySelector('#download-exception-candidate')?.addEventListener('click', () => {
+    if (!prepared) return;
+    const headers = Object.keys(prepared);
+    const csv = `${headers.join(',')}\n${headers.map(key => csvValue(prepared[key])).join(',')}\n`;
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'}));
+    link.download = 'source_mismatch_allowed_candidate.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+})();
+</script>
+"""
     html = html.replace(
         "</body></html>",
-        all_sector_graph_script + raw_esto_context_script + extended_source_control_script + "</body></html>",
+        all_sector_graph_script + raw_esto_context_script + extended_source_control_script
+        + exception_candidate_script + "</body></html>",
     )
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME
     output_path.write_text(html, encoding="utf-8")

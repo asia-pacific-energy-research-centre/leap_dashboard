@@ -4,6 +4,13 @@
 
 **Audience:** analysts, dashboard maintainers, and reviewers
 
+**Authority:** Level 1 operating guide for Common ESTO dashboard ingestion,
+rendering, diagnostics, and publication
+
+**Use this when:** rendering or reviewing dashboard outputs. For
+cross-repository ownership and execution order, start at
+[`leap_mappings/docs/start_here.md`](../../../leap_mappings/docs/start_here.md).
+
 This repository presents Common ESTO comparison outputs. Mapping semantics
 belong to `leap_mappings`; LEAP preparation belongs to `leap_initialisation`.
 
@@ -11,6 +18,9 @@ belong to `leap_mappings`; LEAP preparation belongs to `leap_initialisation`.
 
 ```mermaid
 flowchart LR
+    AXIS["Single-axis mapping contract"]
+    GENERATE["Separate-axis refresh<br/>preliminary mapping gate"]
+    MAP["Mapping Stages 1–3"]
     CONTRACT["Versioned v1 manifest + fact + metadata"]
     LONG["Common ESTO long values"]
     WIDE["Wide compatibility values"]
@@ -23,6 +33,10 @@ flowchart LR
     RENDER["Render charts, tables, diagnostics"]
     OUT["HTML, JS, manifests, summaries"]
 
+    AXIS --> GENERATE --> MAP --> CONTRACT
+    MAP --> LONG
+    MAP --> WIDE
+    MAP --> ROWS
     CONTRACT --> LOAD
     LONG --> LOAD
     WIDE --> LOAD
@@ -149,6 +163,13 @@ The manifest retains suppressed charts with `suppressed=true`, so display
 suppression is auditable. The mapping diagnostics page and full tree explorer
 are diagnostic presentation; they do not modify mapping artifacts.
 
+`dashboard_metadata.json` is the per-economy provenance boundary. It records
+the selected Common ESTO mapping run ID and timestamp, output-contract kind and
+path, and the Stage 3 status only when that status belongs to the same run.
+All-economy production checks must confirm every rendered economy carries the
+same selected upstream run rather than independently resolving a newer or older
+artifact.
+
 ## Caching, regeneration, and incremental behavior
 
 Ordinary rendering reads existing upstream values and rebuilds the selected
@@ -156,8 +177,9 @@ economy output. `CLEAR_EXISTING_OUTPUTS=True` clears that economy’s generated
 dashboard/chart/supporting folders before writing.
 
 `UPDATE_DATA=True` is an opt-in Common ESTO fast path. It writes into the
-sibling mappings repository and skips Stage 0–2 and deep validation. It is not
-a full mapping run and must not overlap Stage 3.
+sibling mappings repository but does not run separate-axis generation,
+Stages 1–2, or deep validation. It is not a full mapping run and must not
+overlap Stage 3.
 
 There is no content-addressed incremental chart cache in the main workflow; an
 economy render regenerates its selected output.

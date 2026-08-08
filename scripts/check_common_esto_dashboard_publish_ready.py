@@ -42,6 +42,7 @@ EXPECTED_PAGE_KEYS = [
     "buildings",
     "others",
     "non_energy",
+    "emissions",
 ]
 DIAGNOSTIC_PAGE_KEYS = [
     "transport_leap_vs_ninth",

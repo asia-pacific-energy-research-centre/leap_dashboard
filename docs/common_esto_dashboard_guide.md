@@ -23,6 +23,71 @@ The workflow currently renders `20_USA` and `02_BD` by default. Set
 `COMMON_ESTO_ECONOMIES` for a different reviewed economy set. Focused tests
 continue to use the tracked `20_USA` sample fixture.
 
+## Output structure
+
+Each rendered economy is a **self-contained folder** — no server, no build
+step, just static files:
+
+```text
+outputs/common_esto_dashboard/<economy>/
+  dashboards/         one .html page per section (index.html, emissions.html, ...)
+  chart_bundles/       one .js + .json pair per page, holding that page's Plotly trace data
+  supporting_files/   CSVs and JSON behind the charts (chart_manifest, page_assignment_summary, ...)
+```
+
+Every dashboard page is a static HTML file with a `<script src="../chart_bundles/...">`
+tag pointing at its data by a **relative path**. That means:
+
+- **A single `.html` file is not portable on its own.** Opening
+  `emissions.html` after copying just that one file elsewhere will load the
+  page but its charts will not draw — the browser has nothing at
+  `../chart_bundles/emissions__charts.js` to fetch. Always copy (or zip) the
+  whole `<economy>/` folder — `dashboards/`, `chart_bundles/`, and
+  `supporting_files/` together — when handing a rendered dashboard to
+  someone outside this checkout.
+- `supporting_files/` is not needed to *view* the dashboard (nothing in
+  `dashboards/` reads from it), but keep it alongside if the recipient might
+  want to check a number behind a chart — see [Publish](#publish) below for
+  which subset actually gets served on GitHub Pages.
+- The `dashboards/index.html` "About this dashboard" section (rendered by
+  `write_index` in `codebase/common_esto_dashboard_renderer.py`) explains
+  this same self-containment point to anyone who opens the dashboard without
+  ever having read this file.
+
+## Aggregate-only LEAP demand and the Emissions page
+
+Some economies currently contain LEAP demand only in aggregate branches such as
+`All demand aggregated/Buildings`, rather than in separately mapped sector
+branches. Those rows are valid and remain useful on the **Energy balance
+overview**. The Emissions page now uses the same declared TFC total as a
+single **LEAP aggregate demand** series when sector detail is unavailable. It
+does not copy that total into Buildings, Industry, Transport, or another
+sector: doing that would invent an allocation and could count the aggregate
+more than once. When lower-level sector detail is present, the page uses its
+non-overlapping detail frontier instead. The generated
+`supporting_files/emissions_source_selection.csv` records which level was used
+for each source and scenario.
+
+### What currently determines “aggregate-only”
+
+The current source of truth is
+`leap_mappings/config/all_demand_aggregated_components.json`. It declares
+`All demand aggregated` as the upstream aggregate and currently lists
+Buildings, Road, Industry, Other sector, Transport non road, and International
+transport as components. The mapping preflight resolves this record per
+economy and reports branches that do not yet have separately modelled LEAP
+detail. It warns if an aggregate and a supposedly detailed component are both
+non-zero; it does not silently zero either one.
+
+The dashboard uses that resolved list for page routing: domestic placeholder
+pages remain visible where useful, while pages without a usable standalone
+mapping stay hidden. The aggregate itself remains in the overview data.
+TFC/TFEC comparison lines use declared common flows 12 and 13 rather than
+summing every visible hierarchy row. Emissions follows the same principle with
+flow 12: detail wins when available, otherwise the aggregate is shown once as
+`LEAP aggregate demand`. This is the current documented mechanism to review or
+improve upstream; it is not an emissions allocation model.
+
 ## Mapping diagnostics: ESTO Extended
 
 The Mapping diagnostics page uses ordinary ESTO by default. If the supplied
@@ -46,6 +111,18 @@ The ordinary production workflow reuses existing outputs under
 `COMMON_ESTO_ROWS_PATH` to render an explicit fixture or dataset. Update the
 tracked fixture when the upstream common ESTO data changes so the sample
 remains representative and dashboard regressions are easier to spot.
+
+## Render directly from a LEAP export
+
+For an economy-specific dashboard, use
+`codebase/common_esto_dashboard_from_export.py` and set its notebook controls,
+or call `render_dashboard_from_leap_export(...)`. This path reads the selected
+economy's exports from `leap_initialisation/data/leap balances exports/<economy>`,
+delegates to the supported LEAP export parser and mapping chain, and copies the
+resulting static dashboard into `outputs/common_esto_dashboard/<economy>/`.
+It therefore uses the current export's LEAP values plus the mapping-owned Common
+ESTO categories; it does not rely on a cached comparison file that may have no
+LEAP rows for that economy. The web app uses this same export-driven path.
 
 To refresh the weekly sample from `leap_mappings/results/common_esto/` and run
 the standard checks:

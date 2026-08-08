@@ -4,16 +4,25 @@ This repository contains the official static dashboard for Common ESTO
 comparison outputs. It consumes the comparison dataset produced by the sibling
 `leap_mappings` repository and renders one dashboard per economy.
 
-Start with
-[`docs/handover/dashboard_pipeline_guide.md`](docs/handover/dashboard_pipeline_guide.md).
-Agents should also read
-[`docs/handover/dashboard_pipeline_agent_guide.md`](docs/handover/dashboard_pipeline_agent_guide.md).
-The connected three-repository overview is
-`leap_mappings/docs/handover/README.md`.
-Current and deferred dashboard work is tracked only in
-[`docs/work_queue.md`](docs/work_queue.md). The dated
+## Start here
+
+For the connected three-repository ownership and reading route, start with
+[`leap_mappings/docs/start_here.md`](../leap_mappings/docs/start_here.md).
+
+Within this repository:
+
+| Need | Authoritative route |
+|---|---|
+| understand or run the dashboard pipeline | [`docs/handover/dashboard_pipeline_guide.md`](docs/handover/dashboard_pipeline_guide.md) |
+| execute safely as an agent | [`docs/handover/dashboard_pipeline_agent_guide.md`](docs/handover/dashboard_pipeline_agent_guide.md) |
+| understand mapping diagnostics | [`docs/handover_mapping_diagnostics.md`](docs/handover_mapping_diagnostics.md) |
+| choose current or deferred work | [`docs/work_queue.md`](docs/work_queue.md) |
+| review output/page status after a fresh render | [`docs/common_esto_dashboard_page_status.md`](docs/common_esto_dashboard_page_status.md) |
+
+The dated
 [`documentation audit`](docs/documentation_audit_20260728.md) records the
-disposition of every tracked Markdown document.
+disposition of every tracked Markdown document; it is evidence, not the
+operating queue.
 
 The production entry point is
 `codebase/common_esto_dashboard_workflow.py`. Supporting modules are flattened

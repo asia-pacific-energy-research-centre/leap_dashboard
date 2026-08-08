@@ -187,6 +187,598 @@ share one displayed product rollup and are summed within the chart.
 - 2026-06-29: Added the configured no-transfers transformation comparison to
   the aggregate overview and renamed its navigation label.
 
+## DASH-006: Rollup modes appear inside the hierarchy tree
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Presentation
+**Affected areas:** Mapping diagnostics; All sector rollup structure
+
+### Current rule
+
+Show `EXPANDING` relationships in the sector hierarchy view by default. Provide
+one checkbox that adds `NON_EXPANDING` and `DETACHED` targets and display
+relationships when the reviewer needs them. Do not restore the former
+rollup-mode selector. Place the mode label inside the rollup target box and use
+a dotted edge for display membership that is not an ordinary hierarchy edge.
+
+Do not render a second, separate rollup-composition graph below the hierarchy.
+Detailed rule membership and reconciliation evidence remain available in the
+page tables. This display rule does not change the canonical hierarchy
+contract or turn rollup inputs into ordinary structural children.
+
+### Validation
+
+The Power-sector view must show Electricity plants, CHP plants, and Heat plants
+under the labelled `EXPANDING` target. The unchecked view must omit
+`NON_EXPANDING` and `DETACHED` display relationships; checking the special
+rollup control must add them. The page must have no rollup-mode selector and no
+separate `REGISTERED ROLLUP COMPOSITION` graph heading.
+
+### History
+
+- 2026-07-29: Confirmed during live review of the 20_USA mapping diagnostics
+  prototype.
+- 2026-07-29: Refined so NON_EXPANDING and DETACHED display relationships are
+  opt-in through one checkbox.
+
+## DASH-007: Hierarchy validation uses one explained diagnostic panel
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Presentation
+**Affected areas:** Mapping diagnostics; hierarchy validation
+
+### Current rule
+
+Present final-output hierarchy failures, source/mapping anchor failures,
+failure reasons, materiality, and reviewed exceptions in one hierarchy
+validation panel. Explain that a hierarchy failure means the tested parent
+does not equal its expected accounting frontier within tolerance, or that the
+frontier is incomplete; it does not by itself prove that a mapping is missing.
+
+Keep the two validation layers visibly distinct:
+
+- Final output hierarchy compares a Common ESTO parent with its declared
+  output children.
+- Source/mapping anchor compares a raw source parent with the de-duplicated
+  mapped frontier used to represent it.
+
+Rank failed checks by absolute mismatch and show the reason alongside the
+values. Keep every numerical failure in that total. An exact, user-confirmed
+source issue is review metadata attached to a failed row: it does not turn the
+row into a pass, prove the mapping is correct, or prove that the source issue
+caused the mapped-anchor failure. Show confirmed and unconfirmed failures
+separately when the current artifact provides the explicit review fields.
+
+Apply the selected dashboard economy to the failure table, review table,
+exception candidates, and summary cards. If an older artifact lacks the
+explicit confirmation fields, state that clearly instead of treating its
+legacy boolean flag as confirmation. Do not show a separate table of rows
+already visible in the current hierarchy graph.
+
+### Validation
+
+The page must show one hierarchy-validation panel with the two check layers
+explained, one materiality-ranked failure table containing failure reasons,
+and the reviewed exceptions below it. It must not retain the former separate
+Stage 3 failures, anchor mismatches, failure reasons, or current-graph rows
+sections.
+
+### History
+
+- 2026-07-29: Confirmed during live review of the 20_USA mapping diagnostics
+  prototype.
+- 2026-07-29: Clarified that source-issue confirmation is a review
+  classification, never a numerical pass, and added strict economy scoping and
+  legacy-artifact handling.
+
+## DASH-008: Paired hierarchy trees use compact values
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Presentation
+**Affected areas:** Mapping diagnostics; original-versus-mapped hierarchy trees
+
+### Current rule
+
+Use one shared magnitude scale within each original-versus-mapped hierarchy
+case and display no more than two decimal places after scaling. Apply the same
+formatter to parents, children, mapped components, totals, and residuals for
+every source dataset. Continue all validation calculations with the original
+unrounded values.
+
+### Validation
+
+The shared context formatter must scale the whole case consistently and emit
+at most two decimal places. The rendered note must continue to state that
+calculations use unrounded values.
+
+### History
+
+- 2026-07-29: Confirmed during live review of the mapping diagnostics
+  prototype.
+
+## DASH-009: A displayed time-series category has one point per year
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Aggregation / presentation validation
+**Affected areas:** Common ESTO flow-product detail charts; chart-bundle QA
+
+### Current rule
+
+A detail-card label can represent several distinct Common ESTO component rows.
+Before plotting, sum those component values by source system, scenario, and
+year so the displayed category has exactly one signed value per year. Do not
+connect the component rows sequentially: repeated years create misleading
+vertical spikes.
+
+Keep the upstream `common_row_id` contract distinct from this presentation
+aggregation. Multiple component IDs under one displayed category are valid;
+duplicate source/scenario/year rows for the same component remain an upstream
+data-contract issue.
+
+Every emitted line or stacked-line trace must also pass a blocking uniqueness
+check on its x values. A chart bundle is not written when a trace still
+contains a repeated year.
+
+### Validation
+
+Regression tests cover multi-component displayed categories and deliberate
+duplicate-year traces. The 2026-07-30 20USA production render emitted 2,784
+line traces across 311 bundled charts with zero repeated-year traces.
+
+### History
+
+- 2026-07-30: Added after repeated component rows produced vertical spikes in
+  Power detail charts.
+
+## DASH-010: Energy-balance demand lines use declared TFC/TFEC totals
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Aggregation / presentation validation
+**Affected areas:** Energy balance overview; all four demand/supply charts
+
+### Current rule
+
+Use the declared top-level flow `12 Total final consumption` and flow `13 Total
+final energy consumption` for TFC and TFEC comparison lines whenever those rows
+exist for a source. Use visible demand detail only as a fallback when the
+requested aggregate is absent.
+
+Do not calculate a total by adding every displayed demand row. Common ESTO can
+legitimately retain parent, child, exact, and generated rollup views together;
+adding those views double counts the same demand. The two supply-detail charts
+also use flow 12 for their demand comparator, which makes LEAP demand available
+for economies still represented by `All demand aggregated`.
+
+### Validation
+
+Regression tests require declared aggregates to override overlapping visible
+detail, retain the detail fallback, and add a LEAP TFC comparator to the supply
+charts when only the aggregate demand row is available.
+
+### History
+
+- 2026-08-02: Confirmed after China 9th Target TFEC was plotted at 235,190 PJ
+  in 2039 while the declared flow 13 value was 86,774 PJ.
+
+## DASH-011: Section aggregates use one non-expanding component frontier
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Aggregation / presentation validation
+**Affected areas:** Section-level aggregate-by-flow and aggregate-by-product charts
+
+### Current rule
+
+When an observed `NON_EXPANDING` subtotal and its additive component rows are
+both present, plot the subtotal once and remove the covered components for that
+source, economy, scenario, year, and common opposite-axis category. Use the
+mapping-owned `component_flow_code` or `component_product_code` expression to
+identify covered exact codes and inclusive ranges. Keep the alternative detail
+frontier when that source observation does not publish the subtotal.
+
+This handles compound subtotals such as `15.01,15.03-15.06 Transport non-road`
+without hard-coding transport labels or reconstructing mapping relationships.
+
+### Validation
+
+The regression test covers a compound transport rollup, two covered children,
+and unaffected `15.02 Road`. The 2026-08-03 China production render leaves only
+Transport non-road and Road in the Transport section aggregate-by-flow stack;
+all-economy publication readiness passed and page-noise analysis found zero
+flags.
+
+### History
+
+- 2026-08-03: Added after the China Transport stack displayed the non-road
+  subtotal together with Domestic air transport, Rail, Domestic navigation,
+  Pipeline transport, and Non-specified transport.
+
+## DASH-012: Aggregate demand placeholders remain visible by sector
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Demand-page routing / transitional presentation
+**Affected areas:** Industry, Transport, Buildings, Other demand, and Non-energy page routing
+
+### Current rule
+
+Keep standalone Industry, Transport, Buildings, and Other demand pages visible
+when their LEAP projection is still supplied by an `All demand aggregated`
+placeholder. These are transitional sector rows and should remain reviewable
+until detailed LEAP demand branches replace them upstream.
+
+Do not apply this exception to Bunkers. International bunkers are outside the
+four domestic demand placeholders and remain hidden when their LEAP branch is
+aggregate-only.
+
+Route the combined `Other sector including non-energy (all demand aggregate)`
+row to Other demand. Continue routing an exact code-17 row to Non-energy and
+keep that standalone page hidden while it has no usable standalone LEAP
+mapping. This is presentation routing only; the dashboard does not split or
+recalculate the upstream aggregate.
+
+### Validation
+
+Regression tests require aggregate-only demand pages to remain visible, the
+unmapped Non-energy page to remain hidden, the combined placeholder to route to
+Other demand, and an exact code-17 row to retain its Non-energy assignment.
+
+### History
+
+- 2026-08-03: Confirmed while reviewing China, where Industry and Buildings
+  had valid LEAP placeholder rows but were hidden, and the combined Other-sector
+  placeholder was assigned to the hidden Non-energy page.
+- 2026-08-03: Narrowed the exception after visual review showed that a global
+  aggregate-page override also exposed Bunkers without a usable LEAP projection.
+
+## DASH-013: Gas-works own use is shown only in the shared transformation boundary
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / comparison-boundary filtering
+**Affected areas:** Other transformation overview and detail charts
+
+### Current rule
+
+Do not plot `10.01.02 Gas works plants` as a standalone own-use comparison.
+LEAP does not expose that quantity separately in its balance results; it is
+already part of `09.06.01 Gas works plants (including own use)`, which is the
+valid shared comparison boundary. Keep the other code-10 own-use and loss rows
+available.
+
+Synthetic overview prefixes must use their configured ESTO hierarchy names:
+`10 Losses and own use` and `10.01 Own use`. They must not inherit the name of
+the first available descendant.
+
+### Validation
+
+Regression tests require the standalone `10.01.02` row to be filtered while
+retaining the boundary-adjusted transformation row and unrelated own-use rows.
+They also require the code-10 overview cards to use the hierarchy labels.
+
+### History
+
+- 2026-08-03: Confirmed after the China Other transformation overview labeled
+  both synthetic prefixes as Gas works plants and exposed the unextractable
+  own-use detail as a separate comparison.
+
+## DASH-014: Aggregate charts choose one observed common-row frontier
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / aggregate-chart selection
+**Affected areas:** Stacked aggregate-by-flow and aggregate-by-product charts
+
+### Current rule
+
+Common ESTO may retain a generated compound flow category and its contained
+flows as separate valid views. Within one aggregate dashboard chart, do not add
+those overlapping flow views together. For each source, economy, scenario,
+year, and product category, prefer an observed compound common flow over common
+flows contained by its ranges or component list. If the compound row is absent
+for an observation, retain the available detail.
+
+Apply this detached-compound rule only after page routing and only on the flow
+axis. A broad transformation flow must not erase Power or Refining rows before
+their higher-priority page rules claim them. Compound product labels are normal
+disjoint dashboard categories and do not imply that contained product codes
+are additive alternatives. Explicit metadata-backed NON_EXPANDING product
+rollups continue to use their established frontier rule.
+
+This extends the existing NON_EXPANDING-rollup frontier rule to detached or
+aggregate-backed common rows that do not carry `is_non_expanding_rollup=True`.
+It changes dashboard aggregation only; the upstream rows and detailed line
+charts remain available.
+
+### Validation
+
+Regression tests require `16.03-16.05,17 Other sector including non-energy
+(all demand aggregate)` to suppress its observed `16.03-16.04` and `16.05`
+components in an aggregate chart, while another source without the broad row
+continues to use those components. A production USA render must show only the
+combined flow in `Aggregate by flow: Other demand`.
+
+### History
+
+- 2026-08-03: Confirmed from the USA Other demand chart. The generated
+  all-demand category is structurally compound but is not flagged as a
+  NON_EXPANDING rollup, so the earlier subtotal-only selector retained it and
+  its components together.
+- 2026-08-03: Restricted the rule after the global, two-axis implementation
+  removed Power and Refining detail before routing and changed the USA 2060
+  Transfers total from 2,134 PJ to 8,601 PJ by dropping a negative product.
+
+## DASH-015: Compound-range overview cards include every range endpoint
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / hierarchy-card generation
+**Affected areas:** Overview stacked-area cards
+
+### Current rule
+
+When overview discovery encounters a compound common flow such as
+`16.01-16.02 Buildings`, close that generated subtree over every common
+category contained by the compound expression. Do not treat only the first
+range endpoint as the card's scope.
+
+Source-specific frontiers remain authoritative. For Buildings, LEAP can use the
+combined Buildings row while Ninth uses Commercial and Residential. If this
+closed frontier duplicates an already generated parent card, keep only the
+first card; retain genuinely distinct detail cards such as Residential.
+
+### Validation
+
+Regression tests require the incomplete `16.01`-derived Buildings card to be
+deduplicated. The production USA Buildings overview must contain `16 Buildings`
+and `16.02 Residential`, with the all-Buildings frontier including Ninth
+Commercial and Ninth Residential.
+
+### History
+
+- 2026-08-03: Confirmed from the USA Buildings overview. The dashboard
+  canonicalized `16.01-16.02` to `16.01`, titled that partial subtree with the
+  compound label, and consequently omitted Ninth Residential from the card.
+  The upstream Ninth Residential mapping itself was present and correct.
+
+## DASH-016: Mixed-depth compound flows remain valid overview frontiers
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / hierarchy-card generation
+**Affected areas:** Other transformation overview stacked-area cards
+
+### Current rule
+
+Determine a compound flow's overview level from every expression endpoint, not
+only its first canonical code. A row such as `09,09.03 Total transformation -
+no transfers` reaches level two through `09.03` and is therefore a valid
+level-two frontier for the code-09 overview. Its own row must not disappear and
+leave only deeper gas-processing descendants in the card.
+
+### Validation
+
+Regression tests require the mixed-depth row to be the source-specific code-09
+frontier. The production USA overview must contain all five dataset totals and
+the complete transformation product stack.
+
+### History
+
+- 2026-08-03: Confirmed after the Other transformation overview rendered only
+  gas works even though 5,133 rows for the broad transformation category were
+  present in the page assignment summary.
+
+## DASH-017: Comparison lines expose available base-year calibration gaps
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / time-series boundary
+**Affected areas:** Aggregate totals and flow-product line charts
+
+### Current rule
+
+Show LEAP and Ninth comparison-line values at the configured base year whenever
+those values exist. Hide their earlier backcast years. Continue using ESTO for
+the stacked historical area through the base year and LEAP for the stacked
+projection only after it, so the fill boundary remains unchanged.
+
+This intentionally allows ESTO, LEAP, and Ninth to display different values at
+the same base-year x coordinate. That visible gap is calibration evidence and
+must not be concealed by starting projection lines one year later.
+
+### Validation
+
+Regression tests require aggregate total lines and individual flow-product
+lines to include LEAP and Ninth at the base year while excluding their earlier
+years. A point available only before the base year remains non-renderable.
+
+### History
+
+- 2026-08-03: Confirmed because the difference between ESTO and model datasets
+  at the handoff year is important diagnostic information.
+
+## DASH-018: Refinery own use appears only in the inclusive comparison boundary
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / comparison-boundary filtering
+**Affected areas:** Refining overview and detail charts
+
+### Current rule
+
+Do not display `10.01.11 Oil refineries` as a standalone dashboard comparison.
+LEAP does not publish refinery own use separately; its value is part of the
+refinery process. The mapping system already folds ESTO and Ninth `10.01.11`
+into `09.07 Oil refineries (including own use)`, which is paired with LEAP's
+`09.07 Oil refineries` as the shared boundary.
+
+Retain that inclusive refinery comparison and suppress the redundant code-10
+component. This is the same presentation principle used for gas-works own use;
+the mapping and its `NON_EXPANDING` rollup remain owned upstream.
+
+### Validation
+
+Regression tests require the inclusive `09.07` row to survive dashboard flow
+exclusions while standalone `10.01.11` is removed. A production USA Refining
+page must not contain a `10 Losses and own use` overview card or a standalone
+`10.01.11 Oil refineries` detail group.
+
+### History
+
+- 2026-08-03: Confirmed after the Refining page showed an ESTO/Ninth-only own-use
+  card beside the valid inclusive refinery comparison, with no LEAP series.
+
+## DASH-019: Aggregate frontiers remain fixed across a time series
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Aggregation / zero-row handling
+**Affected areas:** Aggregate charts containing generated or NON_EXPANDING rows
+
+### Current rule
+
+Choose a common-row frontier once for each comparison scope, source, economy,
+and scenario series. Do not choose it independently for each year. If a
+generated or NON_EXPANDING row is observed anywhere in that series, keep its
+frontier authoritative in years where the row is absent because its components
+cancel to exact zero; treat that absence as zero instead of restoring an
+overlapping detail row.
+
+Sources that never publish the aggregate row still retain their additive detail
+frontier. This preserves source-specific comparison boundaries without allowing
+long-form zero suppression to change the boundary from one year to the next.
+
+### Validation
+
+Regression coverage requires a refinery inclusive row observed with a
+floating-point residual in one year to suppress its ordinary refinery-gas
+detail in both that year and a later exact-zero year. The production USA Ninth
+Target refinery total must be about `-3,605.34 PJ` in 2027, not the erroneous
+`-2,981.39 PJ` fallback value.
+
+### History
+
+- 2026-08-03: Confirmed after exact cancellation between Ninth refinery-gas
+  output and own use caused the Refining aggregate to alternate by roughly
+  `624 PJ` depending on whether a zero row survived long-form serialization.
+
+## DASH-020: Aggregate-placeholder demand overviews require LEAP coverage
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Demand-page overview eligibility
+**Affected areas:** Buildings, Industry, Transport, and Other demand overviews
+
+### Current rule
+
+The four demand pages allowed to remain visible while LEAP uses an
+`All demand aggregated` placeholder may only display overview area cards whose
+selected frontier contains the configured primary LEAP source. Do not present
+an ESTO/Ninth-only child card as a three-dataset overview comparison.
+
+Keep those child categories in their detail groups. When detailed LEAP rows
+become available upstream, their overview cards become eligible automatically.
+Non-demand pages are unaffected by this rule.
+
+### Validation
+
+Regression coverage requires a Buildings overview selection containing only
+ESTO and Ninth Residential rows to be rejected, the same selection with LEAP
+to be accepted, and an equivalent non-demand selection to remain accepted.
+The production USA overview manifest must retain only the broad `16 Buildings`,
+`14 Industry sector`, `15 Transport sector`, and `16 Other sector` demand cards,
+while retaining Residential and Industry child detail groups.
+
+### History
+
+- 2026-08-03: Confirmed after hierarchy depth caused Residential, Mining,
+  Construction, and Manufacturing to appear as ESTO/Ninth-only overview cards,
+  while shallower Transport and Other-demand hierarchies happened not to expose
+  equivalent child cards.
+
+## DASH-021: Emissions are derived from a declared factor set and a detail frontier
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Derived-quantity presentation
+**Affected areas:** Emissions page; `codebase/common_esto_dashboard_emissions.py`;
+`config/common_esto_dashboard/emissions_factor_sets.json`
+
+### Current rule
+
+The Emissions page is derived, not sourced. Every chart is
+`final energy demand x emissions factor`, applied to the same demand rows the
+sector pages plot, so LEAP, ESTO, and the 9th edition are compared on one
+consistent basis.
+
+Four rules make that derivation reproducible:
+
+1. **The factor axis is declared, not assumed.** A factor set names the axis its
+   factors are keyed on (`ninth_fuel`, `esto_product`, or `esto_product_flow`).
+   The loader resolves that axis onto `common_product_label` - and
+   `common_flow_label` when the set is keyed on product/flow pairs - using the
+   leap_mappings contract (`ninth_fuel_to_esto`) and the generated
+   `esto_to_common_esto_map.csv`. A new factor source with different mapping
+   requirements is a config entry, not a code change.
+2. **Subfuels collapse onto their parent fuel.** In a fuels/subfuels factor
+   file, any subfuel other than the placeholder replaces its parent fuel. A
+   parent row carrying the placeholder stands in for that fuel's
+   `<fuel>_unallocated` code only when no explicit unallocated subfuel row
+   already supplies it; otherwise it is a fuel-level aggregate over rows already
+   present and is dropped so its members are not counted twice. Aggregates with
+   no mappable code at all (`19_total`, `20_total_renewables`) are dropped and
+   reported.
+3. **A blank factor means no emissions, not missing data.** Blanks resolve to
+   zero, so electricity, heat, hydrogen, and the renewable carriers contribute
+   nothing at the point of final use rather than dropping out of a total.
+4. **Only one non-overlapping frontier is summed.** Sector pages carry a whole
+   flow hierarchy plus generated rollups that span several pages
+   (`16.03-16.05,17 Other sector including non-energy`). A row that covers
+   another row of the same source and scenario on both axes is dropped, keeping
+   the detail. Detail is preferred over aggregate because the aggregates overlap
+   each other - `16 Other sector` and `16.03-16.05,17` share `16.03-16.05` - so
+   no set of aggregates is guaranteed to partition demand.
+
+Scope is deliberately final energy demand only. Combustion in transformation
+and the power sector is excluded, which is why electricity carries a zero
+factor here rather than an implied grid intensity. Adding transformation page
+keys to `emissions_page.demand_page_keys` would double count against the fuels
+those inputs produce.
+
+Conflicts are resolved by declared strategy and reported, never silently
+averaged. Several 9th fuels mapping to one ESTO product resolve by
+`prefer_specific_then_mean`, which drops residual `_unallocated` contributors
+when a specific one exists; ESTO components disagreeing under one common fuel
+resolve by `component_conflict_resolution`. Both land in
+`supporting_files/emissions_factor_conflicts.csv`.
+
+### Validation
+
+`supporting_files/` must contain `emissions_factor_resolution.csv` (one factor
+per common fuel with its contributing 9th fuels and ESTO components),
+`emissions_factor_conflicts.csv`, `emissions_dropped_factor_rows.csv`,
+`emissions_axis_values_without_factor.csv` (expected empty), and
+`emissions_frontier_coverage_check.csv`.
+
+The coverage check compares every dropped aggregate against the detail retained
+inside it; a gap above `emissions_page.frontier_coverage_tolerance_pj` means the
+detail is incomplete and that source's emissions are understated, and the page
+says so in its note. Base-year totals for LEAP, ESTO, and the 9th edition must
+agree where all three report the same demand: for 20USA at 2022 all three read
+3,443 Mt CO2e.
+
+### History
+
+- 2026-08-06: Added the Emissions page. The first implementation summed every
+  demand row and reported 4,838 Mt CO2e for 20USA 2022 against 3,443 for LEAP;
+  the gap was parent and child flows counted together, which is what rule 4
+  above now prevents.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
