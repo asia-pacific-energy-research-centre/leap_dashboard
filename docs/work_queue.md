@@ -96,6 +96,11 @@ These later commits supersede the corresponding snapshot rows below:
   visible trace, so the remaining line or area still identifies itself. This
   changes presentation only; trace data and filtering are unchanged.
 
+- **DASHQ-039 is `complete_on_master`.** Signed stacked-area categories that
+  cross zero are split into linked positive and negative trace fragments. They
+  now stack from the correct baseline in every year while retaining one colour,
+  one legend item and grouped legend toggling.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not

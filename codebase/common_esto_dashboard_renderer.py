@@ -931,6 +931,52 @@ def _has_nonzero_values(values: pd.Series, tolerance: float = 1e-12) -> bool:
     return bool((numeric.abs() > tolerance).any())
 
 
+def _add_signed_stack_traces(
+    fig: go.Figure,
+    x_values: pd.Series,
+    y_values: pd.Series,
+    stackgroup_prefix: str,
+    trace_name: str,
+    visible: bool,
+    hovertemplate: str,
+    line_color: str = "",
+) -> int:
+    """Add one logical area series to separate positive and negative stacks.
+
+    A product can change sign over time. Plotly assigns ``stackgroup`` per
+    trace, not per point, so choosing a stack from the series-wide sum makes
+    the opposite-sign years overlap other areas. Split at zero while keeping
+    one legend item and one legend group for the logical series.
+    """
+    numeric_values = pd.to_numeric(y_values, errors="coerce").fillna(0.0)
+    signed_parts = [
+        ("pos", numeric_values.clip(lower=0.0)),
+        ("neg", numeric_values.clip(upper=0.0)),
+    ]
+    active_parts = [
+        (sign, values)
+        for sign, values in signed_parts
+        if _has_nonzero_values(values)
+    ]
+    legend_group = f"{stackgroup_prefix}::{trace_name}"
+    for part_index, (sign, values) in enumerate(active_parts):
+        trace = go.Scatter(
+            x=x_values,
+            y=values,
+            mode="lines",
+            stackgroup=f"{stackgroup_prefix}_{sign}",
+            name=trace_name,
+            visible=True if visible else False,
+            legendgroup=legend_group,
+            showlegend=part_index == 0,
+            hovertemplate=hovertemplate,
+        )
+        if line_color:
+            trace.line.color = line_color
+        fig.add_trace(trace)
+    return len(active_parts)
+
+
 def _comparison_projection_area_rows(
     df: pd.DataFrame,
     *,
@@ -1591,6 +1637,7 @@ def apply_chart_chrome(fig: go.Figure, base_year: int | None = None, code_axis: 
             "borderwidth": 1,
             "itemclick": "toggle",
             "itemdoubleclick": "toggleothers",
+            "groupclick": "togglegroup",
             "tracegroupgap": 3,
         }
     )
@@ -1683,25 +1730,25 @@ def build_area_chart(
         for group_label, group in group_df.groupby(group_col, dropna=False):
             if not _has_nonzero_values(group["value"]):
                 continue
-            # Plotly stacks traces cumulatively in the order they're added,
-            # regardless of sign - a positive (output) product added after
-            # several negative (input) products would render below zero,
-            # offset by the prior negative running total. Splitting into a
-            # positive and a negative stackgroup gives each its own
-            # from-zero baseline so outputs stack up and inputs stack down.
-            group_sign = "neg" if group["value"].sum() < 0 else "pos"
-            fig.add_trace(
-                go.Scatter(
-                    x=group["year"],
-                    y=group["value"],
-                    mode="lines",
-                    stackgroup=f"scenario_{tag}_{group_sign}",
-                    name=str(group_label),
-                    visible=True if is_default else False,
-                    hovertemplate="%{x}<br>Signed value: %{y:,.2f}" + chart_unit + "<extra>" + escape(str(group_label)) + "</extra>",
-                )
+            trace_count = _add_signed_stack_traces(
+                fig=fig,
+                x_values=group["year"],
+                y_values=group["value"],
+                stackgroup_prefix=f"scenario_{tag}",
+                trace_name=str(group_label),
+                visible=is_default,
+                hovertemplate=(
+                    "%{x}<br>Signed value: %{y:,.2f}"
+                    + chart_unit
+                    + "<extra>"
+                    + escape(str(group_label))
+                    + "</extra>"
+                ),
             )
-            trace_meta.append(trace_meta_entry(primary_source, scenario_name, True))
+            trace_meta.extend(
+                trace_meta_entry(primary_source, scenario_name, True)
+                for _ in range(trace_count)
+            )
 
     total_df = (
         chart_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum().sort_values(["source_system", "scenario", "year"])
@@ -3506,20 +3553,26 @@ def _build_td_sector_chart(
             if not _has_nonzero_values(sector_data["value"]):
                 continue
             color = sector_colors.get(page_key)
-            group_sign = "neg" if sector_data["value"].sum() < 0 else "pos"
-            trace_kw: dict = dict(
-                x=sector_data["year"],
-                y=sector_data["value"],
-                mode="lines",
-                stackgroup=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}_{group_sign}",
-                name=page_label,
-                visible=True if is_default else False,
-                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(page_label) + "</extra>",
+            trace_count = _add_signed_stack_traces(
+                fig=fig,
+                x_values=sector_data["year"],
+                y_values=sector_data["value"],
+                stackgroup_prefix=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}",
+                trace_name=page_label,
+                visible=is_default,
+                hovertemplate=(
+                    "%{x}<br>%{y:,.2f}"
+                    + chart_unit
+                    + "<extra>"
+                    + escape(page_label)
+                    + "</extra>"
+                ),
+                line_color=color or "",
             )
-            if color:
-                trace_kw["line"] = {"color": color}
-            fig.add_trace(go.Scatter(**trace_kw))
-            trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
+            trace_meta.extend(
+                trace_meta_entry(stack_source_name, scenario_name, True)
+                for _ in range(trace_count)
+            )
 
     # Explicit flow 12 is the reliable total. The displayed detail can contain
     # several valid hierarchy views and must not be added together.
@@ -3638,14 +3691,25 @@ def _build_td_fuel_chart(
             if not _has_nonzero_values(grp["value"]):
                 continue
             lbl = str(product)
-            group_sign = "neg" if grp["value"].sum() < 0 else "pos"
-            fig.add_trace(go.Scatter(
-                x=grp["year"], y=grp["value"],
-                mode="lines", stackgroup=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}_{group_sign}", name=lbl,
-                visible=True if is_default else False,
-                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
-            ))
-            trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
+            trace_count = _add_signed_stack_traces(
+                fig=fig,
+                x_values=grp["year"],
+                y_values=grp["value"],
+                stackgroup_prefix=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}",
+                trace_name=lbl,
+                visible=is_default,
+                hovertemplate=(
+                    "%{x}<br>%{y:,.2f}"
+                    + chart_unit
+                    + "<extra>"
+                    + escape(lbl)
+                    + "</extra>"
+                ),
+            )
+            trace_meta.extend(
+                trace_meta_entry(stack_source_name, scenario_name, True)
+                for _ in range(trace_count)
+            )
 
     # Use the same authoritative aggregate policy as the sector chart.
     tfc_total_df = _select_total_rows_by_source(
@@ -3757,14 +3821,25 @@ def _build_supply_stack_chart(
             if not _has_nonzero_values(grp["value"]):
                 continue
             lbl = str(group_value)
-            group_sign = "neg" if grp["value"].sum() < 0 else "pos"
-            fig.add_trace(go.Scatter(
-                x=grp["year"], y=grp["value"],
-                mode="lines", stackgroup=f"supply_{scenario_toggle_tag(stack_source_name, scenario_name)}_{group_sign}", name=lbl,
-                visible=True if is_default else False,
-                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
-            ))
-            trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
+            trace_count = _add_signed_stack_traces(
+                fig=fig,
+                x_values=grp["year"],
+                y_values=grp["value"],
+                stackgroup_prefix=f"supply_{scenario_toggle_tag(stack_source_name, scenario_name)}",
+                trace_name=lbl,
+                visible=is_default,
+                hovertemplate=(
+                    "%{x}<br>%{y:,.2f}"
+                    + chart_unit
+                    + "<extra>"
+                    + escape(lbl)
+                    + "</extra>"
+                ),
+            )
+            trace_meta.extend(
+                trace_meta_entry(stack_source_name, scenario_name, True)
+                for _ in range(trace_count)
+            )
 
     # Supply total lines, incl. primary LEAP scenarios (see note in
     # _build_td_sector_chart on why the stacked breakdown alone doesn't show

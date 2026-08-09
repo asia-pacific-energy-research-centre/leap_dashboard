@@ -38,6 +38,7 @@ from codebase.common_esto_dashboard_renderer import (
     _build_section_aggregate_charts,
     _build_td_fuel_chart,
     _build_supply_stack_chart,
+    _add_signed_stack_traces,
     aggregate_only_tfec_note,
     _select_total_rows_by_source,
     _non_overlapping_common_row_frontier,
@@ -1102,6 +1103,32 @@ def test_shared_chart_chrome_keeps_legend_for_one_trace() -> None:
 
     assert fig.layout.showlegend is True
     assert fig.data[0].name == "ESTO Historical total"
+
+
+def test_signed_stack_trace_crossing_zero_uses_both_stacks_and_one_legend_item() -> None:
+    fig = go.Figure()
+
+    trace_count = _add_signed_stack_traces(
+        fig=fig,
+        x_values=pd.Series([2020, 2021, 2022]),
+        y_values=pd.Series([10.0, -4.0, 5.0]),
+        stackgroup_prefix="scenario_tgt",
+        trace_name="02.01-02.08 Coal products",
+        visible=True,
+        hovertemplate="%{y}",
+    )
+
+    assert trace_count == 2
+    assert [trace.stackgroup for trace in fig.data] == [
+        "scenario_tgt_pos",
+        "scenario_tgt_neg",
+    ]
+    assert [list(trace.y) for trace in fig.data] == [
+        [10.0, 0.0, 5.0],
+        [0.0, -4.0, 0.0],
+    ]
+    assert [trace.showlegend for trace in fig.data] == [True, False]
+    assert fig.data[0].legendgroup == fig.data[1].legendgroup
 
 
 def test_supply_demand_comparison_lines_keep_stable_source_colour() -> None:
