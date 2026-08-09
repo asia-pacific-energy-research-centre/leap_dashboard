@@ -34,6 +34,12 @@ PAGE_NOISE_FLAGS_PATH = DASHBOARD_OUTPUT_ROOT / "page_noise_flags.csv"
 HIGH_CHART_COUNT_THRESHOLD = 150
 HIGH_SUPPRESSED_SHARE_THRESHOLD = 0.25
 SPARSE_ONE_ROW_CHART_THRESHOLD = 10
+# Large chart trees, suppressed candidates, and sparse one-row charts are valid
+# dashboard outcomes. Keep their counts in the summary for inspection, but do
+# not turn them into page-noise warnings.
+ENABLE_HIGH_CHART_COUNT_DIAGNOSTIC = False
+ENABLE_HIGH_SUPPRESSED_SHARE_DIAGNOSTIC = False
+ENABLE_SPARSE_ONE_ROW_CHART_DIAGNOSTIC = False
 RUN_PAGE_NOISE_ANALYSIS = True
 
 
@@ -90,11 +96,20 @@ def build_page_noise_summary(output_root: Path) -> pd.DataFrame:
             sparse_count = int((page_df["row_count"] <= 1).sum())
             suppressed_share = suppressed_count / chart_count if chart_count else 0.0
             flag_reasons: list[str] = []
-            if chart_count > HIGH_CHART_COUNT_THRESHOLD:
+            if (
+                ENABLE_HIGH_CHART_COUNT_DIAGNOSTIC
+                and chart_count > HIGH_CHART_COUNT_THRESHOLD
+            ):
                 flag_reasons.append("high_chart_count")
-            if suppressed_share > HIGH_SUPPRESSED_SHARE_THRESHOLD:
+            if (
+                ENABLE_HIGH_SUPPRESSED_SHARE_DIAGNOSTIC
+                and suppressed_share > HIGH_SUPPRESSED_SHARE_THRESHOLD
+            ):
                 flag_reasons.append("high_suppressed_share")
-            if sparse_count > SPARSE_ONE_ROW_CHART_THRESHOLD:
+            if (
+                ENABLE_SPARSE_ONE_ROW_CHART_DIAGNOSTIC
+                and sparse_count > SPARSE_ONE_ROW_CHART_THRESHOLD
+            ):
                 flag_reasons.append("many_sparse_one_row_charts")
             rows.append({
                 "economy": economy,

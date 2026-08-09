@@ -201,6 +201,11 @@ To flag dense or noisy pages after rendering:
 C:\Users\Work\miniconda3\python.exe scripts\analyze_common_esto_dashboard_page_noise.py
 ```
 
+The page-noise summary retains chart-count, suppressed-share, and sparse-chart
+metrics for inspection. These are accepted dashboard outcomes, so the three
+corresponding warning diagnostics are disabled and `page_noise_flags.csv` is
+expected to contain no rows unless a future diagnostic is added deliberately.
+
 This writes:
 
 ```text
