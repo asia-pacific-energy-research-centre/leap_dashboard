@@ -46,8 +46,10 @@ does not require LEAP COM.
 |---|---|---|
 | `COMMON_ESTO_RUN_DASHBOARD_WORKFLOW` | `1` for execution | run on module load |
 | `COMMON_ESTO_ECONOMIES` | reviewed compact/underscore list | selected economy outputs |
-| `COMMON_ESTO_COMPARISON_SCOPE` | `esto_leap_ninth` | main scope |
+| `COMMON_ESTO_RENDER_COMPARISON_SCOPE_VARIANTS` | `1` | render every configured Common-category basis |
+| `COMMON_ESTO_COMPARISON_SCOPE` | `esto_leap_ninth` | single scope when variant rendering is disabled |
 | `COMMON_ESTO_WIDE_FILE_SCOPE` | same when using wide input | avoids cross-scope duplication |
+| `COMMON_ESTO_DASHBOARD_OUTPUT_ROOT` | `outputs/common_esto_dashboard` | isolate fixture or review renders from production output |
 | `COMMON_ESTO_USE_OUTPUT_CONTRACT` | `0` until an intended v1 generation is selected | `1` strictly selects the v1 manifest with no legacy fallback |
 | `COMMON_ESTO_OUTPUT_CONTRACT_PATH` | canonical sibling manifest | optional explicit v1 manifest path |
 | `COMMON_ESTO_UPDATE_DATA` | `0` | `1` mutates sibling mapping outputs via fast path |

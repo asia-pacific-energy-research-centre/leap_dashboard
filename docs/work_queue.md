@@ -77,13 +77,19 @@ These later commits supersede the corresponding snapshot rows below:
   page through one builder. The restored chart filter derives membership from
   final figure traces, preserves selections on pages with no matches, explains
   the empty state, and covers the temporary aggregate-placeholder Industry/LEAP
-  case. This rule will naturally retain detailed Industry charts once their
-  final figures contain LEAP traces. Flow 13 remains intentionally disabled
-  until non-energy use can be separated from aggregated Other-sector LEAP
-  demand. Verification: 67 focused dashboard tests and 164 repository tests
-  pass; the explicit USA-fixture render writes 501 charts with no loadable
-  manifest/bundle mismatch; all-economy publication readiness passes; and the
-  page-noise scan retains five pre-existing density/suppression review flags.
+  case. The Common-category-basis selector now renders the configured
+  `esto_leap_ninth` and `esto_leap` roots, preserves page and economy context,
+  and keeps chart-filter preferences per scope. Configured source buttons stay
+  available on zero-match pages and empty chart groups are hidden. This rule
+  will naturally retain detailed Industry charts once their final figures
+  contain LEAP traces. Flow 13 remains intentionally disabled until non-energy
+  use can be separated from aggregated Other-sector LEAP demand. Verification:
+  68 focused dashboard tests and 165 repository tests pass; isolated ordinary
+  and batch workflows each render 501 three-way plus 494 two-way fixture charts;
+  production USA renders 533 three-way plus 524 two-way charts with no
+  manifest/bundle mismatch or unexpected source traces; publication readiness
+  passes across 22 roots; and page-noise retains five prior flags plus the
+  expected dense two-way USA Industry review flag.
 
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were

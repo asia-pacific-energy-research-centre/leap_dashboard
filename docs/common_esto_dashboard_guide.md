@@ -35,6 +35,27 @@ outputs/common_esto_dashboard/<economy>/
   supporting_files/   CSVs and JSON behind the charts (chart_manifest, page_assignment_summary, ...)
 ```
 
+The configured default scope, `esto_leap_ninth`, keeps that established folder
+name. The initial two-way scope is rendered alongside it:
+
+```text
+outputs/common_esto_dashboard/<economy>__esto_leap/
+```
+
+The top-right **Common categories** selector moves between these complete
+static variants while retaining the current page. Its options are configured
+under `comparison_scope_selector` in
+`config/common_esto_dashboard/common_esto_dashboard_template.json`; each entry
+declares the mapping-owned comparison scope, label, source systems, and output
+suffix. The economy selector retains the active suffix, so changing economy
+does not silently change category basis.
+
+This selector is distinct from **Charts containing**. Common categories
+rebuilds every page from another common-axis scope. Charts containing only
+hides cards whose final Plotly figure lacks a selected source trace. Chart
+filter preferences are retained per comparison scope, and source buttons stay
+available even on pages where that source has no matching chart.
+
 Every dashboard page is a static HTML file with a `<script src="../chart_bundles/...">`
 tag pointing at its data by a **relative path**. That means:
 
@@ -194,9 +215,14 @@ variables:
 $env:COMMON_ESTO_INPUT_DATA_PATH = "C:\path\to\common_esto_comparison_data.csv"
 $env:COMMON_ESTO_ROWS_PATH = "C:\path\to\common_esto_rows.csv"
 $env:COMMON_ESTO_ECONOMIES = "20_USA"
-$env:COMMON_ESTO_COMPARISON_SCOPE = "esto_leap_ninth"
+$env:COMMON_ESTO_DASHBOARD_OUTPUT_ROOT = "outputs\common_esto_dashboard"
 C:\Users\Work\miniconda3\python.exe codebase\common_esto_dashboard_workflow.py
 ```
+
+Normal runs render every scope enabled in `comparison_scope_selector`. For a
+single-scope diagnostic run, set
+`COMMON_ESTO_RENDER_COMPARISON_SCOPE_VARIANTS=0` and then select the one scope
+with `COMMON_ESTO_COMPARISON_SCOPE`.
 
 ## Config
 
@@ -207,8 +233,9 @@ config/common_esto_dashboard/common_esto_dashboard_template.json
 config/common_esto_dashboard/series_config.json
 ```
 
-The template controls page assignment, sign semantics, total demand, optional
-diagnostic scope-specific pages, and the disabled Sankey scaffold.
+The template controls category-basis options, page assignment, sign semantics,
+total demand, optional diagnostic scope-specific pages, and the disabled
+Sankey scaffold.
 Scope-specific pages are disabled by default until their content has been
 reviewed for production usefulness; enable `scope_specific_pages.enabled` only
 for focused review runs. `series_config.json` controls visible source/scenario
@@ -218,9 +245,8 @@ The approved page-root ownership model, boundary-safe prefix rules,
 most-specific-root routing, explicit routing special cases, and the separate
 dataset-presence chart-filter contract are defined in
 [`dashboard_page_routing_and_chart_visibility.md`](dashboard_page_routing_and_chart_visibility.md).
-That document distinguishes the target contract from the current
-priority/keyword implementation and is the authority for the systematic
-routing migration.
+That document records the implemented most-specific-root routing, scope
+selector, and chart-presence filter contract.
 
 Page status and diagnostic-page review notes are tracked in:
 

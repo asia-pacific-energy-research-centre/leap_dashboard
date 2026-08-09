@@ -29,6 +29,7 @@
 
 #%%
 import importlib.util
+import copy
 import json
 import os
 import sys
@@ -169,7 +170,9 @@ DATASET_REGISTRY_PATH = _resolve(
 )
 TEMPLATE_PATH = _resolve("config/common_esto_dashboard/common_esto_dashboard_template.json")
 SERIES_CONFIG_PATH = _resolve("config/common_esto_dashboard/series_config.json")
-OUTPUT_ROOT = _resolve("outputs/common_esto_dashboard")
+OUTPUT_ROOT = _resolve(
+    os.getenv("COMMON_ESTO_DASHBOARD_OUTPUT_ROOT", "outputs/common_esto_dashboard")
+)
 # The emissions page reads its 9th-fuel -> ESTO mapping contract and the
 # generated ESTO -> common axis map from the same sibling repository.
 set_leap_mappings_root(_LEAP_MAPPINGS_REPO)
@@ -178,6 +181,9 @@ set_leap_mappings_root(_LEAP_MAPPINGS_REPO)
 #%%
 # User-tuned constants.
 COMPARISON_SCOPE = os.getenv("COMMON_ESTO_COMPARISON_SCOPE", "esto_leap_ninth")
+RENDER_COMPARISON_SCOPE_VARIANTS = _env_bool(
+    "COMMON_ESTO_RENDER_COMPARISON_SCOPE_VARIANTS", default=True
+)
 # Which source scope to read from the wide comparison file (see
 # ``common_esto_dashboard_data.DEFAULT_WIDE_FILE_SCOPE``). Use "esto_leap" to
 # read the 2-way LEAP/ESTO comparison instead.
@@ -349,15 +355,84 @@ def _missing_leap_demand_branches(economy: str) -> list[str]:
     return preflight.get_demand_sectors_without_detail(components_df, economy)
 
 
+def configured_comparison_scopes(template: dict) -> list[dict[str, object]]:
+    """Return validated, configuration-driven category-basis definitions."""
+    selector = template.get("comparison_scope_selector", {}) or {}
+    configured = selector.get("scopes", []) if selector.get("enabled", False) else []
+    if not RENDER_COMPARISON_SCOPE_VARIANTS:
+        configured = [
+            {**item, "output_suffix": ""} for item in configured
+            if str(item.get("comparison_scope", "")) == COMPARISON_SCOPE
+        ]
+    if not configured:
+        configured = [{
+            "comparison_scope": COMPARISON_SCOPE,
+            "label": COMPARISON_SCOPE,
+            "source_systems": [],
+            "output_suffix": "",
+        }]
+
+    definitions: list[dict[str, object]] = []
+    seen_scopes: set[str] = set()
+    seen_suffixes: set[str] = set()
+    for position, raw in enumerate(configured):
+        scope = str(raw.get("comparison_scope", "")).strip()
+        if not scope or scope in seen_scopes:
+            raise ValueError(f"Comparison-scope selector contains a missing or duplicate scope: {scope!r}")
+        suffix = str(raw.get("output_suffix", "")).strip()
+        if suffix in seen_suffixes or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for char in suffix):
+            raise ValueError(f"Comparison-scope selector contains an invalid or duplicate output suffix: {suffix!r}")
+        sources = [
+            str(source).strip().upper()
+            for source in raw.get("source_systems", [])
+            if str(source).strip()
+        ]
+        definitions.append({
+            "comparison_scope": scope,
+            "label": str(raw.get("label", scope)).strip() or scope,
+            "source_systems": sources,
+            "output_suffix": suffix,
+            "is_default": position == 0,
+        })
+        seen_scopes.add(scope)
+        seen_suffixes.add(suffix)
+
+    requested_default = str(selector.get("default_scope", template.get("default_comparison_scope", ""))).strip()
+    if RENDER_COMPARISON_SCOPE_VARIANTS and requested_default:
+        if requested_default not in seen_scopes:
+            raise ValueError(f"Configured default comparison scope is not selectable: {requested_default!r}")
+        for definition in definitions:
+            definition["is_default"] = definition["comparison_scope"] == requested_default
+    default_definitions = [item for item in definitions if item["is_default"]]
+    if len(default_definitions) != 1:
+        raise ValueError("Comparison-scope selector must define exactly one default scope.")
+    if str(default_definitions[0]["output_suffix"]):
+        raise ValueError("The default comparison scope must use an empty output_suffix to preserve existing URLs.")
+    return definitions
+
+
+def category_basis_options(economy: str, definitions: list[dict[str, object]]) -> list[dict[str, str]]:
+    """Return selector options with concrete static dashboard destinations."""
+    return [
+        {
+            "comparison_scope": str(item["comparison_scope"]),
+            "label": str(item["label"]),
+            "dashboard_key": f"{economy}{item['output_suffix']}",
+        }
+        for item in definitions
+    ]
+
+
 def run_dashboard_for_economy(economy: str) -> dict[str, object]:
-    """Render the production Common ESTO dashboard for one economy."""
-    # Accept both underscore ("20_USA") and compact ("20USA") economy keys by
-    # normalizing the key and the data's economy column to the compact form
-    # used for output folders (matches the batch render script).
+    """Render every configured Common-category basis for one economy."""
     economy = str(economy).replace("_", "").strip()
-    template = load_json(TEMPLATE_PATH)
+    base_template = load_json(TEMPLATE_PATH)
     missing_leap_branches = _missing_leap_demand_branches(economy)
-    template = filter_template_for_leap_demand_coverage(template, missing_leap_branches)
+    base_template = filter_template_for_leap_demand_coverage(
+        base_template, missing_leap_branches
+    )
+    definitions = configured_comparison_scopes(base_template)
+    selector_options = category_basis_options(economy, definitions)
     series_config = json.loads(SERIES_CONFIG_PATH.read_text(encoding="utf-8"))
     raw_df = load_common_esto_data(
         INPUT_DATA_PATH,
@@ -367,7 +442,7 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
     )
     raw_df["economy"] = raw_df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
     raw_df = enrich_with_component_metadata(raw_df, COMMON_ROWS_PATH)
-    base_year = int(template.get("chart_generation", {}).get("base_year", 2022))
+    base_year = int(base_template.get("chart_generation", {}).get("base_year", 2022))
     input_row_count = len(raw_df)
     raw_df = filter_ninth_pre_base_year_data(
         raw_df,
@@ -379,69 +454,131 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
             f"Excluded {input_row_count - len(raw_df):,} NINTH rows before base year "
             f"{base_year} (ESTO retained for pre-base-year data)."
         )
-    filtered_df = filter_common_esto_data(
-        raw_df,
-        comparison_scope=COMPARISON_SCOPE,
-        economy=economy,
-        min_year=MIN_YEAR,
-        max_year=MAX_YEAR,
-    )
-    visible_df = apply_visible_series(filtered_df, series_config.get("visible_series", []))
-    visible_df = apply_sign_semantics(visible_df, template.get("sign_semantics"))
-    # Keep all scopes only for scope-specific diagnostic pages. The main
-    # dashboard dataframe above is always restricted to one required scope.
-    scope_filtered_df = raw_df[raw_df["economy"].astype(str) == str(economy)].copy()
+
+    scope_filtered_df = raw_df[raw_df["economy"].astype(str) == economy].copy()
     if MIN_YEAR is not None:
         scope_filtered_df = scope_filtered_df[scope_filtered_df["year"] >= MIN_YEAR]
     if MAX_YEAR is not None:
         scope_filtered_df = scope_filtered_df[scope_filtered_df["year"] <= MAX_YEAR]
     scope_filtered_df = scope_filtered_df.reset_index(drop=True)
-    scope_visible_df = apply_visible_series(scope_filtered_df, series_config.get("visible_series", []))
-    scope_visible_df = apply_sign_semantics(scope_visible_df, template.get("sign_semantics"))
-    layout = build_output_layout(OUTPUT_ROOT, economy, clear_existing=CLEAR_EXISTING_OUTPUTS)
-    dashboard_updated_label = _dashboard_updated_label()
-    _write_dashboard_metadata(layout, dashboard_updated_label)
-    sign_summary_df = build_sign_semantics_summary(visible_df)
-    sign_summary_df.to_csv(layout["supporting"] / "sign_semantics_summary.csv", index=False)
-    manifest_df = render_dashboard(
-        visible_df,
-        template,
-        series_config,
-        layout,
-        scope_df=scope_visible_df,
-        dashboard_updated_label=dashboard_updated_label,
-        additional_pages=[
-            {
-                "page_key": "mapping_diagnostics",
-                "page_label": "Mapping diagnostics",
-                "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
-            },
-            {
-                "page_key": "mapping_tree_explorer",
-                "page_label": "Full mapping tree explorer",
-                "file": "mapping_tree_explorer.html",
-            },
-        ],
+    scope_visible_df = apply_visible_series(
+        scope_filtered_df, series_config.get("visible_series", [])
     )
-    mapping_diagnostics = {
-        "page": str(
-            OUTPUT_ROOT / "diagnostics" / "dashboards" / "mapping_diagnostics.html"
-        ),
-        "summary": str(
-            OUTPUT_ROOT / "diagnostics" / "supporting_files" / "mapping_diagnostics_summary.csv"
-        ),
-    }
+    scope_visible_df = apply_sign_semantics(
+        scope_visible_df, base_template.get("sign_semantics")
+    )
+    dashboard_updated_label = _dashboard_updated_label()
+
+    scope_results: dict[str, dict[str, object]] = {}
+    default_layout: dict[str, Path] | None = None
+    default_result: dict[str, object] | None = None
+    for definition in definitions:
+        comparison_scope = str(definition["comparison_scope"])
+        output_suffix = str(definition["output_suffix"])
+        dashboard_key = f"{economy}{output_suffix}"
+        print(f"Rendering Common categories: {definition['label']} ({comparison_scope})")
+        filtered_df = filter_common_esto_data(
+            raw_df,
+            comparison_scope=comparison_scope,
+            economy=economy,
+            min_year=MIN_YEAR,
+            max_year=MAX_YEAR,
+        )
+        visible_df = apply_visible_series(
+            filtered_df, series_config.get("visible_series", [])
+        )
+        scope_template = copy.deepcopy(base_template)
+        scope_template["_current_dashboard_key"] = economy
+        scope_template["_active_comparison_scope"] = comparison_scope
+        scope_template["_active_dataset_filter_options"] = list(definition["source_systems"])
+        scope_template["_dashboard_key_suffix"] = output_suffix
+        scope_template["_category_basis_options"] = selector_options
+        visible_df = apply_sign_semantics(
+            visible_df, scope_template.get("sign_semantics")
+        )
+        layout = build_output_layout(
+            OUTPUT_ROOT, dashboard_key, clear_existing=CLEAR_EXISTING_OUTPUTS
+        )
+        _write_dashboard_metadata(layout, dashboard_updated_label)
+        (layout["supporting"] / "comparison_scope_selection.json").write_text(
+            json.dumps(
+                {
+                    "active_comparison_scope": comparison_scope,
+                    "label": definition["label"],
+                    "source_systems": definition["source_systems"],
+                    "dashboard_key": dashboard_key,
+                    "selectable_scopes": selector_options,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        sign_summary_df = build_sign_semantics_summary(visible_df)
+        sign_summary_df.to_csv(
+            layout["supporting"] / "sign_semantics_summary.csv", index=False
+        )
+        tree_link = (
+            "mapping_tree_explorer.html"
+            if definition["is_default"]
+            else f"../../{economy}/dashboards/mapping_tree_explorer.html"
+        )
+        manifest_df = render_dashboard(
+            visible_df,
+            scope_template,
+            series_config,
+            layout,
+            scope_df=scope_visible_df,
+            dashboard_updated_label=dashboard_updated_label,
+            additional_pages=[
+                {
+                    "page_key": "mapping_diagnostics",
+                    "page_label": "Mapping diagnostics",
+                    "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
+                },
+                {
+                    "page_key": "mapping_tree_explorer",
+                    "page_label": "Full mapping tree explorer",
+                    "file": tree_link,
+                },
+            ],
+        )
+        scope_result: dict[str, object] = {
+            "comparison_scope": comparison_scope,
+            "dashboard_key": dashboard_key,
+            "dashboard_index": str(layout["dashboards"] / "index.html"),
+            "chart_manifest": str(layout["supporting"] / "chart_manifest.csv"),
+            "sign_semantics_summary": str(layout["supporting"] / "sign_semantics_summary.csv"),
+            "chart_count": len(manifest_df),
+            "input_rows": len(filtered_df),
+            "visible_rows": len(visible_df),
+        }
+        if PUBLISH_TO_DOCS:
+            counts = publish_to_docs(layout, REPO_ROOT / "docs")
+            scope_result["docs_published"] = counts
+            print(f"Published {comparison_scope} to docs/: {counts}")
+        scope_results[comparison_scope] = scope_result
+        if definition["is_default"]:
+            default_layout = layout
+            default_result = scope_result
+        print(f"Rows after scope/economy/year filter: {len(filtered_df):,}")
+        print(f"Rows after visible-series filter: {len(visible_df):,}")
+        print(f"Charts written: {len(manifest_df):,}")
+        print(f"Dashboard index: {layout['dashboards'] / 'index.html'}")
+
+    if default_layout is None or default_result is None:
+        raise RuntimeError("No default comparison-scope dashboard was rendered.")
     mapping_tree_explorer = render_full_tree_explorer(
-        output_path=layout["dashboards"] / "mapping_tree_explorer.html",
+        output_path=default_layout["dashboards"] / "mapping_tree_explorer.html",
         comparison_data=raw_df,
         prefer_extended_esto=PREFER_EXTENDED_ESTO,
     )
     convergence_result = write_capacity_unmet_convergence_page(
         CAPACITY_UNMET_CONVERGENCE_PATH,
-        layout,
+        default_layout,
         enabled=INCLUDE_CAPACITY_UNMET_CONVERGENCE,
     )
-    coverage_config = template.get("leap_demand_sector_coverage", {})
+    coverage_config = base_template.get("leap_demand_sector_coverage", {})
     hidden_page_keys = set(coverage_config.get("_hidden_page_keys", []))
     aggregate_only_skipped = sorted(
         set(coverage_config.get("page_leap_branches", {})) & hidden_page_keys
@@ -461,27 +598,25 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         )
     print(f"LEAP demand branches without detail for {economy}: {', '.join(missing_leap_branches) or 'none'}")
     print(f"Input rows read: {len(raw_df):,}")
-    print(f"Rows after scope/economy/year filter: {len(filtered_df):,}")
-    print(f"Rows after visible-series filter: {len(visible_df):,}")
-    print(f"Charts written: {len(manifest_df):,}")
-    print(f"Sign summary rows written: {len(sign_summary_df):,}")
-    print(f"Dashboard index: {layout['dashboards'] / 'index.html'}")
+    print(f"Total charts across category bases: {sum(int(item['chart_count']) for item in scope_results.values()):,}")
+
+    mapping_diagnostics = {
+        "page": str(OUTPUT_ROOT / "diagnostics" / "dashboards" / "mapping_diagnostics.html"),
+        "summary": str(OUTPUT_ROOT / "diagnostics" / "supporting_files" / "mapping_diagnostics_summary.csv"),
+    }
     result: dict[str, object] = {
         "economy": economy,
-        "dashboard_index": str(layout["dashboards"] / "index.html"),
-        "chart_manifest": str(layout["supporting"] / "chart_manifest.csv"),
-        "sign_semantics_summary": str(layout["supporting"] / "sign_semantics_summary.csv"),
-        "chart_count": len(manifest_df),
+        "dashboard_index": default_result["dashboard_index"],
+        "chart_manifest": default_result["chart_manifest"],
+        "sign_semantics_summary": default_result["sign_semantics_summary"],
+        "chart_count": sum(int(item["chart_count"]) for item in scope_results.values()),
+        "default_chart_count": default_result["chart_count"],
+        "scope_results": scope_results,
         "mapping_diagnostics": mapping_diagnostics,
         "mapping_tree_explorer": str(mapping_tree_explorer),
     }
     if convergence_result:
         result["capacity_unmet_convergence"] = convergence_result
-    if PUBLISH_TO_DOCS:
-        docs_root = REPO_ROOT / "docs"
-        counts = publish_to_docs(layout, docs_root)
-        print(f"Published to docs/: {counts}")
-        result["docs_published"] = counts
     return result
 
 

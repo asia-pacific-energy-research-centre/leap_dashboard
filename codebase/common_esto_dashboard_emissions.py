@@ -1161,6 +1161,7 @@ def build_emissions_page(
     stacked_area_note_from_figure = renderer.stacked_area_note_from_figure
     write_chart_bundle = renderer.write_chart_bundle
     write_dashboard_page = renderer.write_dashboard_page
+    scope_ui_kwargs = renderer.category_basis_ui_kwargs(template)
 
     config = emissions_page_config(template)
     if not emissions_page_enabled(template, assigned_df, factor_config_path):
@@ -1201,6 +1202,7 @@ def build_emissions_page(
             page_key, page_label, layout, all_pages, economy_label, dashboard_switcher,
             current_dashboard, dashboard_updated_label,
             f"No emissions charts: an emissions factor input could not be read ({error}).",
+            scope_ui_kwargs,
         )
     unit = str(factor_set.get("emissions_unit", DEFAULT_EMISSIONS_UNIT))
 
@@ -1214,6 +1216,7 @@ def build_emissions_page(
             current_dashboard, dashboard_updated_label,
             "No emissions charts: none of the demand fuels for this economy carry an "
             f"emissions factor. Unmatched fuels: {', '.join(missing_labels) or 'none'}.",
+            scope_ui_kwargs,
         )
     diagnostics["frontier_coverage_check"] = coverage_check
     diagnostics["source_selection"] = source_selection
@@ -1322,6 +1325,7 @@ def build_emissions_page(
             ),
         ),
         dashboard_updated_label=dashboard_updated_label,
+        **scope_ui_kwargs,
     )
     page_row = {
         "file": f"{page_key}.html",
@@ -1343,6 +1347,7 @@ def _write_explained_empty_page(
     current_dashboard: str,
     dashboard_updated_label: str,
     reason: str,
+    scope_ui_kwargs: dict[str, object] | None = None,
 ) -> tuple[list[dict], dict]:
     """Write a chartless Emissions page that explains why it has no charts.
 
@@ -1365,6 +1370,7 @@ def _write_explained_empty_page(
         current_dashboard=current_dashboard,
         page_note=reason,
         dashboard_updated_label=dashboard_updated_label,
+        **(scope_ui_kwargs or {}),
     )
     return [], {
         "file": f"{page_key}.html",

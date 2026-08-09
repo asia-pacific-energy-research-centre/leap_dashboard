@@ -1,5 +1,6 @@
 import json
 import re
+import copy
 from pathlib import Path
 
 import pandas as pd
@@ -377,6 +378,86 @@ def test_industry_filter_membership_tracks_temporary_leap_placeholder_detail(
     assert any("LEAP" not in datasets and "Electricity" in caption for datasets, caption in cards)
     assert "Charts containing:" in html
     assert "No charts on this page show every selected dataset" in html
+
+
+def test_category_basis_variants_preserve_page_economy_and_filter_options(
+    tmp_path: Path,
+) -> None:
+    base_template = _load_template()
+    base_template["total_demand_page"] = {"enabled": False}
+    base_template["emissions_page"] = {"enabled": False}
+    base_template["scope_specific_pages"] = {"enabled": False}
+    series_config = _load_series_config()
+    base_rows = apply_sign_semantics(
+        _build_common_esto_rows(), base_template["sign_semantics"]
+    )
+    base_rows = base_rows[
+        base_rows["comparison_scope"].eq("leap_vs_esto_vs_ninth")
+    ].copy()
+    options = [
+        {
+            "comparison_scope": "esto_leap_ninth",
+            "label": "LEAP + ESTO + Ninth",
+            "dashboard_key": "20USA",
+        },
+        {
+            "comparison_scope": "esto_leap",
+            "label": "LEAP + ESTO",
+            "dashboard_key": "20USA__esto_leap",
+        },
+    ]
+
+    for scope, suffix, sources in [
+        ("esto_leap_ninth", "", ["LEAP", "ESTO", "NINTH"]),
+        ("esto_leap", "__esto_leap", ["LEAP", "ESTO"]),
+    ]:
+        template = copy.deepcopy(base_template)
+        template["_current_dashboard_key"] = "20USA"
+        template["_active_comparison_scope"] = scope
+        template["_active_dataset_filter_options"] = sources
+        template["_dashboard_key_suffix"] = suffix
+        template["_category_basis_options"] = options
+        rows = base_rows.copy()
+        rows["comparison_scope"] = scope
+        if scope == "esto_leap":
+            rows = rows[~rows["source_system"].astype(str).eq("NINTH")].copy()
+        layout = build_output_layout(
+            tmp_path / "outputs", f"20USA{suffix}", clear_existing=True
+        )
+        render_dashboard(rows, template, series_config, layout)
+
+    default_html = (
+        tmp_path / "outputs" / "20USA" / "dashboards" / "transport.html"
+    ).read_text(encoding="utf-8")
+    two_way_html = (
+        tmp_path
+        / "outputs"
+        / "20USA__esto_leap"
+        / "dashboards"
+        / "transport.html"
+    ).read_text(encoding="utf-8")
+
+    assert "Common categories" in default_html
+    assert "../../20USA__esto_leap/dashboards/transport.html" in default_html
+    assert "../../20USA/dashboards/transport.html" in two_way_html
+    assert "../../01AUS__esto_leap/dashboards/transport.html" in two_way_html
+    assert 'data-dataset-filter="NINTH"' in default_html
+    assert 'data-dataset-filter="NINTH"' not in two_way_html
+    assert "common-esto-dataset-filter:' + scope" in default_html
+    assert "data-dataset-filter-section" in default_html
+    assert "dataset-group-empty" in default_html
+    default_manifest = pd.read_csv(
+        tmp_path / "outputs" / "20USA" / "supporting_files" / "chart_manifest.csv"
+    )
+    two_way_manifest = pd.read_csv(
+        tmp_path
+        / "outputs"
+        / "20USA__esto_leap"
+        / "supporting_files"
+        / "chart_manifest.csv"
+    )
+    assert set(default_manifest["comparison_scope"]) == {"esto_leap_ninth"}
+    assert set(two_way_manifest["comparison_scope"]) == {"esto_leap"}
 
 
 def test_common_esto_dashboard_excludes_electricity_and_heat_output_rows() -> None:

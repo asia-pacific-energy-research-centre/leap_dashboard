@@ -3,6 +3,7 @@
 
 #%%
 import json
+import copy
 import os
 import sys
 import traceback
@@ -42,7 +43,11 @@ from mapping_pipeline_provenance import selected_run_metadata  # noqa: E402
 # The workflow module runs its full render (plus upstream data refresh and docs
 # publish) at import time unless this env override is set first.
 os.environ.setdefault("COMMON_ESTO_RUN_DASHBOARD_WORKFLOW", "0")
-from common_esto_dashboard_workflow import _missing_leap_demand_branches  # noqa: E402
+from common_esto_dashboard_workflow import (  # noqa: E402
+    _missing_leap_demand_branches,
+    category_basis_options,
+    configured_comparison_scopes,
+)
 
 
 def _resolve(path: str | Path) -> Path:
@@ -96,7 +101,6 @@ OUTPUT_ROOT = _resolve(
 )
 SUMMARY_PATH = OUTPUT_ROOT / "render_summary.csv"
 
-COMPARISON_SCOPE = os.getenv("COMMON_ESTO_COMPARISON_SCOPE", "esto_leap_ninth")
 WIDE_FILE_SCOPE = os.getenv("COMMON_ESTO_WIDE_FILE_SCOPE", "esto_leap_ninth")
 USE_OUTPUT_CONTRACT = os.getenv("COMMON_ESTO_USE_OUTPUT_CONTRACT", "0") != "0"
 MIN_YEAR = 2010
@@ -135,7 +139,11 @@ def _existing_dashboard_economies() -> list[str]:
         return []
     economies = []
     for path in OUTPUT_ROOT.iterdir():
-        if path.is_dir() and (path / "dashboards" / "index.html").exists():
+        if (
+            path.is_dir()
+            and "__" not in path.name
+            and (path / "dashboards" / "index.html").exists()
+        ):
             economies.append(path.name)
     return sorted(economies)
 
@@ -201,15 +209,8 @@ def _render_one_economy(
     try:
         missing_leap_branches = _missing_leap_demand_branches(economy)
         template = filter_template_for_leap_demand_coverage(template, missing_leap_branches)
-        filtered_df = filter_common_esto_data(
-            raw_df,
-            comparison_scope=COMPARISON_SCOPE,
-            economy=economy,
-            min_year=MIN_YEAR,
-            max_year=MAX_YEAR,
-        )
-        visible_df = apply_visible_series(filtered_df, series_config.get("visible_series", []))
-        visible_df = apply_sign_semantics(visible_df, template.get("sign_semantics"))
+        definitions = configured_comparison_scopes(template)
+        selector_options = category_basis_options(economy, definitions)
         scope_filtered_df = filter_common_esto_data(
             raw_df,
             comparison_scope=ALL_SCOPES,
@@ -219,37 +220,99 @@ def _render_one_economy(
         )
         scope_visible_df = apply_visible_series(scope_filtered_df, series_config.get("visible_series", []))
         scope_visible_df = apply_sign_semantics(scope_visible_df, template.get("sign_semantics"))
-        layout = build_output_layout(OUTPUT_ROOT, economy, clear_existing=CLEAR_EXISTING_OUTPUTS)
         dashboard_updated_label = _dashboard_updated_label()
-        sign_summary_df = build_sign_semantics_summary(visible_df)
-        sign_summary_df.to_csv(layout["supporting"] / "sign_semantics_summary.csv", index=False)
-        manifest_df = render_dashboard(
-            visible_df,
-            template,
-            series_config,
-            layout,
-            scope_df=scope_visible_df,
-            dashboard_updated_label=dashboard_updated_label,
-            additional_pages=[
-                {
-                    "page_key": "mapping_diagnostics",
-                    "page_label": "Mapping diagnostics",
-                    "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
-                },
-            ],
-        )
-        _write_dashboard_metadata(
-            layout,
-            dashboard_updated_label,
-            mapping_metadata,
-        )
+        total_charts = 0
+        default_manifest_df = pd.DataFrame()
+        default_filtered_rows = 0
+        default_visible_rows = 0
+        default_layout: dict[str, Path] | None = None
+        scope_chart_counts: dict[str, int] = {}
+        for definition in definitions:
+            comparison_scope = str(definition["comparison_scope"])
+            output_suffix = str(definition["output_suffix"])
+            dashboard_key = f"{economy}{output_suffix}"
+            filtered_df = filter_common_esto_data(
+                raw_df,
+                comparison_scope=comparison_scope,
+                economy=economy,
+                min_year=MIN_YEAR,
+                max_year=MAX_YEAR,
+            )
+            visible_df = apply_visible_series(
+                filtered_df, series_config.get("visible_series", [])
+            )
+            scope_template = copy.deepcopy(template)
+            scope_template["_current_dashboard_key"] = economy
+            scope_template["_active_comparison_scope"] = comparison_scope
+            scope_template["_active_dataset_filter_options"] = list(
+                definition["source_systems"]
+            )
+            scope_template["_dashboard_key_suffix"] = output_suffix
+            scope_template["_category_basis_options"] = selector_options
+            visible_df = apply_sign_semantics(
+                visible_df, scope_template.get("sign_semantics")
+            )
+            layout = build_output_layout(
+                OUTPUT_ROOT, dashboard_key, clear_existing=CLEAR_EXISTING_OUTPUTS
+            )
+            sign_summary_df = build_sign_semantics_summary(visible_df)
+            sign_summary_df.to_csv(
+                layout["supporting"] / "sign_semantics_summary.csv", index=False
+            )
+            (layout["supporting"] / "comparison_scope_selection.json").write_text(
+                json.dumps(
+                    {
+                        "active_comparison_scope": comparison_scope,
+                        "label": definition["label"],
+                        "source_systems": definition["source_systems"],
+                        "dashboard_key": dashboard_key,
+                        "selectable_scopes": selector_options,
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            manifest_df = render_dashboard(
+                visible_df,
+                scope_template,
+                series_config,
+                layout,
+                scope_df=scope_visible_df,
+                dashboard_updated_label=dashboard_updated_label,
+                additional_pages=[
+                    {
+                        "page_key": "mapping_diagnostics",
+                        "page_label": "Mapping diagnostics",
+                        "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
+                    },
+                ],
+            )
+            _write_dashboard_metadata(
+                layout,
+                dashboard_updated_label,
+                {**mapping_metadata, "comparison_scope": comparison_scope},
+            )
+            chart_count = len(manifest_df)
+            total_charts += chart_count
+            scope_chart_counts[comparison_scope] = chart_count
+            if definition["is_default"]:
+                default_manifest_df = manifest_df
+                default_filtered_rows = len(filtered_df)
+                default_visible_rows = len(visible_df)
+                default_layout = layout
+        if default_layout is None:
+            raise RuntimeError("No default comparison-scope dashboard was rendered.")
 
         result.update({
             "status": "ok",
-            "filtered_rows": len(filtered_df),
-            "visible_rows": len(visible_df),
-            "chart_count": len(manifest_df),
-            "dashboard_path": str(layout["dashboards"] / "index.html"),
+            "filtered_rows": default_filtered_rows,
+            "visible_rows": default_visible_rows,
+            "chart_count": total_charts,
+            "default_chart_count": len(default_manifest_df),
+            "scope_count": len(definitions),
+            "scope_chart_counts": json.dumps(scope_chart_counts, sort_keys=True),
+            "dashboard_path": str(default_layout["dashboards"] / "index.html"),
             "dashboard_updated": dashboard_updated_label,
         })
     except Exception as exc:

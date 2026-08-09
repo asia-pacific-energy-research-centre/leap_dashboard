@@ -1,7 +1,7 @@
 # Dashboard page routing and chart visibility
 
-**Status:** Approved design; the current renderer implements parts of this
-contract, but the systematic migration described below is still pending.
+**Status:** Implemented. TFEC flow 13 and detailed upstream LEAP demand remain
+separate deferred data-boundary items, as documented below.
 
 This document defines how Common ESTO categories belong to dashboard pages and
 how users filter charts by the datasets actually shown. It is a presentation
@@ -159,6 +159,29 @@ active overview flow and then removed by an unrelated global exclusion. Flow
 13 can be enabled after that upstream boundary becomes separable and the TFEC
 calculation is validated.
 
+## Common-category-basis selector
+
+The top-right **Common categories** selector changes the upstream comparison
+scope that defines the common flow and product categories. Its initial
+configuration lives under `comparison_scope_selector` in
+`common_esto_dashboard_template.json`:
+
+- `esto_leap_ninth` renders LEAP + ESTO + Ninth and retains the established
+  economy output key, such as `20USA`;
+- `esto_leap` renders LEAP + ESTO under the configured sibling key, such as
+  `20USA__esto_leap`.
+
+Each option declares its scope, display label, source systems, and output
+suffix. Adding another mapping-owned comparison scope therefore requires one
+configuration entry rather than new page-routing code. Every scope is rendered
+as a complete static dashboard so switching category basis preserves the
+current page. Economy switching preserves the active scope suffix.
+
+Each variant writes `supporting_files/comparison_scope_selection.json`, carries
+`comparison_scope` in its chart manifest and routing summary, and is included
+by the ordinary publication-readiness and page-noise scanners. The default
+scope keeps the old URLs; alternate scopes never overwrite it.
+
 ## Dataset-presence chart filter
 
 The dataset-presence filter answers a different question from the comparison-
@@ -201,10 +224,11 @@ selection, suppression, and source fallback. A source counts as displayed only
 when the final chart contains a corresponding non-empty trace; the renderer's
 raw input dataframe is not sufficient authority.
 
-The selection is a dashboard-wide preference and must survive page, economy,
-and comparison-scope navigation. Every configured source option for the active
-scope should remain selectable even when the current page has no matching
-chart. In that case the page should say, for example:
+The selection is a dashboard-wide preference within one comparison scope and
+must survive page and economy navigation. Preferences are stored separately by
+scope and restored when the user returns to that category basis. Every
+configured source option for the active scope remains selectable even when the
+current page has no matching chart. In that case the page says, for example:
 
 ```text
 No charts on Industry show LEAP for this economy and category basis.
@@ -239,7 +263,8 @@ The filter must:
    focused temporary-placeholder Industry/LEAP tests.
 9. Run both `esto_leap_ninth` and `esto_leap` through routing, rendering,
    publication-readiness, and page-noise checks before enabling the new scope
-   selector.
+   selector. **Implemented:** both ordinary and all-economy workflows render
+   every configured scope and the readiness/noise scripts discover both roots.
 
 ## Required validation
 

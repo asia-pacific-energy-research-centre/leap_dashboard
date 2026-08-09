@@ -1,6 +1,24 @@
 {
   "title": "Common ESTO Comparison Dashboard",
   "default_comparison_scope": "esto_leap_ninth",
+  "comparison_scope_selector": {
+    "enabled": true,
+    "default_scope": "esto_leap_ninth",
+    "scopes": [
+      {
+        "comparison_scope": "esto_leap_ninth",
+        "label": "LEAP + ESTO + Ninth",
+        "source_systems": ["LEAP", "ESTO", "NINTH"],
+        "output_suffix": ""
+      },
+      {
+        "comparison_scope": "esto_leap",
+        "label": "LEAP + ESTO",
+        "source_systems": ["LEAP", "ESTO"],
+        "output_suffix": "__esto_leap"
+      }
+    ]
+  },
   "dashboard_mode": "auto_tree",
   "default_chart_type": "line",
   "excluded_flow_code_prefixes": ["06", "10.01.02", "10.01.11", "11", "13", "18", "19"],

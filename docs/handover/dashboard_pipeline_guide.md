@@ -73,8 +73,11 @@ Wide data requires one `comparison_scope`; it folds source system into
 scenario. Long data is preferred because it retains explicit source system and
 does not zero-fill missing source years.
 
-`LEAP_MAPPINGS_ROOT`, input paths, comparison scope, economies, and several
-display options have environment overrides.
+`LEAP_MAPPINGS_ROOT`, input paths, comparison-scope variant rendering,
+economies, output root, and several display options have environment
+overrides. Normal production runs render every scope declared by
+`comparison_scope_selector`; the default scope keeps the compact economy folder
+and alternate scopes use configured sibling suffixes.
 
 ## Preprocessing
 
@@ -85,7 +88,8 @@ The production workflow:
 3. joins component metadata from `common_esto_rows.csv`;
 4. removes 9th pre-base-year rows by default so ESTO is the historical
    comparator;
-5. filters comparison scope, economy, and 2010–2060 by default;
+5. filters economy and 2010–2060, then renders each configured comparison
+   scope into its own static dashboard root;
 6. applies visible-series configuration;
 7. applies presentation sign semantics;
 8. retains all scopes separately for optional diagnostic scope pages.

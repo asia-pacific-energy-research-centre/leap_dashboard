@@ -753,6 +753,7 @@ def build_page_assignment_summary(assigned_df: pd.DataFrame) -> pd.DataFrame:
     if assigned_df.empty:
         return pd.DataFrame()
     group_columns = [
+        "comparison_scope",
         "_page_key",
         "_page_label",
         "_section_key",
@@ -2178,7 +2179,7 @@ a:hover { text-decoration: underline; }
 }
 .header-inline-controls {
   display:flex;align-items:center;gap:8px;justify-content:flex-end;
-  flex:0 0 auto;flex-wrap:nowrap;margin-left:auto;
+  flex:1 1 100%;flex-wrap:wrap;margin-left:0;min-width:0;
 }
 .dashboard-context { margin-top:6px;color:#4b5563;font-size:13px;line-height:1.35; }
 .dashboard-updated { margin-left:10px;padding-left:10px;border-left:1px solid #c5ccd3;color:#64748b;white-space:nowrap; }
@@ -2259,12 +2260,15 @@ a:hover { text-decoration: underline; }
 }
 .scenario-toggle-btn + .scenario-toggle-btn { border-left:1px solid #c5ccd3; }
 .scenario-toggle-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.category-basis-switcher { display:flex;align-items:center;gap:6px;font-size:12px;color:#4b5563;white-space:nowrap; }
+.category-basis-switcher span { font-weight:600; }
+.category-basis-switcher select { max-width:210px;padding:5px 28px 5px 8px;border:1px solid #c5ccd3;border-radius:6px;background:#fff;color:#111;font:inherit; }
 .dataset-filter {
   display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap;flex:0 0 auto;
   width:max-content;max-width:max-content;
   font-size:12px;color:#4b5563;
 }
-.dataset-filter-label { flex:0 0 260px;font-weight:600;width:260px;line-height:1.2;text-align:right; }
+.dataset-filter-label { flex:0 0 auto;font-weight:600;line-height:1.2;text-align:right; }
 .dataset-filter-buttons { display:flex;flex:0 0 auto;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
 .dataset-filter-btn {
   padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
@@ -2275,6 +2279,7 @@ a:hover { text-decoration: underline; }
 .dataset-filter-status { width:100%;text-align:right;color:#64748b;font-size:11px; }
 .dataset-filter-status.is-empty { color:#9a3412;font-weight:600; }
 .chart-card.dataset-filtered { display:none; }
+.dataset-group-empty { display:none !important; }
 .dashboard-grid {
   display:grid;
   grid-template-columns:repeat(3, minmax(0, 1fr));
@@ -2400,16 +2405,21 @@ _SCENARIO_TOGGLE_JS = """
 
 _DATASET_FILTER_JS = """
 (function() {
+  var filter = document.querySelector('[data-dataset-filter-group]');
   var buttons = Array.from(document.querySelectorAll('[data-dataset-filter]'));
-  if (!buttons.length) return;
-  var key = 'common-esto-dataset-filter';
+  if (!filter || !buttons.length) return;
+  var scope = filter.dataset.comparisonScope || 'default';
+  var key = 'common-esto-dataset-filter:' + scope;
   var status = document.querySelector('[data-dataset-filter-status]');
   var clear = document.querySelector('[data-dataset-filter-clear]');
+  var available = buttons.map(function(button) { return button.dataset.datasetFilter; });
   var active = [];
   try {
     var stored = JSON.parse(window.localStorage.getItem(key) || '[]');
     if (Array.isArray(stored)) {
-      active = stored.map(function(d) { return String(d).toUpperCase(); });
+      active = stored
+        .map(function(d) { return String(d).toUpperCase(); })
+        .filter(function(d) { return available.indexOf(d) !== -1; });
     }
   } catch (e) {}
 
@@ -2427,6 +2437,13 @@ _DATASET_FILTER_JS = """
       var hidden = active.some(function(d) { return have.indexOf(d) === -1; });
       card.classList.toggle('dataset-filtered', hidden);
       if (!hidden) visibleCount += 1;
+    });
+    document.querySelectorAll('[data-dataset-filter-section]').forEach(function(group) {
+      var groupCards = Array.from(group.querySelectorAll('.chart-card[data-datasets]'));
+      var hasVisibleCard = groupCards.some(function(card) {
+        return !card.classList.contains('dataset-filtered');
+      });
+      group.classList.toggle('dataset-group-empty', groupCards.length > 0 && !hasVisibleCard);
     });
     if (status) {
       var selectedText = active.length ? ' containing ' + active.join(' + ') : '';
@@ -2547,7 +2564,7 @@ _SORT_JS = """
 
 _DASHBOARD_SWITCHER_JS = """
 (function() {
-  document.querySelectorAll('[data-dashboard-switcher]').forEach(function(select) {
+  document.querySelectorAll('[data-navigation-select]').forEach(function(select) {
     select.addEventListener('change', function() {
       var href = select.value;
       if (href) window.location.href = href;
@@ -2764,8 +2781,13 @@ def _current_dashboard_label(
     return str(series_config.get("economy_label") or current_dashboard)
 
 
-def _dashboard_switcher_html(dashboards: list[dict[str, str]], current_dashboard: str, current_file: str) -> str:
-    """Build a static cross-dashboard switcher for matching page filenames."""
+def _dashboard_switcher_html(
+    dashboards: list[dict[str, str]],
+    current_dashboard: str,
+    current_file: str,
+    dashboard_key_suffix: str = "",
+) -> str:
+    """Build a static cross-economy switcher while retaining category scope."""
     if len(dashboards) <= 1:
         return ""
 
@@ -2773,14 +2795,51 @@ def _dashboard_switcher_html(dashboards: list[dict[str, str]], current_dashboard
     for item in dashboards:
         dashboard_key = item["dashboard_key"]
         label = item["label"]
-        href = current_file if dashboard_key == current_dashboard else f"../../{escape(dashboard_key)}/dashboards/{escape(current_file)}"
+        target_dashboard_key = f"{dashboard_key}{dashboard_key_suffix}"
+        href = (
+            current_file
+            if dashboard_key == current_dashboard
+            else f"../../{escape(target_dashboard_key)}/dashboards/{escape(current_file)}"
+        )
         selected = " selected" if dashboard_key == current_dashboard else ""
         options.append(f'<option value="{href}"{selected}>{escape(label)}</option>')
 
     return (
         '<label class="dashboard-switcher">'
         '<span>Economy</span>'
-        f'<select data-dashboard-switcher aria-label="Switch dashboard">{"".join(options)}</select>'
+        f'<select data-navigation-select data-dashboard-switcher aria-label="Switch economy">{"".join(options)}</select>'
+        '</label>'
+    )
+
+
+def _category_basis_switcher_html(
+    category_basis_options: list[dict[str, str]],
+    current_scope: str,
+    current_file: str,
+) -> str:
+    """Build the comparison-scope selector for matching dashboard pages."""
+    if len(category_basis_options) <= 1:
+        return ""
+    options: list[str] = []
+    for item in category_basis_options:
+        scope = str(item.get("comparison_scope", "")).strip()
+        label = str(item.get("label", scope)).strip()
+        dashboard_key = str(item.get("dashboard_key", "")).strip()
+        if not scope or not dashboard_key:
+            continue
+        href = (
+            current_file
+            if scope == current_scope
+            else f"../../{escape(dashboard_key)}/dashboards/{escape(current_file)}"
+        )
+        selected = " selected" if scope == current_scope else ""
+        options.append(f'<option value="{href}"{selected}>{escape(label)}</option>')
+    if len(options) <= 1:
+        return ""
+    return (
+        '<label class="category-basis-switcher">'
+        '<span>Common categories</span>'
+        f'<select data-navigation-select data-category-basis-switcher aria-label="Choose datasets defining the common categories">{"".join(options)}</select>'
         '</label>'
     )
 
@@ -2790,11 +2849,11 @@ _DATASET_DISPLAY_LABELS = {"NINTH": "Ninth"}
 SHOW_DATASET_FILTER = True
 
 
-def _dataset_filter_html(datasets: list[str]) -> str:
+def _dataset_filter_html(datasets: list[str], comparison_scope: str = "default") -> str:
     """Build the header dataset-filter button group.
 
-    One toggle button per dataset (source system) present on the page. When a
-    button is active (blue), chart cards lacking that dataset are hidden.
+    One toggle button per dataset configured for the active comparison scope.
+    When a button is active (blue), chart cards lacking that dataset are hidden.
 
     Returns nothing while ``SHOW_DATASET_FILTER`` is off, which leaves the
     header without the control and the rest of the page untouched.
@@ -2807,7 +2866,7 @@ def _dataset_filter_html(datasets: list[str]) -> str:
         for d in datasets
     )
     return (
-        '<div class="dataset-filter" role="group" aria-label="Charts containing dataset">'
+        f'<div class="dataset-filter" role="group" aria-label="Charts containing dataset" data-dataset-filter-group data-comparison-scope="{escape(comparison_scope)}">'
         '<span class="dataset-filter-label">'
         "Charts containing:</span>"
         f'<div class="dataset-filter-buttons">{buttons}</div>'
@@ -2873,6 +2932,7 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
             f'</figure>'
         )
     return (
+        f'<section data-dataset-filter-section>'
         f'<h2 class="section-heading">Overview</h2>'
         f'<section class="section-sort-group">'
         f'<div class="sort-bar"><span class="sort-bar-label">Sort:</span>'
@@ -2882,6 +2942,7 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
         f'<button class="sort-btn" data-sort="pctDiff">Largest % diff</button>'
         f'</div>'
         f'<div class="{grid_class}" data-sortable-grid="overview">{"".join(cards)}</div>'
+        f'</section>'
         f'</section>'
     )
 
@@ -2998,7 +3059,7 @@ def _line_sections_html(line_rows: list[dict], page_label: str) -> str:
                 grid_class = _grid_class_for(len(group_rows))
                 cards_html = _chart_cards_html(group_rows, f"{page_label} > {section_label} > {group}")
                 sub_chunks.append(
-                    f'<section id="{group_anchor}" style="scroll-margin-top:150px;">'
+                    f'<section id="{group_anchor}" data-dataset-filter-section style="scroll-margin-top:150px;">'
                     f'<h3 class="subsection-heading">{escape(group)}</h3>'
                     f'<section class="section-sort-group">'
                     f'{_sort_bar_html()}'
@@ -3009,7 +3070,7 @@ def _line_sections_html(line_rows: list[dict], page_label: str) -> str:
             body_html = "".join(sub_chunks)
 
         chunks.append(
-            f'<section id="{anchor}" style="scroll-margin-top:150px;">'
+            f'<section id="{anchor}" data-dataset-filter-section style="scroll-margin-top:150px;">'
             f'<h2 class="section-heading">{escape(section_label)}</h2>'
             f'{body_html}'
             f'</section>'
@@ -3028,6 +3089,10 @@ def write_dashboard_page(
     current_dashboard: str = "",
     page_note: str = "",
     dashboard_updated_label: str = "",
+    category_basis_options: list[dict[str, str]] | None = None,
+    current_comparison_scope: str = "",
+    dataset_filter_options: list[str] | None = None,
+    dashboard_key_suffix: str = "",
 ) -> None:
     """Write a polished HTML dashboard page with sticky header, lazy loading, and sorting."""
     page_label = str(page_config.get("page_label", "Dashboard"))
@@ -3036,18 +3101,28 @@ def write_dashboard_page(
     line_rows = [r for r in chart_rows if not (r.get("chart_type") == "stacked_area" and str(r.get("section_label")) == "Overview")]
     section_tree = line_section_tree(line_rows)
 
-    page_datasets: list[str] = []
-    for r in chart_rows:
-        for token in str(r.get("datasets", "")).split(","):
-            token = token.strip()
-            if token and token not in page_datasets:
-                page_datasets.append(token)
+    page_datasets: list[str] = [
+        str(token).strip().upper()
+        for token in (dataset_filter_options or [])
+        if str(token).strip()
+    ]
+    if not page_datasets:
+        for r in chart_rows:
+            for token in str(r.get("datasets", "")).split(","):
+                token = token.strip().upper()
+                if token and token not in page_datasets:
+                    page_datasets.append(token)
     preferred_order = ["LEAP", "ESTO", "NINTH"]
     page_datasets.sort(key=lambda d: (preferred_order.index(d) if d in preferred_order else len(preferred_order), d))
 
     nav_chips = _nav_chips_html(all_pages or [], page_file)
-    switcher_html = _dashboard_switcher_html(dashboard_switcher or [], current_dashboard, page_file)
-    dataset_filter_html = _dataset_filter_html(page_datasets)
+    switcher_html = _dashboard_switcher_html(
+        dashboard_switcher or [], current_dashboard, page_file, dashboard_key_suffix
+    )
+    category_basis_html = _category_basis_switcher_html(
+        category_basis_options or [], current_comparison_scope, page_file
+    )
+    dataset_filter_html = _dataset_filter_html(page_datasets, current_comparison_scope)
     jump_nav = _jump_nav_html(page_label, section_tree)
     note_html = f'<div class="visible-note">{escape(page_note)}</div>' if page_note else ""
     overview_html = _area_charts_html(area_rows, page_label)
@@ -3076,6 +3151,7 @@ def write_dashboard_page(
         <div class="header-side-controls">
           {_SCENARIO_TOGGLE_HTML}
           {switcher_html}
+          {category_basis_html}
           {dataset_filter_html}
           <div class="header-inline-controls">{nav_chips}</div>
         </div>
@@ -3113,6 +3189,10 @@ def write_index(
     dashboard_switcher: list[dict[str, str]] | None = None,
     current_dashboard: str = "",
     dashboard_updated_label: str = "",
+    category_basis_options: list[dict[str, str]] | None = None,
+    current_comparison_scope: str = "",
+    dashboard_key_suffix: str = "",
+    dataset_filter_options: list[str] | None = None,
 ) -> None:
     """Write the dashboard index page."""
     economy_heading = f" — {escape(economy_label)}" if economy_label else ""
@@ -3130,7 +3210,17 @@ def write_index(
         f'</li>'
         for p in pages
     )
-    switcher_html = _dashboard_switcher_html(dashboard_switcher or [], current_dashboard, "index.html")
+    switcher_html = _dashboard_switcher_html(
+        dashboard_switcher or [], current_dashboard, "index.html", dashboard_key_suffix
+    )
+    category_basis_html = _category_basis_switcher_html(
+        category_basis_options or [], current_comparison_scope, "index.html"
+    )
+    source_labels = [
+        _DATASET_DISPLAY_LABELS.get(str(source).upper(), str(source))
+        for source in (dataset_filter_options or [])
+    ]
+    source_description = ", ".join(source_labels) if source_labels else "the configured sources"
     updated_html = (
         f'<p style="margin:0;color:#4b5563;font-size:13px;">Updated: {escape(dashboard_updated_label)}</p>'
         if dashboard_updated_label else ""
@@ -3148,6 +3238,8 @@ def write_index(
     .top-row {{ display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap; }}
     .dashboard-switcher {{ display:flex;align-items:center;gap:6px;font-size:13px;color:#4b5563;white-space:nowrap; }}
     .dashboard-switcher select {{ max-width:240px;padding:6px 28px 6px 8px;border:1px solid #c5ccd3;border-radius:6px;background:#fff;color:#111;font:inherit; }}
+    .category-basis-switcher {{ display:flex;align-items:center;gap:6px;font-size:13px;color:#4b5563;white-space:nowrap; }}
+    .category-basis-switcher select {{ max-width:240px;padding:6px 28px 6px 8px;border:1px solid #c5ccd3;border-radius:6px;background:#fff;color:#111;font:inherit; }}
     ul {{ list-style: none; padding: 0; margin-top: 20px; }}
   </style>
 </head>
@@ -3159,14 +3251,14 @@ def write_index(
         {updated_html}
       </div>
       {switcher_html}
+      {category_basis_html}
     </div>
     <p style="color:#4b5563;">Charts are generated automatically from common ESTO flow/product rows.</p>
     <ul>{cards}</ul>
     <div style="margin-top:32px;border-top:1px solid #d8dee4;padding-top:24px;">
       <h2 style="margin:0 0 8px 0;font-size:18px;">About this dashboard</h2>
-      <p style="margin:0 0 12px 0;color:#4b5563;font-size:13px;">This dashboard compares three sources on one shared set of flow/product
-      categories (the "common ESTO" axis): LEAP model results, ESTO historical
-      balances, and 9th Edition Outlook projections. A source's native flow and
+      <p style="margin:0 0 12px 0;color:#4b5563;font-size:13px;">This dashboard compares {escape(source_description)} on one shared set of flow/product
+      categories (the "common ESTO" axis). A source's native flow and
       product codes are mapped onto the common axis in <code>leap_mappings</code>,
       so a chart here is always comparing like with like even when the three
       sources describe the same fuel or sector differently.</p>
@@ -4082,6 +4174,7 @@ def build_total_demand_page(
         dashboard_switcher=dashboard_switcher,
         current_dashboard=current_dashboard,
         dashboard_updated_label=dashboard_updated_label,
+        **category_basis_ui_kwargs(template),
     )
     page_row = {
         "file": "total_demand.html", "label": page_label,
@@ -4310,6 +4403,7 @@ def build_scope_specific_pages(
             current_dashboard=current_dashboard,
             page_note=str(scope_page.get("page_note", "")),
             dashboard_updated_label=dashboard_updated_label,
+            **category_basis_ui_kwargs(template),
         )
         page_rows.append({
             "file": page_file,
@@ -4409,6 +4503,16 @@ def assign_bespoke_overview_rows(
     return out
 
 
+def category_basis_ui_kwargs(template: dict) -> dict[str, object]:
+    """Return renderer-only category-basis controls attached by the workflow."""
+    return {
+        "category_basis_options": template.get("_category_basis_options", []),
+        "current_comparison_scope": str(template.get("_active_comparison_scope", "")),
+        "dataset_filter_options": template.get("_active_dataset_filter_options", []),
+        "dashboard_key_suffix": str(template.get("_dashboard_key_suffix", "")),
+    }
+
+
 def render_dashboard(
     df: pd.DataFrame,
     template: dict,
@@ -4420,7 +4524,7 @@ def render_dashboard(
 ) -> pd.DataFrame:
     """Render page bundles, dashboard pages, and a chart manifest."""
     series_labels = series_config.get("series_labels", {})
-    current_dashboard = layout["root"].name
+    current_dashboard = str(template.get("_current_dashboard_key", layout["root"].name))
     dashboard_switcher = _normalise_dashboard_switcher(series_config, current_dashboard)
     economy_label = _current_dashboard_label(series_config, dashboard_switcher, current_dashboard)
     page_rules = template.get("sector_pages")
@@ -4679,6 +4783,7 @@ def render_dashboard(
             dashboard_switcher=dashboard_switcher,
             current_dashboard=current_dashboard,
             dashboard_updated_label=dashboard_updated_label,
+            **category_basis_ui_kwargs(template),
         )
         page_rows.append({
             "file": page_file,
@@ -4754,8 +4859,12 @@ def render_dashboard(
         dashboard_switcher=dashboard_switcher,
         current_dashboard=current_dashboard,
         dashboard_updated_label=dashboard_updated_label,
+        **category_basis_ui_kwargs(template),
     )
     manifest_df = pd.DataFrame(manifest_rows)
+    active_scope = str(template.get("_active_comparison_scope", "")).strip()
+    if active_scope and "comparison_scope" not in manifest_df.columns:
+        manifest_df.insert(0, "comparison_scope", active_scope)
     manifest_df.to_csv(layout["supporting"] / "chart_manifest.csv", index=False)
     return manifest_df
 
