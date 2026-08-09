@@ -917,6 +917,33 @@ def test_common_esto_dashboard_shows_updated_label(tmp_path: Path) -> None:
     assert "Updated: 2026-07-10 14:30 JST" in index_html
 
 
+def test_common_esto_dashboard_writes_page_aware_guides(tmp_path: Path) -> None:
+    template = _load_template()
+    series_config = _load_series_config()
+    df = apply_sign_semantics(_build_common_esto_rows(), template["sign_semantics"])
+    main_df = df[df["comparison_scope"] == "leap_vs_esto_vs_ninth"].copy()
+
+    layout = build_output_layout(tmp_path / "outputs", "20USA", clear_existing=True)
+    render_dashboard(main_df, template, series_config, layout, scope_df=df)
+
+    transport_html = (layout["dashboards"] / "transport.html").read_text(encoding="utf-8")
+    index_html = (layout["dashboards"] / "index.html").read_text(encoding="utf-8")
+
+    for html in (transport_html, index_html):
+        assert 'id="dashboard-guide-launch"' in html
+        assert 'id="dashboard-guide-dialog"' in html
+        assert 'class="dashboard-guide-backdrop"' in html
+        assert "dashboard-guide-highlight" in html
+
+    assert "Use Transport to review road and non-road energy demand" in transport_html
+    assert "Compare projection scenarios" in transport_html
+    assert 'data-guide-id="page-navigation"' in transport_html
+    assert 'data-guide-id="chart-card"' in transport_html
+    assert "Choose where to begin" in index_html
+    assert 'data-guide-id="page-list"' in index_html
+    assert "Compare projection scenarios" not in index_html
+
+
 def _write_multi_scope_wide_file(path: Path) -> None:
     """A wide file where 'ESTO historical' is identical across two scopes."""
     rows = []
