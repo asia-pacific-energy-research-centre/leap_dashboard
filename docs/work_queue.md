@@ -106,6 +106,12 @@ These later commits supersede the corresponding snapshot rows below:
   TFC totals; supply charts retain only available-supply totals, with no
   cross-side comparison overlays.
 
+- **DASHQ-041 is `complete_on_master`.** A generated overview card whose
+  source-specific frontiers resolve to one logical flow boundary inherits that
+  boundary's real common label. When both forms exist, the boundary-adjusted
+  `(including own use)` label is preferred; multi-category prefix cards retain
+  aggregate label discovery.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not

@@ -824,6 +824,59 @@ def node_label_for_prefix(nodes: pd.DataFrame, prefix: str, fallback_name: str =
     return f"{prefix} {fallback_name}".strip()
 
 
+def preferred_collapsed_flow_label(
+    nodes: pd.DataFrame,
+    labels_by_source: dict[str, list[str]],
+) -> str:
+    """Return the real label when a generated overview is one logical flow.
+
+    Sources can name the same comparison boundary differently. Oil refining,
+    for example, is ``09.07 Oil refineries`` in LEAP and ``09.07 Oil
+    refineries (including own use)`` in the boundary-adjusted ESTO views. When
+    those are the only labels in a generated prefix card, use the preferred
+    actual boundary label instead of inventing a label for the broader prefix.
+    """
+    selected_labels = {
+        str(label)
+        for source_labels in labels_by_source.values()
+        for label in source_labels
+    }
+    if not selected_labels:
+        return ""
+
+    selected = nodes[
+        nodes["common_flow_label"].astype(str).isin(selected_labels)
+    ].copy()
+    if selected.empty or set(selected["common_flow_label"].astype(str)) != selected_labels:
+        return ""
+
+    selected["_logical_code"] = selected["common_flow_code"].map(canonical_code)
+    selected["_logical_name"] = (
+        selected["common_flow_label"].map(flow_name_without_code)
+        .str.casefold()
+        .str.replace(" (including own use)", "", regex=False)
+        .str.strip()
+    )
+    if selected["_logical_code"].nunique() != 1 or selected["_logical_name"].nunique() != 1:
+        return ""
+
+    boundary_adjusted = selected[
+        selected["common_flow_label"].astype(str).str.casefold().str.contains(
+            "including own use", regex=False
+        )
+    ]
+    candidates = boundary_adjusted if not boundary_adjusted.empty else selected
+    preferred = min(
+        candidates.to_dict("records"),
+        key=lambda row: (
+            code_depth(row["_logical_code"]),
+            str(row["_logical_code"]),
+            str(row["common_flow_label"]),
+        ),
+    )
+    return str(preferred["common_flow_label"])
+
+
 def _frontier_labels_for_subtree(subtree: pd.DataFrame, target_level: int) -> list[str]:
     """Return flow labels forming a non-double-counting frontier within one subtree."""
     def expression_reaches_target_level(value: object) -> bool:
@@ -1419,7 +1472,11 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
             # therefore have no exact row from which to obtain their proper
             # parent name. Do not borrow the first descendant's name for those
             # prefixes; use the configured ESTO hierarchy label instead.
-            label = area_chart_flow_labels.get(prefix, node_label_for_prefix(nodes, prefix))
+            label = area_chart_flow_labels.get(prefix, "")
+            if not label:
+                label = preferred_collapsed_flow_label(nodes, labels_by_source)
+            if not label:
+                label = node_label_for_prefix(nodes, prefix)
             specs.append(
                 {
                     "area_level": level,

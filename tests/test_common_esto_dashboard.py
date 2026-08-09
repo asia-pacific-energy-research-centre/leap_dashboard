@@ -545,6 +545,66 @@ def test_losses_and_own_use_area_cards_use_parent_hierarchy_labels() -> None:
     assert labels_by_prefix["10.01"] == "10.01 Own use"
 
 
+def test_single_boundary_overview_prefers_including_own_use_label() -> None:
+    template = _load_template()
+    page_df = pd.DataFrame(
+        [
+            {
+                "common_flow_code": "09.07",
+                "common_flow_label": "09.07 Oil refineries",
+                "source_system": "LEAP",
+            },
+            {
+                "common_flow_code": "09.07",
+                "common_flow_label": "09.07 Oil refineries (including own use)",
+                "source_system": "ESTO",
+            },
+            {
+                "common_flow_code": "09.07",
+                "common_flow_label": "09.07 Oil refineries (including own use)",
+                "source_system": "NINTH",
+            },
+        ]
+    )
+
+    specs = pick_area_specs(page_df, template)
+    refining_overview = next(
+        spec for spec in specs if spec["aggregate_flow_prefix"] == "09"
+    )
+
+    assert refining_overview["aggregate_flow_label"] == (
+        "09.07 Oil refineries (including own use)"
+    )
+
+
+def test_multi_boundary_overview_does_not_inherit_one_child_label() -> None:
+    template = _load_template()
+    page_df = pd.DataFrame(
+        [
+            {
+                "common_flow_code": flow_code,
+                "common_flow_label": flow_label,
+                "source_system": source_system,
+            }
+            for source_system in ["ESTO", "LEAP", "NINTH"]
+            for flow_code, flow_label in [
+                ("09.07", "09.07 Oil refineries (including own use)"),
+                ("09.08", "09.08 Coal transformation"),
+            ]
+        ]
+    )
+
+    specs = pick_area_specs(page_df, template)
+    transformation_overview = next(
+        spec for spec in specs if spec["aggregate_flow_prefix"] == "09"
+    )
+
+    assert transformation_overview["aggregate_flow_label"] not in {
+        "09.07 Oil refineries (including own use)",
+        "09.08 Coal transformation",
+    }
+
+
 def test_ninth_pre_base_year_rows_are_excluded_by_default() -> None:
     df = pd.DataFrame(
         [

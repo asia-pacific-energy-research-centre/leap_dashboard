@@ -800,6 +800,44 @@ agree where all three report the same demand: for 20USA at 2022 all three read
   the gap was parent and child flows counted together, which is what rule 4
   above now prevents.
 
+## DASH-022: Single-boundary overview cards inherit their real comparison label
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation
+**Affected areas:** Generated overview area charts; Refining
+
+### Current rule
+
+After the renderer computes each source system's non-overlapping frontier for a
+generated overview card, it checks whether every selected label represents the
+same canonical flow code and logical name. If so, the card inherits a real
+common-flow label from that boundary instead of fabricating a label from the
+broader hierarchy prefix. A boundary-adjusted `(including own use)` label is
+preferred when both adjusted and unadjusted forms exist.
+
+Explicit `area_chart_flow_labels` configuration remains authoritative. Cards
+whose frontier contains different codes or logical names do not inherit a child
+label and continue through the existing aggregate-prefix label path. Therefore
+this rule fixes the Refining overview without globally renaming all `09`
+transformation cards.
+
+The rule changes presentation only. Source-specific frontier membership,
+values, mapping output, and comparison scopes are unchanged.
+
+### Validation
+
+Regression coverage requires a `09.07 Oil refineries` / `09.07 Oil refineries
+(including own use)` frontier to render under the adjusted real label, while a
+frontier containing both oil refining and coal transformation must not inherit
+either child label.
+
+### History
+
+- 2026-08-09: Added after the Refining overview was titled `09 Oil refineries`,
+  even though no such common mapping row existed and its complete frontier was
+  the single `09.07` comparison boundary.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
