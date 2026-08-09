@@ -1093,6 +1093,17 @@ def test_stacked_traces_take_their_code_colour_and_totals_keep_theirs() -> None:
     assert fig.data[1].line.color == "#0072B2"
 
 
+def test_shared_chart_chrome_keeps_legend_for_one_trace() -> None:
+    fig = go.Figure(
+        [go.Scatter(x=[2020, 2021], y=[1.0, 2.0], name="ESTO Historical total")]
+    )
+
+    apply_chart_chrome(fig, base_year=None)
+
+    assert fig.layout.showlegend is True
+    assert fig.data[0].name == "ESTO Historical total"
+
+
 def test_supply_demand_comparison_lines_keep_stable_source_colour() -> None:
     import plotly.graph_objects as go
 

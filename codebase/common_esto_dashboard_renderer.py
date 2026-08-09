@@ -1580,6 +1580,10 @@ def apply_chart_chrome(fig: go.Figure, base_year: int | None = None, code_axis: 
         zerolinewidth=2.5,
     )
     fig.update_layout(
+        # Plotly may omit the legend when scenario/dataset filtering leaves a
+        # single visible trace. Keep it so the remaining line or area always
+        # identifies itself explicitly.
+        showlegend=True,
         legend={
             "font": {"size": 11},
             "bgcolor": "rgba(255,255,255,0.84)",

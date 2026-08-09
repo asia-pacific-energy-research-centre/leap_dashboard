@@ -91,6 +91,11 @@ These later commits supersede the corresponding snapshot rows below:
   passes across 22 roots; and page-noise retains five prior flags plus the
   expected dense two-way USA Industry review flag.
 
+- **DASHQ-038 is `complete_on_master`.** Shared chart chrome explicitly keeps
+  Plotly legends enabled when scenario or dataset filtering leaves only one
+  visible trace, so the remaining line or area still identifies itself. This
+  changes presentation only; trace data and filtering are unchanged.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not
