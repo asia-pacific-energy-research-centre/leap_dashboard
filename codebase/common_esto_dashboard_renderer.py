@@ -2968,34 +2968,52 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
     """Build HTML for the page-level overview (area) charts."""
     if not area_rows:
         return ""
-    grid_class = "dashboard-grid overview-grid" if len(area_rows) > 1 else "dashboard-grid expand-1"
-    cards = []
-    for i, row in enumerate(area_rows):
-        caption = escape(str(row.get("title", "")))
-        key = escape(row["chart_key"])
-        cards.append(
-            f'<figure class="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
-            f'<figcaption class="chart-caption">{caption}</figcaption>'
-            f'<div class="meta-subline">{escape(page_label)}</div>'
-            f'<div class="area-data-note">{escape(str(row.get("stacked_area_note", "")))}</div>'
-            f'<div class="chart-load-state" data-loaded="false">Chart queued</div>'
-            f'<div data-chart-key="{key}" class="lazy-chart-plot is-unloaded" role="img" aria-label="{caption}"></div>'
-            f'</figure>'
+    group_order: list[str] = []
+    for row in area_rows:
+        group_label = str(row.get("overview_group", "Overview"))
+        if group_label not in group_order:
+            group_order.append(group_label)
+
+    sections: list[str] = []
+    for group_label in group_order:
+        group_rows = [
+            row for row in area_rows
+            if str(row.get("overview_group", "Overview")) == group_label
+        ]
+        grid_class = (
+            "dashboard-grid overview-grid"
+            if len(group_rows) > 1
+            else "dashboard-grid expand-1"
         )
-    return (
-        f'<section data-dataset-filter-section>'
-        f'<h2 class="section-heading">Overview</h2>'
-        f'<section class="section-sort-group">'
-        f'<div class="sort-bar"><span class="sort-bar-label">Sort:</span>'
-        f'<button class="sort-btn active" data-sort="default">Default</button>'
-        f'<button class="sort-btn" data-sort="totalAbs">Largest total</button>'
-        f'<button class="sort-btn" data-sort="absDiff">Largest difference</button>'
-        f'<button class="sort-btn" data-sort="pctDiff">Largest % diff</button>'
-        f'</div>'
-        f'<div class="{grid_class}" data-sortable-grid="overview">{"".join(cards)}</div>'
-        f'</section>'
-        f'</section>'
-    )
+        cards = []
+        for i, row in enumerate(group_rows):
+            caption = escape(str(row.get("title", "")))
+            key = escape(row["chart_key"])
+            cards.append(
+                f'<figure class="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
+                f'<figcaption class="chart-caption">{caption}</figcaption>'
+                f'<div class="meta-subline">{escape(page_label)} &gt; {escape(group_label)}</div>'
+                f'<div class="area-data-note">{escape(str(row.get("stacked_area_note", "")))}</div>'
+                f'<div class="chart-load-state" data-loaded="false">Chart queued</div>'
+                f'<div data-chart-key="{key}" class="lazy-chart-plot is-unloaded" role="img" aria-label="{caption}"></div>'
+                f'</figure>'
+            )
+        grid_key = "overview" if group_label == "Overview" else f"overview-{safe_slug(group_label)}"
+        sections.append(
+            f'<section data-dataset-filter-section>'
+            f'<h2 class="section-heading">{escape(group_label)}</h2>'
+            f'<section class="section-sort-group">'
+            f'<div class="sort-bar"><span class="sort-bar-label">Sort:</span>'
+            f'<button class="sort-btn active" data-sort="default">Default</button>'
+            f'<button class="sort-btn" data-sort="totalAbs">Largest total</button>'
+            f'<button class="sort-btn" data-sort="absDiff">Largest difference</button>'
+            f'<button class="sort-btn" data-sort="pctDiff">Largest % diff</button>'
+            f'</div>'
+            f'<div class="{grid_class}" data-sortable-grid="{escape(grid_key)}">{"".join(cards)}</div>'
+            f'</section>'
+            f'</section>'
+        )
+    return "".join(sections)
 
 
 def _grid_class_for(n: int) -> str:
@@ -3466,7 +3484,6 @@ def _select_total_rows_by_source(
 
 def _build_td_sector_chart(
     demand_df: pd.DataFrame,
-    supply_df: pd.DataFrame,
     overview_flow_df: pd.DataFrame,
     series_labels: dict[str, str],
     primary_source: str,
@@ -3474,17 +3491,13 @@ def _build_td_sector_chart(
     sector_colors: dict[str, str],
     base_year: int | None = None,
 ) -> go.Figure:
-    """Build the sector stack against the currently valid TFC total.
+    """Build final energy demand by sector with authoritative TFC totals.
 
     TFC (Total Final Consumption) includes all demand sectors (codes 14-17).
     TFEC remains deliberately unavailable until non-energy use can be separated
     from aggregated Other-sector LEAP demand, so this chart must not calculate
     a visible-detail substitute for flow 13.
 
-    supply_total = sum of signed values for codes 01, 02, 03
-    (Production + Imports - Exports). Bunkers (04, 05) and stock changes (06)
-    are excluded because they are not recorded in LEAP projection scenarios,
-    making the supply line a valid comparison across the full time series.
     """
     chart_unit = _chart_unit(demand_df)
     fig = go.Figure()
@@ -3597,29 +3610,18 @@ def _build_td_sector_chart(
         ))
         trace_meta.append(trace_meta_entry(src, scen, True))
 
-    # Supply total lines — always visible regardless of TFC/TFEC mode
-    if not supply_df.empty:
-        for (src, scen), grp in supply_df.groupby(["source_system", "scenario"]):
-            if not _has_nonzero_values(grp["value"]):
-                continue
-            lbl = series_label_from_values(src, scen, series_labels) + " supply (01–03)"
-            grp_sorted = grp.sort_values("year")
-            fig.add_trace(go.Scatter(
-                x=grp_sorted["year"], y=grp_sorted["value"],
-                mode="lines", name=lbl, line={"dash": "dot"},
-                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
-            ))
-            trace_meta.append(trace_meta_entry(src, scen, True, "both"))
-
     fig.update_layout(
-        title="Supply vs Demand by sector (TFC)",
+        title="Final energy demand by sector (TFC)",
         xaxis_title="Year",
         yaxis_title=f"Signed energy ({chart_unit})",
         margin={"l": 64, "r": 28, "t": 100, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={
             "trace_meta": trace_meta,
-            "stacked_area_note": stacked_area_dataset_note(stacked_sources, "demand"),
+            "stacked_area_note": (
+                "Areas show demand sectors; lines show TFC totals by dataset and scenario. "
+                + stacked_area_dataset_note(stacked_sources, "demand")
+            ),
         },
     )
     apply_chart_chrome(fig, base_year)
@@ -3628,14 +3630,13 @@ def _build_td_sector_chart(
 
 def _build_td_fuel_chart(
     demand_df: pd.DataFrame,
-    supply_df: pd.DataFrame,
     overview_flow_df: pd.DataFrame,
     series_labels: dict[str, str],
     primary_source: str,
     primary_scenario: str,
     base_year: int | None = None,
 ) -> go.Figure:
-    """Stacked-area chart by fuel across all demand sectors (TFC), with supply line."""
+    """Build final energy demand by fuel with authoritative TFC totals."""
     chart_unit = _chart_unit(demand_df)
     fig = go.Figure()
     trace_meta: list[dict] = []
@@ -3733,29 +3734,18 @@ def _build_td_fuel_chart(
         ))
         trace_meta.append(trace_meta_entry(src, scen, True))
 
-    # Supply total lines
-    if not supply_df.empty:
-        supply_totals = supply_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
-        for (src, scen), grp in supply_totals.groupby(["source_system", "scenario"]):
-            if not _has_nonzero_values(grp["value"]):
-                continue
-            lbl = series_label_from_values(src, scen, series_labels) + " supply (01–03)"
-            fig.add_trace(go.Scatter(
-                x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
-                mode="lines", name=lbl, line={"dash": "dot"},
-                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
-            ))
-            trace_meta.append(trace_meta_entry(src, scen, True))
-
     fig.update_layout(
-        title="Supply vs Demand by fuel (TFC)",
+        title="Final energy demand by fuel (TFC)",
         xaxis_title="Year",
         yaxis_title=f"Signed energy ({chart_unit})",
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={
             "trace_meta": trace_meta,
-            "stacked_area_note": stacked_area_dataset_note(stacked_sources, "fuel"),
+            "stacked_area_note": (
+                "Areas show demand fuels; lines show TFC totals by dataset and scenario. "
+                + stacked_area_dataset_note(stacked_sources, "fuel")
+            ),
         },
     )
     apply_chart_chrome(fig, base_year, code_axis="product")
@@ -3764,8 +3754,6 @@ def _build_td_fuel_chart(
 
 def _build_supply_stack_chart(
     supply_detail_df: pd.DataFrame,
-    demand_df: pd.DataFrame,
-    overview_flow_df: pd.DataFrame,
     series_labels: dict[str, str],
     primary_source: str,
     primary_scenario: str,
@@ -3773,11 +3761,10 @@ def _build_supply_stack_chart(
     chart_title: str,
     base_year: int | None = None,
 ) -> go.Figure:
-    """Stacked-area chart of supply (TPES) split by `group_col`, with a demand total line.
+    """Build available supply composition with same-side supply totals.
 
-    Mirrors _build_td_fuel_chart with roles reversed: supply is the stacked series
-    and demand is the comparison total line. `group_col` is "common_flow_label" for
-    a by-component (Production/Imports/Exports, ...) breakdown or
+    `group_col` is "common_flow_label" for a by-component
+    (Production/Imports/Exports, ...) breakdown or
     "common_product_label" for a by-fuel breakdown. Supply's row set is whatever the
     caller filtered into supply_detail_df (total_demand_page.supply_codes), so adding
     codes there (e.g. bunkers 04/05) automatically adds new stacked series here.
@@ -3856,26 +3843,11 @@ def _build_supply_stack_chart(
         ))
         trace_meta.append(trace_meta_entry(src, scen, True))
 
-    # Demand total lines. Explicit flow 12 also carries LEAP demand when an
-    # economy is still modelled through the All demand aggregated placeholder.
-    demand_total_df = _select_total_rows_by_source(
-        demand_df,
-        overview_flow_df,
-        flow_code="12",
+    composition_note = (
+        "Areas show production, imports and exports"
+        if group_col == "common_flow_label"
+        else "Areas show supply fuels"
     )
-    if not demand_total_df.empty:
-        demand_totals = demand_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
-        for (src, scen), grp in demand_totals.groupby(["source_system", "scenario"]):
-            if not _has_nonzero_values(grp["value"]):
-                continue
-            lbl = series_label_from_values(src, scen, series_labels) + " demand (TFC)"
-            fig.add_trace(go.Scatter(
-                x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
-                mode="lines", name=lbl, line={"dash": "dot"},
-                hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
-            ))
-            trace_meta.append(trace_meta_entry(src, scen, True))
-
     fig.update_layout(
         title=chart_title,
         xaxis_title="Year",
@@ -3884,7 +3856,10 @@ def _build_supply_stack_chart(
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={
             "trace_meta": trace_meta,
-            "stacked_area_note": stacked_area_dataset_note(stacked_sources, "supply"),
+            "stacked_area_note": (
+                f"{composition_note}; lines show available supply totals by dataset and scenario. "
+                + stacked_area_dataset_note(stacked_sources, "supply")
+            ),
         },
     )
     apply_chart_chrome(fig, base_year, code_axis=code_axis_for_group_col(group_col))
@@ -4021,26 +3996,16 @@ def build_total_demand_page(
 ) -> tuple[list[dict], dict | None]:
     """Build the total demand summary page (config-driven bespoke page).
 
-    Generates aggregate balance-check comparison charts:
-    - Supply vs Demand by sector: demand stacked by demand page group, TFC/TFEC
-      dropdown, with a supply total line overlaid
-    - Supply vs Demand by fuel: demand stacked by common_product_label, with a
-      supply total line overlaid
-    - Demand vs Supply by component: supply (total_demand_page.supply_codes)
-      stacked by common_flow_label (Production/Imports/Exports/...), with a
-      demand total line overlaid. Adding codes to supply_codes (e.g. bunkers
-      04/05) automatically adds new stacked series here.
-    - Demand vs Supply by fuel: supply stacked by common_product_label, with a
-      demand total line overlaid
+    Generates composition charts without cross-side comparison overlays:
+    - Final energy demand by sector, with authoritative TFC total lines
+    - Final energy demand by fuel, with authoritative TFC total lines
+    - Energy supply by component, with available-supply total lines
+    - Energy supply by fuel, with available-supply total lines
     - Total transformation excluding transfers, when configured rollup metadata exists
 
-    The first two charts include a supply total line defined as:
-        supply_total = sum of signed values for codes 01, 02, 03
-        (Production + Imports - Exports)
-
-    Bunkers (04, 05) and stock changes (06) are excluded from the supply line
-    because they are not modelled in LEAP projection scenarios, ensuring the
-    supply line is a valid comparison across both historical and projection years.
+    Available supply is the signed sum of configured supply codes 01, 02 and 03
+    (Production + Imports - Exports). Bunkers, stock changes and TFC demand are
+    not overlaid on these supply-composition charts.
 
     This is a bespoke page — it aggregates across sector pages rather than
     operating on a single page's rows. The parameters (demand pages, supply
@@ -4082,11 +4047,6 @@ def build_total_demand_page(
         lambda c: code_expression_matches_any_prefix(c, supply_codes)
     )
     supply_detail_df = assigned_df[supply_detail_mask].copy()
-    supply_df = (
-        supply_detail_df
-        .groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
-    )
-
     charts: dict[str, go.Figure] = {}
     chart_rows: list[dict] = []
     manifest_rows: list[dict] = []
@@ -4095,16 +4055,18 @@ def build_total_demand_page(
     chart_specs: list[dict] = [
         {
             "chart_key": "chart__area__total_demand__sector",
-            "title": "Supply vs Demand by sector",
-            "build": lambda: _build_td_sector_chart(demand_df, supply_df, overview_flow_df, series_labels, primary_source, primary_scenario, sector_colors, base_year=base_year),
+            "title": "Final energy demand by sector (TFC)",
+            "overview_group": "Demand composition",
+            "build": lambda: _build_td_sector_chart(demand_df, overview_flow_df, series_labels, primary_source, primary_scenario, sector_colors, base_year=base_year),
             "total_abs": demand_total_abs,
             "row_count": len(demand_df),
             "source_flow_labels": "; ".join(demand_page_keys),
         },
         {
             "chart_key": "chart__area__total_demand__fuel",
-            "title": "Supply vs Demand by fuel",
-            "build": lambda: _build_td_fuel_chart(demand_df, supply_df, overview_flow_df, series_labels, primary_source, primary_scenario, base_year=base_year),
+            "title": "Final energy demand by fuel (TFC)",
+            "overview_group": "Demand composition",
+            "build": lambda: _build_td_fuel_chart(demand_df, overview_flow_df, series_labels, primary_source, primary_scenario, base_year=base_year),
             "total_abs": demand_total_abs,
             "row_count": len(demand_df),
             "source_flow_labels": "; ".join(demand_page_keys),
@@ -4114,10 +4076,11 @@ def build_total_demand_page(
         supply_total_abs = float(supply_detail_df["value"].abs().sum())
         chart_specs.append({
             "chart_key": "chart__area__total_demand__supply_component",
-            "title": "Demand vs Supply by component",
+            "title": "Energy supply by balance component",
+            "overview_group": "Supply composition",
             "build": lambda: _build_supply_stack_chart(
-                supply_detail_df, demand_df, overview_flow_df, series_labels, primary_source, primary_scenario,
-                group_col="common_flow_label", chart_title="Demand vs Supply by component", base_year=base_year,
+                supply_detail_df, series_labels, primary_source, primary_scenario,
+                group_col="common_flow_label", chart_title="Energy supply by balance component", base_year=base_year,
             ),
             "total_abs": supply_total_abs,
             "row_count": len(supply_detail_df),
@@ -4125,10 +4088,11 @@ def build_total_demand_page(
         })
         chart_specs.append({
             "chart_key": "chart__area__total_demand__supply_fuel",
-            "title": "Demand vs Supply by fuel",
+            "title": "Energy supply by fuel",
+            "overview_group": "Supply composition",
             "build": lambda: _build_supply_stack_chart(
-                supply_detail_df, demand_df, overview_flow_df, series_labels, primary_source, primary_scenario,
-                group_col="common_product_label", chart_title="Demand vs Supply by fuel", base_year=base_year,
+                supply_detail_df, series_labels, primary_source, primary_scenario,
+                group_col="common_product_label", chart_title="Energy supply by fuel", base_year=base_year,
             ),
             "total_abs": supply_total_abs,
             "row_count": len(supply_detail_df),
@@ -4144,13 +4108,14 @@ def build_total_demand_page(
         chart_rows.append({
             "chart_key": chart_key, "chart_type": "stacked_area",
             "title": title, "product_label": title, "section_label": "Overview",
+            "overview_group": spec["overview_group"],
             "total_abs_value": total_abs, "abs_diff": 0.0, "pct_diff": 0.0,
             "datasets": chart_dataset_tokens_from_figure(fig),
             "stacked_area_note": stacked_area_note_from_figure(fig),
         })
         manifest_rows.append({
             "page_key": "total_demand", "page_label": page_label,
-            "section_label": "Overview", "chart_type": "stacked_area",
+            "section_label": spec["overview_group"], "chart_type": "stacked_area",
             "chart_key": chart_key, "common_flow_label": title,
             "common_product_label": "All", "row_count": int(spec["row_count"]),
             "source_flow_labels": spec["source_flow_labels"],

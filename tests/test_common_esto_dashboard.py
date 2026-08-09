@@ -203,7 +203,6 @@ def test_total_demand_fuel_area_uses_non_overlapping_parent_child_frontier() -> 
 
     figure = _build_td_fuel_chart(
         pd.DataFrame(rows),
-        pd.DataFrame(columns=["source_system", "scenario", "year", "value"]),
         pd.DataFrame(columns=["source_system", "scenario", "year", "common_flow_code", "value"]),
         {},
         "LEAP",
@@ -1195,41 +1194,25 @@ def test_total_demand_lines_fall_back_to_visible_detail_without_aggregate() -> N
     assert selected["value"].sum() == 100.0
 
 
-def test_supply_stack_uses_aggregate_leap_demand_when_detail_is_absent() -> None:
+def test_supply_stack_keeps_supply_totals_and_excludes_demand_comparison_lines() -> None:
     supply = pd.DataFrame([
         {
             "source_system": "LEAP", "scenario": "Target", "year": 2039,
             "common_flow_label": "01 Production", "value": 150.0,
         },
     ])
-    demand = pd.DataFrame([
-        {"source_system": "NINTH", "scenario": "target", "year": 2039, "value": 230.0},
-    ])
-    overview = pd.DataFrame([
-        {
-            "source_system": "LEAP", "scenario": "Target", "year": 2039,
-            "common_flow_code": "12", "value": 100.0,
-        },
-        {
-            "source_system": "NINTH", "scenario": "target", "year": 2039,
-            "common_flow_code": "12", "value": 105.0,
-        },
-    ])
-
     fig = _build_supply_stack_chart(
         supply,
-        demand,
-        overview,
         series_labels=_load_series_config()["series_labels"],
         primary_source="LEAP",
         primary_scenario="Target",
         group_col="common_flow_label",
-        chart_title="Demand vs Supply by component",
+        chart_title="Energy supply by balance component",
     )
     traces = {trace.name: list(trace.y) for trace in fig.data}
 
-    assert traces["LEAP Target demand (TFC)"] == [100.0]
-    assert traces["9th Target demand (TFC)"] == [105.0]
+    assert traces["LEAP Target supply total"] == [150.0]
+    assert not any("demand" in name.casefold() for name in traces)
 
 
 def test_aggregate_only_leap_demand_warns_about_tfec_non_energy() -> None:
@@ -1428,7 +1411,6 @@ def test_energy_balance_fuel_area_uses_esto_history_on_leap_category_frontier() 
     figure = _build_td_fuel_chart(
         rows,
         pd.DataFrame(columns=rows.columns),
-        pd.DataFrame(columns=rows.columns),
         {"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
         "LEAP",
         "Target",
@@ -1438,6 +1420,8 @@ def test_energy_balance_fuel_area_uses_esto_history_on_leap_category_frontier() 
     assert area_names == {"07.01 Motor gasoline"}
     motor = next(trace for trace in figure.data if trace.name == "07.01 Motor gasoline")
     assert list(motor.x) == [2022, 2023]
+    assert figure.layout.title.text == "Final energy demand by fuel (TFC)"
+    assert not any("supply" in str(trace.name).casefold() for trace in figure.data)
 
 
 def test_leap_and_ninth_lines_include_available_base_year_values() -> None:

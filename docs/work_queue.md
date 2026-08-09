@@ -101,6 +101,11 @@ These later commits supersede the corresponding snapshot rows below:
   now stack from the correct baseline in every year while retaining one colour,
   one legend item and grouped legend toggling.
 
+- **DASHQ-040 is `complete_on_master`.** The Energy balance overview separates
+  demand and supply composition into named sections. Demand charts retain only
+  TFC totals; supply charts retain only available-supply totals, with no
+  cross-side comparison overlays.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not
