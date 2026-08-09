@@ -225,6 +225,22 @@
       "optional": true
     },
     {
+      "id": "overview-first",
+      "target": "[data-guide-id='chart-card']",
+      "title": "Start with the summaries, not every chart",
+      "copy": "These pages deliberately preserve the comparison tree. Each relevant flow can be crossed with every product or fuel reported for it, and every valid flow-product pair needs a chart comparing the available datasets. On large pages, the number of detail charts therefore grows with both the flow tree and product coverage. That detail is retained for drill-down and auditability; reviewers are not expected to read every chart.",
+      "table": {
+        "caption": "Recommended way to use a dense page",
+        "headers": ["Review stage", "What to do"],
+        "rows": [
+          ["Start at the top", "Use the page-level stacked-area summaries for the main totals, composition and direction of change."],
+          ["Scan section summaries", "Where enough detail exists, a section or subsection opens with stacked-area charts that condense its flows and products."],
+          ["Drill down selectively", "Use the section chips and sorting controls when a summary shows a material difference or an unexpected trend."],
+          ["Keep the detail as evidence", "Open individual flow-product charts when you need the exact dataset comparison or need to trace the cause upstream."]
+        ]
+      }
+    },
+    {
       "id": "chart-card",
       "target": "[data-guide-id='chart-card']",
       "title": "Read like with like",
@@ -278,7 +294,7 @@
       "id": "index-pages",
       "target": "[data-guide-id='page-list']",
       "title": "Choose where to begin",
-      "copy": "Start broad, then move to the page that owns the difference. The counts show how many overview, summary and detail charts were generated; a high count means use the page's sections and sorting controls rather than scanning every chart.",
+      "copy": "Start broad, then move to the page that owns the difference. The chart count can be large because each routed flow is compared across every relevant product or fuel. Use the overview and section summaries first, then the section chips and sorting controls instead of scanning every detail chart.",
       "table": {
         "caption": "Recommended review route",
         "headers": ["If you are checking…", "Start with…", "Then open…"],

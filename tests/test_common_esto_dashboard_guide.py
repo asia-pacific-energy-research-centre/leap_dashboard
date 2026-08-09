@@ -49,12 +49,22 @@ def test_chart_guide_adds_only_the_current_pages_review_content() -> None:
     assert "Included and excluded boundaries" in emissions_script
 
 
+def test_chart_guide_explains_the_overview_first_review_strategy() -> None:
+    chart_script = build_guide_fragments("chart", "industry", "Industry")["script"]
+
+    assert "Start with the summaries, not every chart" in chart_script
+    assert "every valid flow-product pair" in chart_script
+    assert "Recommended way to use a dense page" in chart_script
+    assert chart_script.index("Start with the summaries") < chart_script.index("Read like with like")
+
+
 def test_index_guide_includes_the_recommended_review_route() -> None:
     index_script = build_guide_fragments("index", "index", "Common ESTO Dashboard")["script"]
 
     assert "Recommended review route" in index_script
     assert "Mapping diagnostics" in index_script
     assert "does not allocate coarse values" in index_script
+    assert "each routed flow is compared across every relevant product or fuel" in index_script
 
 
 def test_guide_validation_rejects_duplicate_step_ids() -> None:
