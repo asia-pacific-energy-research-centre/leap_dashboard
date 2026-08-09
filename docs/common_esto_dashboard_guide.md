@@ -261,6 +261,14 @@ chart pages, mapping diagnostics, and the full mapping-tree explorer. The
 page key, so Supply can explain signs while Emissions explains its derived
 boundary without duplicating the navigation steps.
 
+Each chart page's first `page_steps` entry is its page reference. It should
+state the flow roots or bespoke inputs represented on that page, the product
+families users will generally encounter, and any boundary or visibility quirks
+that change interpretation. Keep these references aligned with
+`dashboard_page_routing_and_chart_visibility.md` and the confirmed DASH rules;
+for example, Refining must explain that standalone refinery own use is hidden
+because the valid LEAP-comparable row is the inclusive refinery boundary.
+
 To edit the tour, change a step's `title` or `copy`, or add a step with a unique
 `id` and a stable CSS `target`. A step may also include a `table` object with a
 `caption`, `headers`, and `rows`; this is useful for compact sign guides,

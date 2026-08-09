@@ -20,6 +20,22 @@
   "page_steps": {
     "total_demand": [
       {
+        "id": "overview-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on the Energy balance overview",
+        "copy": "This is a bespoke summary page rather than another branch of the detail tree. It brings together reviewed whole-system identities so you can locate a large imbalance or demand change before opening the page that owns the underlying flows.",
+        "table": {
+          "caption": "Energy balance overview contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Supply", "Production (01), imports (02) and signed exports (03), with total primary energy supply (07) where available", "Bunkers and stock changes are outside the projection-comparable supply total."],
+            ["Final demand", "Total final consumption (12), split into the major demand pages and broad fuel groups", "Demand sectors are selected on a non-overlapping frontier; do not add their parents and children again."],
+            ["Transformation", "The reviewed total transformation boundary excluding transfers", "Negative inputs and positive outputs can cancel, so inspect the transformation pages for process detail."],
+            ["TFEC", "Not currently displayed", "Flow 13 is temporarily disabled because non-energy use cannot yet be separated from aggregate LEAP Other demand."]
+          ]
+        }
+      },
+      {
         "id": "overview-boundaries",
         "target": "[data-guide-id='chart-card']",
         "title": "Know what each overview total includes",
@@ -30,13 +46,28 @@
           "rows": [
             ["Supply", "Production + imports + signed exports", "Bunkers and stock changes are outside this projection-comparable total."],
             ["TFC", "Energy and non-energy final consumption", "Use it to test the overall demand boundary before opening sector pages."],
-            ["TFEC", "Final consumption excluding non-energy use", "A TFC/TFEC gap should be explainable by feedstocks and other non-energy use."],
             ["Transformation", "Total transformation excluding transfers", "Inputs are normally negative and outputs positive; compare the boundary, not a simple gross sum."]
           ]
         }
       }
     ],
     "supply": [
+      {
+        "id": "supply-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on Supply",
+        "copy": "Supply is organised by the balance flows that add energy to, or remove energy from, the economy. Detail charts cross those flows with the available Common ESTO products.",
+        "table": {
+          "caption": "Supply page contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Core flows", "Production (01), imports (02) and exports (03)", "Exports are displayed as negative because they leave domestic supply."],
+            ["Balancing flows", "Stock changes (06) and statistical discrepancy (11) belong to the Supply family", "They may be excluded from the current presentation; if shown, either sign can be meaningful."],
+            ["Products", "Primary fuels, petroleum products, gas, electricity, heat and other reported carriers", "The exact fuel detail depends on the selected Common-category scope and source coverage."],
+            ["How to use it", "Start with supply composition, then open the material flow-product pair", "A supply difference can come from quantity, sign convention, product grouping or source coverage."]
+          ]
+        }
+      },
       {
         "id": "supply-signs",
         "target": "[data-guide-id='chart-card']",
@@ -57,6 +88,22 @@
     ],
     "bunkers": [
       {
+        "id": "bunkers-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on Bunkers",
+        "copy": "Bunkers contains fuel supplied to international transport, kept outside the domestic Transport page and domestic demand totals.",
+        "table": {
+          "caption": "Bunkers page contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Flows", "International marine bunkers (04) and international aviation bunkers (05)", "These are international movements, not domestic navigation or aviation."],
+            ["Products", "Usually marine fuel oils, jet fuel and other reported bunker fuels", "The dashboard retains whatever shared product grain the selected datasets can support."],
+            ["Signs", "Fuel supplied to bunkers is normally negative", "The negative sign means removal from domestic supply, not negative physical activity."],
+            ["LEAP coverage", "A standalone page requires usable LEAP projection detail", "An aggregate-only bunker placeholder is hidden because it cannot support a meaningful comparison here."]
+          ]
+        }
+      },
+      {
         "id": "bunkers-boundary",
         "target": "[data-guide-id='chart-card']",
         "title": "Keep international bunkers outside domestic transport",
@@ -64,6 +111,22 @@
       }
     ],
     "power": [
+      {
+        "id": "power-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on Power",
+        "copy": "Power covers electricity and heat transformation, combining the plant boundaries needed to compare sources that organise producers and technologies differently.",
+        "table": {
+          "caption": "Power page contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Flows", "Electricity plants, CHP plants and heat plants under 09.01 and 09.02, plus related power-sector own use", "The specific Power roots take ownership before the broader Other transformation root."],
+            ["Input products", "Coal, gas, oil, renewables, waste and other fuels used by plants", "Transformation inputs are normally negative."],
+            ["Output products", "Electricity and heat", "Outputs are normally positive and should be reviewed with their matching inputs."],
+            ["Shared plant boundary", "Main-activity and autoproducer categories may be combined by plant type", "LEAP and the 9th do not align with ESTO at every producer or technology split, so the combined category is often the honest comparison level."]
+          ]
+        }
+      },
       {
         "id": "power-review",
         "target": "[data-guide-id='chart-card']",
@@ -83,6 +146,23 @@
     ],
     "refining": [
       {
+        "id": "refining-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on Refining",
+        "copy": "Refining follows the oil-refinery process boundary: feedstocks enter, petroleum products leave, and own use is included where needed to make the source systems comparable.",
+        "table": {
+          "caption": "Refining page contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Flows", "Oil refineries under 09.07", "The specific Refining root takes ownership before the broader transformation root."],
+            ["Input products", "Crude oil, NGL, refinery feedstocks and other refinery inputs", "Inputs are normally negative."],
+            ["Output products", "LPG, gasoline, kerosene, diesel, fuel oil and other petroleum products", "Outputs are normally positive; compare the product mix as well as total throughput."],
+            ["Including own use", "09.07 Oil refineries (including own use) is the shared comparison boundary", "LEAP does not publish refinery own use separately. Standalone 10.01.11 is therefore suppressed; ESTO and Ninth own use are folded into the inclusive boundary."],
+            ["Transfers", "Refinery or blending transfers are not shown here", "All flow-08 transfers are deliberately routed to Other transformation > Transfers."]
+          ]
+        }
+      },
+      {
         "id": "refining-review",
         "target": "[data-guide-id='chart-card']",
         "title": "Read refinery inputs, outputs and own use together",
@@ -100,6 +180,23 @@
       }
     ],
     "other_transformation": [
+      {
+        "id": "other-transformation-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on Other transformation",
+        "copy": "This page owns transformation processes that are not more specifically Power or Refining, plus transfers and the relevant energy-sector own-use and loss boundaries.",
+        "table": {
+          "caption": "Other transformation page contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Transformation flows", "Gas processing, coal transformation, liquefaction/regasification and other 09 processes outside Power and Refining", "Inputs are negative and outputs positive; process boundaries can include own use."],
+            ["Transfers", "Flow 08 movements between product categories", "Transfers have either sign and are routed here through an explicit special case, regardless of refinery wording."],
+            ["Own use and losses", "Relevant 10.01 and 10.02 rows not represented by a more-specific inclusive boundary", "Do not add a standalone own-use row to an inclusive process row."],
+            ["Gas works quirk", "09.06.01 Gas works plants (including own use)", "LEAP does not expose 10.01.02 gas-works own use separately, so that standalone row is suppressed just like refinery own use."],
+            ["Products", "The input and output fuels appropriate to each conversion process", "Read the flow label first: the same product can be an input in one process and an output in another."]
+          ]
+        }
+      },
       {
         "id": "transformation-boundaries",
         "target": "[data-guide-id='chart-card']",
@@ -119,6 +216,22 @@
     ],
     "industry": [
       {
+        "id": "industry-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on Industry",
+        "copy": "Industry owns the complete Common ESTO flow tree below 14, from the sector total through mining, construction, manufacturing and available subsectors.",
+        "table": {
+          "caption": "Industry page contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Flows", "14 Industry, 14.01 Mining, 14.02 Construction, 14.03 Manufacturing and descendants such as iron and steel or chemicals", "The available depth changes with the selected Common-category scope."],
+            ["Products", "Coal, oil products, gas, electricity, heat, renewables, hydrogen and other reported industrial carriers", "Every supported subsector-product pair can create a detail chart, making this one of the densest pages."],
+            ["Hierarchy", "Sector parents, subsector parents and detailed children can all be available as alternative views", "Do not sum parent and child charts together."],
+            ["Aggregate-only LEAP", "Some economies currently expose only the broad LEAP Industry placeholder", "The broad chart can contain LEAP while detailed charts contain only ESTO or Ninth; the dataset filter makes that coverage difference visible."]
+          ]
+        }
+      },
+      {
         "id": "industry-review",
         "target": "[data-guide-id='chart-card']",
         "title": "Work from sector total to subsector and fuel",
@@ -126,6 +239,22 @@
       }
     ],
     "transport": [
+      {
+        "id": "transport-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on Transport",
+        "copy": "Transport owns the domestic final-demand tree below 15, covering the modes and fuels used within the economy.",
+        "table": {
+          "caption": "Transport page contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Flows", "Total transport, road, rail, domestic aviation, domestic navigation, pipeline and non-specified transport where available", "International aviation and marine bunkers are kept on the separate Bunkers page."],
+            ["Products", "Gasoline, diesel, jet fuel, fuel oil, biofuels, gas, electricity, hydrogen and other reported transport fuels", "Fuel detail follows the finest shared grain supported by the selected sources."],
+            ["Comparison views", "Road, non-road and total-transport rollups", "These are context-specific alternatives; the same LEAP branch can contribute to several views, so do not add those views together."],
+            ["How to diagnose", "Move from total transport to mode and then fuel", "A difference can reflect activity, modal structure, efficiency, fuel switching or source coverage."]
+          ]
+        }
+      },
       {
         "id": "transport-review",
         "target": "[data-guide-id='chart-card']",
@@ -135,6 +264,22 @@
     ],
     "buildings": [
       {
+        "id": "buildings-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on Buildings",
+        "copy": "Buildings combines the Common ESTO demand trees for commercial and public services and residential energy use.",
+        "table": {
+          "caption": "Buildings page contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Flows", "Commercial and public services (16.01), Residential (16.02), and supported descendants such as datacentres", "Datacentre detail appears only where the shared structure and data provide it."],
+            ["Products", "Electricity, gas, oil products, coal, heat, renewables and other reported building fuels", "The product mix often matters more than the total when reviewing electrification."],
+            ["Aggregate-only LEAP", "Some economies report only an aggregate Buildings branch", "The page keeps that honest aggregate instead of allocating it between residential, commercial or datacentres."],
+            ["How to diagnose", "Compare the Buildings total, then residential/commercial and fuel composition", "Check activity, service demand, efficiency and fuel-switching assumptions before treating a difference as mapping error."]
+          ]
+        }
+      },
+      {
         "id": "buildings-review",
         "target": "[data-guide-id='chart-card']",
         "title": "Check detail availability before explaining a split",
@@ -142,6 +287,22 @@
       }
     ],
     "others": [
+      {
+        "id": "other-demand-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on Other demand",
+        "copy": "Other demand owns final energy uses outside Industry, Transport and Buildings, plus one temporary combined placeholder used where LEAP detail is not yet separable.",
+        "table": {
+          "caption": "Other demand page contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Flows", "Agriculture (16.03), fishing (16.04) and non-specified other demand (16.05)", "These are domestic final-demand flows, not a catch-all for every unassigned row."],
+            ["Products", "Electricity, oil products, gas, coal, renewables and other reported fuels", "Available products depend strongly on economy and source detail."],
+            ["Combined placeholder", "16.03-16.05,17 Other sector including non-energy", "LEAP currently reports this boundary inseparably for some economies. It is routed here temporarily and must not be interpreted as a detailed sector split."],
+            ["Relationship to Non-energy", "Exact standalone 17 remains owned by the Non-energy page", "Do not add exact 17 to the combined placeholder; they overlap."]
+          ]
+        }
+      },
       {
         "id": "other-demand-review",
         "target": "[data-guide-id='chart-card']",
@@ -151,6 +312,22 @@
     ],
     "non_energy": [
       {
+        "id": "non-energy-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on Non-energy use",
+        "copy": "Non-energy use owns exact flow 17: fuels used as chemical feedstocks, materials or other non-combustion inputs rather than for their energy content.",
+        "table": {
+          "caption": "Non-energy page contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Flows", "17 Non-energy use and any supported descendants", "This page is separate from energy consumed by Industry or Other demand."],
+            ["Products", "Oil products, natural gas, coal and other fuels used as feedstocks or materials", "A positive value is material use; it should not be read as combustion demand."],
+            ["Totals and emissions", "Included in TFC but excluded from TFEC and the dashboard's combustion-emissions calculation", "Current TFEC presentation is disabled while aggregate LEAP Other/non-energy demand remains inseparable."],
+            ["Visibility", "The page requires usable standalone LEAP flow-17 coverage", "If LEAP only supplies the combined 16.03-16.05,17 placeholder, that row stays on Other demand and this page remains hidden."]
+          ]
+        }
+      },
+      {
         "id": "non-energy-boundary",
         "target": "[data-guide-id='chart-card']",
         "title": "Keep feedstock use separate from combustion",
@@ -158,6 +335,23 @@
       }
     ],
     "emissions": [
+      {
+        "id": "emissions-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on Emissions",
+        "copy": "Emissions is a derived two-chart summary rather than a routed flow tree. It translates selected energy use into comparable direct-combustion emissions.",
+        "table": {
+          "caption": "Emissions page contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Charts", "Emissions by fuel and emissions by major sector", "The page intentionally condenses the energy-detail tree into two review views."],
+            ["Underlying flows", "Final energy demand plus negative transformation inputs and own use selected from a non-overlapping frontier", "Positive transformation outputs and transfers are excluded."],
+            ["Products", "Combustible fuels resolved to the configured emissions-factor set", "Electricity, heat, hydrogen and renewable carriers with blank factors contribute zero at point of final use."],
+            ["Excluded demand", "Non-energy use and mixed Other/non-energy aggregates that cannot be separated", "The page does not invent a combustion share or sector allocation."],
+            ["Interpretation", "Energy demand multiplied by a declared factor set", "This is a consistent dashboard calculation, not a source-system emissions inventory or an electricity-grid intensity calculation."]
+          ]
+        }
+      },
       {
         "id": "emissions-method",
         "target": "[data-guide-id='chart-card']",
@@ -177,6 +371,21 @@
     ],
     "transport_leap_vs_ninth": [
       {
+        "id": "transport-diagnostic-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on diagnostic Transport",
+        "copy": "This optional page isolates LEAP and 9th Outlook transport rows in the alternate leap_vs_ninth comparison scope.",
+        "table": {
+          "caption": "Diagnostic Transport contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Flows", "Available flow-15 transport categories such as road, rail, navigation and pipeline", "The shared grain is defined specifically for LEAP-versus-9th, not the default three-source scope."],
+            ["Products", "Transport fuels reported by both model datasets at a comparable grain", "Sparse or one-sided rows can remain useful diagnostics but are not automatically publication-ready."],
+            ["Use", "Focused model-to-model detail review", "Use alongside the production Transport page, not as its replacement."]
+          ]
+        }
+      },
+      {
         "id": "transport-diagnostic-limit",
         "target": "[data-guide-id='chart-card']",
         "title": "Use this as a focused diagnostic slice",
@@ -184,6 +393,21 @@
       }
     ],
     "datacentres_leap_vs_ninth": [
+      {
+        "id": "datacentres-diagnostic-page-scope",
+        "target": "[data-guide-id='chart-card']",
+        "title": "What appears on diagnostic Datacentres",
+        "copy": "This optional page isolates datacentre demand rows that can be compared between LEAP and the 9th Outlook.",
+        "table": {
+          "caption": "Diagnostic Datacentres contents",
+          "headers": ["Area", "Generally included", "Important quirk"],
+          "rows": [
+            ["Flows", "Datacentre descendants of commercial and public services where available", "The source structures may expose only a small number of matching rows."],
+            ["Products", "Usually electricity, plus any other carrier explicitly reported at datacentre level", "Do not infer a fuel split from the broader Buildings total."],
+            ["Use", "Focused model-to-model demand review", "Return to Buildings for the production-facing sector context; this page stays hidden by default while coverage is sparse."]
+          ]
+        }
+      },
       {
         "id": "datacentres-diagnostic-limit",
         "target": "[data-guide-id='chart-card']",

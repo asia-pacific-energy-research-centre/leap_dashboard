@@ -49,6 +49,54 @@ def test_chart_guide_adds_only_the_current_pages_review_content() -> None:
     assert "Included and excluded boundaries" in emissions_script
 
 
+@pytest.mark.parametrize(
+    ("page_key", "page_label", "scope_title"),
+    [
+        ("total_demand", "Energy balance overview", "What appears on the Energy balance overview"),
+        ("supply", "Supply", "What appears on Supply"),
+        ("bunkers", "Bunkers", "What appears on Bunkers"),
+        ("power", "Power", "What appears on Power"),
+        ("refining", "Refining", "What appears on Refining"),
+        ("other_transformation", "Other transformation", "What appears on Other transformation"),
+        ("industry", "Industry", "What appears on Industry"),
+        ("transport", "Transport", "What appears on Transport"),
+        ("buildings", "Buildings", "What appears on Buildings"),
+        ("others", "Other demand", "What appears on Other demand"),
+        ("non_energy", "Non-energy use", "What appears on Non-energy use"),
+        ("emissions", "Emissions", "What appears on Emissions"),
+        ("transport_leap_vs_ninth", "Diagnostic transport", "What appears on diagnostic Transport"),
+        ("datacentres_leap_vs_ninth", "Diagnostic datacentres", "What appears on diagnostic Datacentres"),
+    ],
+)
+def test_each_chart_page_has_unique_scope_guidance(
+    page_key: str,
+    page_label: str,
+    scope_title: str,
+) -> None:
+    script = build_guide_fragments("chart", page_key, page_label)["script"]
+
+    assert scope_title in script
+
+
+def test_refining_scope_explains_the_inclusive_own_use_boundary() -> None:
+    script = build_guide_fragments("chart", "refining", "Refining")["script"]
+
+    assert "LEAP does not publish refinery own use separately" in script
+    assert "Standalone 10.01.11 is therefore suppressed" in script
+    assert "Other transformation &gt; Transfers" not in script
+    assert "Other transformation > Transfers" in script
+
+
+def test_energy_balance_scope_records_tfec_as_temporarily_disabled() -> None:
+    script = build_guide_fragments(
+        "chart", "total_demand", "Energy balance overview"
+    )["script"]
+
+    assert "TFEC" in script
+    assert "Not currently displayed" in script
+    assert "temporarily disabled" in script
+
+
 def test_chart_guide_explains_the_overview_first_review_strategy() -> None:
     chart_script = build_guide_fragments("chart", "industry", "Industry")["script"]
 
