@@ -2188,19 +2188,12 @@ def build_product_chart(
     product_label: str,
     series_labels: dict[str, str],
     *,
-    hist_diff_by_scenario: dict[str, pd.Series] | None = None,
-    proj_diff_by_scenario: dict[str, pd.Series] | None = None,
     primary_source: str = "LEAP",
     primary_scenario: str = "Target",
     comparison_source: str = "ESTO",
     base_year: int | None = None,
 ) -> go.Figure:
-    """Build a line chart for one common flow/product row.
-
-    ``hist_diff_by_scenario``/``proj_diff_by_scenario`` map scenario name
-    ("Reference"/"Target") to a diff series, so both scenarios' diff lines can
-    be built and left for the client-side REF/TGT toggle to show/hide.
-    """
+    """Build a line chart for one common flow/product row."""
     chart_df = _non_overlapping_common_row_frontier(chart_df)
     chart_unit = _chart_unit(chart_df)
     fig = go.Figure()
@@ -2253,38 +2246,6 @@ def build_product_chart(
             )
         )
         trace_meta.append(trace_meta_entry(source_system, scenario, True))
-    for scenario_name, diff_series in (hist_diff_by_scenario or {}).items():
-        if diff_series is None or diff_series.empty:
-            continue
-        diff_label = f"{primary_source} {scenario_name} minus comparison (hist)"
-        fig.add_trace(
-            go.Scatter(
-                x=diff_series.index.tolist(),
-                y=diff_series.values.tolist(),
-                mode="lines",
-                name=diff_label,
-                visible="legendonly",
-                line={"dash": "dot", "color": "#6b7280"},
-                hovertemplate="%{x}<br>Diff: %{y:,.2f}" + chart_unit + "<extra>" + escape(diff_label) + "</extra>",
-            )
-        )
-        trace_meta.append(trace_meta_entry(primary_source, scenario_name, "legendonly"))
-    for scenario_name, diff_series in (proj_diff_by_scenario or {}).items():
-        if diff_series is None or diff_series.empty:
-            continue
-        diff_label = f"{primary_source} {scenario_name} minus 9th (proj)"
-        fig.add_trace(
-            go.Scatter(
-                x=diff_series.index.tolist(),
-                y=diff_series.values.tolist(),
-                mode="lines",
-                name=diff_label,
-                visible="legendonly",
-                line={"dash": "dot", "color": "#f59e0b"},
-                hovertemplate="%{x}<br>Diff: %{y:,.2f}" + chart_unit + "<extra>" + escape(diff_label) + "</extra>",
-            )
-        )
-        trace_meta.append(trace_meta_entry(primary_source, scenario_name, "legendonly"))
     fig.update_layout(
         title=title_with_sign_note(f"{flow_label} - {product_label}", chart_df),
         xaxis_title="Year",
@@ -4465,8 +4426,6 @@ def _line_chart_manifest_and_rows(
             flow_label,
             product_label,
             series_labels,
-            hist_diff_by_scenario=hist_diff_by_scenario,
-            proj_diff_by_scenario=proj_diff_by_scenario,
             primary_source=primary_source,
             primary_scenario=primary_scenario,
             comparison_source=comparison_source,
@@ -4588,24 +4547,45 @@ def drop_esto_post_base_year_rows(df: pd.DataFrame, comparison_source: str, base
     return df[~(is_comparison_source & is_post_base_year)].copy()
 
 
-def drop_excluded_flow_rows(df: pd.DataFrame, excluded_flow_code_prefixes: list[object]) -> pd.DataFrame:
-    """Drop rows whose common flow code matches a configured exclusion prefix.
+def drop_excluded_flow_rows(
+    df: pd.DataFrame,
+    excluded_flow_code_prefixes: list[object],
+    excluded_flow_labels: list[object] | None = None,
+) -> pd.DataFrame:
+    """Drop rows matching configured code prefixes or exact flow labels.
 
     Applies only to ``measure == "energy"`` rows: the exclusion list encodes
     energy-balance identity rules (supply/TFC/TFEC), which do not mean
     anything for a non-energy series. A frame without a ``measure`` column is
     treated as all-energy, matching behaviour before that column existed.
     """
-    if df.empty or not excluded_flow_code_prefixes:
+    if df.empty:
         return df
     is_energy = (
         df["measure"].astype(str).eq("energy")
         if "measure" in df.columns
         else pd.Series(True, index=df.index)
     )
-    excluded_mask = is_energy & df["common_flow_code"].apply(
-        lambda value: code_expression_matches_any_prefix(value, excluded_flow_code_prefixes)
-    )
+    excluded_mask = pd.Series(False, index=df.index)
+    if excluded_flow_code_prefixes:
+        excluded_mask = excluded_mask | (
+            is_energy
+            & df["common_flow_code"].apply(
+                lambda value: code_expression_matches_any_prefix(value, excluded_flow_code_prefixes)
+            )
+        )
+    excluded_labels = {
+        str(value).strip().casefold()
+        for value in (excluded_flow_labels or [])
+        if str(value).strip()
+    }
+    if excluded_labels and "common_flow_label" in df.columns:
+        excluded_mask = excluded_mask | (
+            is_energy
+            & df["common_flow_label"].fillna("").astype(str).str.strip().str.casefold().isin(
+                excluded_labels
+            )
+        )
     return df[~excluded_mask].copy()
 
 
@@ -4693,13 +4673,18 @@ def render_dashboard(
     comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
     base_year = int(chart_config.get("base_year", 2023))
     excluded_flow_code_prefixes = template.get("excluded_flow_code_prefixes", [])
+    excluded_flow_labels = template.get("excluded_flow_labels", [])
     df = _keep_one_measure_for_energy_balance_charts(df)
     df = drop_esto_post_base_year_rows(df, comparison_source, base_year)
-    df = drop_excluded_flow_rows(df, excluded_flow_code_prefixes)
+    df = drop_excluded_flow_rows(df, excluded_flow_code_prefixes, excluded_flow_labels)
     if scope_df is not None:
         scope_df = _keep_one_measure_for_energy_balance_charts(scope_df)
         scope_df = drop_esto_post_base_year_rows(scope_df, comparison_source, base_year)
-        scope_df = drop_excluded_flow_rows(scope_df, excluded_flow_code_prefixes)
+        scope_df = drop_excluded_flow_rows(
+            scope_df,
+            excluded_flow_code_prefixes,
+            excluded_flow_labels,
+        )
     routing_special_cases = template.get("routing_special_cases", [])
     assigned_df = assign_pages(df, page_rules, routing_special_cases)
     assigned_df = assign_bespoke_overview_rows(
@@ -4908,7 +4893,6 @@ def render_dashboard(
                 continue
             chart_figure = build_product_chart(
                 pair_rows, flow_label, product_label, series_labels,
-                hist_diff_by_scenario=hist_diff_by_scenario, proj_diff_by_scenario=proj_diff_by_scenario,
                 primary_source=primary_source, primary_scenario=primary_scenario,
                 comparison_source=comparison_source, base_year=base_year,
             )

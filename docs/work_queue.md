@@ -127,6 +127,15 @@ These later commits supersede the corresponding snapshot rows below:
   suppressed when only one effective flow remains and the product companion
   already shows the same signed envelope.
 
+- **DASHQ-043 is `complete_unpushed`.** Refining is published from the inclusive
+  `09.07 Oil refineries (including own use)` comparison boundary. The exact
+  non-inclusive row is excluded from page construction while the page retains
+  the concise name **Refining**.
+
+- **DASHQ-044 is `complete_unpushed`.** Optional `LEAP ... minus ...` diagnostic
+  traces are absent from ordinary chart legends. Difference series remain in
+  the chart manifest for ranking and audit diagnostics.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not

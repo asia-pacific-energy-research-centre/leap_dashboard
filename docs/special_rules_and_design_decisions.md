@@ -876,6 +876,22 @@ aggregate; multi-flow sections remain eligible for flow charts.
   roughly `-3,400 PJ` net balance while its product companion showed about
   `+33,000 PJ` of outputs and `-36,000 PJ` of inputs.
 
+## DASH-024: Refining publishes the inclusive boundary and ordinary charts omit difference diagnostics
+
+**Status:** Implemented.
+
+The public **Refining** page is based on the comparison boundary
+`09.07 Oil refineries (including own use)`. The non-inclusive
+`09.07 Oil refineries` row is excluded from dashboard page construction, so it
+cannot appear as a second apparently valid section or overview card. The page
+name remains the concise presentation label **Refining**; the chip and chart
+labels expose the actual inclusive comparison boundary.
+
+The optional `LEAP ... minus comparison` and `LEAP ... minus 9th` traces are no
+longer added to ordinary chart legends. The renderer still computes and stores
+the historical and projection difference series used by manifest diagnostics,
+sorting and audit workflows; only the optional visual traces were removed.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

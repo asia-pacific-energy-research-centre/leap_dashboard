@@ -1409,6 +1409,57 @@ def test_aggregate_flow_rows_drop_nested_refinery_categories_per_source() -> Non
     }
 
 
+def test_refining_page_keeps_only_inclusive_comparison_boundary() -> None:
+    rows = pd.DataFrame([
+        {"common_flow_code": "09.07", "common_flow_label": "09.07 Oil refineries"},
+        {
+            "common_flow_code": "09.07",
+            "common_flow_label": "09.07 Oil refineries (including own use)",
+        },
+    ])
+
+    filtered = drop_excluded_flow_rows(
+        rows,
+        [],
+        ["09.07 Oil refineries"],
+    )
+
+    assert filtered["common_flow_label"].tolist() == [
+        "09.07 Oil refineries (including own use)"
+    ]
+
+
+def test_product_chart_omits_optional_difference_traces() -> None:
+    chart_df = pd.DataFrame([
+        {
+            "source_system": "ESTO",
+            "scenario": "historical",
+            "year": 2022,
+            "value": 10.0,
+        },
+        {
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2022,
+            "value": 12.0,
+        },
+    ])
+
+    figure = build_product_chart(
+        chart_df,
+        "01 Production",
+        "08.01 Natural gas",
+        {},
+        base_year=2022,
+    )
+
+    assert {str(trace.name) for trace in figure.data} == {
+        "ESTO|historical",
+        "LEAP|Target",
+    }
+    assert not any(" minus " in str(trace.name).casefold() for trace in figure.data)
+
+
 def test_non_expanding_subtotal_is_selected_once_for_dashboard_aggregates() -> None:
     subtotal_value = 30.0
     detail_frontier_value = 10.0 + 20.0
@@ -1904,8 +1955,8 @@ def test_page_routing_keeps_transformation_total_and_sector_details(tmp_path: Pa
         {
             **common_values,
             "common_flow_code": "09.07",
-            "common_flow_name": "Oil refineries",
-            "common_flow_label": "09.07 Oil refineries",
+            "common_flow_name": "Oil refineries (including own use)",
+            "common_flow_label": "09.07 Oil refineries (including own use)",
             "value": -20.0,
         },
     ])
