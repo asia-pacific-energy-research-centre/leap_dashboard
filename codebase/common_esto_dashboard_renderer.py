@@ -1007,10 +1007,32 @@ def _add_signed_stack_traces(
     one legend item and one legend group for the logical series.
     """
     numeric_values = pd.to_numeric(y_values, errors="coerce").fillna(0.0)
-    signed_parts = [
-        ("pos", numeric_values.clip(lower=0.0)),
-        ("neg", numeric_values.clip(upper=0.0)),
-    ]
+    return _add_preseparated_signed_stack_traces(
+        fig=fig,
+        x_values=x_values,
+        signed_parts=[
+            ("pos", numeric_values.clip(lower=0.0)),
+            ("neg", numeric_values.clip(upper=0.0)),
+        ],
+        stackgroup_prefix=stackgroup_prefix,
+        trace_name=trace_name,
+        visible=visible,
+        hovertemplate=hovertemplate,
+        line_color=line_color,
+    )
+
+
+def _add_preseparated_signed_stack_traces(
+    fig: go.Figure,
+    x_values: pd.Series,
+    signed_parts: list[tuple[str, pd.Series]],
+    stackgroup_prefix: str,
+    trace_name: str,
+    visible: bool,
+    hovertemplate: str,
+    line_color: str = "",
+) -> int:
+    """Add already-separated gross positive and negative category totals."""
     active_parts = [
         (sign, values)
         for sign, values in signed_parts
@@ -1760,15 +1782,15 @@ def build_area_chart(
     # the active LEAP projection stack.  ESTO can contain categories that are
     # absent or zero throughout the projection; showing those as empty bands
     # makes the legend look like a data series exists when it does not.
-    projected_groups = (
-        chart_df[
-            (chart_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
-            & (chart_df["scenario"].astype(str).str.casefold().isin({"reference", "target"}))
-            & (chart_df["year"] > base_year)
-        ]
-        .groupby(group_col, dropna=False)["value"]
-        .sum()
-    )
+    projected_rows = chart_df[
+        (chart_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
+        & (chart_df["scenario"].astype(str).str.casefold().isin({"reference", "target"}))
+        & (chart_df["year"] > base_year)
+    ].copy()
+    projected_rows["_gross_value"] = pd.to_numeric(
+        projected_rows["value"], errors="coerce"
+    ).fillna(0.0).abs()
+    projected_groups = projected_rows.groupby(group_col, dropna=False)["_gross_value"].sum()
     active_groups = projected_groups.loc[projected_groups.abs() > 1e-12].index
     pre_base_df = pre_base_df[pre_base_df[group_col].isin(active_groups)]
 
@@ -1786,16 +1808,30 @@ def build_area_chart(
             continue
         tag = scenario_toggle_tag(primary_source, scenario_name)
         is_default = scenario_name.casefold() == default_scenario.casefold()
+        signed_area_df = area_df.copy()
+        signed_values = pd.to_numeric(signed_area_df["value"], errors="coerce").fillna(0.0)
+        signed_area_df["_positive_value"] = signed_values.clip(lower=0.0)
+        signed_area_df["_negative_value"] = signed_values.clip(upper=0.0)
         group_df = (
-            area_df.groupby([group_col, "year"], as_index=False)["value"].sum().sort_values([group_col, "year"])
+            signed_area_df.groupby([group_col, "year"], as_index=False)[
+                ["_positive_value", "_negative_value"]
+            ]
+            .sum()
+            .sort_values([group_col, "year"])
         )
         for group_label, group in group_df.groupby(group_col, dropna=False):
-            if not _has_nonzero_values(group["value"]):
+            if not (
+                _has_nonzero_values(group["_positive_value"])
+                or _has_nonzero_values(group["_negative_value"])
+            ):
                 continue
-            trace_count = _add_signed_stack_traces(
+            trace_count = _add_preseparated_signed_stack_traces(
                 fig=fig,
                 x_values=group["year"],
-                y_values=group["value"],
+                signed_parts=[
+                    ("pos", group["_positive_value"]),
+                    ("neg", group["_negative_value"]),
+                ],
                 stackgroup_prefix=f"scenario_{tag}",
                 trace_name=str(group_label),
                 visible=is_default,
@@ -1911,13 +1947,23 @@ def _build_section_aggregate_charts(
             "source_flow_labels": flow_labels,
         }
         area_df = page_df[page_df["common_flow_label"].isin(flow_labels)]
+        effective_flow_rows = _non_overlapping_flow_rows(
+            _non_overlapping_common_row_frontier(area_df)
+        )
+        effective_flow_count = effective_flow_rows["common_flow_label"].nunique(
+            dropna=True
+        )
         for group_col, group_noun, title_prefix, manifest_flow, manifest_product in (
             ("common_product_label", "product", "Aggregate by product", section_label, "All products"),
             ("common_flow_label", "flow", "Aggregate by flow", "All flows", section_label),
         ):
             chart_key = f"chart__area__section__{safe_slug(page_key)}__{safe_slug(section_label)}__{group_noun}"
             metrics = compute_ranking_metrics(area_df, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
-            suppressed = metrics["total_abs_value"] < suppression_threshold
+            redundant_single_flow = group_noun == "flow" and effective_flow_count <= 1
+            suppressed = (
+                metrics["total_abs_value"] < suppression_threshold
+                or redundant_single_flow
+            )
             manifest_rows.append({
                 "page_key": page_key,
                 "page_label": page_label,

@@ -838,6 +838,44 @@ either child label.
   even though no such common mapping row existed and its complete frontier was
   the single `09.07` comparison boundary.
 
+## DASH-023: Signed composition is preserved before category aggregation
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation and aggregation order
+**Affected areas:** Signed stacked-area charts; transformation section summaries
+
+### Current rule
+
+Every signed stacked-area chart separates positive and negative observations
+before aggregating the category displayed in its legend. Products or flows can
+therefore contribute to both the output and input stacks in one year without
+their gross activity cancelling into a small net area. Dataset total lines
+remain signed net totals and are unchanged.
+
+The rule applies to both product-grouped and flow-grouped area charts. It is
+harmless for one-sided demand and supply compositions and necessary for
+transformation sections, where positive outputs and negative inputs routinely
+share a category.
+
+A section-level `Aggregate by flow` chart is suppressed when its selected,
+non-overlapping frontier contains only one effective flow. In that case the
+companion product chart already shows the same positive and negative envelope,
+so the flow card adds no decomposition. Multi-flow sections retain both charts.
+
+### Validation
+
+Regression coverage requires both product and flow aggregation to retain gross
+positive and negative values when their net is smaller. A one-flow Refining
+section must render its product aggregate and suppress only its redundant flow
+aggregate; multi-flow sections remain eligible for flow charts.
+
+### History
+
+- 2026-08-09: Added after the USA Refining flow aggregate displayed only the
+  roughly `-3,400 PJ` net balance while its product companion showed about
+  `+33,000 PJ` of outputs and `-36,000 PJ` of inputs.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

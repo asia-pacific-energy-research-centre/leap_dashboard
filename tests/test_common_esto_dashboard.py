@@ -1217,6 +1217,87 @@ def test_signed_stack_trace_crossing_zero_uses_both_stacks_and_one_legend_item()
     assert fig.data[0].legendgroup == fig.data[1].legendgroup
 
 
+@pytest.mark.parametrize(
+    ("group_col", "historical_categories", "projected_categories"),
+    [
+        (
+            "common_flow_label",
+            [("09.07 Oil refineries", "06.01 Crude oil", -80.0),
+             ("09.07 Oil refineries", "07.01 Motor gasoline", 100.0)],
+            [("09.07 Oil refineries", "06.01 Crude oil", -90.0),
+             ("09.07 Oil refineries", "07.01 Motor gasoline", 120.0)],
+        ),
+        (
+            "common_product_label",
+            [("09.01 Electricity plants", "08.01 Natural gas", -80.0),
+             ("09.06 Gas works plants", "08.01 Natural gas", 100.0)],
+            [("09.01 Electricity plants", "08.01 Natural gas", -90.0),
+             ("09.06 Gas works plants", "08.01 Natural gas", 120.0)],
+        ),
+    ],
+)
+def test_area_chart_preserves_gross_signs_before_category_aggregation(
+    group_col: str,
+    historical_categories: list[tuple[str, str, float]],
+    projected_categories: list[tuple[str, str, float]],
+) -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "comparison_scope": "esto_leap_ninth",
+                "economy": "20_USA",
+                "source_system": source_system,
+                "scenario": scenario,
+                "year": year,
+                "common_flow_code": flow_label.split()[0],
+                "common_flow_label": flow_label,
+                "common_product_code": product_label.split()[0],
+                "common_product_label": product_label,
+                "is_non_expanding_rollup": False,
+                "value": value,
+            }
+            for source_system, scenario, year, categories in [
+                ("ESTO", "historical", 2022, historical_categories),
+                ("LEAP", "Target", 2023, projected_categories),
+            ]
+            for flow_label, product_label, value in categories
+        ]
+    )
+
+    figure = build_area_chart(
+        rows,
+        {
+            "aggregate_flow_label": "Transformation",
+            "source_flow_labels": sorted(rows["common_flow_label"].unique()),
+            "source_flow_labels_by_system": {},
+        },
+        {"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
+        {
+            "chart_generation": {
+                "comparison_source_system": "ESTO",
+                "base_year": 2022,
+                "primary_area_source_system": "LEAP",
+                "primary_area_scenario": "Target",
+            }
+        },
+        group_col=group_col,
+    )
+
+    visible_areas = [
+        trace for trace in figure.data
+        if trace.stackgroup and trace.visible is True
+    ]
+    assert [trace.stackgroup for trace in visible_areas] == [
+        "scenario_tgt_pos",
+        "scenario_tgt_neg",
+    ]
+    assert [list(trace.y) for trace in visible_areas] == [
+        [100.0, 120.0],
+        [-80.0, -90.0],
+    ]
+    assert [trace.showlegend for trace in visible_areas] == [True, False]
+
+
 def test_supply_demand_comparison_lines_keep_stable_source_colour() -> None:
     import plotly.graph_objects as go
 
@@ -1914,6 +1995,64 @@ def test_section_aggregate_suppresses_chart_with_only_pre_base_year_projection()
     assert chart_rows == []
     assert len(manifest_rows) == 2
     assert all(row["suppressed"] for row in manifest_rows)
+
+
+def test_section_aggregate_suppresses_redundant_single_flow_chart() -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "comparison_scope": "esto_leap_ninth",
+                "economy": "20_USA",
+                "source_system": source_system,
+                "scenario": scenario,
+                "year": year,
+                "common_flow_code": "09.07",
+                "common_flow_label": "09.07 Oil refineries",
+                "common_product_code": product_code,
+                "common_product_label": product_label,
+                "is_non_expanding_rollup": False,
+                "_section_label": "Refining",
+                "value": value,
+            }
+            for source_system, scenario, year, product_code, product_label, value in [
+                ("ESTO", "historical", 2022, "06.01", "06.01 Crude oil", -80.0),
+                ("ESTO", "historical", 2022, "07.01", "07.01 Motor gasoline", 100.0),
+                ("LEAP", "Target", 2023, "06.01", "06.01 Crude oil", -90.0),
+                ("LEAP", "Target", 2023, "07.01", "07.01 Motor gasoline", 120.0),
+            ]
+        ]
+    )
+    template = {
+        "chart_generation": {
+            "primary_area_source_system": "LEAP",
+            "primary_area_scenario": "Target",
+            "comparison_source_system": "ESTO",
+            "ninth_source_system": "NINTH",
+            "base_year": 2022,
+            "suppression_threshold": 1.0,
+        }
+    }
+
+    charts, chart_rows, manifest_rows = _build_section_aggregate_charts(
+        rows,
+        page_key="refining",
+        page_label="Refining",
+        parent_flow_labels=set(),
+        template=template,
+        series_labels={"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
+    )
+
+    assert set(charts) == {"chart__area__section__refining__refining__product"}
+    assert [row["chart_key"] for row in chart_rows] == [
+        "chart__area__section__refining__refining__product"
+    ]
+    suppression_by_key = {
+        row["chart_key"]: row["suppressed"] for row in manifest_rows
+    }
+    assert suppression_by_key == {
+        "chart__area__section__refining__refining__product": False,
+        "chart__area__section__refining__refining__flow": True,
+    }
 
 
 def test_chart_chrome_resolves_duplicate_configured_category_colours() -> None:

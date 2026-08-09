@@ -120,6 +120,13 @@ These later commits supersede the corresponding snapshot rows below:
   `(including own use)` label is preferred; multi-category prefix cards retain
   aggregate label discovery.
 
+- **DASHQ-042 is `complete_on_master`.** Signed stacked-area charts preserve
+  gross positive and negative contributions before aggregating their displayed
+  product or flow category, preventing transformation inputs and outputs from
+  cancelling into a misleadingly small area. Section-level flow charts are
+  suppressed when only one effective flow remains and the product companion
+  already shows the same signed envelope.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not
