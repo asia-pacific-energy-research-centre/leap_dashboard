@@ -351,6 +351,9 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     )
     html = Path(result["page"]).read_text(encoding="utf-8")
 
+    assert 'id="dashboard-guide-launch"' in html
+    assert 'id="dashboard-guide-dialog"' in html
+    assert "What mapping diagnostics are for" in html
     assert "How the anchor validator connects the hierarchies" in html
     assert "How to read a hierarchy case" in html
     assert "One-to-many fan-out" in html
