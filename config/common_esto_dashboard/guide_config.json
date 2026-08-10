@@ -5,11 +5,11 @@
     "total_demand": "Start here for a whole-system view of final demand, transformation, supply and the principal energy-balance totals.",
     "buildings": "Use Buildings to review residential and commercial energy demand, including fuel totals and changes that need to be traced back to model assumptions.",
     "industry": "Use Industry to review industrial energy demand by subsector and fuel, with particular attention to large changes and differences between sources.",
-    "transport": "Use Transport to review road and non-road energy demand, fuel switching and the effect of the detailed transport model on LEAP results.",
-    "bunkers": "Use Bunkers to review international aviation and marine energy use separately from domestic transport demand.",
+    "transport": "Use Transport to review road and non-road energy demand within the economy, including fuel switching and the effect of the detailed transport model on LEAP results. International aviation and marine bunkers are not included here; review them on Supply or on the separate International transport page.",
+    "international_transport": "Use International transport to review international aviation and marine bunker fuel as a signed deduction from domestic supply.",
     "others": "Use Other demand to review agriculture, fishing, non-specified demand and aggregate-only demand that has not yet been replaced by detailed LEAP branches.",
     "non_energy": "Use Non-energy use to review fuels consumed as feedstocks or materials rather than as an energy source.",
-    "power": "Use Power to review electricity and heat generation, fuel inputs, outputs and unusual dispatch or conversion outcomes.",
+    "power": "Use Power to review electricity and heat generation, fuel inputs and outputs. LEAP's power transformation modules do not measure power-sector own use or losses within the transformation process. These are represented separately, so the charts on this page let you analyse power-sector own use and losses alongside the transformation results.",
     "refining": "Use Refining to review refinery inputs, oil-product outputs and differences that may indicate a yield, capacity or balance issue.",
     "other_transformation": "Use Other transformation to review conversion processes and transfers that sit outside power and refining.",
     "supply": "Use Supply to review how production, trade and transformation outputs meet the model's fuel requirements.",
@@ -31,7 +31,7 @@
           "caption": "Energy balance overview contents",
           "headers": ["Area", "Generally included", "Important quirk"],
           "rows": [
-            ["Supply", "Production (01), imports (02) and signed exports (03), with total primary energy supply (07) where available", "Bunkers and stock changes are outside the projection-comparable supply total."],
+            ["Supply", "Production (01), imports (02), signed exports (03), and signed international transport (04-05), with total primary energy supply (07) where available", "Stock changes remain outside the projection-comparable supply total."],
             ["Final demand", "Total final consumption (12), split into the major demand pages and broad fuel groups", "Demand sectors are selected on a non-overlapping frontier; do not add their parents and children again."],
             ["Transformation", "The reviewed total transformation boundary excluding transfers", "Negative inputs and positive outputs can cancel, so inspect the transformation pages for process detail."],
             ["TFEC", "Not currently displayed", "Flow 13 is temporarily disabled because non-energy use cannot yet be separated from aggregate LEAP Other demand."]
@@ -47,7 +47,7 @@
           "caption": "Overview measures",
           "headers": ["Measure", "What it represents", "Review prompt"],
           "rows": [
-            ["Supply", "Production + imports + signed exports", "Bunkers and stock changes are outside this projection-comparable total."],
+            ["Supply", "Production + imports + signed exports + signed international transport", "Stock changes remain outside this projection-comparable total."],
             ["TFC", "Energy and non-energy final consumption", "Use it to test the overall demand boundary before opening sector pages."],
             ["Transformation", "Total transformation excluding transfers", "Inputs are normally negative and outputs positive; compare the boundary, not a simple gross sum."]
           ]
@@ -65,7 +65,7 @@
           "caption": "Supply page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
           "rows": [
-            ["Core flows", "Production (01), imports (02) and exports (03)", "Exports are displayed as negative because they leave domestic supply."],
+            ["Core flows", "Production (01), imports (02), exports (03), and international transport (04-05)", "Exports and international transport are displayed as negative because they leave domestic supply."],
             ["Balancing flows", "Stock changes (06) and statistical discrepancy (11) belong to the Supply family", "They may be excluded from the current presentation; if shown, either sign can be meaningful."],
             ["Products", "Primary fuels, petroleum products, gas, electricity, heat and other reported carriers", "The exact fuel detail depends on the selected Common-category scope and source coverage."],
             ["How to use it", "Start with supply composition, then open the material flow-product pair", "A supply difference can come from quantity, sign convention, product grouping or source coverage."]
@@ -84,35 +84,36 @@
             ["Production", "Positive", "Adds domestic supply."],
             ["Imports", "Positive", "Adds supply from outside the economy."],
             ["Exports", "Negative", "Removes energy from domestic supply."],
+            ["International transport", "Negative", "Marine and aviation bunkers are supplied domestically but excluded from domestic energy use."],
             ["Stock changes", "Either", "Positive is a stock draw; negative is a stock build."],
             ["Statistical discrepancy", "Either", "A balancing signal to investigate, not an ordinary supply source."]
           ]
         }
       }
     ],
-    "bunkers": [
+    "international_transport": [
       {
-        "id": "bunkers-page-scope",
+        "id": "international-transport-page-scope",
         "target": "[data-guide-id='chart-card']",
-        "title": "What appears on Bunkers",
-        "copy": "Bunkers contains fuel supplied to international transport, kept outside the domestic Transport page and domestic demand totals. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "title": "What appears on International transport",
+        "copy": "International transport contains marine and aviation bunker fuel, kept outside domestic Transport and domestic demand totals. It is a focused view of rows that also remain on Supply and contribute to TPES. The table shows each Common flow and fuel beside the native categories mapped into it for the participating datasets.",
         "dynamic_content": "page_mapping_table",
         "table": {
-          "caption": "Bunkers page contents",
+          "caption": "International transport page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
           "rows": [
             ["Flows", "International marine bunkers (04) and international aviation bunkers (05)", "These are international movements, not domestic navigation or aviation."],
             ["Products", "Usually marine fuel oils, jet fuel and other reported bunker fuels", "The dashboard retains whatever shared product grain the selected datasets can support."],
             ["Signs", "Fuel supplied to bunkers is normally negative", "The negative sign means removal from domestic supply, not negative physical activity."],
-            ["LEAP coverage", "A standalone page requires usable LEAP projection detail", "An aggregate-only bunker placeholder is hidden because it cannot support a meaningful comparison here."]
+            ["Supply relationship", "The same rows remain visible on Supply and are included in TPES", "This page is a secondary review view, not another amount to add to Supply."]
           ]
         }
       },
       {
-        "id": "bunkers-boundary",
+        "id": "international-transport-boundary",
         "target": "[data-guide-id='chart-card']",
         "title": "Keep international bunkers outside domestic transport",
-        "copy": "International aviation and marine bunkers are shown as negative because they are removed from domestic supply. Review them separately from domestic Transport; a positive bunker value is a sign-convention warning."
+        "copy": "International aviation and marine bunkers are shown as negative because they are removed from domestic supply. Review them separately from domestic Transport and alongside Supply; a positive bunker value is a sign-convention warning."
       }
     ],
     "power": [
@@ -130,22 +131,6 @@
             ["Input products", "Coal, gas, oil, renewables, waste and other fuels used by plants", "Transformation inputs are normally negative."],
             ["Output products", "Electricity and heat", "Outputs are normally positive and should be reviewed with their matching inputs."],
             ["Shared plant boundary", "Main-activity and autoproducer categories may be combined by plant type", "LEAP and the 9th do not align with ESTO at every producer or technology split, so the combined category is often the honest comparison level."]
-          ]
-        }
-      },
-      {
-        "id": "power-review",
-        "target": "[data-guide-id='chart-card']",
-        "title": "Review the conversion story, not one line alone",
-        "copy": "Power rows use shared plant categories because the source systems do not align at every public/autoproducer or technology split. Read fuel inputs, electricity or heat outputs, and related own use together.",
-        "table": {
-          "caption": "Power review sequence",
-          "headers": ["Signal", "What to check next"],
-          "rows": [
-            ["Input changes sharply", "Generation mix, dispatch, fuel availability and the matching output."],
-            ["Output changes without input", "Efficiency, technology classification and units."],
-            ["Large source difference", "Whether both sources support the same plant detail and comparison boundary."],
-            ["Unexpected sign", "Inputs should normally be negative; electricity and heat outputs positive."]
           ]
         }
       }
@@ -252,18 +237,12 @@
           "caption": "Transport page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
           "rows": [
-            ["Flows", "Total transport, road, rail, domestic aviation, domestic navigation, pipeline and non-specified transport where available", "International aviation and marine bunkers are kept on the separate Bunkers page."],
+            ["Flows", "Total transport, road, rail, domestic aviation, domestic navigation, pipeline and non-specified transport where available", "International aviation and marine bunkers are kept on the separate International transport page and also remain on Supply."],
             ["Products", "Gasoline, diesel, jet fuel, fuel oil, biofuels, gas, electricity, hydrogen and other reported transport fuels", "Fuel detail follows the finest shared grain supported by the selected sources."],
             ["Comparison views", "Road, non-road and total-transport rollups", "These are context-specific alternatives; the same LEAP branch can contribute to several views, so do not add those views together."],
             ["How to diagnose", "Move from total transport to mode and then fuel", "A difference can reflect activity, modal structure, efficiency, fuel switching or source coverage."]
           ]
         }
-      },
-      {
-        "id": "transport-review",
-        "target": "[data-guide-id='chart-card']",
-        "title": "Separate domestic mode detail from total transport",
-        "copy": "Road, non-road and total Transport are context-specific comparison views: the same LEAP branch can contribute to more than one view, but those views are alternatives rather than additive rows. Trace differences through mode, activity, efficiency and fuel switching; review international bunkers on their own page."
       }
     ],
     "buildings": [
@@ -425,8 +404,8 @@
     {
       "id": "chart-card",
       "target": "[data-guide-id='category-basis-switcher'], [data-guide-id='chart-card']",
-      "title": "How the comparison basis sets the detail",
-      "copy": "The comparison basis chooses which datasets define the common categories. It shows the most detailed category every participating dataset can represent without splitting a value, while keeping ESTO-style codes and names where possible. For example, the 9th Outlook has one category for coal products, so LEAP + ESTO + Ninth shows 02.01-02.08 Coal products; with only LEAP + ESTO, the basis can show the individual 02.x fuels."
+      "title": "How common categories make comparison possible",
+      "copy": "Different datasets do not always divide fuels and sectors in the same way. Common categories are shared lines that every dataset in the selected comparison basis can fill. For each line, the dashboard uses the broadest category required by any of those datasets, so it does not guess how a reported total should be split. This keeps as much real detail as possible while allowing a fair comparison, and uses ESTO-style codes and names where possible. For example, the 9th Outlook reports coal products as one group, so LEAP + ESTO + Ninth uses 02.01-02.08 Coal products. With only LEAP + ESTO, the common categories can show the individual 02.x fuels because both datasets support that detail."
     },
     {
       "id": "section-navigation",

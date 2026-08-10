@@ -1103,6 +1103,54 @@ def test_common_esto_dashboard_can_render_opt_in_scope_pages(tmp_path: Path) -> 
     assert "transport_leap_vs_ninth" in page_keys
 
 
+def test_common_esto_dashboard_renders_international_transport_as_secondary_supply_view(
+    tmp_path: Path,
+) -> None:
+    template = _load_template()
+    series_config = _load_series_config()
+    rows = _build_common_esto_rows()
+    bunker_rows: list[dict[str, object]] = []
+    for source_system, scenario, value in [
+        ("ESTO", "historical", -4.0),
+        ("LEAP", "Target", -4.5),
+        ("NINTH", "Target", -4.2),
+    ]:
+        for year in [2022, 2024]:
+            bunker_rows.append({
+                "comparison_scope": "leap_vs_esto_vs_ninth",
+                "source_system": source_system,
+                "economy": "20_USA",
+                "scenario": scenario,
+                "year": year,
+                "common_flow_code": "04-05",
+                "common_flow_name": "International transport (bunkers)",
+                "common_flow_label": "04-05 International transport (bunkers)",
+                "common_product_code": "07.05",
+                "common_product_name": "Kerosene type jet fuel",
+                "common_product_label": "07.05 Kerosene type jet fuel",
+                "value": value,
+            })
+    rows = pd.concat([rows, pd.DataFrame(bunker_rows)], ignore_index=True, sort=False)
+    df = apply_sign_semantics(rows, template["sign_semantics"])
+    main_df = df[df["comparison_scope"] == "leap_vs_esto_vs_ninth"].copy()
+
+    layout = build_output_layout(tmp_path / "outputs", "20USA", clear_existing=True)
+    manifest = render_dashboard(main_df, template, series_config, layout, scope_df=df)
+
+    page_path = layout["dashboards"] / "international_transport.html"
+    assert page_path.exists()
+    assert "international_transport" in set(manifest["page_key"])
+
+    supply_html = (layout["dashboards"] / "supply.html").read_text(encoding="utf-8")
+    international_html = page_path.read_text(encoding="utf-8")
+    assert 'href="international_transport.html"' in supply_html
+    assert "International transport" in international_html
+
+    assignments = pd.read_csv(layout["supporting"] / "page_assignment_summary.csv")
+    assert "international_transport" not in set(assignments["page_key"])
+    assert "supply" in set(assignments["page_key"])
+
+
 def test_common_esto_dashboard_switcher_uses_current_dashboard_label(tmp_path: Path) -> None:
     template = _load_template()
     series_config = _load_series_config()
@@ -1173,7 +1221,7 @@ def test_common_esto_dashboard_writes_page_aware_guides(tmp_path: Path) -> None:
 
     assert "Use Transport to review road and non-road energy demand" in transport_html
     assert "Choose what you are viewing" in transport_html
-    assert "How the comparison basis sets the detail" in transport_html
+    assert "How common categories make comparison possible" in transport_html
     assert 'data-guide-id="page-navigation"' in transport_html
     assert 'data-guide-id="chart-card"' in transport_html
     assert 'data-guide-id="sort-controls"' not in transport_html

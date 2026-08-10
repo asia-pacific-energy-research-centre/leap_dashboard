@@ -50,8 +50,9 @@ def test_chart_guide_adds_only_the_current_pages_review_content() -> None:
     power_script = build_guide_fragments("chart", "power", "Power")["script"]
     emissions_script = build_guide_fragments("chart", "emissions", "Emissions")["script"]
 
-    assert "Review the conversion story" in power_script
-    assert "Power review sequence" in power_script
+    assert "do not measure power-sector own use or losses" in power_script
+    assert "Review the conversion story" not in power_script
+    assert "Power review sequence" not in power_script
     assert "These emissions are derived" not in power_script
     assert "These emissions are derived" in emissions_script
     assert "Included and excluded boundaries" in emissions_script
@@ -61,7 +62,7 @@ def test_routed_chart_pages_use_mapping_backed_contents_tables() -> None:
     config = json.loads(DEFAULT_GUIDE_CONFIG_PATH.read_text(encoding="utf-8"))
     routed_pages = {
         "supply",
-        "bunkers",
+        "international_transport",
         "power",
         "refining",
         "other_transformation",
@@ -87,7 +88,7 @@ def test_routed_chart_pages_use_mapping_backed_contents_tables() -> None:
     [
         ("total_demand", "Energy balance overview", "What appears on the Energy balance overview"),
         ("supply", "Supply", "What appears on Supply"),
-        ("bunkers", "Bunkers", "What appears on Bunkers"),
+        ("international_transport", "International transport", "What appears on International transport"),
         ("power", "Power", "What appears on Power"),
         ("refining", "Refining", "What appears on Refining"),
         ("other_transformation", "Other transformation", "What appears on Other transformation"),
@@ -137,9 +138,17 @@ def test_chart_guide_explains_the_overview_first_review_strategy() -> None:
     assert "Start with the summary charts at the top" in chart_script
     assert "then open the detailed charts only" in chart_script
     assert "Recommended way to use a dense page" not in chart_script
-    assert chart_script.index("How the comparison basis sets the detail") < chart_script.index(
+    assert chart_script.index("How common categories make comparison possible") < chart_script.index(
         "Start with the summaries"
     )
+
+
+def test_transport_purpose_excludes_international_transport_without_extra_card() -> None:
+    chart_script = build_guide_fragments("chart", "transport", "Transport")["script"]
+
+    assert "International aviation and marine bunkers are not included here" in chart_script
+    assert "Supply or on the separate International transport page" in chart_script
+    assert "Separate domestic mode detail from total transport" not in chart_script
 
 
 def test_buildings_guide_accepts_mapping_table_and_placeholder_context() -> None:

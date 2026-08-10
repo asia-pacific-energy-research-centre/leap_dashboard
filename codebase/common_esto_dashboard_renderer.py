@@ -2939,9 +2939,9 @@ def _section_anchor(page_label: str, section_label: str, subsection_label: str |
 def _nav_chips_html(all_pages: list[dict], current_file: str) -> str:
     """Build page-navigation chip HTML."""
     overview = ["total_demand"]
-    demand = ["buildings", "bunkers", "industry", "transport", "others", "non_energy"]
+    demand = ["buildings", "industry", "transport", "others", "non_energy"]
     transform = ["power", "refining", "other_transformation"]
-    supply = ["supply"]
+    supply = ["supply", "international_transport"]
     derived = ["emissions"]
     page_map = {p["page_key"]: p for p in all_pages}
 
@@ -3428,7 +3428,7 @@ def guide_page_context(
     """Build economy- and scope-specific guide content from the rendered page."""
     mapping_table_pages = {
         "supply",
-        "bunkers",
+        "international_transport",
         "power",
         "refining",
         "other_transformation",
@@ -4626,7 +4626,7 @@ def build_total_demand_page(
 
 
 def _configured_scope_page_mask(df: pd.DataFrame, scope_page: dict) -> pd.Series:
-    """Return rows matching a scope-specific page config."""
+    """Return rows matching a configured secondary or scope-specific page."""
     mask = pd.Series(True, index=df.index)
     scope = str(scope_page.get("comparison_scope", "")).strip()
     if scope and "comparison_scope" in df.columns:
@@ -5015,6 +5015,16 @@ def render_dashboard(
     page_summary_df = build_page_assignment_summary(assigned_df)
     page_summary_df.to_csv(layout["supporting"] / "page_assignment_summary.csv", index=False)
 
+    secondary_config = template.get("secondary_pages", {})
+    secondary_pages_by_key: dict[str, dict] = {}
+    if secondary_config.get("enabled", False):
+        for secondary_page in secondary_config.get("pages", []):
+            if not secondary_page.get("enabled", True):
+                continue
+            secondary_key = safe_slug(secondary_page.get("page_key", "secondary"))
+            if secondary_key:
+                secondary_pages_by_key[secondary_key] = secondary_page
+
     # First pass: build page inventory (needed for navigation chips on every page).
     page_meta = assigned_df[["_page_key", "_page_label"]].drop_duplicates().sort_values("_page_key")
     page_inventory: list[dict] = []
@@ -5044,6 +5054,15 @@ def render_dashboard(
         page_label = str(meta["_page_label"])
         if not assigned_df[assigned_df["_page_key"] == meta["_page_key"]].empty:
             page_inventory.append({"page_key": page_key, "page_label": page_label, "file": f"{page_key}.html"})
+
+    for secondary_key, secondary_page in secondary_pages_by_key.items():
+        secondary_mask = _configured_scope_page_mask(assigned_df, secondary_page)
+        if secondary_mask.any() and secondary_key not in {page["page_key"] for page in page_inventory}:
+            page_inventory.append({
+                "page_key": secondary_key,
+                "page_label": str(secondary_page.get("page_label", secondary_key)),
+                "file": f"{secondary_key}.html",
+            })
 
     scope_config = template.get("scope_specific_pages", {})
     if scope_config.get("enabled", False) and scope_df is not None and not scope_df.empty:
@@ -5100,7 +5119,17 @@ def render_dashboard(
         # first pass through the generic builder and then overwrite its files.
         if page_key == "total_demand":
             continue
-        page_df = assigned_df[assigned_df["_page_key"].apply(safe_slug) == page_key].copy()
+        secondary_page = secondary_pages_by_key.get(page_key)
+        if secondary_page:
+            page_df = assigned_df[
+                _configured_scope_page_mask(assigned_df, secondary_page)
+            ].copy()
+            page_df["_page_key"] = page_key
+            page_df["_page_label"] = page_label
+            page_df["_section_key"] = page_key
+            page_df["_section_label"] = page_label
+        else:
+            page_df = assigned_df[assigned_df["_page_key"].apply(safe_slug) == page_key].copy()
         if page_df.empty:
             continue
 
@@ -5272,7 +5301,11 @@ def render_dashboard(
             economy_label=economy_label,
             dashboard_switcher=dashboard_switcher,
             current_dashboard=current_dashboard,
-            page_note=page_placeholder_note(page_key, template),
+            page_note=(
+                str(secondary_page.get("page_note", ""))
+                if secondary_page
+                else page_placeholder_note(page_key, template)
+            ),
             dashboard_updated_label=dashboard_updated_label,
             guide_context=guide_page_context(
                 page_key,
