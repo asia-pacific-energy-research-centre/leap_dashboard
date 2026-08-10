@@ -1805,8 +1805,10 @@ def _apply_total_series_chrome(fig: go.Figure) -> None:
         if source is None:
             continue
         color = _TOTAL_SERIES_COLORS[source]
-        trace.line.color = color
-        trace.line.width = max(float(trace.line.width or 0), 2.25)
+        trace_line = getattr(trace, "line", None)
+        if trace_line is not None:
+            trace_line.color = color
+            trace_line.width = max(float(trace_line.width or 0), 2.25)
         if getattr(trace, "marker", None) is not None:
             trace.marker.color = color
 
@@ -2546,6 +2548,140 @@ def build_product_chart(
     )
     apply_chart_chrome(fig, base_year)
     return fig
+
+
+def build_base_year_product_bar(
+    chart_df: pd.DataFrame,
+    flow_label: str,
+    series_labels: dict[str, str],
+    base_year: int,
+) -> go.Figure:
+    """Build a grouped fuel bar chart for one base-year-only balance flow."""
+    base_df = chart_df[chart_df["year"] == base_year].copy()
+    base_df = _non_overlapping_common_row_frontier(base_df)
+    chart_unit = _chart_unit(base_df)
+    fig = go.Figure()
+    trace_meta: list[dict] = []
+    for (source_system, scenario), group in base_df.groupby(
+        ["source_system", "scenario"], dropna=False
+    ):
+        grouped = (
+            group.groupby("common_product_label", as_index=False, dropna=False)["value"]
+            .sum()
+            .sort_values("common_product_label")
+        )
+        if grouped.empty or not _has_nonzero_values(grouped["value"]):
+            continue
+        label = series_label(group.iloc[0], series_labels)
+        source_color = _TOTAL_SERIES_COLORS.get(str(source_system).strip().upper(), "")
+        fig.add_trace(
+            go.Bar(
+                x=grouped["common_product_label"],
+                y=grouped["value"],
+                name=label,
+                marker_color=source_color or None,
+                hovertemplate=(
+                    "%{x}<br>Signed value: %{y:,.2f} "
+                    + chart_unit
+                    + "<extra>"
+                    + escape(label)
+                    + "</extra>"
+                ),
+            )
+        )
+        trace_meta.append(trace_meta_entry(source_system, scenario, True))
+    fig.update_layout(
+        title=title_with_sign_note(f"{flow_label}: base year {base_year}", base_df),
+        xaxis_title="Fuel",
+        yaxis_title=f"Signed energy ({chart_unit})",
+        barmode="group",
+        margin={"l": 64, "r": 28, "t": 84, "b": 210},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.32, "xanchor": "left", "x": 0},
+        meta={"trace_meta": trace_meta},
+    )
+    fig.update_xaxes(tickangle=-35, automargin=True)
+    apply_chart_chrome(fig)
+    return fig
+
+
+def _build_supply_base_year_bar_charts(
+    page_df: pd.DataFrame,
+    page_key: str,
+    page_label: str,
+    flow_codes: list[str],
+    base_year: int,
+    suppression_threshold: float,
+    primary_source: str,
+    primary_scenario: str,
+    comparison_source: str,
+    ninth_source: str,
+    series_labels: dict[str, str],
+) -> tuple[dict[str, go.Figure], list[dict], list[dict], pd.DataFrame]:
+    """Build base-year bars and return rows left for ordinary chart generation."""
+    configured_codes = {canonical_code(value) for value in flow_codes if canonical_code(value)}
+    if not configured_codes or page_df.empty:
+        return {}, [], [], page_df
+
+    balance_mask = page_df["common_flow_code"].map(canonical_code).isin(configured_codes)
+    balance_df = page_df[balance_mask & page_df["year"].eq(base_year)].copy()
+    remaining_df = page_df[~balance_mask].copy()
+    charts: dict[str, go.Figure] = {}
+    chart_rows: list[dict] = []
+    manifest_rows: list[dict] = []
+    for flow_label, flow_df in balance_df.groupby("common_flow_label", sort=True):
+        flow_label = str(flow_label)
+        section_label = (
+            str(flow_df["_section_label"].mode().iloc[0])
+            if "_section_label" in flow_df.columns and not flow_df.empty
+            else page_label
+        )
+        chart_key = f"chart__bar__base_year__{safe_slug(page_key)}__{safe_slug(flow_label)}"
+        metrics = compute_ranking_metrics(
+            flow_df,
+            primary_source,
+            primary_scenario,
+            comparison_source,
+            base_year=base_year,
+            ninth_source=ninth_source,
+        )
+        suppressed = metrics["total_abs_value"] < suppression_threshold
+        manifest_rows.append({
+            "page_key": page_key,
+            "page_label": page_label,
+            "section_label": section_label,
+            "chart_type": "bar",
+            "chart_key": chart_key,
+            "common_flow_label": flow_label,
+            "common_product_label": f"Base-year fuels ({base_year})",
+            "row_count": int(len(flow_df)),
+            "source_flow_labels": flow_label,
+            "sign_note": sign_note_for_chart(flow_df),
+            "suppressed": suppressed,
+            **metrics,
+        })
+        if suppressed:
+            continue
+        figure = build_base_year_product_bar(
+            flow_df,
+            flow_label,
+            series_labels,
+            base_year,
+        )
+        if not figure.data:
+            manifest_rows[-1]["suppressed"] = True
+            continue
+        charts[chart_key] = figure
+        chart_rows.append({
+            "chart_key": chart_key,
+            "chart_type": "bar",
+            "title": f"{flow_label}: base year {base_year}",
+            "product_label": f"Base-year fuel comparison: {flow_label}",
+            "section_label": section_label,
+            "flow_group_label": flow_label,
+            "datasets": chart_dataset_tokens_from_figure(figure),
+            **metrics,
+        })
+    return charts, chart_rows, manifest_rows, remaining_df
 
 
 _PAGE_CSS = """
@@ -5279,6 +5415,28 @@ def render_dashboard(
 
         charts: dict[str, go.Figure] = {}
         chart_rows: list[dict] = []
+
+        supply_config = template.get("supply_page", {})
+        supply_page_key = safe_slug(supply_config.get("page_key", "supply"))
+        if page_key == supply_page_key:
+            bar_charts, bar_chart_rows, bar_manifest_rows, page_df = (
+                _build_supply_base_year_bar_charts(
+                    page_df=page_df,
+                    page_key=page_key,
+                    page_label=page_label,
+                    flow_codes=list(supply_config.get("base_year_bar_flow_codes", [])),
+                    base_year=base_year,
+                    suppression_threshold=suppression_threshold,
+                    primary_source=primary_source,
+                    primary_scenario=primary_scenario,
+                    comparison_source=comparison_source,
+                    ninth_source=ninth_source,
+                    series_labels=series_labels,
+                )
+            )
+            charts.update(bar_charts)
+            chart_rows.extend(bar_chart_rows)
+            manifest_rows.extend(bar_manifest_rows)
 
         area_specs = (
             []

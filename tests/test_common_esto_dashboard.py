@@ -44,6 +44,7 @@ from codebase.common_esto_dashboard_renderer import (
     select_transformation_total_rows,
     _build_section_aggregate_charts,
     _build_flow_group_aggregate_charts,
+    _build_supply_base_year_bar_charts,
     _build_td_fuel_chart,
     _build_supply_stack_chart,
     _add_signed_stack_traces,
@@ -2670,6 +2671,56 @@ def test_flow_group_aggregates_replace_hierarchy_parents_with_safe_summaries() -
         "09.06 Gas processing plants | 09.06.01 Gas works plants | "
         "09.06.02 Liquefaction/regasification plants"
     )
+
+
+def test_supply_balancing_flows_use_base_year_bar_charts() -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "source_system": source,
+                "scenario": scenario,
+                "year": year,
+                "common_flow_code": flow_code,
+                "common_flow_label": flow_label,
+                "common_product_code": product_code,
+                "common_product_label": product_label,
+                "_section_label": "Supply",
+                "value": value,
+            }
+            for source, scenario, year, flow_code, flow_label, product_code, product_label, value in [
+                ("ESTO", "historical", 2022, "06", "06 Stock changes", "01", "01 Coal", 5.0),
+                ("LEAP", "Target", 2022, "06", "06 Stock changes", "01", "01 Coal", 7.0),
+                ("LEAP", "Target", 2030, "06", "06 Stock changes", "01", "01 Coal", 99.0),
+                ("ESTO", "historical", 2022, "11", "11 Statistical discrepancy", "17", "17 Electricity", -3.0),
+                ("LEAP", "Target", 2022, "11", "11 Statistical discrepancy", "17", "17 Electricity", -4.0),
+                ("LEAP", "Target", 2030, "01", "01 Production", "01", "01 Coal", 100.0),
+            ]
+        ]
+    )
+
+    charts, chart_rows, manifest_rows, remaining_rows = _build_supply_base_year_bar_charts(
+        page_df=rows,
+        page_key="supply",
+        page_label="Supply",
+        flow_codes=["06", "11"],
+        base_year=2022,
+        suppression_threshold=1.0,
+        primary_source="LEAP",
+        primary_scenario="Target",
+        comparison_source="ESTO",
+        ninth_source="NINTH",
+        series_labels={"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
+    )
+
+    assert set(charts) == {
+        "chart__bar__base_year__supply__06_stock_changes",
+        "chart__bar__base_year__supply__11_statistical_discrepancy",
+    }
+    assert all(row["chart_type"] == "bar" for row in chart_rows)
+    assert all(row["chart_type"] == "bar" for row in manifest_rows)
+    assert set(remaining_rows["common_flow_code"]) == {"01"}
+    stock_chart = charts["chart__bar__base_year__supply__06_stock_changes"]
+    assert {value for trace in stock_chart.data for value in trace.y} == {5.0, 7.0}
 
 
 def test_chart_chrome_resolves_duplicate_configured_category_colours() -> None:

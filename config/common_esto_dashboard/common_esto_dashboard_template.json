@@ -265,6 +265,11 @@
     },
     "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports), and the common 04-05 International transport (bunkers) comparison row. The combined bunker row is used in overview totals so its retained 04/05 source children are not counted again; the detailed children remain available on the Supply page. Bunkers are supply deductions and are excluded from domestic demand. Stock changes (06) remain outside the projection-comparable total."
   },
+  "supply_page": {
+    "page_key": "supply",
+    "base_year_bar_flow_codes": ["06", "11"],
+    "_note": "Stock changes and statistical discrepancy are balancing rows rather than projection series. When the Common ESTO input publishes them, show their available base-year fuel values as grouped bars and exclude them from ordinary line and area charts."
+  },
   "emissions_page": {
     "enabled": true,
     "page_key": "emissions",

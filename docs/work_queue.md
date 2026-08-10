@@ -180,6 +180,16 @@ These later commits supersede the corresponding snapshot rows below:
   Do not activate this during a mixed economy-by-economy rollout and do not
   split the existing combined Other/non-energy value in the dashboard.
 
+- **DASHQ-048 is `dashboard_ready_upstream_blocked`.** Supply treats Stock
+  changes (`06`) and Statistical discrepancy (`11`) as base-year balancing
+  diagnostics and renders each available flow as a grouped fuel bar chart
+  instead of a projection line or area. The current upstream Common ESTO fact
+  contains no flow-06 or flow-11 rows for any economy, so the production USA
+  page cannot display these charts yet. `leap_mappings` must publish valid
+  Common rows first; the dashboard must not reconstruct them directly from
+  native ESTO or LEAP data. The current LEAP-to-ESTO lineage also contains no
+  USA observations for either flow.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not

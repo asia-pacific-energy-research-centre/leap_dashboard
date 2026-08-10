@@ -1029,6 +1029,28 @@ structure explorer.
   by an impossible ESTO scenario/year lookup; replaced the basis dropdown with
   `Include ESTO Extended-only rows`.
 
+## DASH-030: Show balancing-only supply flows as base-year bars
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Presentation
+**Affected areas:** Supply page; Stock changes (`06`); Statistical discrepancy (`11`)
+
+### Current rule
+
+Stock changes and Statistical discrepancy do not form ordinary comparable
+projection series. When the upstream Common ESTO input supplies these flows,
+exclude them from normal area and line generation and show one grouped bar
+chart per flow using the configured base year, with fuels on the x-axis and
+available datasets as the comparison series. Do not source or map the rows
+directly in the dashboard when they are absent from the Common ESTO fact.
+
+### History
+
+- 2026-08-10: Added conditional base-year bar rendering. The current upstream
+  comparison fact contains no flow-06 or flow-11 rows, so activation remains
+  blocked on a consistent upstream mapping generation.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
