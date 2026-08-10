@@ -391,7 +391,7 @@
       "id": "chart-card",
       "target": "[data-guide-id='category-basis-switcher'], [data-guide-id='chart-card']",
       "title": "How common categories make comparison possible",
-      "copy": "Different datasets do not always divide fuels and sectors in the same way. Common categories are shared lines that every dataset in the selected comparison basis can fill. For each line, the dashboard uses the broadest category required by any of those datasets, so it does not guess how a reported total should be split. This keeps as much real detail as possible while allowing a fair comparison, and uses ESTO-style codes and names where possible. For example, the 9th Outlook reports coal products as one group, so LEAP + ESTO + Ninth uses 02.01-02.08 Coal products. With only LEAP + ESTO, the common categories can show the individual 02.x fuels because both datasets support that detail."
+      "copy": "Different datasets do not always divide fuels and sectors in the same way. Common categories are shared groupings that all the datasets in the selected comparison basis can represent. For each category, the dashboard uses the broadest grouping needed by any of those datasets, so it does not guess how to divide a reported total. This keeps as much real detail as possible while allowing a fair comparison, and uses ESTO-style codes and names where possible. For example, the 9th Outlook reports coal products as one group, so LEAP + ESTO + Ninth uses 02.01-02.08 Coal products. With only LEAP + ESTO, the common categories can show the individual 02.x fuels because both datasets support that detail."
     },
     {
       "id": "section-navigation",
