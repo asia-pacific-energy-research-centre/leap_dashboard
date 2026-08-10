@@ -278,6 +278,7 @@ def test_rollup_boundary_details_show_parent_children_components_and_mode_meanin
     assert html.count('data-rollup-flow="09 Total transformation sector"') == 1
     assert html.count('data-rollup-flow="09.08.01 Coke ovens"') == 1
     assert html.count('data-rollup-flow="10.01.05 Coke ovens"') == 1
+    assert 'class="rollup-validation-status"' in html
 
 
 def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Path) -> None:
@@ -432,6 +433,9 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "ORPHANED_HIERARCHY_ROW" in html
     assert "intentional DETACHED" in html
     assert "value-pass" in html
+    assert "missingCount=(target===undefined?1:0)" in html
+    assert "Not validated:" in html
+    assert ".rollup-boundary.value-unavailable .rollup-validation-status" in html
     assert '<details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2>' in html
     assert '<details class="panel collapsed-panel"><summary><h2>Hierarchy validation: failures and reviewed exceptions</h2>' in html
     assert Path(result["summary"]).exists()

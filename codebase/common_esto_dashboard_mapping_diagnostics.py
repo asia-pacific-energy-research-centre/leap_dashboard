@@ -1113,6 +1113,7 @@ def _rollup_boundary_details_html(
             '<div class="boundary-columns"><div><h4>Ordinary hierarchy</h4><strong>Parent</strong>'
             f'<ul>{parent_html}</ul><strong>Children</strong><ul>{child_html}</ul><strong>Siblings</strong><ul>{sibling_html}</ul></div>'
             f'<div><h4>Composition components</h4><ul>{component_html}</ul></div></div>'
+            '<p class="rollup-validation-status" aria-live="polite"></p>'
             f'<p class="helper-note"><span class="mode-pill">{escape(mode)}</span> {escape(explanations.get(mode, "Defined by the mapping workbook."))}</p>'
             f'<p class="artifact-id">{escape(note)}<br>{escape(str(rollup_id))}</p></article>'
         )
@@ -1542,6 +1543,8 @@ def write_mapping_diagnostics_page(
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>APEC-wide mapping diagnostics</title><style>
+.rollup-validation-status {{ display:none; margin:8px 0 0; padding:7px 9px; border-radius:6px; font-size:12px; }}
+.rollup-boundary.value-unavailable .rollup-validation-status {{ display:block; background:#fff4e5; color:#8a4b08; }}
 body {{ font-family: Inter,Segoe UI,Arial,sans-serif; margin:0; background:#f4f6f8; color:#172033; }}
 .shell {{ max-width:1600px; margin:auto; padding:20px; }} header {{ background:white; border:1px solid #d9e1ea; border-radius:12px; padding:18px 22px; }}
 h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b7a; }} .metrics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:16px 0; }}
@@ -1581,6 +1584,25 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     )
     graph_heading_html = '<section class="panel"><h2>All sector rollup structure</h2>'
     html = html.replace('String(x)===String(selected)));', 'String(x)===String(selected))));')
+    old_rollup_check_js = (
+        "document.querySelectorAll('[data-rollup-target]').forEach(el=>{let target=values.get(el.dataset.rollupTarget),"
+        "inputs=el.dataset.rollupInputs.split('|').filter(Boolean),sum=inputs.reduce((s,x)=>s+(values.get(x)||0),0),"
+        "ok=target!==undefined&&Math.abs(target-sum)<=0.01*Math.max(Math.abs(target),1);"
+        "el.classList.toggle('value-pass',ok);el.classList.toggle('value-fail',target!==undefined&&!ok);});"
+    )
+    new_rollup_check_js = (
+        "document.querySelectorAll('[data-rollup-target]').forEach(el=>{let target=values.get(el.dataset.rollupTarget),"
+        "inputs=el.dataset.rollupInputs.split('|').filter(Boolean),inputValues=inputs.map(x=>values.get(x)),"
+        "missingCount=(target===undefined?1:0)+inputValues.filter(v=>v===undefined).length,unavailable=missingCount>0,"
+        "sum=inputValues.reduce((s,v)=>s+(v||0),0),ok=!unavailable&&Math.abs(target-sum)<=0.01*Math.max(Math.abs(target),1),"
+        "status=el.querySelector('.rollup-validation-status');el.classList.toggle('value-pass',ok);"
+        "el.classList.toggle('value-fail',!unavailable&&!ok);el.classList.toggle('value-unavailable',unavailable);"
+        "if(status){let verb=missingCount===1?'is':'are';status.textContent=unavailable?"
+        "`Not validated: ${missingCount} required value${missingCount===1?'':'s'} ${verb} unavailable for this selection.`:'';}});"
+    )
+    if old_rollup_check_js not in html:
+        raise RuntimeError("Mapping diagnostics rollup-check script no longer matches the expected template.")
+    html = html.replace(old_rollup_check_js, new_rollup_check_js, 1)
     html = html.replace(
         'unique(ROLLUP_VALUES.map(r=>r.source_system))',
         "unique(ROLLUP_VALUES.filter(r=>r.source_system!=='ESTO_RAW').map(r=>r.source_system))",
@@ -2423,12 +2445,21 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
       const target = valueFor(element.dataset.rollupTarget);
       const inputs = element.dataset.rollupInputs.split('|').filter(Boolean);
       const inputValues = inputs.map(valueFor);
-      const unavailable = inputValues.some(value => value === undefined);
+      const missingCount = (target === undefined ? 1 : 0)
+        + inputValues.filter(value => value === undefined).length;
+      const unavailable = missingCount > 0;
       const sum = inputValues.reduce((total, value) => total + (value || 0), 0);
       const ok = !unavailable && target !== undefined && Math.abs(target - sum) <= 0.01 * Math.max(Math.abs(target), 1);
+      const status = element.querySelector('.rollup-validation-status');
       element.classList.toggle('value-pass', ok);
       element.classList.toggle('value-fail', !unavailable && target !== undefined && !ok);
       element.classList.toggle('value-unavailable', unavailable);
+      if (status) {
+        const verb = missingCount === 1 ? 'is' : 'are';
+        status.textContent = unavailable
+          ? `Not validated: ${missingCount} required value${missingCount === 1 ? '' : 's'} ${verb} unavailable for this selection.`
+          : '';
+      }
     });
   };
   ry.addEventListener('change', paintWithRawEsto);
