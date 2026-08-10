@@ -1706,7 +1706,7 @@ def test_non_expanding_frontier_does_not_fall_back_when_a_year_is_exact_zero() -
     ]
 
 
-def test_area_charts_drop_zero_only_categories_and_align_esto_frontier() -> None:
+def test_area_charts_drop_zero_only_categories_and_keep_historical_only_categories() -> None:
     common = {
         "comparison_scope": "esto_leap_ninth",
         "economy": "20_USA",
@@ -1719,6 +1719,8 @@ def test_area_charts_drop_zero_only_categories_and_align_esto_frontier() -> None
          "common_product_code": "07.01", "common_product_label": "07.01 Motor gasoline", "value": 10.0},
         {**common, "source_system": "ESTO", "scenario": "historical", "year": 2022,
          "common_product_code": "12.99", "common_product_label": "12.99 Solar nonspecified", "value": 0.0},
+        {**common, "source_system": "ESTO", "scenario": "historical", "year": 2022,
+         "common_product_code": "07.10", "common_product_label": "07.10 Refinery gas (not liquefied)", "value": 5.0},
         {**common, "source_system": "LEAP", "scenario": "Target", "year": 2023,
          "common_product_code": "07.01", "common_product_label": "07.01 Motor gasoline", "value": 20.0},
         {**common, "source_system": "LEAP", "scenario": "Target", "year": 2023,
@@ -1736,8 +1738,15 @@ def test_area_charts_drop_zero_only_categories_and_align_esto_frontier() -> None
                                "primary_area_source_system": "LEAP", "primary_area_scenario": "Target"}},
     )
     area_names = {str(trace.name) for trace in figure.data if trace.stackgroup}
-    assert area_names == {"07.01 Motor gasoline"}
+    assert area_names == {"07.01 Motor gasoline", "07.10 Refinery gas (not liquefied)"}
     assert "12.99 Solar nonspecified" not in area_names
+    historical_only = next(
+        trace for trace in figure.data
+        if trace.name == "07.10 Refinery gas (not liquefied)" and trace.visible is True
+    )
+    assert list(historical_only.x) == [2022]
+    esto_total = next(trace for trace in figure.data if trace.name == "ESTO historical total")
+    assert list(esto_total.y) == [15.0]
 
 
 def test_energy_balance_fuel_area_uses_esto_history_on_leap_category_frontier() -> None:
@@ -1746,6 +1755,8 @@ def test_energy_balance_fuel_area_uses_esto_history_on_leap_category_frontier() 
          "common_product_label": "07.01 Motor gasoline", "value": 10.0},
         {"source_system": "ESTO", "scenario": "historical", "year": 2022,
          "common_product_label": "12.99 Solar nonspecified", "value": 0.0},
+        {"source_system": "ESTO", "scenario": "historical", "year": 2022,
+         "common_product_label": "07.10 Refinery gas (not liquefied)", "value": 5.0},
         {"source_system": "LEAP", "scenario": "Target", "year": 2023,
          "common_product_label": "07.01 Motor gasoline", "value": 20.0},
         {"source_system": "LEAP", "scenario": "Target", "year": 2023,
@@ -1760,7 +1771,7 @@ def test_energy_balance_fuel_area_uses_esto_history_on_leap_category_frontier() 
         base_year=2022,
     )
     area_names = {str(trace.name) for trace in figure.data if trace.stackgroup}
-    assert area_names == {"07.01 Motor gasoline"}
+    assert area_names == {"07.01 Motor gasoline", "07.10 Refinery gas (not liquefied)"}
     motor = next(trace for trace in figure.data if trace.name == "07.01 Motor gasoline")
     assert list(motor.x) == [2022, 2023]
     assert figure.layout.title.text == "Final energy demand by fuel (TFC)"

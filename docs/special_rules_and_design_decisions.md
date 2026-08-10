@@ -927,6 +927,34 @@ metadata and the non-expanding-rollup contributor QA emitted alongside it.
 The dashboard does not maintain a second list of mapping relationships.
 Power-related pump-storage own use is routed to Power.
 
+## DASH-026: Historical composition stacks reconcile to their total lines
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Presentation and numeric reconciliation
+**Affected areas:** `codebase/common_esto_dashboard_renderer.py`; stacked-area charts
+
+### Current rule
+
+The category frontier for a comparison stacked-area chart is the union of
+categories with nonzero historical comparison data and categories with nonzero
+projected stack-source data. Historical-only categories remain visible through
+the base year and then end naturally; projected-only categories begin when
+their source data begins. Categories that are zero in both windows are omitted.
+
+This ensures the historical stacked envelope equals its historical total line.
+Restricting history to categories also present in LEAP projections is invalid
+because it silently removes legitimate historical fuels. Russia Industry is
+the regression case: historical `07.10 Refinery gas (not liquefied)` contributes
+192.155 PJ in 2010 and 384.833 PJ in 2017, while `16.01 Biogas` contributes
+0.0615 PJ in 2022; all are included in the ESTO total line and must therefore
+also appear in its stack.
+
+### History
+
+- 2026-08-10: Replaced projection-only category filtering with the nonzero
+  historical/projected union across generic and bespoke composition charts.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

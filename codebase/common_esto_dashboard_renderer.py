@@ -1182,11 +1182,10 @@ def _comparison_projection_area_rows(
 ) -> tuple[pd.DataFrame, str]:
     """Return comparison historical rows plus detailed projected rows.
 
-    The area charts should use one category frontier on both sides of the
-    base-year boundary.  Choose the most detailed available projection source,
-    then restrict ESTO historical rows to categories that are actually active
-    in that source after the base year.  This prevents an ESTO-only category
-    from appearing as a misleading zero band beside the LEAP stack.
+    The area charts use the union of nonzero historical and projected
+    categories. Choose the most detailed available projection source, while
+    retaining genuine ESTO-only historical categories so the historical stack
+    reconciles to its comparison total line.
     """
     candidates = [primary_source, "NINTH", "LEAP", "ESTO"]
     source_column = df["source_system"].astype(str).str.casefold()
@@ -1207,18 +1206,23 @@ def _comparison_projection_area_rows(
     if not selected_source:
         return df.iloc[0:0].copy(), ""
 
-    active_groups = (
-        projected.groupby(group_col, dropna=False)[value_col]
-        .sum()
-        .loc[lambda values: values.abs() > 1e-12]
-        .index
-    )
-    projected = projected[projected[group_col].isin(active_groups)]
     historical = df[
         source_column.eq(comparison_source.casefold())
         & df["year"].le(base_year)
-        & df[group_col].isin(active_groups)
-    ]
+    ].copy()
+    projected_gross = pd.to_numeric(projected[value_col], errors="coerce").fillna(0.0).abs()
+    historical_gross = pd.to_numeric(historical[value_col], errors="coerce").fillna(0.0).abs()
+    projected_active = projected.assign(_gross_value=projected_gross).groupby(
+        group_col, dropna=False
+    )["_gross_value"].sum()
+    historical_active = historical.assign(_gross_value=historical_gross).groupby(
+        group_col, dropna=False
+    )["_gross_value"].sum()
+    active_groups = projected_active.loc[projected_active > 1e-12].index.union(
+        historical_active.loc[historical_active > 1e-12].index
+    )
+    projected = projected[projected[group_col].isin(active_groups)]
+    historical = historical[historical[group_col].isin(active_groups)]
     return pd.concat([historical, projected], ignore_index=True), selected_source
 
 
@@ -1889,10 +1893,9 @@ def build_area_chart(
         & (chart_df["year"] <= base_year)
     ]
 
-    # Keep the historical comparison stack on the same category frontier as
-    # the active LEAP projection stack.  ESTO can contain categories that are
-    # absent or zero throughout the projection; showing those as empty bands
-    # makes the legend look like a data series exists when it does not.
+    # Use the union of nonzero ESTO-history and LEAP-projection categories.
+    # Historical-only fuels must remain in the pre-base stack so its envelope
+    # reconciles to the ESTO total line; they naturally end at the base year.
     projected_rows = chart_df[
         (chart_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
         & (chart_df["scenario"].astype(str).str.casefold().isin({"reference", "target"}))
@@ -1902,7 +1905,14 @@ def build_area_chart(
         projected_rows["value"], errors="coerce"
     ).fillna(0.0).abs()
     projected_groups = projected_rows.groupby(group_col, dropna=False)["_gross_value"].sum()
-    active_groups = projected_groups.loc[projected_groups.abs() > 1e-12].index
+    historical_rows = pre_base_df.copy()
+    historical_rows["_gross_value"] = pd.to_numeric(
+        historical_rows["value"], errors="coerce"
+    ).fillna(0.0).abs()
+    historical_groups = historical_rows.groupby(group_col, dropna=False)["_gross_value"].sum()
+    active_groups = projected_groups.loc[projected_groups > 1e-12].index.union(
+        historical_groups.loc[historical_groups > 1e-12].index
+    )
     pre_base_df = pre_base_df[pre_base_df[group_col].isin(active_groups)]
 
     fig = go.Figure()

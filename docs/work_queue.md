@@ -144,6 +144,12 @@ These later commits supersede the corresponding snapshot rows below:
   restored Overview uses separate boundary-driven summaries and the same
   multi-flow-versus-single-flow rule as Refining.
 
+- **DASHQ-046 is `complete_unpushed`.** Stacked-area category frontiers now use
+  the union of nonzero historical and projected categories. Historical-only
+  fuels remain visible through the base year, so each historical stack
+  reconciles exactly to its total line. Russia Industry verifies the fix for
+  refinery gas in 2010–2017 and Biogas in 2022.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not
