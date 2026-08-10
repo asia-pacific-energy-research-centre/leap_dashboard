@@ -908,6 +908,70 @@ def test_mapping_guide_context_applies_to_other_chart_pages() -> None:
     assert context["placeholder_in_use"] is False
 
 
+def test_mapping_guide_table_columns_follow_comparison_basis() -> None:
+    chart_rows = [
+        {
+            "chart_type": "line",
+            "flow_group_label": "14 Industry sector",
+            "product_label": "17 Electricity",
+            "common_row_id": "industry_electricity",
+        }
+    ]
+    source_map = pd.DataFrame(
+        [
+            {
+                "comparison_scope": "esto_leap",
+                "source_system": source_system,
+                "source_flow": source_system + " industry",
+                "source_product": "Electricity",
+                "common_flow_label": "14 Industry sector",
+                "common_product_label": "17 Electricity",
+                "common_row_id": "industry_electricity",
+            }
+            for source_system in ["ESTO", "LEAP"]
+        ]
+    )
+
+    table = guide_page_mapping_table(
+        chart_rows,
+        source_map,
+        "esto_leap",
+        source_systems=["LEAP", "ESTO"],
+    )
+
+    assert table["headers"] == [
+        "Common sector",
+        "Common fuel",
+        "ESTO sector",
+        "ESTO fuel",
+        "LEAP sector",
+        "LEAP fuel",
+    ]
+    assert "9th sector" not in table["headers"]
+    assert table["note"] == ""
+
+
+def test_mapping_guide_table_flags_mismatched_provenance_generation() -> None:
+    chart_rows = [
+        {
+            "chart_type": "line",
+            "flow_group_label": "14.03.01 Iron and steel",
+            "product_label": "02.02 Gas coke",
+            "common_row_id": "stale_common_row_id",
+        }
+    ]
+
+    table = guide_page_mapping_table(
+        chart_rows,
+        pd.DataFrame(),
+        "esto_leap_ninth",
+        source_systems=["LEAP", "ESTO", "NINTH"],
+    )
+
+    assert table["rows"][0][2:] == ["Provenance unavailable*"] * 6
+    assert "Regenerate the comparison data and mapping files together" in table["note"]
+
+
 def test_source_category_map_combines_native_and_esto_mappings(tmp_path: Path) -> None:
     source_path = tmp_path / "source_to_common.csv"
     esto_path = tmp_path / "esto_to_common.csv"

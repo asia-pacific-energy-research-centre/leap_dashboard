@@ -161,6 +161,19 @@ These later commits supersede the corresponding snapshot rows below:
   reconciles exactly to its total line. Russia Industry verifies the fix for
   refinery gas in 2010–2017 and Biogas in 2022.
 
+- **DASHQ-047 is `paused` pending the global LEAP export cutover.** Once every
+  economy exports Non-energy as its own demand branch, update the upstream
+  Common ESTO mappings so that the separate branch maps to exact flow `17
+  Non-energy use` and the Other-demand aggregate maps only to `16.03-16.05`,
+  with no flow-17 component. Then route exact flow 17 to an Industry-page
+  **Non-energy use** section, remove the standalone Non-energy page, and update
+  the Industry guide to explain that grouping. Activation requires one
+  generation of the comparison fact, source-to-Common map, and ESTO-to-Common
+  map from the same upstream run; the no-split QA must remain empty and TFC,
+  TFEC, emissions, page-frontier, and all-economy publication checks must pass.
+  Do not activate this during a mixed economy-by-economy rollout and do not
+  split the existing combined Other/non-energy value in the dashboard.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not

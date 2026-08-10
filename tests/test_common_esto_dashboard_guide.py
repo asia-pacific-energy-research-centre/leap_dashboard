@@ -158,6 +158,22 @@ def test_buildings_guide_accepts_mapping_table_and_placeholder_context() -> None
     )["dialog_html"]
 
 
+def test_mapping_table_renders_optional_provenance_note() -> None:
+    context = {
+        "page_mapping_table": {
+            "caption": "Page categories and published source mappings",
+            "headers": ["Common sector", "Common fuel"],
+            "rows": [["14 Industry sector", "17 Electricity"]],
+            "note": "* Mapping inputs do not match.",
+        }
+    }
+
+    fragments = build_guide_fragments("chart", "industry", "Industry", context)
+
+    assert "Mapping inputs do not match" in fragments["script"]
+    assert "dashboard-guide-table-note" in fragments["css"]
+
+
 def test_shared_placeholder_step_is_omitted_when_page_has_no_placeholder() -> None:
     script = build_guide_fragments(
         "chart",

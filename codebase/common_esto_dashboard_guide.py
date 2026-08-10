@@ -49,6 +49,7 @@ GUIDE_CSS = """
 .dashboard-guide-gallery button:disabled { opacity:.4;cursor:default; }
 .dashboard-guide-table { margin-top:14px;overflow-x:auto;border:1px solid #cbd8e7;border-radius:6px; }
 .dashboard-guide-table-caption { padding:8px 10px;background:#eef5fc;color:#0b3d5c;font-size:13px;font-weight:750; }
+.dashboard-guide-table-note { margin:8px 10px;color:#7c2d12;font-size:12px;line-height:1.45; }
 .dashboard-guide-table table { width:100%;min-width:640px;border-collapse:collapse;color:#334155;font-size:13px; }
 .dashboard-guide-table th,.dashboard-guide-table td { padding:7px 9px;border-top:1px solid #dbe5ef;text-align:left;vertical-align:top; }
 .dashboard-guide-table th { background:#f8fafc;color:#0b3d5c; }
@@ -293,6 +294,10 @@ def _guide_js(steps: list[dict], guide_label: str) -> str:
     var caption = document.createElement('div');
     caption.className = 'dashboard-guide-table-caption';
     caption.textContent = table.caption || '';
+    var note = document.createElement('p');
+    note.className = 'dashboard-guide-table-note';
+    note.textContent = table.note || '';
+    note.hidden = !table.note;
     var htmlTable = document.createElement('table');
     var head = document.createElement('thead');
     var headRow = document.createElement('tr');
@@ -301,7 +306,7 @@ def _guide_js(steps: list[dict], guide_label: str) -> str:
     var body = document.createElement('tbody');
     (table.rows || []).forEach(function(row) {{ var tableRow = document.createElement('tr'); row.forEach(function(value) {{ var cell = document.createElement('td'); cell.textContent = value; tableRow.appendChild(cell); }}); body.appendChild(tableRow); }});
     htmlTable.append(head, body);
-    tableContainer.append(caption, htmlTable);
+    tableContainer.append(caption, note, htmlTable);
   }};
   var show = function(index, stepDirection) {{
     direction = stepDirection || direction;

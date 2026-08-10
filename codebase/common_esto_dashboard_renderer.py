@@ -3282,6 +3282,7 @@ def guide_page_mapping_table(
     source_category_map: pd.DataFrame | None,
     comparison_scope: str,
     category_label: str = "sector",
+    source_systems: list[str] | None = None,
 ) -> dict[str, object]:
     """Build a native-source provenance table for visible detail charts."""
     mapping = (
@@ -3306,7 +3307,20 @@ def guide_page_mapping_table(
         if pair[1] and pair[2] and pair not in visible_pairs:
             visible_pairs.append(pair)
 
+    preferred_sources = ["ESTO", "LEAP", "NINTH"]
+    requested_sources = {
+        str(value).strip().upper()
+        for value in (source_systems or [])
+        if str(value).strip()
+    }
+    table_sources = (
+        [source for source in preferred_sources if source in requested_sources]
+        if requested_sources
+        else preferred_sources
+    )
+
     table_rows: list[list[str]] = []
+    unavailable_row_count = 0
     for common_row_id, common_flow, common_product in visible_pairs:
         if not mapping.empty and common_row_id and "common_row_id" in mapping.columns:
             mapped = mapping[mapping["common_row_id"].astype(str) == common_row_id]
@@ -3319,33 +3333,47 @@ def guide_page_mapping_table(
             mapped = mapping
 
         source_cells: list[str] = []
-        for source_system in ("ESTO", "LEAP", "NINTH"):
+        mapping_unavailable = mapped.empty
+        if mapping_unavailable:
+            unavailable_row_count += 1
+        for source_system in table_sources:
             source_rows = (
                 mapped[mapped["source_system"].astype(str).str.upper() == source_system]
                 if not mapped.empty and "source_system" in mapped.columns
                 else mapped
             )
-            source_cells.extend(
-                [
-                    _mapping_cell(source_rows, "source_flow"),
-                    _mapping_cell(source_rows, "source_product"),
-                ]
-            )
+            if mapping_unavailable:
+                source_cells.extend(["Provenance unavailable*", "Provenance unavailable*"])
+            else:
+                source_cells.extend(
+                    [
+                        _mapping_cell(source_rows, "source_flow"),
+                        _mapping_cell(source_rows, "source_product"),
+                    ]
+                )
         table_rows.append([common_flow, common_product, *source_cells])
 
+    source_labels = {"ESTO": "ESTO", "LEAP": "LEAP", "NINTH": "9th"}
+    headers = [f"Common {category_label}", "Common fuel"]
+    for source_system in table_sources:
+        source_label = source_labels[source_system]
+        headers.extend(
+            [f"{source_label} {category_label}", f"{source_label} fuel"]
+        )
+
+    note = ""
+    if unavailable_row_count:
+        category_word = "category was" if unavailable_row_count == 1 else "categories were"
+        note = (
+            f"* {unavailable_row_count} displayed {category_word} not found in the "
+            "supplied provenance maps. Regenerate the comparison data and mapping "
+            "files together before interpreting those rows."
+        )
     return {
         "caption": "Page categories and published source mappings",
-        "headers": [
-            f"Common {category_label}",
-            "Common fuel",
-            f"ESTO {category_label}",
-            "ESTO fuel",
-            f"LEAP {category_label}",
-            "LEAP fuel",
-            f"9th {category_label}",
-            "9th fuel",
-        ],
+        "headers": headers,
         "rows": table_rows,
+        "note": note,
     }
 
 
@@ -3430,6 +3458,7 @@ def guide_page_context(
             source_category_map,
             str(template.get("_active_comparison_scope", "")),
             category_label="sector" if page_key in sector_pages else "flow",
+            source_systems=list(template.get("_active_dataset_filter_options", [])),
         )
     return context
 

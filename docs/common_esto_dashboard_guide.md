@@ -279,6 +279,12 @@ Energy balance overview and Emissions retain bespoke contents tables because
 they are summary surfaces rather than ordinary flow/product detail trees. The
 mapping table reads `source_to_common_esto_map.csv` for LEAP/9th and
 `esto_to_common_esto_map.csv` for ESTO; it does not infer mappings from labels.
+Its source columns follow the active comparison basis, so the two-way
+LEAP + ESTO view does not show empty 9th columns. If a rendered Common row ID is
+absent from the supplied provenance maps, the table marks it as unavailable
+and asks for the comparison fact and mapping files to be regenerated together;
+plain em dashes remain reserved for a participating source that genuinely has
+no native category feeding an otherwise matched Common row.
 `dynamic_content: placeholder_status` explains economy-specific aggregate LEAP
 coverage resolved from the upstream mappings record and is omitted when the
 page does not use a placeholder. Use `optional: true`
