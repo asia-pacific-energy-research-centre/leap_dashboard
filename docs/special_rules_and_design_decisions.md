@@ -915,6 +915,13 @@ The same page retains three separate operational sections where data exist:
 - **Transfers** contains `08` and is absent when an economy has no transfer
   rows.
 
+The page Overview follows the same boundary-driven rule as Refining, without
+reintroducing a broad `09` or combined `10` total. It shows separate summaries
+for transformation processes, residual own use, transmission/distribution
+losses and transfers. A summary groups by flow when several logical flows are
+present; when only one flow exists it groups by product instead, because a
+single-item flow legend would be redundant.
+
 Absorbed own-use membership is read from upstream Common ESTO component
 metadata and the non-expanding-rollup contributor QA emitted alongside it.
 The dashboard does not maintain a second list of mapping relationships.

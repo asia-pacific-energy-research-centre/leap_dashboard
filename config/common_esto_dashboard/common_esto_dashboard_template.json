@@ -44,14 +44,19 @@
     "page_key": "other_transformation",
     "hide_generic_overview": true,
     "append_inclusive_transformation_label": true,
-    "suppress_section_aggregate_labels": ["Other transformation (including own use)"],
+    "overview_summaries": [
+      {"section_label": "Other transformation (including own use)", "group_by": "flow_or_product"},
+      {"section_label": "Other energy-sector own use", "group_by": "flow_or_product"},
+      {"section_label": "Transmission and distribution losses", "group_by": "product"},
+      {"section_label": "Transfers", "group_by": "product"}
+    ],
     "section_labels": {
       "transformation": "Other transformation (including own use)",
       "own_use": "Other energy-sector own use",
       "losses": "Transmission and distribution losses",
       "transfers": "Transfers"
     },
-    "_note": "Transformation cards stay disaggregated and are labelled as inclusive of auxiliary-fuel own use. Residual own-use rows already absorbed into an upstream inclusive Common ESTO boundary are excluded using upstream component and non-expanding-rollup contributor metadata, not a dashboard mapping list."
+    "_note": "The Overview keeps transformation, residual own use, losses and transfers separate. Multi-flow summaries group by flow; single-flow summaries fall back to product, matching the Refining overview rule. Transformation detail stays disaggregated and is labelled as inclusive of auxiliary-fuel own use. Residual own-use rows already absorbed into an upstream inclusive Common ESTO boundary are excluded using upstream component and non-expanding-rollup contributor metadata, not a dashboard mapping list."
   },
   "routing_special_cases": [
     {

@@ -2230,6 +2230,77 @@ def test_section_aggregate_suppresses_redundant_single_flow_chart() -> None:
     }
 
 
+def test_other_transformation_section_summaries_are_promoted_to_overview() -> None:
+    section_flows = [
+        ("Other transformation (including own use)", "09.06.01", "09.06.01 Gas works plants (including own use)"),
+        ("Other transformation (including own use)", "09.08.01", "09.08.01 Coke ovens (including own use)"),
+        ("Other energy-sector own use", "10.01.06", "10.01.06 Coal mines"),
+        ("Other energy-sector own use", "10.01.12", "10.01.12 Oil and gas extraction"),
+        ("Transmission and distribution losses", "10.02", "10.02 Transmission and distribution losses"),
+        ("Transfers", "08", "08 Transfers"),
+    ]
+    rows = pd.DataFrame(
+        [
+            {
+                "comparison_scope": "esto_leap_ninth",
+                "economy": "20_USA",
+                "source_system": source_system,
+                "scenario": scenario,
+                "year": year,
+                "common_flow_code": flow_code,
+                "common_flow_label": flow_label,
+                "common_product_code": "17",
+                "common_product_label": "17 Electricity",
+                "is_non_expanding_rollup": False,
+                "_section_label": section_label,
+                "value": value,
+            }
+            for section_label, flow_code, flow_label in section_flows
+            for source_system, scenario, year, value in [
+                ("ESTO", "historical", 2022, -10.0),
+                ("LEAP", "Target", 2023, -12.0),
+            ]
+        ]
+    )
+    template = {
+        "other_transformation_page": {
+            "page_key": "other_transformation",
+            "overview_summaries": [
+                {"section_label": "Other transformation (including own use)", "group_by": "flow_or_product"},
+                {"section_label": "Other energy-sector own use", "group_by": "flow_or_product"},
+                {"section_label": "Transmission and distribution losses", "group_by": "product"},
+                {"section_label": "Transfers", "group_by": "product"},
+            ],
+        },
+        "chart_generation": {
+            "primary_area_source_system": "LEAP",
+            "primary_area_scenario": "Target",
+            "comparison_source_system": "ESTO",
+            "ninth_source_system": "NINTH",
+            "base_year": 2022,
+            "suppression_threshold": 1.0,
+        },
+    }
+
+    charts, chart_rows, manifest_rows = _build_section_aggregate_charts(
+        rows,
+        page_key="other_transformation",
+        page_label="Other transformation",
+        parent_flow_labels=set(),
+        template=template,
+        series_labels={"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
+    )
+
+    assert list(charts) == [
+        "chart__area__section__other_transformation__other_transformation_including_own_use__flow",
+        "chart__area__section__other_transformation__other_energy_sector_own_use__flow",
+        "chart__area__section__other_transformation__transmission_and_distribution_losses__product",
+        "chart__area__section__other_transformation__transfers__product",
+    ]
+    assert all(row["section_label"] == "Overview" for row in chart_rows)
+    assert all(row["section_label"] == "Overview" for row in manifest_rows)
+
+
 def test_chart_chrome_resolves_duplicate_configured_category_colours() -> None:
     import plotly.graph_objects as go
     from codebase.common_esto_dashboard_renderer import load_code_colors

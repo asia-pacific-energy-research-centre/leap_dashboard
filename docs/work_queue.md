@@ -140,7 +140,9 @@ These later commits supersede the corresponding snapshot rows below:
   inclusive process-level cards rather than unclear cross-page `09`/`10`
   totals. Residual other own use, transmission/distribution losses and
   transfers remain separately aggregated, with absorbed own use determined
-  from upstream component and non-expanding-rollup contributor metadata.
+  from upstream component and non-expanding-rollup contributor metadata. Its
+  restored Overview uses separate boundary-driven summaries and the same
+  multi-flow-versus-single-flow rule as Refining.
 
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were

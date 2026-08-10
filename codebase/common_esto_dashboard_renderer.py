@@ -2048,22 +2048,34 @@ def _build_section_aggregate_charts(
         if section_label not in ordered_sections:
             ordered_sections.append(section_label)
 
-    suppressed_sections = {
-        str(value).strip().casefold()
-        for value in template.get("other_transformation_page", {}).get(
-            "suppress_section_aggregate_labels", []
+    other_transformation_config = template.get("other_transformation_page", {})
+    is_other_transformation_page = page_key == safe_slug(
+        other_transformation_config.get("page_key", "other_transformation")
+    )
+    overview_summaries = {
+        str(item.get("section_label", "")).strip().casefold(): {
+            "group_by": str(item.get("group_by", "product")).strip().casefold(),
+            "order": order,
+        }
+        for order, item in enumerate(
+            other_transformation_config.get("overview_summaries", [])
         )
-        if str(value).strip()
+        if str(item.get("section_label", "")).strip()
     }
-    for section_label in ordered_sections:
-        if (
-            page_key == safe_slug(
-                template.get("other_transformation_page", {}).get(
-                    "page_key", "other_transformation"
-                )
+    if is_other_transformation_page and overview_summaries:
+        existing_order = {label: order for order, label in enumerate(ordered_sections)}
+        ordered_sections.sort(
+            key=lambda label: (
+                overview_summaries.get(
+                    label.casefold(), {"order": len(overview_summaries)}
+                )["order"],
+                existing_order[label],
             )
-            and section_label.casefold() in suppressed_sections
-        ):
+        )
+
+    for section_label in ordered_sections:
+        overview_summary = overview_summaries.get(section_label.casefold())
+        if is_other_transformation_page and overview_summaries and not overview_summary:
             continue
         flow_labels = sorted(set(section_flows.get(section_label, [])))
         if not flow_labels:
@@ -2080,10 +2092,17 @@ def _build_section_aggregate_charts(
         effective_flow_count = effective_flow_rows["common_flow_label"].nunique(
             dropna=True
         )
+        overview_group_by = ""
+        if overview_summary:
+            overview_group_by = str(overview_summary["group_by"])
+            if overview_group_by == "flow_or_product":
+                overview_group_by = "flow" if effective_flow_count > 1 else "product"
         for group_col, group_noun, title_prefix, manifest_flow, manifest_product in (
             ("common_product_label", "product", "Aggregate by product", section_label, "All products"),
             ("common_flow_label", "flow", "Aggregate by flow", "All flows", section_label),
         ):
+            if overview_summary and group_noun != overview_group_by:
+                continue
             chart_key = f"chart__area__section__{safe_slug(page_key)}__{safe_slug(section_label)}__{group_noun}"
             metrics = compute_ranking_metrics(area_df, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
             redundant_single_flow = group_noun == "flow" and effective_flow_count <= 1
@@ -2094,7 +2113,7 @@ def _build_section_aggregate_charts(
             manifest_rows.append({
                 "page_key": page_key,
                 "page_label": page_label,
-                "section_label": section_label,
+                "section_label": "Overview" if overview_summary else section_label,
                 "chart_type": "stacked_area",
                 "chart_key": chart_key,
                 "common_flow_label": manifest_flow,
@@ -2124,7 +2143,7 @@ def _build_section_aggregate_charts(
                 "chart_type": "stacked_area",
                 "title": f"{title_prefix}: {section_label}",
                 "product_label": f"{title_prefix}: {section_label}",
-                "section_label": section_label,
+                "section_label": "Overview" if overview_summary else section_label,
                 "datasets": chart_dataset_tokens_from_figure(figure),
                 "stacked_area_note": stacked_area_note_from_figure(figure),
                 **metrics,
