@@ -995,14 +995,38 @@ mapping evidence. The equivalent NINTH section does not inherit this warning.
 The mapping diagnostics page does not prepare or download candidate source
 exceptions. Source exceptions require evidence-led review in the upstream
 mapping workflow and its maintained exception workbook; the dashboard remains
-a read-only diagnostic consumer. The hierarchy summary and related-economy
-evidence remain available because they provide the numerical and attribution
-evidence needed before an upstream review decision.
+a read-only diagnostic consumer. Numerical, attribution, and review evidence is
+displayed directly beneath the failed source-tree check that it explains.
 
 ### History
 
 - 2026-08-10: Removed the `Prepare reviewed source exception` panel and its
   browser-side candidate-generation controls.
+- 2026-08-10: Removed the standalone hierarchy-validation and related-economy
+  tables in favour of a collapsed evidence drill-down on each failed check.
+
+## DASH-029: Rollup structure filters use structural membership, not selected-period values
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Diagnostic interaction and structural filtering
+**Affected areas:** `codebase/common_esto_dashboard_mapping_diagnostics.py`; all-sector rollup graph
+
+### Current rule
+
+The default all-sector graph is limited by timeless original-ESTO structural
+membership. It must not require an ESTO value for the scenario and year chosen
+for another dataset, because ESTO historical periods do not overlap NINTH or
+LEAP projection selections. A separate checkbox includes ESTO Extended-only
+rows. Dataset values are always displayed one selected dataset at a time; the
+former `Compare ESTO vs Extended` graph mode is not part of this general
+structure explorer.
+
+### History
+
+- 2026-08-10: Fixed NINTH projection selections being filtered to an empty graph
+  by an impossible ESTO scenario/year lookup; replaced the basis dropdown with
+  `Include ESTO Extended-only rows`.
 
 ## End-to-end run report
 

@@ -468,12 +468,6 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "One-to-many fan-out" in html
     assert "De-duplicated frontier" in html
     assert "Raw source contradiction" in html
-    assert "09_total" in html
-    assert "absolute mismatch total" in html
-    assert "Hierarchy validation: failures and reviewed exceptions" in html
-    assert "Final output hierarchy" in html
-    assert "Source / mapping anchor" in html
-    assert "A failure means the difference exceeded tolerance" in html
     assert "09 Child" in html
     assert ">7<" in html
     assert "NINTH flow tree: original vs mapped representation" in html
@@ -501,26 +495,32 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "optional-zero" in html
     assert "onchange=\"document.body.classList.toggle('show-zero-children', this.checked)\"" in html
     assert "Unmapped source child: missing_child" in html
-    assert "Confirmed source issues attached to anchor evidence" in html
+    assert "Why did this fail? Economy evidence (1 failed, 0 supporting rows)" in html
+    assert "Matched rows are kept with this failure" in html
     assert "Confirmed source issues among failed anchor rows" in html
     assert "Unconfirmed failed anchor rows" in html
     assert "SRC-001" in html
     assert "other_economy_parent" not in html
     assert "SRC-OTHER" not in html
     assert "skipped from actionable failures" not in html
-    assert "Exception candidates awaiting review" in html
+    assert "Source review candidates" in html
     assert "direct_children_incomplete_but_leaves_reconcile" in html
+    assert "Hierarchy validation: failures and reviewed exceptions" not in html
+    assert "Related economy evidence" not in html
+    assert "ESTO flow tree: original vs mapped representation" in html
     assert "Direct mapping coverage review" in html
     assert "Dataset<select id=\"rollup-source\"" in html
     assert "ROLLUP_VALUES=" in html
     assert "ESTO_RAW" in html
     assert "ESTO_EXTENDED_RAW" in html
-    assert 'id="rollup-basis"' in html
-    assert "Original ESTO only" in html
-    assert "ESTO + ESTO Extended" in html
-    assert "Compare ESTO vs Extended" in html
+    assert 'id="include-extended-rows"' in html
+    assert "Include ESTO Extended-only rows" in html
+    assert "Compare ESTO vs Extended" not in html
+    assert 'id="rollup-basis"' not in html
     assert "rowsForSource(rawSource).forEach(row => result.add(row.common_flow_label))" in html
+    assert "const allCommonRowsForSource = source =>" in html
     assert "const codeAvailableForBasis = code =>" in html
+    assert "const estoRows = allCommonRowsForSource('ESTO')" in html
     assert "descendant !== code && estoRows.has(descendant)" in html
     assert "boundary.inputs.every(input => codeAvailableForBasis(input))" in html
     assert 'id="rollup-sector"' in html
@@ -548,7 +548,6 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Not validated:" in html
     assert ".rollup-boundary.value-unavailable .rollup-validation-status" in html
     assert '<details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2>' in html
-    assert '<details class="panel collapsed-panel"><summary><h2>Hierarchy validation: failures and reviewed exceptions</h2>' in html
     assert Path(result["summary"]).exists()
 
 
