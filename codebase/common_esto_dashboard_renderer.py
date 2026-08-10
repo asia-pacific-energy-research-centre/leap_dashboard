@@ -3082,8 +3082,8 @@ def _category_basis_switcher_html(
         return ""
     return (
         '<label class="category-basis-switcher" data-guide-id="category-basis-switcher">'
-        '<span>Common categories</span>'
-        f'<select data-navigation-select data-category-basis-switcher aria-label="Choose datasets defining the common categories">{"".join(options)}</select>'
+        '<span>Comparison basis</span>'
+        f'<select data-navigation-select data-category-basis-switcher aria-label="Choose the comparison basis">{"".join(options)}</select>'
         '</label>'
     )
 

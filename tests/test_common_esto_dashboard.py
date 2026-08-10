@@ -444,7 +444,7 @@ def test_category_basis_variants_preserve_page_economy_and_filter_options(
         / "transport.html"
     ).read_text(encoding="utf-8")
 
-    assert "Common categories" in default_html
+    assert "Comparison basis" in default_html
     assert "../../20USA__esto_leap/dashboards/transport.html" in default_html
     assert "../../20USA/dashboards/transport.html" in two_way_html
     assert "../../01AUS__esto_leap/dashboards/transport.html" in two_way_html
