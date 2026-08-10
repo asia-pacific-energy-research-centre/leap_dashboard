@@ -236,12 +236,6 @@
             ["Aggregate-only LEAP", "Some economies currently expose only the broad LEAP Industry placeholder", "The broad chart can contain LEAP while detailed charts contain only ESTO or Ninth; the dataset filter makes that coverage difference visible."]
           ]
         }
-      },
-      {
-        "id": "industry-review",
-        "target": "[data-guide-id='chart-card']",
-        "title": "Work from sector total to subsector and fuel",
-        "copy": "Industry can contain both structural parents and detailed subsectors. Use the overview and section order to locate the material change, then check whether it comes from activity, efficiency, fuel switching or a difference in supported source detail. Do not add parent and child charts together."
       }
     ],
     "transport": [
@@ -417,13 +411,19 @@
       "id": "page-purpose",
       "target": "[data-guide-id='page-purpose']",
       "title": "What this page is for",
-      "copy": "{page_purpose} The dashboard is a review surface, not the model itself: investigate and correct material issues in LEAP or the relevant upstream data, then rerun the dashboard."
+      "copy": "{page_purpose} If something looks wrong, correct it in the model or source data, then rerun the dashboard."
     },
     {
       "id": "top-controls",
       "target": "[data-guide-id='top-controls']",
       "title": "Choose what you are viewing",
-      "copy": "Use the controls at the top to change economy, choose Reference or Target when scenario options are available, select which datasets define the comparison basis, and move between dashboard pages. The comparison basis changes the detail that can be compared safely and is explained later in this guide."
+      "copy": "Use the controls at the top to change economy, choose Reference or Target when scenario options are available, select which datasets define the comparison basis, and move between dashboard pages."
+    },
+    {
+      "id": "chart-card",
+      "target": "[data-guide-id='category-basis-switcher'], [data-guide-id='chart-card']",
+      "title": "How the comparison basis sets the detail",
+      "copy": "The comparison basis chooses which datasets define the common categories. It shows the most detailed category every participating dataset can represent without splitting a value, while keeping ESTO-style codes and names where possible. For example, the 9th Outlook has one category for coal products, so LEAP + ESTO + Ninth shows 02.01-02.08 Coal products; with only LEAP + ESTO, the basis can show the individual 02.x fuels."
     },
     {
       "id": "section-navigation",
@@ -439,15 +439,9 @@
       "copy": "Start with the summary charts at the top of the page. Use the section summaries to spot important differences or unusual trends, then open the detailed charts only where you need to investigate further."
     },
     {
-      "id": "chart-card",
-      "target": "[data-guide-id='category-basis-switcher'], [data-guide-id='chart-card']",
-      "title": "How the comparison basis sets the detail",
-      "copy": "The comparison basis chooses which datasets define the common categories. It shows the most detailed category every participating dataset can represent without splitting a value, while keeping ESTO-style codes and names where possible. For example, the 9th Outlook has one category for coal products, so LEAP + ESTO + Ninth shows 02.01-02.08 Coal products; with only LEAP + ESTO, the basis can show the individual 02.x fuels."
-    },
-    {
       "id": "placeholder-status",
-      "target": "[data-guide-id='chart-card']",
-      "title": "Check whether this page uses a placeholder",
+      "target": ".visible-note",
+      "title": "What the placeholder warning means",
       "copy": "{placeholder_status}",
       "dynamic_content": "placeholder_status"
     },
@@ -456,13 +450,6 @@
       "target": "[data-guide-id='chart-card'] .lazy-chart-plot",
       "title": "Use the chart tools",
       "copy": "Hover to inspect a year, drag to zoom and double-click the chart to reset the view. Click a legend item to remove that series; double-click it to show only that series, then double-click again to restore the others. Use the Plotly toolbar to download a chart. Inputs to transformation are normally negative and outputs positive; page and chart notes call out important sign conventions."
-    },
-    {
-      "id": "sorting",
-      "target": "[data-guide-id='sort-controls']",
-      "title": "Find material differences first",
-      "copy": "Default preserves the configured order. Largest total finds the biggest parts of the system; Largest difference and Largest % diff help triage disagreements over the available comparison periods. A large percentage on a tiny series still needs judgement, and missing values are not treated as zero.",
-      "optional": true
     }
   ],
   "index_steps": [
@@ -493,7 +480,7 @@
       "id": "index-pages",
       "target": "[data-guide-id='page-list']",
       "title": "Choose where to begin",
-      "copy": "Start broad, then move to the page that owns the difference. The chart count can be large because each routed flow is compared across every relevant product or fuel. Use the overview and section summaries first, then the section chips and sorting controls instead of scanning every detail chart.",
+      "copy": "Start broad, then move to the page that owns the difference. The chart count can be large because each routed flow is compared across every relevant product or fuel. Use the overview and section summaries first, then use the section chips to move directly to the detail you need.",
       "table": {
         "caption": "Recommended review route",
         "headers": ["If you are checking…", "Start with…", "Then open…"],

@@ -129,8 +129,8 @@ def test_chart_guide_explains_the_overview_first_review_strategy() -> None:
     assert "Start with the summary charts at the top" in chart_script
     assert "then open the detailed charts only" in chart_script
     assert "Recommended way to use a dense page" not in chart_script
-    assert chart_script.index("Start with the summaries") < chart_script.index(
-        "How the comparison basis sets the detail"
+    assert chart_script.index("How the comparison basis sets the detail") < chart_script.index(
+        "Start with the summaries"
     )
 
 
@@ -169,7 +169,7 @@ def test_shared_placeholder_step_is_omitted_when_page_has_no_placeholder() -> No
         },
     )["script"]
 
-    assert "Check whether this page uses a placeholder" not in script
+    assert "What the placeholder warning means" not in script
 
 
 def test_chart_guide_combines_top_controls_and_drops_review_action() -> None:
@@ -179,6 +179,13 @@ def test_chart_guide_combines_top_controls_and_drops_review_action() -> None:
     assert "choose Reference or Target" in script
     assert "select which datasets define the comparison basis" in script
     assert "move between dashboard pages" in script
+    assert "is explained later in this guide" not in script
+    assert "correct it in the model or source data" in script
+    assert "review surface, not the model itself" not in script
+    assert "Work from sector total to subsector and fuel" not in build_guide_fragments(
+        "chart", "industry", "Industry"
+    )["script"]
+    assert "Find material differences first" not in script
     assert "Confirm the economy and update" not in script
     assert "Compare projection scenarios" not in script
     assert "Move through the energy system" not in script

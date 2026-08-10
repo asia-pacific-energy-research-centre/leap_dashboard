@@ -2516,16 +2516,6 @@ a:hover { text-decoration: underline; }
 .jump-chip[data-level="2"] { background:#f5edff;border-color:#c69af0;color:#4c1d70; }
 .jump-chip[data-level="2"]::before { background:#9333ea; }
 .visible-note { margin:8px 0 10px 0;padding:8px 12px;background:#fffbe6;border-left:3px solid #f0a500;border-radius:4px;font-size:13px;color:#5a3e00;line-height:1.5; }
-.sort-bar {
-  display:flex;flex-wrap:wrap;align-items:center;gap:6px;
-  margin:10px 0 8px 0;font-size:12px;color:#4b5563;
-}
-.sort-bar-label { font-weight:600;white-space:nowrap; }
-.sort-btn {
-  padding:4px 10px;border:1px solid #c5ccd3;border-radius:999px;
-  background:#fff;color:#0b3d5c;font-size:12px;cursor:pointer;
-}
-.sort-btn.active { border-color:#1f6feb;background:#e8f0fe;font-weight:700; }
 .scenario-toggle {
   display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
   font-size:12px;color:#4b5563;white-space:nowrap;
@@ -2812,28 +2802,6 @@ _LAZY_LOAD_JS = """
 
   window.addEventListener('resize', function() {
     plots.forEach(function(p) { if (p.dataset.rendered === 'true') window.Plotly.Plots.resize(p); });
-  });
-})();
-"""
-
-_SORT_JS = """
-(function() {
-  document.querySelectorAll('.sort-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      var sortKey = btn.dataset.sort;
-      var bar = btn.closest('.sort-bar');
-      var grid = btn.closest('.section-sort-group').querySelector('[data-sortable-grid]');
-      if (!grid) return;
-      var cards = Array.from(grid.querySelectorAll(':scope > .chart-card'));
-      if (sortKey === 'default') {
-        cards.sort(function(a, b) { return parseInt(a.dataset.defaultOrder||0) - parseInt(b.dataset.defaultOrder||0); });
-      } else {
-        cards.sort(function(a, b) { return parseFloat(b.dataset[sortKey]||0) - parseFloat(a.dataset[sortKey]||0); });
-      }
-      cards.forEach(function(c) { grid.appendChild(c); });
-      bar.querySelectorAll('.sort-btn').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-    });
   });
 })();
 """
@@ -3228,12 +3196,6 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
             f'<section data-dataset-filter-section>'
             f'<h2 class="section-heading">{escape(group_label)}</h2>'
             f'<section class="section-sort-group">'
-            f'<div class="sort-bar" data-guide-id="sort-controls"><span class="sort-bar-label">Sort:</span>'
-            f'<button class="sort-btn active" data-sort="default">Default</button>'
-            f'<button class="sort-btn" data-sort="totalAbs">Largest total</button>'
-            f'<button class="sort-btn" data-sort="absDiff">Largest difference</button>'
-            f'<button class="sort-btn" data-sort="pctDiff">Largest % diff</button>'
-            f'</div>'
             f'<div class="{grid_class}" data-sortable-grid="{escape(grid_key)}">{"".join(cards)}</div>'
             f'</section>'
             f'</section>'
@@ -3276,14 +3238,8 @@ def _chart_cards_html(rows: list[dict], subline: str) -> str:
 
 
 def _sort_bar_html() -> str:
-    return (
-        '<div class="sort-bar" data-guide-id="sort-controls"><span class="sort-bar-label">Sort:</span>'
-        '<button class="sort-btn active" data-sort="default">Default</button>'
-        '<button class="sort-btn" data-sort="totalAbs">Largest total</button>'
-        '<button class="sort-btn" data-sort="absDiff">Largest difference</button>'
-        '<button class="sort-btn" data-sort="pctDiff">Largest % diff</button>'
-        '</div>'
-    )
+    """Sorting controls are intentionally omitted from dense chart sections."""
+    return ""
 
 
 def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[str]]]:
@@ -3408,10 +3364,11 @@ def guide_placeholder_status(page_key: str, template: dict) -> str:
         )
     sector_text = ", ".join(sectors)
     return (
-        f"Placeholder in use: the LEAP '{placeholder_branch}' branch supplies "
-        f"{sector_text} on this page. This preserves the available total, but it means "
-        "LEAP does not yet provide the separate sector or subsector detail shown by the "
-        "other datasets. Treat that missing detail as unavailable, not as zero."
+        f"The yellow warning means LEAP is using a placeholder for {sector_text}. "
+        f"A placeholder is a broad total from the '{placeholder_branch}' branch, used "
+        "until this part of the economy is modelled separately. It preserves the total "
+        "but cannot provide sector or subsector detail, which is why detailed LEAP charts "
+        "are missing. Treat that detail as unavailable, not as zero."
     )
 
 
@@ -3648,7 +3605,6 @@ def write_dashboard_page(
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script src="../chart_bundles/{escape(bundle_js_name)}"></script>
   <script>{_LAZY_LOAD_JS}</script>
-  <script>{_SORT_JS}</script>
   <script>{_DATASET_FILTER_JS}</script>
   <script>{guide["script"]}</script>
 </body>

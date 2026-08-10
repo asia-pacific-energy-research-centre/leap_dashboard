@@ -36,6 +36,10 @@ These later commits supersede the corresponding snapshot rows below:
   at the top of every affected page. The redundant
   **Charts containing** control is hidden while card-level dataset membership
   remains available.
+  A later Industry-guide pass moves the comparison-basis explanation directly
+  after the header controls, simplifies the shared correction wording, anchors
+  placeholder guidance to the yellow page warning, and removes the unused
+  chart-sorting controls.
 
 - **DASHQ-003 and DASHQ-004 are complete in the current documentation
   checkout.** `docs/handover_mapping_diagnostics.md` now retains the original

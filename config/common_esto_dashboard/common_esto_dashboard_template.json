@@ -91,6 +91,8 @@
         "01",
         "02",
         "03",
+        "04",
+        "05",
         "06",
         "11"
       ],
@@ -98,24 +100,12 @@
         "Production",
         "Imports",
         "Exports",
+        "International transport",
+        "Bunkers",
         "Stock changes",
         "Statistical discrepancy"
       ],
-      "rule_note": "Supply and top-level balancing rows. Matches generated labels by any component code, not just the first displayed code."
-    },
-    {
-      "page_key": "bunkers",
-      "page_label": "Bunkers",
-      "priority": 20,
-      "flow_code_prefixes": [
-        "04",
-        "05"
-      ],
-      "flow_keywords": [
-        "International marine bunkers",
-        "International aviation bunkers"
-      ],
-      "rule_note": "International aviation and marine bunkers."
+      "rule_note": "Supply and top-level balancing rows, including signed international-transport bunkers. Matches generated labels by any component code, not just the first displayed code."
     },
     {
       "page_key": "power",
@@ -258,7 +248,7 @@
     "page_label": "Energy balance overview",
     "overview_flow_codes": ["07", "12"],
     "demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"],
-    "supply_codes": ["01", "02", "03"],
+    "supply_codes": ["01", "02", "03", "04", "05"],
     "tfec_enabled": false,
     "tfec_status": "Temporarily disabled because non-energy use cannot yet be separated from aggregated Other-sector LEAP demand.",
     "transformation_total": {
@@ -273,7 +263,7 @@
       "others": "#8b5cf6",
       "non_energy": "#94a3b8"
     },
-    "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports). Bunkers (04,05) and stock changes (06) are excluded because they are not recorded in LEAP projection scenarios."
+    "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports), 04 (International marine bunkers), and 05 (International aviation bunkers). Bunkers are supply deductions and are excluded from domestic demand. Stock changes (06) remain outside the projection-comparable total."
   },
   "emissions_page": {
     "enabled": true,
@@ -296,12 +286,11 @@
       "industry": ["Industry"],
       "transport": ["Passenger road", "Freight road", "Transport non road"],
       "buildings": ["Buildings"],
-      "others": ["Other sector"],
-      "bunkers": ["Transport non road"]
+      "others": ["Other sector"]
     },
     "always_skip_page_keys": [],
     "require_primary_source_page_keys": ["non_energy"],
-    "_note": "page_leap_branches maps each sector page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. show_aggregate_only_page_keys keeps only the four domestic demand pages visible while they use placeholders; aggregate-only Bunkers remains hidden because it has no usable LEAP projection here. Non-energy remains hidden until exact standalone rows include the configured primary source; the combined Other sector including non-energy placeholder is routed to Other demand by its explicit routing special case."
+    "_note": "page_leap_branches maps each domestic demand page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. International transport is a signed supply deduction and is routed to Supply, not domestic demand. Non-energy remains hidden until exact standalone rows include the configured primary source; the combined Other sector including non-energy placeholder is routed to Other demand by its explicit routing special case."
   },
   "scope_specific_pages": {
     "enabled": false,

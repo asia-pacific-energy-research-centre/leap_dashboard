@@ -770,7 +770,7 @@ def test_chart_dataset_tokens_come_from_final_traces() -> None:
     assert chart_dataset_tokens_from_figure(figure) == "ESTO"
 
 
-def test_aggregate_only_demand_pages_remain_visible_but_unmapped_page_is_hidden() -> None:
+def test_aggregate_only_domestic_demand_pages_remain_visible() -> None:
     template = _load_template()
 
     filtered = filter_template_for_leap_demand_coverage(
@@ -778,13 +778,12 @@ def test_aggregate_only_demand_pages_remain_visible_but_unmapped_page_is_hidden(
         {"Industry", "Buildings", "Other sector", "Transport non road"},
     )
 
-    assert filtered["leap_demand_sector_coverage"]["_hidden_page_keys"] == ["bunkers"]
+    assert "_hidden_page_keys" not in filtered["leap_demand_sector_coverage"]
     assert filtered["leap_demand_sector_coverage"]["_aggregate_only_page_branches"] == {
         "industry": ["Industry"],
         "transport": ["Transport non road"],
         "buildings": ["Buildings"],
         "others": ["Other sector"],
-        "bunkers": ["Transport non road"],
     }
 
 
@@ -1113,6 +1112,8 @@ def test_common_esto_dashboard_writes_page_aware_guides(tmp_path: Path) -> None:
     assert "How the comparison basis sets the detail" in transport_html
     assert 'data-guide-id="page-navigation"' in transport_html
     assert 'data-guide-id="chart-card"' in transport_html
+    assert 'data-guide-id="sort-controls"' not in transport_html
+    assert "Largest difference" not in transport_html
     assert "Choose where to begin" in index_html
     assert 'data-guide-id="page-list"' in index_html
     assert "Compare projection scenarios" not in index_html

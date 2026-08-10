@@ -113,8 +113,6 @@ Implemented chart behaviour includes:
   manifest records;
 - sticky navigation, section jump links, responsive chart grids, and lazy
   loading of Plotly bundles;
-- client-side sorting by total magnitude, absolute difference, and percentage
-  difference;
 - an economy/dashboard switcher.
 
 Difference traces, scope-specific page generation, and publishing support are
