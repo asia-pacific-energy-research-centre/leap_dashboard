@@ -15,7 +15,6 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     _rollup_boundary_details_html,
     _rollup_graph_data,
     _transformation_rollup_diagram_html,
-    _exception_candidate_controls_html,
     load_esto_exact_values_for_economy,
     prefer_compressed_csv_path,
     write_mapping_diagnostics_page,
@@ -162,27 +161,6 @@ def test_stage_validation_is_recalculated_on_apec_sum() -> None:
     assert result.iloc[0]["children_sum"] == 8.0
     assert result.iloc[0]["status"] == "failed"
     assert result.iloc[0]["related_economy_count"] == 2
-
-
-def test_exception_controls_offer_all_and_related_economies() -> None:
-    apec = pd.DataFrame([{
-        "status": "failed", "source_system": "NINTH", "validation_axis": "flow",
-        "comparison_scope": "esto_leap_ninth", "economy": "00APEC",
-        "scenario": "reference", "year": 2030, "other_axis_value": "Gas",
-        "parent_code": "09_total", "parent_value": 10.0,
-        "source_non_additivity_observed": True,
-    }])
-    examples = pd.DataFrame([
-        {**apec.iloc[0].to_dict(), "economy": "01AUS"},
-        {**apec.iloc[0].to_dict(), "economy": "20USA"},
-    ])
-
-    html = _exception_candidate_controls_html(apec, examples)
-
-    assert '<option value="all">all</option>' in html
-    assert '<option value="01AUS">01AUS</option>' in html
-    assert '<option value="20USA">20USA</option>' in html
-    assert "source_mismatch_allowed" in html
 
 
 def test_anchor_review_split_keeps_confirmed_failures_and_filters_economy() -> None:
@@ -502,6 +480,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "LEAP flow tree: original vs mapped representation" in html
     assert "Caution: treat this section as provisional." in html
     assert "until the relevant LEAP exports have been checked and confirmed" in html
+    assert "Prepare reviewed source exception" not in html
+    assert "download-exception-candidate" not in html
     assert "Original raw source tree" in html
     assert "Original source parent" in html
     assert "Unique mapped comparison total" in html

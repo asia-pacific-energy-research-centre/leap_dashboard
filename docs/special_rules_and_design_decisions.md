@@ -983,6 +983,27 @@ mapping evidence. The equivalent NINTH section does not inherit this warning.
 - 2026-08-10: Added after live review found flat LEAP export structures and
   inconsistent raw-versus-normalized signs producing misleading issue cards.
 
+## DASH-028: Source exceptions are reviewed outside the dashboard
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Diagnostic workflow boundary
+**Affected areas:** `codebase/common_esto_dashboard_mapping_diagnostics.py`
+
+### Current rule
+
+The mapping diagnostics page does not prepare or download candidate source
+exceptions. Source exceptions require evidence-led review in the upstream
+mapping workflow and its maintained exception workbook; the dashboard remains
+a read-only diagnostic consumer. The hierarchy summary and related-economy
+evidence remain available because they provide the numerical and attribution
+evidence needed before an upstream review decision.
+
+### History
+
+- 2026-08-10: Removed the `Prepare reviewed source exception` panel and its
+  browser-side candidate-generation controls.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

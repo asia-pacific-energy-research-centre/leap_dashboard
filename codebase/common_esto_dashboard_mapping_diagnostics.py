@@ -509,67 +509,6 @@ def _aggregate_stage_validation_to_apec(frame: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
-def _exception_candidate_controls_html(
-    apec_anchor: pd.DataFrame,
-    economy_examples: pd.DataFrame,
-) -> str:
-    """Render reviewed-exception candidate controls for eligible source issues."""
-    if apec_anchor.empty or "source_non_additivity_observed" not in apec_anchor.columns:
-        return '<p class="empty-state">No exception-eligible APEC source issues.</p>'
-    candidates = apec_anchor[
-        apec_anchor["status"].astype(str).eq("failed")
-        & apec_anchor["source_non_additivity_observed"].astype(str).str.lower().eq("true")
-    ].copy()
-    if candidates.empty:
-        return '<p class="empty-state">No exception-eligible APEC source issues.</p>'
-    issue_columns = [
-        "validation_axis", "comparison_scope", "source_system", "scenario", "year",
-        "other_axis_value", "parent_code",
-    ]
-    examples = economy_examples.copy()
-    cards: list[str] = []
-    for number, row in enumerate(candidates.head(MAX_TABLE_ROWS).to_dict("records"), start=1):
-        related = examples.copy()
-        for column in issue_columns:
-            if column in related.columns:
-                related = related[related[column].astype(str).eq(str(row.get(column, "")))]
-        economies = sorted(set(related.get("economy", pd.Series(dtype=str)).astype(str)) - {"", APEC_ECONOMY})
-        economy_options = ''.join(
-            f'<option value="{escape(value)}">{escape(value)}</option>' for value in ["all", *economies]
-        )
-        payload = {
-            "source_system": row.get("source_system", ""),
-            "validation_axis": row.get("validation_axis", ""),
-            "parent_code": row.get("parent_code", ""),
-            "other_axis_value": row.get("other_axis_value", ""),
-            "scenario": row.get("scenario", ""),
-            "year": row.get("year", ""),
-            "parent_value": row.get("parent_value", ""),
-        }
-        encoded = escape(json.dumps(payload, ensure_ascii=False), quote=True)
-        cards.append(
-            f'<div class="exception-candidate" data-exception-payload="{encoded}">'
-            f'<strong>{escape(str(row.get("source_system", "")))} — '
-            f'{escape(str(row.get("parent_code", "")))}</strong>'
-            f'<span>{escape(str(row.get("other_axis_value", "")))}; '
-            f'{len(economies)} related economies</span>'
-            f'<label>Economy<select class="exception-economy">{economy_options}</select></label>'
-            '<label>Scenario<select class="exception-scenario"><option value="current">Current</option><option value="all">all</option></select></label>'
-            '<label>Year<select class="exception-year"><option value="current">Current</option><option value="all">all</option></select></label>'
-            '<label>Issue class<select class="exception-class"><option value="confirmed_source_non_additivity">confirmed_source_non_additivity</option><option value="confirmed_source_hierarchy_condition">confirmed_source_hierarchy_condition</option></select></label>'
-            f'<button type="button" class="prepare-exception" data-number="{number}">Prepare candidate row</button>'
-            '</div>'
-        )
-    return (
-        '<p class="subtle">These controls prepare a candidate for the '
-        '<code>source_mismatch_allowed</code> sheet. They do not approve or edit the workbook; '
-        'a reviewer must confirm the row.</p>'
-        + ''.join(cards)
-        + '<label>Prepared candidate row<textarea id="exception-candidate-output" rows="5" readonly></textarea></label>'
-        + '<button type="button" id="download-exception-candidate">Download candidate CSV</button>'
-    )
-
-
 def _confirmed_source_issue_mask(frame: pd.DataFrame) -> pd.Series:
     """Identify explicit user confirmations without reinterpreting check status."""
     if not _has_explicit_anchor_review_fields(frame):
@@ -1440,10 +1379,6 @@ def write_mapping_diagnostics_page(
         dashboard_economy,
     )
     scoped_economy_examples = anchor_economy_examples.copy()
-    exception_candidate_controls = _exception_candidate_controls_html(
-        scoped_anchor,
-        scoped_economy_examples,
-    )
 
     stage_value_summary = _value_failure_summary(scoped_stage, "children_sum")
     if not stage_value_summary.empty:
@@ -1597,7 +1532,6 @@ body {{ font-family: Inter,Segoe UI,Arial,sans-serif; margin:0; background:#f4f6
 .shell {{ max-width:1600px; margin:auto; padding:20px; }} header {{ background:white; border:1px solid #d9e1ea; border-radius:12px; padding:18px 22px; }}
 h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b7a; }} .metrics {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin:16px 0; }}
 .metric-card,.panel {{ background:white; border:1px solid #d9e1ea; border-radius:10px; padding:14px; }} .metric-card span {{ display:block; color:#5f6b7a; font-size:13px; }} .metric-card strong {{ font-size:28px; }} .collapsed-panel summary {{ cursor:pointer; display:flex; align-items:center; justify-content:space-between; }} .collapsed-panel summary h2 {{ margin:0; }} .collapsed-panel summary span {{ color:#1b5e9a; font-size:0; }} .collapsed-panel[open] summary span::after {{ content:'Hide'; font-size:13px; }} .collapsed-panel:not([open]) summary span::after {{ content:'Show'; font-size:13px; }} .collapsed-panel > div {{ margin-top:14px; }}
-.exception-candidate {{ display:grid; grid-template-columns:minmax(260px,2fr) repeat(4,minmax(150px,1fr)) auto; gap:10px; align-items:end; border-top:1px solid #d9e1ea; padding:12px 0; }} .exception-candidate span {{ color:#5f6b7a; }} .exception-candidate label {{ display:grid; gap:4px; font-size:12px; }} .exception-candidate select,.exception-candidate button,textarea {{ font:inherit; padding:7px; }} #exception-candidate-output {{ width:100%; box-sizing:border-box; margin-top:8px; }} @media (max-width:1100px) {{ .exception-candidate {{ grid-template-columns:1fr 1fr; }} }}
 .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:16px; }} .guide-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; }} .guide-card {{ border-radius:8px; padding:10px; font-size:13px; line-height:1.4; }} .guide-card strong {{ display:block; margin-bottom:3px; }} .guide-good {{ background:#e8f5e9; color:#176b35; }} .guide-warning {{ background:#fff4e5; color:#8a4b08; }} .guide-neutral {{ background:#e8f0fa; color:#294f78; }} .flow {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }} .flow div {{ background:#e8f0fa; border:1px solid #adc4df; border-radius:8px; padding:10px; font-size:13px; }} .arrow {{ color:#53718f; font-size:22px; }}
 .paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .value-tree li.tree-category {{ display:block; border-bottom:0; color:#5f6b7a; font-size:12px; font-weight:600; padding-top:10px; }} .value-tree li.tree-structural {{ color:#5f6b7a; font-style:italic; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .helper-note,.source-warning {{ font-size:12px; line-height:1.4; margin:10px 0 0; padding:8px; border-radius:6px; }} .helper-note {{ background:#e8f5e9; color:#176b35; }} .source-warning {{ background:#fff4e5; color:#8a4b08; }} .value-tree li.optional-zero {{ display:none; }} body.show-zero-children .value-tree li.optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
 .transformation-diagram {{ display:grid; grid-template-columns:minmax(260px,0.8fr) minmax(520px,2fr); gap:16px; }} .ordinary-hierarchy,.rollup-boundaries {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .ordinary-hierarchy h3,.rollup-boundaries h3,.rollup-boundary h3,.rollup-boundary h4 {{ margin:0 0 8px; }} .tree-root {{ background:#dceaf8; border:1px solid #8eb2d4; border-radius:6px; font-weight:600; padding:8px; }} .ordinary-hierarchy ul,.rollup-boundary ul {{ list-style:none; padding-left:12px; margin:8px 0; }} .ordinary-hierarchy li,.rollup-boundary li {{ margin:5px 0; }} .solid-edge {{ color:#2d6a9f; font-weight:700; margin-right:4px; }} .dashed-edge {{ color:#7c5b00; font-weight:700; margin-left:6px; }} .rollup-boundary {{ border:1px solid #d9e1ea; border-left:5px solid #3d7fb1; border-radius:8px; padding:10px; margin-top:10px; background:#fff; }} .rollup-boundary.detached {{ border-left-color:#9b5c00; background:#fffaf0; }} .mode-pill {{ display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#dceaf8; color:#174b73; }} .detached .mode-pill {{ background:#ffe7ba; color:#754300; }} .boundary-columns {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px; }} .artifact-id {{ margin:8px 0 0; color:#5f6b7a; font-family:ui-monospace,monospace; font-size:11px; }} .rollup-controls {{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:12px 0; }} .rollup-controls label {{ display:grid; gap:3px; color:#5f6b7a; font-size:12px; }} .rollup-controls select {{ min-width:140px; padding:6px; }} .rollup-value {{ float:right; font-variant-numeric:tabular-nums; color:#5f6b7a; }} .rollup-check.value-pass,.rollup-boundary.value-pass {{ background:#ecf8ef; border-color:#5dae70; }} .rollup-check.value-fail,.rollup-boundary.value-fail {{ background:#fff0f0; border-color:#c95d5d; }} .rollup-check.value-pass .rollup-value,.rollup-boundary.value-pass .rollup-value {{ color:#176b35; }} .rollup-check.value-fail .rollup-value,.rollup-boundary.value-fail .rollup-value {{ color:#9b1c1c; }} @media (max-width:760px) {{ .paired-trees,.transformation-diagram,.boundary-columns {{ grid-template-columns:1fr; }} }}
@@ -1611,7 +1545,6 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 <section class="panel"><h2>All sector rollup structure</h2><p class="subtle">Start with the collapsed major-sector overview, choose a sector, or search for a flow. The graph never treats rollup composition as an ordinary hierarchy branch.</p><div class="rollup-explainer"><div><strong>Normal hierarchy</strong>A solid blue arrow means the child has the displayed parent in the ESTO flow tree.</div><div><strong>Registered rollup</strong>A dotted ochre arrow means the input contributes to a compiled comparison boundary; it is not another parent-child edge.</div><div><strong>NON_EXPANDING vs DETACHED</strong>NON_EXPANDING replaces a comparison frontier without adding another hierarchy branch. DETACHED remains outside ordinary ancestor totals and is intentional, not an orphan.</div><div><strong>ESTO Extended</strong>Extended-only rows are purple. “ESTO + Extended” makes both datasets selectable; “Compare” shows both values side by side without adding them.</div></div><div class="rollup-filter-grid"><label>ESTO basis<select id="rollup-basis"><option value="original">Original ESTO only</option><option value="plus">ESTO + ESTO Extended</option><option value="compare">Compare ESTO vs Extended</option></select></label><label>Major sector<select id="rollup-sector"></select></label><label>Rollup type<select id="rollup-mode"><option value="NONE" selected>Hierarchy only</option><option value="ALL">All rollup types</option><option value="EXPANDING">EXPANDING</option><option value="NON_EXPANDING">NON_EXPANDING</option><option value="DETACHED">DETACHED</option></select></label><label>Validation/status<select id="rollup-status"><option value="ALL">All statuses</option><option value="ISSUES">Issues only</option><option value="PASS">Reconciled only</option><option value="UNAVAILABLE">Unavailable only</option></select></label><label>Search for a flow<input id="rollup-search" type="search" placeholder="Code or label" autocomplete="off"></label><span class="basis-state" id="rollup-basis-state">Showing original ESTO only</span></div><div class="rollup-legend"><span><i class="legend-line"></i>normal hierarchy</span><span><i class="legend-line rollup"></i>rollup composition</span><span><i class="legend-line detached"></i>intentional DETACHED boundary</span><span>Purple node = Extended-only addition; red = orphan, duplicate, inconsistency, or failed validation.</span></div><div class="rollup-graph-toolbar"><button type="button" id="rollup-fit">Fit width</button><button type="button" id="rollup-zoom-out">−</button><button type="button" id="rollup-zoom-reset">100%</button><button type="button" id="rollup-zoom-in">+</button><button type="button" id="rollup-clear-selection">Clear selection</button><span class="rollup-graph-help">Click a node to highlight its parent, children, and rollup relationships. Choose a major sector (or click one) to expand it.</span></div><div class="rollup-graph-wrap"><div id="rollup-graph"></div></div><div class="rollup-summary"><h3>Rows in the current graph</h3><p class="rollup-summary-status" id="rollup-summary-status"></p><div class="table-scroll"><table id="rollup-summary-table"><thead><tr><th>Flow code</th><th>Flow label</th><th>Parent flow</th><th>Relationship type</th><th>Rollup type</th><th>Original / Extended</th><th>Child count</th><th>Rollup membership</th><th>Validation / status</th></tr></thead><tbody></tbody></table></div></div></section>
 <details class="panel collapsed-panel"><summary><h2>Hierarchy validation: failures and reviewed exceptions</h2><span></span></summary><div><p class="subtle">Each check compares one APEC parent with the rows that should account for it in the same scenario, year, and opposite-axis category. A failure means the difference exceeded tolerance or the comparison frontier was incomplete; it does not automatically mean a mapping is missing.</p><div class="guide-grid"><div class="guide-card guide-neutral"><strong>Final output hierarchy</strong>Checks whether each Common ESTO parent equals the sum of its declared output children after summing economies.</div><div class="guide-card guide-neutral"><strong>Source / mapping anchor</strong>Checks whether an APEC raw-source parent equals its de-duplicated mapped Common ESTO frontier.</div><div class="guide-card guide-warning"><strong>How to interpret a failure</strong>Review the APEC mismatch first, then open related economy evidence. Causes include incomplete mapped coverage, a raw source contradiction, or a hierarchy rule that needs review.</div></div><h3>Failed APEC checks ranked by materiality</h3><p class="subtle">Confirmed source issues remain in numerical failure totals; review metadata never turns a failed check into a pass.</p>{_table_html(hierarchy_failure_display, ['check_layer','source_system','validation_axis','parent_code','failure_reasons','failed_checks','confirmed_issue_failed','unconfirmed_failed','source_non_additivity_observed','parent_total','children_total','net_difference','absolute_mismatch_total'])}<h3>Confirmed source issues attached to anchor evidence</h3><p class="subtle">{escape(reviewed_anchor_note)}</p>{_table_html(reviewed_anchor_exceptions, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','status','parent_value','frontier_sum','difference','abs_error','reason','source_non_additivity_observed','exception_id','exception_review_status','exception_issue_class','exception_resolution','data_quality_exception_notes'])}<h3>Exception candidates awaiting review</h3><p class="subtle">These are not confirmed issues. Their immediate children fail to reconcile while all descendant leaves reconcile; review the source hierarchy before confirming an exact context.</p>{_table_html(scoped_leaf_reconciliation_candidates, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','parent_value','direct_children_sum','leaf_descendants_sum','candidate_classification','notes'])}</div></details>
 <details class="panel collapsed-panel"><summary><h2>Related economy evidence</h2><span></span></summary><div><p class="subtle">Economies are calculated only after an APEC anchor fails. Failed examples are shown first; passing related contexts remain available as supporting evidence.</p>{_table_html(scoped_economy_examples, ['source_system','validation_axis','parent_code','other_axis_value','economy','scenario','year','status','parent_value','frontier_sum','difference','abs_error','reason','attribution_status','known_data_quality_exception','exception_id'])}</div></details>
-<details class="panel collapsed-panel"><summary><h2>Prepare reviewed source exception</h2><span></span></summary><div>{exception_candidate_controls}</div></details>
 <label class="zero-toggle"><input id="show-zero-children" type="checkbox" autocomplete="off" onchange="document.body.classList.toggle('show-zero-children', this.checked)"> Show zero-value children and mapped components</label>
 <section class="panel"><h2>NINTH flow tree: original vs mapped representation</h2><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, common_esto_tree, 'NINTH', anchor_mapped_component_context_values, dashboard_economy)}</section>
 <section class="panel"><h2>LEAP flow tree: original vs mapped representation</h2><p class="source-warning"><strong>Caution: treat this section as provisional.</strong> Apparent hierarchy or mapping problems can be caused by incomplete, flattened, inconsistent, or otherwise messy LEAP balance exports rather than by the mappings themselves. Do not rely on conclusions from this section until the relevant LEAP exports have been checked and confirmed.</p><p class="subtle">The right side uses the Common ESTO hierarchy, including structure-only ancestors where needed; otherwise it shows a direct fan-out.</p>{_paired_tree_html(leap_paired_summary, leap_tree, common_esto_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy)}</section>
@@ -2551,54 +2484,10 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
     # focused renderer so graph and table cannot drift onto different filters.
     raw_esto_context_script = ""
     extended_source_control_script = ""
-    exception_candidate_script = r"""
-<script>
-(() => {
-  let prepared = null;
-  const output = document.querySelector('#exception-candidate-output');
-  const csvValue = value => `"${String(value ?? '').replaceAll('"', '""')}"`;
-  document.querySelectorAll('.prepare-exception').forEach(button => {
-    button.addEventListener('click', () => {
-      const card = button.closest('.exception-candidate');
-      const base = JSON.parse(card.dataset.exceptionPayload);
-      const economy = card.querySelector('.exception-economy').value;
-      const scenarioMode = card.querySelector('.exception-scenario').value;
-      const yearMode = card.querySelector('.exception-year').value;
-      prepared = {
-        enabled: true,
-        review_status: 'needs_review',
-        exception_id: '',
-        issue_class: card.querySelector('.exception-class').value,
-        source_system: base.source_system,
-        validation_axis: base.validation_axis,
-        parent_code: base.parent_code,
-        other_axis_value: base.other_axis_value,
-        economy,
-        scenario: scenarioMode === 'all' ? 'all' : base.scenario,
-        year: yearMode === 'all' ? 'all' : base.year,
-        parent_value: base.parent_value,
-        notes: ''
-      };
-      output.value = JSON.stringify(prepared, null, 2);
-    });
-  });
-  document.querySelector('#download-exception-candidate')?.addEventListener('click', () => {
-    if (!prepared) return;
-    const headers = Object.keys(prepared);
-    const csv = `${headers.join(',')}\n${headers.map(key => csvValue(prepared[key])).join(',')}\n`;
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'}));
-    link.download = 'source_mismatch_allowed_candidate.csv';
-    link.click();
-    URL.revokeObjectURL(link.href);
-  });
-})();
-</script>
-"""
     html = html.replace(
         "</body></html>",
         all_sector_graph_script + raw_esto_context_script + extended_source_control_script
-        + exception_candidate_script + dashboard_guide["dialog_html"]
+        + dashboard_guide["dialog_html"]
         + f'<script>{dashboard_guide["script"]}</script></body></html>',
     )
     output_path = layout["dashboards"] / DIAGNOSTIC_PAGE_NAME
