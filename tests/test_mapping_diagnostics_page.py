@@ -6,9 +6,11 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     _aggregate_stage_validation_to_apec,
     _anchor_value_summary,
     _context_value_formatter,
+    _direct_parent_mapping_reconciles,
     _mapping_cardinality_diagnostics,
     _mapped_target_structure_html,
     _paired_anchor_aggregate_summary,
+    _paired_tree_html,
     _reviewed_anchor_exceptions,
     _rollup_boundary_details_html,
     _rollup_graph_data,
@@ -18,6 +20,133 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     prefer_compressed_csv_path,
     write_mapping_diagnostics_page,
 )
+
+
+def test_direct_parent_mapping_with_zero_difference_is_not_an_issue_card() -> None:
+    summary_row = type("SummaryRow", (), {
+        "parent_total": 1_064_256.45150299,
+        "raw_residual": 0.0,
+    })()
+    components = pd.DataFrame([
+        {
+            "raw_node_role": "parent",
+            "mapping_status": "mapped",
+            "common_row_id": "electricity-plants-electricity",
+            "mapped_value": 1_064_256.45150299,
+            "comparison_scope": "esto_leap_ninth",
+            "economy": "00APEC",
+            "scenario": "reference-and-target",
+            "year": "2030-2070",
+        },
+        {
+            "raw_node_role": "child",
+            "mapping_status": "missing_source_mapping:technology_leaf",
+            "common_row_id": "",
+            "mapped_value": 0.0,
+            "comparison_scope": "esto_leap_ninth",
+            "economy": "00APEC",
+            "scenario": "reference-and-target",
+            "year": "2030-2070",
+        },
+    ])
+
+    assert _direct_parent_mapping_reconciles(summary_row, components)
+
+
+def test_direct_parent_mapping_with_a_real_difference_remains_an_issue() -> None:
+    summary_row = type("SummaryRow", (), {
+        "parent_total": 10.0,
+        "raw_residual": 0.0,
+    })()
+    components = pd.DataFrame([{
+        "raw_node_role": "parent",
+        "mapping_status": "mapped",
+        "common_row_id": "mapped-parent",
+        "mapped_value": 9.0,
+        "comparison_scope": "esto_leap_ninth",
+        "economy": "00APEC",
+        "scenario": "reference",
+        "year": 2030,
+    }])
+
+    assert not _direct_parent_mapping_reconciles(summary_row, components)
+
+
+def test_paired_tree_hides_reconciled_parent_despite_unmapped_leaf_detail() -> None:
+    summary = pd.DataFrame([{
+        "validation_axis": "flow",
+        "other_axis_value": "17_electricity",
+        "parent_code": "09_total_transformation_sector/09_01_electricity_plants",
+        "parent_total": 1_064_256.45150299,
+        "children_total": 1_064_256.45150299,
+        "raw_residual": 0.0,
+        "mapped_frontier_total": 0.0,
+        "mapped_difference": 1_064_256.45150299,
+        "absolute_mismatch": 1_064_256.45150299,
+        "child_totals": {"09_01_01_coal_power": 124_705.685336873},
+        "scenarios": "reference, target",
+        "years": "2030, 2040, 2050, 2060, 2070",
+    }])
+    source_tree = pd.DataFrame([
+        {
+            "code": "09_total_transformation_sector/09_01_electricity_plants",
+            "label": "09_01_electricity_plants",
+            "is_subtotal": False,
+        },
+        {
+            "code": "09_01_01_coal_power",
+            "label": "09_01_01_coal_power",
+            "is_subtotal": False,
+        },
+    ])
+    components = pd.DataFrame([
+        {
+            "source_system": "NINTH",
+            "validation_axis": "flow",
+            "other_axis_value": "17_electricity",
+            "parent_code": "09_total_transformation_sector/09_01_electricity_plants",
+            "economy": "00APEC",
+            "scenario": "reference-and-target",
+            "year": "2030-2070",
+            "comparison_scope": "esto_leap_ninth",
+            "raw_node_role": "parent",
+            "raw_child_code": "09_total_transformation_sector/09_01_electricity_plants",
+            "mapping_status": "mapped",
+            "common_row_id": "electricity-plants-electricity",
+            "component_esto_flow": "09.01.01,09.02.01 Electricity plants",
+            "component_esto_product": "17 Electricity",
+            "mapped_value": 1_064_256.45150299,
+        },
+        {
+            "source_system": "NINTH",
+            "validation_axis": "flow",
+            "other_axis_value": "17_electricity",
+            "parent_code": "09_total_transformation_sector/09_01_electricity_plants",
+            "economy": "00APEC",
+            "scenario": "reference-and-target",
+            "year": "2030-2070",
+            "comparison_scope": "esto_leap_ninth",
+            "raw_node_role": "child",
+            "raw_child_code": "09_01_01_01_subcritical",
+            "mapping_status": "missing_source_mapping:09_01_01_01_subcritical",
+            "common_row_id": "",
+            "component_esto_flow": "",
+            "component_esto_product": "",
+            "mapped_value": 0.0,
+        },
+    ])
+
+    html = _paired_tree_html(
+        summary,
+        source_tree,
+        pd.DataFrame(),
+        "NINTH",
+        components,
+        "00APEC",
+    )
+
+    assert "No unresolved anchor differences" in html
+    assert "Unmapped source child" not in html
 
 
 def test_stage_validation_is_recalculated_on_apec_sum() -> None:

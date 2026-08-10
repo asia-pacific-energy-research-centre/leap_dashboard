@@ -773,6 +773,50 @@ def _tree_label_lookup(tree: pd.DataFrame) -> dict[str, str]:
     }
 
 
+def _direct_parent_mapping_reconciles(
+    row: object,
+    component_rows: pd.DataFrame,
+) -> bool:
+    """Return whether a directly mapped parent fully resolves this card.
+
+    Anchor validation deliberately tests mapped child frontiers, but some
+    source hierarchies are intentionally mapped at a coarser parent boundary.
+    When that direct parent mapping preserves the parent total and the raw
+    immediate children also reconcile, there is no unresolved difference to
+    show as an issue card.  Component fan-out that recombines into the same
+    Common ESTO row is counted once per context.
+    """
+    required = {
+        "raw_node_role", "mapping_status", "common_row_id", "mapped_value",
+        "comparison_scope", "economy", "scenario", "year",
+    }
+    if component_rows.empty or not required.issubset(component_rows.columns):
+        return False
+    parent_rows = component_rows[
+        component_rows["raw_node_role"].astype(str).eq("parent")
+        & component_rows["mapping_status"].astype(str).str.startswith("mapped")
+        & component_rows["common_row_id"].astype(str).ne("")
+    ].copy()
+    if parent_rows.empty:
+        return False
+    parent_rows["mapped_value"] = pd.to_numeric(
+        parent_rows["mapped_value"], errors="coerce"
+    ).fillna(0.0)
+    identity_columns = [
+        "comparison_scope", "economy", "scenario", "year", "common_row_id",
+    ]
+    mapped_parent_total = float(
+        parent_rows.drop_duplicates(identity_columns)["mapped_value"].sum()
+    )
+    parent_total = float(getattr(row, "parent_total"))
+    raw_residual = float(getattr(row, "raw_residual"))
+    tolerance = 1e-9 * max(abs(parent_total), abs(mapped_parent_total), 1.0)
+    return (
+        abs(parent_total - mapped_parent_total) <= tolerance
+        and abs(raw_residual) <= tolerance
+    )
+
+
 def _paired_tree_html(
     summary: pd.DataFrame,
     tree: pd.DataFrame,
@@ -818,6 +862,8 @@ def _paired_tree_html(
                     component_rows.groupby(component_scope_keys, dropna=False)["_scope_priority"].transform("min")
                 )
             ].drop(columns="_scope_priority")
+        if _direct_parent_mapping_reconciles(row, component_rows):
+            continue
         parent_mapping_excluded = False
         if not component_rows.empty and "raw_node_role" in component_rows.columns:
             parent_rows = component_rows[
@@ -907,6 +953,8 @@ def _paired_tree_html(
             f'<li class="tree-residual"><span>Anchor difference (parent − mapped total)</span><strong>{format_value(float(row.mapped_difference))}</strong></li>'
             f'</ul>{mapped_structure_note}{frontier_basis_note}{detail_shortfall_note}</section></div></article>'
         )
+    if not cards:
+        return '<p class="empty-state">No unresolved anchor differences for this dashboard economy.</p>'
     return "".join(cards)
 
 
