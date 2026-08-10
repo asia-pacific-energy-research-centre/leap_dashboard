@@ -248,7 +248,7 @@
     "page_label": "Energy balance overview",
     "overview_flow_codes": ["07", "12"],
     "demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"],
-    "supply_codes": ["01", "02", "03", "04", "05"],
+    "supply_codes": ["01", "02", "03", "04-05"],
     "tfec_enabled": false,
     "tfec_status": "Temporarily disabled because non-energy use cannot yet be separated from aggregated Other-sector LEAP demand.",
     "transformation_total": {
@@ -263,7 +263,7 @@
       "others": "#8b5cf6",
       "non_energy": "#94a3b8"
     },
-    "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports), 04 (International marine bunkers), and 05 (International aviation bunkers). Bunkers are supply deductions and are excluded from domestic demand. Stock changes (06) remain outside the projection-comparable total."
+    "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports), and the common 04-05 International transport (bunkers) comparison row. The combined bunker row is used in overview totals so its retained 04/05 source children are not counted again; the detailed children remain available on the Supply page. Bunkers are supply deductions and are excluded from domestic demand. Stock changes (06) remain outside the projection-comparable total."
   },
   "emissions_page": {
     "enabled": true,

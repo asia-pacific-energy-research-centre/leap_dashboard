@@ -6,7 +6,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from codebase.common_esto_dashboard_renderer import assign_pages
+from codebase.common_esto_dashboard_renderer import (
+    assign_pages,
+    code_expression_matches_prefix,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -31,10 +34,16 @@ def test_international_transport_routes_to_supply_and_supply_total() -> None:
     assigned = assign_pages(rows, template["sector_pages"], template.get("routing_special_cases", []))
 
     assert assigned.iloc[0]["_page_key"] == "supply"
-    assert template["total_demand_page"]["supply_codes"] == ["01", "02", "03", "04", "05"]
+    assert template["total_demand_page"]["supply_codes"] == ["01", "02", "03", "04-05"]
     assert "bunkers" not in {
         page["page_key"] for page in template["sector_pages"]
     }
+
+
+def test_exact_compound_code_can_be_selected_without_selecting_its_children() -> None:
+    assert code_expression_matches_prefix("04-05", "04-05")
+    assert not code_expression_matches_prefix("04", "04-05")
+    assert not code_expression_matches_prefix("05", "04-05")
 
 
 #%%

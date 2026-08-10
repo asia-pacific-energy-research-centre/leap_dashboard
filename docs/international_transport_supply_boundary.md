@@ -2,8 +2,10 @@
 
 International marine and aviation bunkers are outside domestic final demand.
 The Common ESTO dashboard therefore routes codes `04` and `05` to the Supply
-page and includes their signed values in both Energy balance overview supply
-composition charts.
+page and includes the signed combined `04-05` comparison row in both Energy
+balance overview supply composition charts. The overview uses that common row
+rather than also summing its retained `04` and `05` source children, which
+would count bunkers twice. The detailed children remain visible on Supply.
 
 LEAP's `All demand aggregated/International transport` placeholder is stored as
 a positive demand magnitude in the source export. The maintained mapping

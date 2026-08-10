@@ -323,6 +323,8 @@ def code_range_matches_prefix(start_code: str, end_code: str, prefix: str) -> bo
 
 def code_expression_matches_prefix(code_or_label: object, prefix: str) -> bool:
     """Return True when any component/range in a code expression matches a prefix."""
+    if str(code_or_label or "").strip() == str(prefix or "").strip():
+        return True
     for record in parse_code_expression(code_or_label):
         if code_range_matches_prefix(record.get("start", ""), record.get("end", ""), prefix):
             return True
