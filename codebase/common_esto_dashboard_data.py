@@ -940,6 +940,19 @@ def filter_template_for_leap_demand_coverage(
     show_aggregate_only = {
         str(key) for key in coverage_config.get("show_aggregate_only_page_keys", [])
     }
+    aggregate_only_page_branches = {
+        str(page_key): [
+            str(branch)
+            for branch in branches
+            if str(branch).casefold() in missing
+        ]
+        for page_key, branches in page_branches.items()
+    }
+    aggregate_only_page_branches = {
+        page_key: branches
+        for page_key, branches in aggregate_only_page_branches.items()
+        if branches
+    }
     pages_to_drop = {
         page_key
         for page_key, branches in page_branches.items()
@@ -948,12 +961,11 @@ def filter_template_for_leap_demand_coverage(
         and all(str(branch).casefold() in missing for branch in branches)
     }
     pages_to_drop |= always_skip
-    if not pages_to_drop:
-        return template
-
     out = dict(template)
     coverage_config = dict(coverage_config)
-    coverage_config["_hidden_page_keys"] = sorted(pages_to_drop)
+    coverage_config["_aggregate_only_page_branches"] = aggregate_only_page_branches
+    if pages_to_drop:
+        coverage_config["_hidden_page_keys"] = sorted(pages_to_drop)
     out["leap_demand_sector_coverage"] = coverage_config
     return out
 

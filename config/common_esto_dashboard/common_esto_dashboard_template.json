@@ -290,6 +290,7 @@
   },
   "leap_demand_sector_coverage": {
     "enabled": true,
+    "aggregate_placeholder_branch": "All demand aggregated",
     "show_aggregate_only_page_keys": ["industry", "transport", "buildings", "others"],
     "page_leap_branches": {
       "industry": ["Industry"],

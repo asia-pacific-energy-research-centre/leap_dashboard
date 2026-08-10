@@ -27,8 +27,8 @@ def test_index_and_chart_guides_have_different_steps() -> None:
     chart_script = build_guide_fragments("chart", "supply", "Supply")["script"]
     index_script = build_guide_fragments("index", "index", "Common ESTO Dashboard")["script"]
 
-    assert "Compare projection scenarios" in chart_script
-    assert "Compare projection scenarios" not in index_script
+    assert "Choose what you are viewing" in chart_script
+    assert "Choose what you are viewing" not in index_script
     assert "Choose where to begin" in index_script
     assert "What mapping diagnostics are for" in build_guide_fragments(
         "diagnostics", "mapping_diagnostics", "Mapping diagnostics"
@@ -102,8 +102,47 @@ def test_chart_guide_explains_the_overview_first_review_strategy() -> None:
 
     assert "Start with the summaries, not every chart" in chart_script
     assert "every valid flow-product pair" in chart_script
-    assert "Recommended way to use a dense page" in chart_script
-    assert chart_script.index("Start with the summaries") < chart_script.index("Read like with like")
+    assert "Recommended way to use a dense page" not in chart_script
+    assert chart_script.index("Start with the summaries") < chart_script.index(
+        "How the comparison basis sets the detail"
+    )
+
+
+def test_buildings_guide_accepts_rendered_tree_and_placeholder_context() -> None:
+    context = {
+        "page_tree": [
+            {
+                "label": "16.02 Residential",
+                "children": ["17 Electricity", "08.01 Natural gas"],
+            }
+        ],
+        "placeholder_status": (
+            "Placeholder in use: the LEAP 'All demand aggregated' branch supplies "
+            "Buildings on this page."
+        ),
+    }
+
+    script = build_guide_fragments("chart", "buildings", "Buildings", context)["script"]
+
+    assert "16.02 Residential" in script
+    assert "08.01 Natural gas" in script
+    assert "All demand aggregated" in script
+    assert "dashboard-guide-tree" in build_guide_fragments(
+        "chart", "buildings", "Buildings", context
+    )["dialog_html"]
+
+
+def test_chart_guide_combines_top_controls_and_drops_review_action() -> None:
+    script = build_guide_fragments("chart", "buildings", "Buildings")["script"]
+
+    assert "change economy" in script
+    assert "choose Reference or Target" in script
+    assert "select which datasets define the comparison basis" in script
+    assert "move between dashboard pages" in script
+    assert "Confirm the economy and update" not in script
+    assert "Compare projection scenarios" not in script
+    assert "Move through the energy system" not in script
+    assert "Turn a difference into a review action" not in script
 
 
 def test_index_guide_includes_the_recommended_review_route() -> None:

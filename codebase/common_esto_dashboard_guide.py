@@ -52,7 +52,12 @@ GUIDE_CSS = """
 .dashboard-guide-table table { width:100%;min-width:640px;border-collapse:collapse;color:#334155;font-size:13px; }
 .dashboard-guide-table th,.dashboard-guide-table td { padding:7px 9px;border-top:1px solid #dbe5ef;text-align:left;vertical-align:top; }
 .dashboard-guide-table th { background:#f8fafc;color:#0b3d5c; }
-.dashboard-guide-image[hidden],.dashboard-guide-gallery[hidden],.dashboard-guide-table[hidden] { display:none!important; }
+.dashboard-guide-tree { margin-top:14px;padding:12px 14px;border:1px solid #cbd8e7;border-radius:6px;background:#f8fafc;color:#334155;font-size:13px; }
+.dashboard-guide-tree ul { margin:5px 0 0;padding-left:22px; }
+.dashboard-guide-tree > ul { margin-top:0; }
+.dashboard-guide-tree li + li { margin-top:5px; }
+.dashboard-guide-tree strong { color:#0b3d5c; }
+.dashboard-guide-image[hidden],.dashboard-guide-gallery[hidden],.dashboard-guide-table[hidden],.dashboard-guide-tree[hidden] { display:none!important; }
 .dashboard-guide-actions { display:flex;align-items:center;justify-content:space-between;margin-top:17px; }
 .dashboard-guide-actions button { border:0;border-radius:6px;padding:9px 13px;background:transparent;color:#173452;font-weight:700;cursor:pointer; }
 .dashboard-guide-next { background:#1f6feb!important;color:#fff!important; }
@@ -82,6 +87,7 @@ GUIDE_DIALOG_HTML = """
     <button id="dashboard-guide-gallery-next" type="button" aria-label="Next screenshot">&rarr;</button>
   </div>
   <div id="dashboard-guide-table" class="dashboard-guide-table" hidden></div>
+  <div id="dashboard-guide-tree" class="dashboard-guide-tree" hidden></div>
   <div class="dashboard-guide-actions"><button id="dashboard-guide-back" type="button">Back</button><button id="dashboard-guide-next" class="dashboard-guide-next" type="button">Next <span aria-hidden="true">&rarr;</span></button></div>
 </aside>
 """
@@ -127,6 +133,12 @@ def validate_guide_config(config: dict) -> None:
                     raise ValueError(
                         f"{list_name} step {position} table rows must match the header count."
                     )
+            dynamic_content = str(step.get("dynamic_content", "")).strip()
+            if dynamic_content and dynamic_content not in {"page_tree", "placeholder_status"}:
+                raise ValueError(
+                    f"{list_name} step {position} has unsupported dynamic_content: "
+                    f"{dynamic_content}"
+                )
         return seen
 
     step_ids_by_list: dict[str, set[str]] = {}
@@ -155,7 +167,13 @@ def load_guide_config(config_path: str = str(DEFAULT_GUIDE_CONFIG_PATH)) -> dict
     return config
 
 
-def _resolved_steps(config: dict, page_kind: str, page_key: str, page_label: str) -> list[dict]:
+def _resolved_steps(
+    config: dict,
+    page_kind: str,
+    page_key: str,
+    page_label: str,
+    page_context: dict | None = None,
+) -> list[dict]:
     list_by_kind = {
         "chart": "chart_steps",
         "index": "index_steps",
@@ -172,12 +190,25 @@ def _resolved_steps(config: dict, page_kind: str, page_key: str, page_label: str
         source_steps[insert_at:insert_at] = page_specific_steps
     purposes = config["page_purposes"]
     page_purpose = str(purposes.get(page_key, purposes["default"]))
-    replacements = {"page_key": page_key, "page_label": page_label, "page_purpose": page_purpose}
+    context = page_context or {}
+    replacements = {
+        "page_key": page_key,
+        "page_label": page_label,
+        "page_purpose": page_purpose,
+        "placeholder_status": str(
+            context.get(
+                "placeholder_status",
+                "No aggregate LEAP placeholder is identified for this page.",
+            )
+        ),
+    }
     resolved: list[dict] = []
     for source in source_steps:
         step = dict(source)
         for field in ("title", "copy"):
             step[field] = str(step[field]).format(**replacements)
+        if step.get("dynamic_content") == "page_tree" and context.get("page_tree"):
+            step["tree"] = context["page_tree"]
         resolved.append(step)
     return resolved
 
@@ -209,6 +240,7 @@ def _guide_js(steps: list[dict], guide_label: str) -> str:
   var galleryPrevious = get('#dashboard-guide-gallery-previous');
   var galleryNext = get('#dashboard-guide-gallery-next');
   var tableContainer = get('#dashboard-guide-table');
+  var treeContainer = get('#dashboard-guide-tree');
   var back = get('#dashboard-guide-back');
   var next = get('#dashboard-guide-next');
   var closeButton = get('#dashboard-guide-close');
@@ -261,6 +293,27 @@ def _guide_js(steps: list[dict], guide_label: str) -> str:
     htmlTable.append(head, body);
     tableContainer.append(caption, htmlTable);
   }};
+  var renderTree = function(tree) {{
+    treeContainer.replaceChildren();
+    treeContainer.hidden = !tree || !tree.length;
+    if (!tree || !tree.length) return;
+    var root = document.createElement('ul');
+    tree.forEach(function(branch) {{
+      var item = document.createElement('li');
+      var label = document.createElement('strong');
+      label.textContent = branch.label || '';
+      item.appendChild(label);
+      var children = document.createElement('ul');
+      (branch.children || []).forEach(function(value) {{
+        var child = document.createElement('li');
+        child.textContent = value;
+        children.appendChild(child);
+      }});
+      item.appendChild(children);
+      root.appendChild(item);
+    }});
+    treeContainer.appendChild(root);
+  }};
   var show = function(index, stepDirection) {{
     direction = stepDirection || direction;
     current = findAvailableIndex(index, direction);
@@ -279,7 +332,8 @@ def _guide_js(steps: list[dict], guide_label: str) -> str:
     gallery.hidden = !galleryItems.length;
     if (galleryItems.length) renderGallery(); else {{ galleryImages.replaceChildren(); galleryCaption.textContent = ''; }}
     renderTable(step.table);
-    dialog.classList.toggle('guide-has-rich-content', Boolean(step.image || galleryItems.length || step.table));
+    renderTree(step.tree);
+    dialog.classList.toggle('guide-has-rich-content', Boolean(step.image || galleryItems.length || step.table || step.tree));
     back.style.visibility = current === 0 ? 'hidden' : 'visible';
     next.innerHTML = current === steps.length - 1 ? 'Done <span aria-hidden="true">✓</span>' : 'Next <span aria-hidden="true">→</span>';
     if (target) {{
@@ -341,12 +395,17 @@ def _guide_js(steps: list[dict], guide_label: str) -> str:
 """
 
 
-def build_guide_fragments(page_kind: str, page_key: str, page_label: str) -> dict[str, str]:
+def build_guide_fragments(
+    page_kind: str,
+    page_key: str,
+    page_label: str,
+    page_context: dict | None = None,
+) -> dict[str, str]:
     """Return the CSS, dialog HTML and script for one generated page."""
     if page_kind not in {"chart", "index", "diagnostics", "tree"}:
         raise ValueError(f"Unsupported guide page kind: {page_kind}")
     config = load_guide_config()
-    steps = _resolved_steps(config, page_kind, page_key, page_label)
+    steps = _resolved_steps(config, page_kind, page_key, page_label, page_context)
     return {
         "css": GUIDE_CSS,
         "dialog_html": GUIDE_DIALOG_HTML,

@@ -3113,7 +3113,7 @@ def _category_basis_switcher_html(
     if len(options) <= 1:
         return ""
     return (
-        '<label class="category-basis-switcher">'
+        '<label class="category-basis-switcher" data-guide-id="category-basis-switcher">'
         '<span>Common categories</span>'
         f'<select data-navigation-select data-category-basis-switcher aria-label="Choose datasets defining the common categories">{"".join(options)}</select>'
         '</label>'
@@ -3122,7 +3122,7 @@ def _category_basis_switcher_html(
 
 _DATASET_DISPLAY_LABELS = {"NINTH": "Ninth"}
 
-SHOW_DATASET_FILTER = True
+SHOW_DATASET_FILTER = False
 
 
 def _dataset_filter_html(datasets: list[str], comparison_scope: str = "default") -> str:
@@ -3306,6 +3306,57 @@ def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[str]]]:
     return [(sl, subs if len(subs) > 1 else []) for sl, subs in tree]
 
 
+def guide_page_tree(chart_rows: list[dict]) -> list[dict[str, object]]:
+    """Return the visible detail-chart flow/fuel tree used by the page guide."""
+    fuels_by_flow: dict[str, list[str]] = {}
+    for row in chart_rows:
+        if str(row.get("chart_type", "")) != "line":
+            continue
+        flow_label = str(
+            row.get("flow_group_label") or row.get("section_label") or ""
+        ).strip()
+        product_label = str(row.get("product_label") or "").strip()
+        if not flow_label or not product_label:
+            continue
+        fuels = fuels_by_flow.setdefault(flow_label, [])
+        if product_label not in fuels:
+            fuels.append(product_label)
+    return [
+        {"label": flow_label, "children": fuels}
+        for flow_label, fuels in fuels_by_flow.items()
+    ]
+
+
+def guide_placeholder_status(page_key: str, template: dict) -> str:
+    """Explain the mapping-owned aggregate placeholder for one demand page."""
+    coverage = template.get("leap_demand_sector_coverage", {}) or {}
+    placeholder_branch = str(
+        coverage.get("aggregate_placeholder_branch", "All demand aggregated")
+    ).strip()
+    page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
+    sectors = [str(value) for value in page_branches.get(page_key, []) if str(value).strip()]
+    if not sectors:
+        return (
+            "No aggregate LEAP placeholder is identified for this page in this economy. "
+            "The sectors and fuels shown above come from the separately available mapped detail."
+        )
+    sector_text = ", ".join(sectors)
+    return (
+        f"Placeholder in use: the LEAP '{placeholder_branch}' branch supplies "
+        f"{sector_text} on this page. This preserves the available total, but it means "
+        "LEAP does not yet provide the separate sector or subsector detail shown by the "
+        "other datasets. Treat that missing detail as unavailable, not as zero."
+    )
+
+
+def guide_page_context(page_key: str, chart_rows: list[dict], template: dict) -> dict:
+    """Build economy- and scope-specific guide content from the rendered page."""
+    return {
+        "page_tree": guide_page_tree(chart_rows),
+        "placeholder_status": guide_placeholder_status(page_key, template),
+    }
+
+
 def _line_sections_html(line_rows: list[dict], page_label: str) -> str:
     """Build section-grouped HTML for line charts, with subsections keyed by flow."""
     if not line_rows:
@@ -3387,6 +3438,7 @@ def write_dashboard_page(
     current_comparison_scope: str = "",
     dataset_filter_options: list[str] | None = None,
     dashboard_key_suffix: str = "",
+    guide_context: dict | None = None,
 ) -> None:
     """Write a polished HTML dashboard page with sticky header, lazy loading, and sorting."""
     page_label = str(page_config.get("page_label", "Dashboard"))
@@ -3424,7 +3476,12 @@ def write_dashboard_page(
     economy_ctx = f"Economy: <strong>{escape(economy_label)}</strong>" if economy_label else ""
     if economy_ctx and dashboard_updated_label:
         economy_ctx = f'{economy_ctx}<span class="dashboard-updated">Updated: {escape(dashboard_updated_label)}</span>'
-    guide = build_guide_fragments("chart", str(page_config.get("page_key", "")), page_label)
+    guide = build_guide_fragments(
+        "chart",
+        str(page_config.get("page_key", "")),
+        page_label,
+        guide_context,
+    )
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -3443,7 +3500,7 @@ def write_dashboard_page(
           <h1 style="margin:0;font-size:24px;line-height:1.15;">{escape(page_label)}</h1>
           {f'<div class="dashboard-context" data-guide-id="economy-context">{economy_ctx}</div>' if economy_ctx else ""}
         </div>
-        <div class="header-side-controls">
+        <div class="header-side-controls" data-guide-id="top-controls">
           {_SCENARIO_TOGGLE_HTML.replace('class="scenario-toggle"', 'class="scenario-toggle" data-guide-id="scenario-toggle"')}
           {switcher_html}
           {category_basis_html}
@@ -5102,6 +5159,7 @@ def render_dashboard(
             dashboard_switcher=dashboard_switcher,
             current_dashboard=current_dashboard,
             dashboard_updated_label=dashboard_updated_label,
+            guide_context=guide_page_context(page_key, chart_rows, template),
             **category_basis_ui_kwargs(template),
         )
         page_rows.append({

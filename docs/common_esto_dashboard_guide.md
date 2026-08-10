@@ -50,11 +50,12 @@ declares the mapping-owned comparison scope, label, source systems, and output
 suffix. The economy selector retains the active suffix, so changing economy
 does not silently change category basis.
 
-This selector is distinct from **Charts containing**. Common categories
-rebuilds every page from another common-axis scope. Charts containing only
-hides cards whose final Plotly figure lacks a selected source trace. Chart
-filter preferences are retained per comparison scope, and source buttons stay
-available even on pages where that source has no matching chart.
+The separate **Charts containing** dataset-presence filter is currently hidden
+because it added a second dataset chooser without materially improving the
+normal review route. **Common categories** remains the user-facing control: it
+rebuilds every page from another common-axis scope and therefore determines the
+detail that can be compared safely. The renderer retains dataset membership on
+chart cards so the filter can be restored later without changing chart data.
 
 Every dashboard page is a static HTML file with a `<script src="../chart_bundles/...">`
 tag pointing at its data by a **relative path**. That means:
@@ -251,8 +252,8 @@ The approved page-root ownership model, boundary-safe prefix rules,
 most-specific-root routing, explicit routing special cases, and the separate
 dataset-presence chart-filter contract are defined in
 [`dashboard_page_routing_and_chart_visibility.md`](dashboard_page_routing_and_chart_visibility.md).
-That document records the implemented most-specific-root routing, scope
-selector, and chart-presence filter contract.
+That document records the implemented most-specific-root routing and scope
+selector, plus the dormant chart-presence filter contract.
 
 `guide_config.json` contains the editable text and ordered steps for the
 top-right **Guide** button. It has separate step lists for the landing page,
@@ -270,12 +271,14 @@ for example, Refining must explain that standalone refinery own use is hidden
 because the valid LEAP-comparable row is the inclusive refinery boundary.
 
 To edit the tour, change a step's `title` or `copy`, or add a step with a unique
-`id` and a stable CSS `target`. A step may also include a `table` object with a
-`caption`, `headers`, and `rows`; this is useful for compact sign guides,
-inclusion boundaries, and review sequences. Use `optional: true` only when the
-target is legitimately absent on some rendered pages. The renderer validates
-required fields and duplicate IDs before it writes HTML; guide markup, styling,
-page-step insertion, and interaction code live in
+`id` and a stable CSS `target`. A step may include a `table` object with a
+`caption`, `headers`, and `rows`. The Buildings page also uses
+`dynamic_content: page_tree` to list the visible flow/fuel chart tree and
+`dynamic_content: placeholder_status` to explain economy-specific aggregate
+LEAP coverage resolved from the upstream mappings record. Use `optional: true`
+only when the target is legitimately absent on some rendered pages. The
+renderer validates required fields and duplicate IDs before it writes HTML;
+guide markup, styling, page-step insertion, and interaction code live in
 `codebase/common_esto_dashboard_guide.py`.
 
 Guide content should explain how to interpret and review the existing output,

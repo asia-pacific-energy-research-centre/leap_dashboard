@@ -33,6 +33,8 @@ from codebase.common_esto_dashboard_renderer import (
     color_for_code,
     color_for_plotting_name,
     drop_excluded_flow_rows,
+    guide_page_tree,
+    guide_placeholder_status,
     pick_area_specs,
     prepare_other_transformation_page_rows,
     render_dashboard,
@@ -324,7 +326,7 @@ def test_common_esto_dashboard_renders_core_pages_by_default(tmp_path: Path) -> 
         assert loadable_manifest_keys == bundle_keys
 
 
-def test_industry_filter_membership_tracks_temporary_leap_placeholder_detail(
+def test_dataset_membership_is_retained_on_cards_without_header_filter(
     tmp_path: Path,
 ) -> None:
     template = _load_template()
@@ -378,8 +380,8 @@ def test_industry_filter_membership_tracks_temporary_leap_placeholder_detail(
     )
     assert any("LEAP" in datasets and "Industry" in caption for datasets, caption in cards)
     assert any("LEAP" not in datasets and "Electricity" in caption for datasets, caption in cards)
-    assert "Charts containing:" in html
-    assert "No charts on this page show every selected dataset" in html
+    assert "Charts containing:" not in html
+    assert 'data-dataset-filter="LEAP"' not in html
 
 
 def test_category_basis_variants_preserve_page_economy_and_filter_options(
@@ -443,9 +445,9 @@ def test_category_basis_variants_preserve_page_economy_and_filter_options(
     assert "../../20USA__esto_leap/dashboards/transport.html" in default_html
     assert "../../20USA/dashboards/transport.html" in two_way_html
     assert "../../01AUS__esto_leap/dashboards/transport.html" in two_way_html
-    assert 'data-dataset-filter="NINTH"' in default_html
+    assert 'data-dataset-filter="NINTH"' not in default_html
     assert 'data-dataset-filter="NINTH"' not in two_way_html
-    assert "common-esto-dataset-filter:' + scope" in default_html
+    assert "Charts containing:" not in default_html
     assert "data-dataset-filter-section" in default_html
     assert "dataset-group-empty" in default_html
     default_manifest = pd.read_csv(
@@ -774,6 +776,47 @@ def test_aggregate_only_demand_pages_remain_visible_but_unmapped_page_is_hidden(
     )
 
     assert filtered["leap_demand_sector_coverage"]["_hidden_page_keys"] == ["bunkers"]
+    assert filtered["leap_demand_sector_coverage"]["_aggregate_only_page_branches"] == {
+        "industry": ["Industry"],
+        "transport": ["Transport non road"],
+        "buildings": ["Buildings"],
+        "others": ["Other sector"],
+        "bunkers": ["Transport non road"],
+    }
+
+
+def test_buildings_guide_context_uses_visible_chart_tree_and_mapping_placeholder() -> None:
+    chart_rows = [
+        {
+            "chart_type": "stacked_area",
+            "flow_group_label": "Buildings summary",
+            "product_label": "Overview",
+        },
+        {
+            "chart_type": "line",
+            "flow_group_label": "16.02 Residential",
+            "product_label": "17 Electricity",
+        },
+        {
+            "chart_type": "line",
+            "flow_group_label": "16.02 Residential",
+            "product_label": "08.01 Natural gas",
+        },
+    ]
+    template = filter_template_for_leap_demand_coverage(
+        _load_template(), ["Buildings"]
+    )
+
+    assert guide_page_tree(chart_rows) == [
+        {
+            "label": "16.02 Residential",
+            "children": ["17 Electricity", "08.01 Natural gas"],
+        }
+    ]
+    status = guide_placeholder_status("buildings", template)
+    assert "All demand aggregated" in status
+    assert "Buildings" in status
+    assert "unavailable, not as zero" in status
 
 
 def test_aggregate_placeholder_overviews_require_leap_rows() -> None:
@@ -938,7 +981,8 @@ def test_common_esto_dashboard_writes_page_aware_guides(tmp_path: Path) -> None:
         assert "dashboard-guide-highlight" in html
 
     assert "Use Transport to review road and non-road energy demand" in transport_html
-    assert "Compare projection scenarios" in transport_html
+    assert "Choose what you are viewing" in transport_html
+    assert "How the comparison basis sets the detail" in transport_html
     assert 'data-guide-id="page-navigation"' in transport_html
     assert 'data-guide-id="chart-card"' in transport_html
     assert "Choose where to begin" in index_html

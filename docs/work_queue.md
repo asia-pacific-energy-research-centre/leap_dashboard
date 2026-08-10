@@ -29,6 +29,11 @@ These later commits supersede the corresponding snapshot rows below:
   A second content pass adds evidence-backed page-specific review guidance,
   sign and boundary tables, a recommended review route, and clearer diagnostic
   interpretation without changing mapping semantics.
+  A 2026-08-10 guide refinement merges the header controls into one step,
+  explains how comparison scope changes the lowest common category detail,
+  builds the Buildings flow/fuel tree from the rendered page, and reports its
+  mapping-resolved aggregate placeholder. The redundant **Charts containing**
+  control is hidden while card-level dataset membership remains available.
 
 - **DASHQ-003 and DASHQ-004 are complete in the current documentation
   checkout.** `docs/handover_mapping_diagnostics.md` now retains the original

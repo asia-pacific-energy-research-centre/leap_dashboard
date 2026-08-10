@@ -265,25 +265,17 @@
     "buildings": [
       {
         "id": "buildings-page-scope",
-        "target": "[data-guide-id='chart-card']",
+        "target": "[data-guide-id='section-navigation'], [data-guide-id='chart-card']",
         "title": "What appears on Buildings",
-        "copy": "Buildings combines the Common ESTO demand trees for commercial and public services and residential energy use.",
-        "table": {
-          "caption": "Buildings page contents",
-          "headers": ["Area", "Generally included", "Important quirk"],
-          "rows": [
-            ["Flows", "Commercial and public services (16.01), Residential (16.02), and supported descendants such as datacentres", "Datacentre detail appears only where the shared structure and data provide it."],
-            ["Products", "Electricity, gas, oil products, coal, heat, renewables and other reported building fuels", "The product mix often matters more than the total when reviewing electrification."],
-            ["Aggregate-only LEAP", "Some economies report only an aggregate Buildings branch", "The page keeps that honest aggregate instead of allocating it between residential, commercial or datacentres."],
-            ["How to diagnose", "Compare the Buildings total, then residential/commercial and fuel composition", "Check activity, service demand, efficiency and fuel-switching assumptions before treating a difference as mapping error."]
-          ]
-        }
+        "copy": "This tree is generated from the Buildings charts on this page. It shows each available sector or subsector and the fuels compared for it; the contents can change with the economy and comparison basis.",
+        "dynamic_content": "page_tree"
       },
       {
         "id": "buildings-review",
         "target": "[data-guide-id='chart-card']",
-        "title": "Check detail availability before explaining a split",
-        "copy": "Buildings covers residential plus commercial and public services, with datacentres where the shared structure supports them. If LEAP is aggregate-only for this economy, the page preserves that honest boundary instead of inventing a residential, commercial or datacentre allocation."
+        "title": "Check whether Buildings uses a placeholder",
+        "copy": "{placeholder_status}",
+        "dynamic_content": "placeholder_status"
       }
     ],
     "others": [
@@ -424,22 +416,10 @@
       "copy": "{page_purpose} The dashboard is a review surface, not the model itself: investigate and correct material issues in LEAP or the relevant upstream data, then rerun the dashboard."
     },
     {
-      "id": "economy",
-      "target": "[data-guide-id='economy-context']",
-      "title": "Confirm the economy and update",
-      "copy": "Check the economy before interpreting a result. The update label records when this rendered dashboard was built; it is not the date of every underlying source observation."
-    },
-    {
-      "id": "scenario",
-      "target": "[data-guide-id='scenario-toggle']",
-      "title": "Compare projection scenarios",
-      "copy": "Use the scenario control to compare the configured projection pathways. ESTO remains the historical comparator; LEAP and 9th Outlook traces change where the selected scenario is available. A missing trace is not converted to zero."
-    },
-    {
-      "id": "page-navigation",
-      "target": "[data-guide-id='page-navigation']",
-      "title": "Move through the energy system",
-      "copy": "Use these page links to move from the whole-system overview through Demand, Transformation, Supply and Emissions. The current page is outlined in blue."
+      "id": "top-controls",
+      "target": "[data-guide-id='top-controls']",
+      "title": "Choose what you are viewing",
+      "copy": "Use the controls at the top to change economy, choose Reference or Target when scenario options are available, select which datasets define the comparison basis, and move between dashboard pages. The comparison basis changes the detail that can be compared safely and is explained later in this guide."
     },
     {
       "id": "section-navigation",
@@ -452,29 +432,19 @@
       "id": "overview-first",
       "target": "[data-guide-id='chart-card']",
       "title": "Start with the summaries, not every chart",
-      "copy": "These pages deliberately preserve the comparison tree. Each relevant flow can be crossed with every product or fuel reported for it, and every valid flow-product pair needs a chart comparing the available datasets. On large pages, the number of detail charts therefore grows with both the flow tree and product coverage. That detail is retained for drill-down and auditability; reviewers are not expected to read every chart.",
-      "table": {
-        "caption": "Recommended way to use a dense page",
-        "headers": ["Review stage", "What to do"],
-        "rows": [
-          ["Start at the top", "Use the page-level stacked-area summaries for the main totals, composition and direction of change."],
-          ["Scan section summaries", "Where enough detail exists, a section or subsection opens with stacked-area charts that condense its flows and products."],
-          ["Drill down selectively", "Use the section chips and sorting controls when a summary shows a material difference or an unexpected trend."],
-          ["Keep the detail as evidence", "Open individual flow-product charts when you need the exact dataset comparison or need to trace the cause upstream."]
-        ]
-      }
+      "copy": "These pages deliberately preserve the comparison tree. Each relevant flow can be crossed with every product or fuel reported for it, and every valid flow-product pair needs a chart comparing the available datasets. On large pages, the number of detail charts therefore grows with both the flow tree and product coverage. Start with the page and section summaries, then open detail charts only where a material difference or unexpected trend needs investigation."
     },
     {
       "id": "chart-card",
-      "target": "[data-guide-id='chart-card']",
-      "title": "Read like with like",
-      "copy": "Each chart compares sources after they have been merged and aggregated onto the lowest common flow and product categories they can all express without splitting a source value. A broad generated label can therefore be the correct comparison boundary, not a loss of data. Hover for exact values and use the legend to isolate a trace."
+      "target": "[data-guide-id='category-basis-switcher'], [data-guide-id='chart-card']",
+      "title": "How the comparison basis sets the detail",
+      "copy": "The comparison basis chooses which datasets define the common categories. It shows the most detailed category every participating dataset can represent without splitting a value, while keeping ESTO-style codes and names where possible. For example, the 9th Outlook has one category for coal products, so LEAP + ESTO + Ninth shows 02.01-02.08 Coal products; with only LEAP + ESTO, the basis can show the individual 02.x fuels."
     },
     {
       "id": "chart-tools",
       "target": "[data-guide-id='chart-card'] .lazy-chart-plot",
       "title": "Use the chart tools",
-      "copy": "Hover to inspect a year, drag to zoom, double-click to reset and use the Plotly toolbar to download a chart. Inputs to transformation are normally negative and outputs positive; page and chart notes call out important sign conventions."
+      "copy": "Hover to inspect a year, drag to zoom and double-click the chart to reset the view. Click a legend item to remove that series; double-click it to show only that series, then double-click again to restore the others. Use the Plotly toolbar to download a chart. Inputs to transformation are normally negative and outputs positive; page and chart notes call out important sign conventions."
     },
     {
       "id": "sorting",
@@ -482,12 +452,6 @@
       "title": "Find material differences first",
       "copy": "Default preserves the configured order. Largest total finds the biggest parts of the system; Largest difference and Largest % diff help triage disagreements over the available comparison periods. A large percentage on a tiny series still needs judgement, and missing values are not treated as zero.",
       "optional": true
-    },
-    {
-      "id": "review-workflow",
-      "target": "[data-guide-id='review-workflow']",
-      "title": "Turn a difference into a review action",
-      "copy": "Start with material totals, identify the first year and source that diverge, then check signs, comparison boundary and source coverage before diagnosing the cause. A difference can reflect a model assumption, source revision, supported level of detail or a real mapping issue. Correct the owning model, source data, mapping or dashboard rule, rerun, and keep the explanation with the review evidence. Never edit generated HTML."
     }
   ],
   "index_steps": [

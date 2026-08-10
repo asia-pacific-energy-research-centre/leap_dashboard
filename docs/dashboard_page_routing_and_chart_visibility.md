@@ -184,6 +184,12 @@ scope keeps the old URLs; alternate scopes never overwrite it.
 
 ## Dataset-presence chart filter
 
+**Current UI status (2026-08-10): hidden.** The comparison-scope selector is
+the useful dataset-related control for ordinary review, so the additional
+**Charts containing** chooser is not rendered. Chart cards still carry dataset
+membership and the filtering implementation remains available if a reviewed
+use case justifies restoring it.
+
 The dataset-presence filter answers a different question from the comparison-
 scope selector:
 
@@ -200,9 +206,10 @@ categories are hidden. This is transitional, not an enduring Industry rule:
 once detailed LEAP Industry categories are available, every detailed chart
 that actually contains a LEAP trace must remain visible under the LEAP filter.
 
-### Current implementation
+### Dormant implementation
 
-The renderer enables this control with `SHOW_DATASET_FILTER = True`. It:
+The renderer hides this control with `SHOW_DATASET_FILTER = False`. When
+enabled, it:
 
 - derives each card's comma-separated `data-datasets` membership from the
   final Plotly figure's non-empty traces and `layout.meta.trace_meta`;
