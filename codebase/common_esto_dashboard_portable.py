@@ -53,6 +53,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     filter_ninth_pre_base_year_data,
     filter_template_for_leap_demand_coverage,
     load_common_esto_data,
+    load_source_category_map,
 )
 from common_esto_dashboard_output_layout import build_output_layout  # noqa: E402
 from common_esto_dashboard_renderer import render_dashboard, set_code_colors_path  # noqa: E402
@@ -78,6 +79,8 @@ REQUIRED_DASHBOARD_INPUTS = {
 #: Optional inputs. Absent ones fall back to a documented default.
 OPTIONAL_DASHBOARD_INPUTS = {
     "code_colors_path": "Per-axis ESTO code colour map (code_colors.json)",
+    "source_to_common_map_path": "LEAP/9th native-source to Common ESTO map",
+    "esto_to_common_map_path": "ESTO component to Common ESTO map",
 }
 
 
@@ -102,6 +105,8 @@ def render_common_esto_dashboard(
     series_config_path: Path | str,
     output_root: Path | str,
     code_colors_path: Path | str | None = None,
+    source_to_common_map_path: Path | str | None = None,
+    esto_to_common_map_path: Path | str | None = None,
     comparison_scope: str = "esto_leap_ninth",
     wide_file_scope: str = "esto_leap_ninth",
     min_year: int | None = 2010,
@@ -118,6 +123,11 @@ def render_common_esto_dashboard(
     than a lookup because the record that answers it is owned by ``leap_mappings``
     (``config/all_demand_aggregated_components.json``); passing an empty sequence
     renders every sector page.
+
+    ``source_to_common_map_path`` and ``esto_to_common_map_path`` are optional
+    provenance inputs for the guide's native-category table. When omitted, the
+    dashboard still renders and the table retains the Common categories with
+    unavailable source cells.
     """
     economy_key = normalize_dashboard_economy_key(economy)
     if code_colors_path is not None:
@@ -127,7 +137,12 @@ def render_common_esto_dashboard(
         template,
         list(missing_leap_demand_branches),
     )
+    template["_active_comparison_scope"] = comparison_scope
     series_config = json.loads(Path(series_config_path).read_text(encoding="utf-8"))
+    source_category_map = load_source_category_map(
+        Path(source_to_common_map_path) if source_to_common_map_path is not None else None,
+        Path(esto_to_common_map_path) if esto_to_common_map_path is not None else None,
+    )
 
     raw_df = load_common_esto_data(
         Path(comparison_data_path),
@@ -189,6 +204,7 @@ def render_common_esto_dashboard(
         layout,
         scope_df=scope_visible_df,
         dashboard_updated_label=dashboard_updated_label,
+        source_category_map=source_category_map,
     )
 
     return {

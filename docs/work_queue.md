@@ -31,9 +31,11 @@ These later commits supersede the corresponding snapshot rows below:
   interpretation without changing mapping semantics.
   A 2026-08-10 guide refinement merges the header controls into one step,
   explains how comparison scope changes the lowest common category detail,
-  builds the Buildings flow/fuel tree from the rendered page, and reports its
-  mapping-resolved aggregate placeholder. The redundant **Charts containing**
-  control is hidden while card-level dataset membership remains available.
+  builds the Buildings category-provenance table from the rendered page and
+  published source mappings, and reports its mapping-resolved aggregate
+  placeholder both in the guide and at the top of the page. The redundant
+  **Charts containing** control is hidden while card-level dataset membership
+  remains available.
 
 - **DASHQ-003 and DASHQ-004 are complete in the current documentation
   checkout.** `docs/handover_mapping_diagnostics.md` now retains the original

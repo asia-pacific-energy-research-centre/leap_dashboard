@@ -121,6 +121,12 @@ onto `common_product_label`, then a merge and a multiply. That is the shape the
 rest is heading towards, though its factor *resolution* is mapping work that is
 scheduled to move upstream.
 
+The upstream repository now also publishes
+`results/common_esto/source_to_common_esto_map.csv` for LEAP and 9th native
+categories, alongside `esto_to_common_esto_map.csv` for ESTO components. The
+dashboard uses these files as read-only provenance for its guide tables; it
+does not use them to reimplement the upstream value conversion.
+
 **Target.** This dashboard converts the original datasets at render time by
 calling an importable function published by `leap_mappings`, using a per-scope
 `(source_system, native flow, native product) -> common_row_id` table. One merge

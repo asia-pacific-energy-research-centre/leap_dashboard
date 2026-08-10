@@ -147,6 +147,63 @@ COMPONENT_METADATA_COLUMNS = [
     "non_expanding_contributor_inputs",
 ]
 
+SOURCE_CATEGORY_MAP_COLUMNS = [
+    "comparison_scope",
+    "source_system",
+    "source_flow",
+    "source_product",
+    "common_flow_label",
+    "common_product_label",
+    "common_row_id",
+]
+
+
+def load_source_category_map(
+    source_to_common_map_path: Path | None = None,
+    esto_to_common_map_path: Path | None = None,
+) -> pd.DataFrame:
+    """Load published native-source provenance for Common ESTO rows."""
+    frames: list[pd.DataFrame] = []
+    if source_to_common_map_path is not None:
+        source_map = pd.read_csv(Path(source_to_common_map_path), dtype=str).fillna("")
+        missing = [
+            column for column in SOURCE_CATEGORY_MAP_COLUMNS
+            if column not in source_map.columns
+        ]
+        if missing:
+            raise ValueError(
+                f"Source-to-Common map is missing columns: {missing}"
+            )
+        frames.append(source_map[SOURCE_CATEGORY_MAP_COLUMNS].copy())
+
+    if esto_to_common_map_path is not None:
+        esto_map = pd.read_csv(Path(esto_to_common_map_path), dtype=str).fillna("")
+        required = [
+            "comparison_scope",
+            "component_esto_flow",
+            "component_esto_product",
+            "common_flow_label",
+            "common_product_label",
+            "common_row_id",
+        ]
+        missing = [column for column in required if column not in esto_map.columns]
+        if missing:
+            raise ValueError(f"ESTO-to-Common map is missing columns: {missing}")
+        esto_map = esto_map.rename(
+            columns={
+                "component_esto_flow": "source_flow",
+                "component_esto_product": "source_product",
+            }
+        )
+        esto_map["source_system"] = "ESTO"
+        frames.append(esto_map[SOURCE_CATEGORY_MAP_COLUMNS].copy())
+
+    if not frames:
+        return pd.DataFrame(columns=SOURCE_CATEGORY_MAP_COLUMNS)
+    combined = pd.concat(frames, ignore_index=True)
+    combined["source_system"] = combined["source_system"].astype(str).str.upper()
+    return combined.drop_duplicates(SOURCE_CATEGORY_MAP_COLUMNS).reset_index(drop=True)
+
 
 def filter_ninth_pre_base_year_data(
     df: pd.DataFrame,

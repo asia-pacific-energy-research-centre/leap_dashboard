@@ -3306,25 +3306,90 @@ def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[str]]]:
     return [(sl, subs if len(subs) > 1 else []) for sl, subs in tree]
 
 
-def guide_page_tree(chart_rows: list[dict]) -> list[dict[str, object]]:
-    """Return the visible detail-chart flow/fuel tree used by the page guide."""
-    fuels_by_flow: dict[str, list[str]] = {}
+def _mapping_cell(rows: pd.DataFrame, column: str) -> str:
+    """Return sorted unique mapping labels for one guide-table cell."""
+    if rows.empty or column not in rows.columns:
+        return "—"
+    values = sorted(
+        {
+            str(value).strip()
+            for value in rows[column]
+            if str(value).strip()
+        },
+        key=str.casefold,
+    )
+    return "\n".join(values) if values else "—"
+
+
+def guide_page_mapping_table(
+    chart_rows: list[dict],
+    source_category_map: pd.DataFrame | None,
+    comparison_scope: str,
+) -> dict[str, object]:
+    """Build a native-source provenance table for visible detail charts."""
+    mapping = (
+        source_category_map.copy()
+        if source_category_map is not None
+        else pd.DataFrame()
+    )
+    if comparison_scope and not mapping.empty and "comparison_scope" in mapping.columns:
+        mapping = mapping[
+            mapping["comparison_scope"].astype(str) == comparison_scope
+        ].copy()
+
+    visible_pairs: list[tuple[str, str, str]] = []
     for row in chart_rows:
         if str(row.get("chart_type", "")) != "line":
             continue
-        flow_label = str(
-            row.get("flow_group_label") or row.get("section_label") or ""
-        ).strip()
-        product_label = str(row.get("product_label") or "").strip()
-        if not flow_label or not product_label:
-            continue
-        fuels = fuels_by_flow.setdefault(flow_label, [])
-        if product_label not in fuels:
-            fuels.append(product_label)
-    return [
-        {"label": flow_label, "children": fuels}
-        for flow_label, fuels in fuels_by_flow.items()
-    ]
+        pair = (
+            str(row.get("common_row_id") or "").strip(),
+            str(row.get("flow_group_label") or row.get("section_label") or "").strip(),
+            str(row.get("product_label") or "").strip(),
+        )
+        if pair[1] and pair[2] and pair not in visible_pairs:
+            visible_pairs.append(pair)
+
+    table_rows: list[list[str]] = []
+    for common_row_id, common_flow, common_product in visible_pairs:
+        if not mapping.empty and common_row_id and "common_row_id" in mapping.columns:
+            mapped = mapping[mapping["common_row_id"].astype(str) == common_row_id]
+        elif not mapping.empty:
+            mapped = mapping[
+                (mapping["common_flow_label"].astype(str) == common_flow)
+                & (mapping["common_product_label"].astype(str) == common_product)
+            ]
+        else:
+            mapped = mapping
+
+        source_cells: list[str] = []
+        for source_system in ("ESTO", "LEAP", "NINTH"):
+            source_rows = (
+                mapped[mapped["source_system"].astype(str).str.upper() == source_system]
+                if not mapped.empty and "source_system" in mapped.columns
+                else mapped
+            )
+            source_cells.extend(
+                [
+                    _mapping_cell(source_rows, "source_flow"),
+                    _mapping_cell(source_rows, "source_product"),
+                ]
+            )
+        table_rows.append([common_flow, common_product, *source_cells])
+
+    return {
+        "caption": "Page categories and published source mappings",
+        "headers": [
+            "Common sector",
+            "Common fuel",
+            "ESTO sector",
+            "ESTO fuel",
+            "LEAP sector",
+            "LEAP fuel",
+            "9th sector",
+            "9th fuel",
+        ],
+        "rows": table_rows,
+    }
 
 
 def guide_placeholder_status(page_key: str, template: dict) -> str:
@@ -3349,12 +3414,40 @@ def guide_placeholder_status(page_key: str, template: dict) -> str:
     )
 
 
-def guide_page_context(page_key: str, chart_rows: list[dict], template: dict) -> dict:
+def page_placeholder_note(page_key: str, template: dict) -> str:
+    """Return a visible page-top note when mapped sector detail is unavailable."""
+    coverage = template.get("leap_demand_sector_coverage", {}) or {}
+    page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
+    sectors = [str(value) for value in page_branches.get(page_key, []) if str(value).strip()]
+    if not sectors:
+        return ""
+    placeholder_branch = str(
+        coverage.get("aggregate_placeholder_branch", "All demand aggregated")
+    ).strip()
+    return (
+        f"LEAP placeholder in use: '{placeholder_branch}' supplies "
+        f"{', '.join(sectors)} on this page. Detailed LEAP sector and subsector "
+        "values are not yet available; missing detail should not be read as zero."
+    )
+
+
+def guide_page_context(
+    page_key: str,
+    chart_rows: list[dict],
+    template: dict,
+    source_category_map: pd.DataFrame | None = None,
+) -> dict:
     """Build economy- and scope-specific guide content from the rendered page."""
-    return {
-        "page_tree": guide_page_tree(chart_rows),
+    context = {
         "placeholder_status": guide_placeholder_status(page_key, template),
     }
+    if page_key == "buildings":
+        context["page_mapping_table"] = guide_page_mapping_table(
+            chart_rows,
+            source_category_map,
+            str(template.get("_active_comparison_scope", "")),
+        )
+    return context
 
 
 def _line_sections_html(line_rows: list[dict], page_label: str) -> str:
@@ -4873,6 +4966,7 @@ def render_dashboard(
     scope_df: pd.DataFrame | None = None,
     dashboard_updated_label: str = "",
     additional_pages: list[dict[str, str]] | None = None,
+    source_category_map: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Render page bundles, dashboard pages, and a chart manifest."""
     series_labels = series_config.get("series_labels", {})
@@ -5140,6 +5234,12 @@ def render_dashboard(
                 "product_label": product_display,
                 "section_label": section_label,
                 "flow_group_label": str(flow_label),
+                "common_row_id": (
+                    str(pair_rows["common_row_id"].mode().iloc[0])
+                    if "common_row_id" in pair_rows.columns
+                    and not pair_rows["common_row_id"].dropna().empty
+                    else ""
+                ),
                 "datasets": chart_dataset_tokens_from_figure(chart_figure),
                 **metrics,
             })
@@ -5158,8 +5258,14 @@ def render_dashboard(
             economy_label=economy_label,
             dashboard_switcher=dashboard_switcher,
             current_dashboard=current_dashboard,
+            page_note=page_placeholder_note(page_key, template),
             dashboard_updated_label=dashboard_updated_label,
-            guide_context=guide_page_context(page_key, chart_rows, template),
+            guide_context=guide_page_context(
+                page_key,
+                chart_rows,
+                template,
+                source_category_map,
+            ),
             **category_basis_ui_kwargs(template),
         )
         page_rows.append({

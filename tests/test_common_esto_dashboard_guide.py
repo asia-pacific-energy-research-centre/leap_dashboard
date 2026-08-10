@@ -101,21 +101,21 @@ def test_chart_guide_explains_the_overview_first_review_strategy() -> None:
     chart_script = build_guide_fragments("chart", "industry", "Industry")["script"]
 
     assert "Start with the summaries, not every chart" in chart_script
-    assert "every valid flow-product pair" in chart_script
+    assert "Start with the summary charts at the top" in chart_script
+    assert "detailed sector-and-fuel charts" in chart_script
     assert "Recommended way to use a dense page" not in chart_script
     assert chart_script.index("Start with the summaries") < chart_script.index(
         "How the comparison basis sets the detail"
     )
 
 
-def test_buildings_guide_accepts_rendered_tree_and_placeholder_context() -> None:
+def test_buildings_guide_accepts_mapping_table_and_placeholder_context() -> None:
     context = {
-        "page_tree": [
-            {
-                "label": "16.02 Residential",
-                "children": ["17 Electricity", "08.01 Natural gas"],
-            }
-        ],
+        "page_mapping_table": {
+            "caption": "Page categories and published source mappings",
+            "headers": ["Common sector", "Common fuel", "LEAP sector"],
+            "rows": [["16.02 Residential", "17 Electricity", "Buildings"]],
+        },
         "placeholder_status": (
             "Placeholder in use: the LEAP 'All demand aggregated' branch supplies "
             "Buildings on this page."
@@ -125,9 +125,10 @@ def test_buildings_guide_accepts_rendered_tree_and_placeholder_context() -> None
     script = build_guide_fragments("chart", "buildings", "Buildings", context)["script"]
 
     assert "16.02 Residential" in script
-    assert "08.01 Natural gas" in script
+    assert "17 Electricity" in script
+    assert "LEAP sector" in script
     assert "All demand aggregated" in script
-    assert "dashboard-guide-tree" in build_guide_fragments(
+    assert "dashboard-guide-table" in build_guide_fragments(
         "chart", "buildings", "Buildings", context
     )["dialog_html"]
 

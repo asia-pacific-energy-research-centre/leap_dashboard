@@ -15,6 +15,7 @@ from codebase.common_esto_dashboard_data import (
     filter_common_esto_data,
     filter_ninth_pre_base_year_data,
     filter_template_for_leap_demand_coverage,
+    load_source_category_map,
     load_common_esto_data,
 )
 from codebase.common_esto_dashboard_emissions import select_emissions_component_rows
@@ -33,8 +34,9 @@ from codebase.common_esto_dashboard_renderer import (
     color_for_code,
     color_for_plotting_name,
     drop_excluded_flow_rows,
-    guide_page_tree,
+    guide_page_mapping_table,
     guide_placeholder_status,
+    page_placeholder_note,
     pick_area_specs,
     prepare_other_transformation_page_rows,
     render_dashboard,
@@ -785,7 +787,7 @@ def test_aggregate_only_demand_pages_remain_visible_but_unmapped_page_is_hidden(
     }
 
 
-def test_buildings_guide_context_uses_visible_chart_tree_and_mapping_placeholder() -> None:
+def test_buildings_guide_context_uses_source_mapping_and_placeholder() -> None:
     chart_rows = [
         {
             "chart_type": "stacked_area",
@@ -796,27 +798,120 @@ def test_buildings_guide_context_uses_visible_chart_tree_and_mapping_placeholder
             "chart_type": "line",
             "flow_group_label": "16.02 Residential",
             "product_label": "17 Electricity",
+            "common_row_id": "residential_electricity",
         },
         {
             "chart_type": "line",
             "flow_group_label": "16.02 Residential",
             "product_label": "08.01 Natural gas",
+            "common_row_id": "residential_gas",
         },
     ]
     template = filter_template_for_leap_demand_coverage(
         _load_template(), ["Buildings"]
     )
 
-    assert guide_page_tree(chart_rows) == [
-        {
-            "label": "16.02 Residential",
-            "children": ["17 Electricity", "08.01 Natural gas"],
-        }
+    source_map = pd.DataFrame(
+        [
+            {
+                "comparison_scope": "esto_leap_ninth",
+                "source_system": "ESTO",
+                "source_flow": "16.02 Residential",
+                "source_product": "17 Electricity",
+                "common_flow_label": "16.02 Residential",
+                "common_product_label": "17 Electricity",
+                "common_row_id": "residential_electricity",
+            },
+            {
+                "comparison_scope": "esto_leap_ninth",
+                "source_system": "LEAP",
+                "source_flow": "All demand aggregated/Buildings",
+                "source_product": "Electricity",
+                "common_flow_label": "16.02 Residential",
+                "common_product_label": "17 Electricity",
+                "common_row_id": "residential_electricity",
+            },
+            {
+                "comparison_scope": "esto_leap_ninth",
+                "source_system": "NINTH",
+                "source_flow": "16_other_sector/16_02_residential",
+                "source_product": "17_electricity",
+                "common_flow_label": "16.02 Residential",
+                "common_product_label": "17 Electricity",
+                "common_row_id": "residential_electricity",
+            },
+        ]
+    )
+    table = guide_page_mapping_table(
+        chart_rows,
+        source_map,
+        "esto_leap_ninth",
+    )
+    assert table["headers"] == [
+        "Common sector",
+        "Common fuel",
+        "ESTO sector",
+        "ESTO fuel",
+        "LEAP sector",
+        "LEAP fuel",
+        "9th sector",
+        "9th fuel",
+    ]
+    assert table["rows"][0] == [
+        "16.02 Residential",
+        "17 Electricity",
+        "16.02 Residential",
+        "17 Electricity",
+        "All demand aggregated/Buildings",
+        "Electricity",
+        "16_other_sector/16_02_residential",
+        "17_electricity",
     ]
     status = guide_placeholder_status("buildings", template)
     assert "All demand aggregated" in status
     assert "Buildings" in status
     assert "unavailable, not as zero" in status
+    note = page_placeholder_note("buildings", template)
+    assert "LEAP placeholder in use" in note
+    assert "missing detail should not be read as zero" in note
+
+
+def test_source_category_map_combines_native_and_esto_mappings(tmp_path: Path) -> None:
+    source_path = tmp_path / "source_to_common.csv"
+    esto_path = tmp_path / "esto_to_common.csv"
+    pd.DataFrame(
+        [
+            {
+                "comparison_scope": "esto_leap_ninth",
+                "source_system": "LEAP",
+                "source_flow": "Buildings",
+                "source_product": "Electricity",
+                "common_flow_label": "16.01-16.02 Buildings",
+                "common_product_label": "17 Electricity",
+                "common_row_id": "buildings_electricity",
+            }
+        ]
+    ).to_csv(source_path, index=False)
+    pd.DataFrame(
+        [
+            {
+                "comparison_scope": "esto_leap_ninth",
+                "component_esto_flow": "16.02 Residential",
+                "component_esto_product": "17 Electricity",
+                "common_flow_label": "16.01-16.02 Buildings",
+                "common_product_label": "17 Electricity",
+                "common_row_id": "buildings_electricity",
+                "component_sign": 1,
+            }
+        ]
+    ).to_csv(esto_path, index=False)
+
+    combined = load_source_category_map(source_path, esto_path)
+
+    assert set(combined["source_system"]) == {"LEAP", "ESTO"}
+    esto_row = combined[combined["source_system"] == "ESTO"].iloc[0]
+    assert esto_row["source_flow"] == "16.02 Residential"
+    assert esto_row["source_product"] == "17 Electricity"
 
 
 def test_aggregate_placeholder_overviews_require_leap_rows() -> None:

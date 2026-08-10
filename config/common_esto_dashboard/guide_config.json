@@ -267,8 +267,8 @@
         "id": "buildings-page-scope",
         "target": "[data-guide-id='section-navigation'], [data-guide-id='chart-card']",
         "title": "What appears on Buildings",
-        "copy": "This tree is generated from the Buildings charts on this page. It shows each available sector or subsector and the fuels compared for it; the contents can change with the economy and comparison basis.",
-        "dynamic_content": "page_tree"
+        "copy": "This table is generated from the Buildings charts and the published mappings. It shows each Common sector and fuel on this page beside the native ESTO, LEAP and 9th categories mapped into it. The contents can change with the economy and comparison basis.",
+        "dynamic_content": "page_mapping_table"
       },
       {
         "id": "buildings-review",
@@ -432,7 +432,7 @@
       "id": "overview-first",
       "target": "[data-guide-id='chart-card']",
       "title": "Start with the summaries, not every chart",
-      "copy": "These pages deliberately preserve the comparison tree. Each relevant flow can be crossed with every product or fuel reported for it, and every valid flow-product pair needs a chart comparing the available datasets. On large pages, the number of detail charts therefore grows with both the flow tree and product coverage. Start with the page and section summaries, then open detail charts only where a material difference or unexpected trend needs investigation."
+      "copy": "Start with the summary charts at the top of the page. Use the section summaries to spot important differences or unusual trends, then open the detailed sector-and-fuel charts only where you need to investigate further."
     },
     {
       "id": "chart-card",

@@ -426,6 +426,12 @@ when their LEAP projection is still supplied by an `All demand aggregated`
 placeholder. These are transitional sector rows and should remain reviewable
 until detailed LEAP demand branches replace them upstream.
 
+When a visible page uses one of these placeholders, show a page-top note naming
+the placeholder branch and the affected page sector. The guide's page-content
+table must use the published source-to-Common mappings to show which native
+ESTO, LEAP, and 9th flow/product categories feed each visible Common category;
+do not reconstruct that provenance from display-label similarity.
+
 Do not apply this exception to Bunkers. International bunkers are outside the
 four domestic demand placeholders and remain hidden when their LEAP branch is
 aggregate-only.
@@ -456,6 +462,8 @@ become visible once it contains LEAP data.
   page roots; isolated the combined placeholder as an exact special case; and
   made Non-energy visibility depend on usable LEAP coverage rather than a
   permanent skip list.
+- 2026-08-10: Added visible page-top placeholder notices and mapping-backed
+  page-content provenance tables to the dashboard guide.
 
 ## DASH-013: Gas-works own use is shown only in the shared transformation boundary
 

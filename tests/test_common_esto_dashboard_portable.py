@@ -70,7 +70,11 @@ def test_required_inputs_are_declared_for_every_path_argument() -> None:
 
 
 def test_optional_inputs_are_declared() -> None:
-    assert set(OPTIONAL_DASHBOARD_INPUTS) == {"code_colors_path"}
+    assert set(OPTIONAL_DASHBOARD_INPUTS) == {
+        "code_colors_path",
+        "source_to_common_map_path",
+        "esto_to_common_map_path",
+    }
 
 
 def test_code_colors_path_can_be_redirected_and_restored(tmp_path: Path) -> None:

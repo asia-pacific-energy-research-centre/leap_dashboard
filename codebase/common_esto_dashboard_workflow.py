@@ -17,6 +17,9 @@
 #   Optional override for dashboard input CSV path.
 # COMMON_ESTO_ROWS_PATH
 #   Optional override for common rows CSV path.
+# COMMON_ESTO_SOURCE_TO_COMMON_MAP_PATH / COMMON_ESTO_ESTO_TO_COMMON_MAP_PATH
+#   Optional overrides for the published native-source provenance maps used by
+#   guide page-content tables.
 # LEAP_MAPPINGS_ROOT
 #   Optional sibling-repository root. Defaults to ../leap_mappings.
 # COMMON_ESTO_PUBLISH_TO_DOCS
@@ -57,6 +60,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     filter_common_esto_data,
     filter_template_for_leap_demand_coverage,
     load_common_esto_data,
+    load_source_category_map,
 )
 from common_esto_dashboard_emissions import set_leap_mappings_root  # noqa: E402
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
@@ -161,6 +165,18 @@ OUTPUT_CONTRACT_PATH = _resolve(
     os.getenv("COMMON_ESTO_OUTPUT_CONTRACT_PATH", str(DEFAULT_OUTPUT_CONTRACT_PATH))
 )
 COMMON_ROWS_PATH = _resolve(os.getenv("COMMON_ESTO_ROWS_PATH", str(_LEAP_MAPPINGS_RESULTS / "common_esto_rows.csv")))
+SOURCE_TO_COMMON_MAP_PATH = _resolve(
+    os.getenv(
+        "COMMON_ESTO_SOURCE_TO_COMMON_MAP_PATH",
+        str(_LEAP_MAPPINGS_RESULTS / "source_to_common_esto_map.csv"),
+    )
+)
+ESTO_TO_COMMON_MAP_PATH = _resolve(
+    os.getenv(
+        "COMMON_ESTO_ESTO_TO_COMMON_MAP_PATH",
+        str(_LEAP_MAPPINGS_RESULTS / "esto_to_common_esto_map.csv"),
+    )
+)
 DATASET_REGISTRY_PATH = _resolve(
     os.getenv(
         "COMMON_ESTO_DATASET_REGISTRY_PATH",
@@ -422,7 +438,10 @@ def category_basis_options(economy: str, definitions: list[dict[str, object]]) -
     ]
 
 
-def run_dashboard_for_economy(economy: str) -> dict[str, object]:
+def run_dashboard_for_economy(
+    economy: str,
+    source_category_map: pd.DataFrame | None = None,
+) -> dict[str, object]:
     """Render every configured Common-category basis for one economy."""
     economy = str(economy).replace("_", "").strip()
     base_template = load_json(TEMPLATE_PATH)
@@ -433,6 +452,11 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
     definitions = configured_comparison_scopes(base_template)
     selector_options = category_basis_options(economy, definitions)
     series_config = json.loads(SERIES_CONFIG_PATH.read_text(encoding="utf-8"))
+    if source_category_map is None:
+        source_category_map = load_source_category_map(
+            SOURCE_TO_COMMON_MAP_PATH,
+            ESTO_TO_COMMON_MAP_PATH,
+        )
     raw_df = load_common_esto_data(
         INPUT_DATA_PATH,
         wide_file_scope=WIDE_FILE_SCOPE,
@@ -531,6 +555,7 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
                     "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
                 },
             ],
+            source_category_map=source_category_map,
         )
         scope_result: dict[str, object] = {
             "comparison_scope": comparison_scope,
@@ -661,11 +686,18 @@ def run_dashboard_workflow() -> dict[str, object]:
 
     print(f"Configured economies: {', '.join(configured_economies)}")
     shared_mapping_diagnostics = run_shared_mapping_diagnostics()
+    source_category_map = load_source_category_map(
+        SOURCE_TO_COMMON_MAP_PATH,
+        ESTO_TO_COMMON_MAP_PATH,
+    )
     economy_results: dict[str, dict[str, object]] = {}
     for idx, economy in enumerate(configured_economies, start=1):
         print("-" * 72)
         print(f"[{idx}/{len(configured_economies)}] Rendering economy: {economy}")
-        economy_results[economy] = run_dashboard_for_economy(economy)
+        economy_results[economy] = run_dashboard_for_economy(
+            economy,
+            source_category_map,
+        )
 
     total_charts = sum(int(result.get("chart_count", 0)) for result in economy_results.values())
     print("-" * 72)
