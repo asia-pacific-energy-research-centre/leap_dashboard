@@ -1,6 +1,6 @@
 # Handover: Mapping diagnostics development
 
-Updated: 2026-07-30
+Updated: 2026-08-10
 
 ## Purpose
 
@@ -25,7 +25,7 @@ The production dashboard also renders the same page under each economy's
 | Diagnostics page renderer | `codebase/common_esto_dashboard_mapping_diagnostics.py` | Builds the self-contained HTML, rollup cards/SVG, anchor sections, and mapping QA tables. |
 | Production dashboard workflow | `codebase/common_esto_dashboard_workflow.py` | Loads Common ESTO data, invokes the diagnostics page renderer, and adds the page to dashboard navigation. |
 | Lightweight USA prototype renderer | `scripts/render_transformation_rollup_diagnostics_prototype.py` | Regenerates the page above without running the entire dashboard. |
-| Full mapping tree explorer | `scripts/render_full_mapping_tree_explorer.py` | Renders the separate interactive original-source / ESTO / Common ESTO tree explorer. |
+| Standalone full mapping tree explorer | `scripts/render_full_mapping_tree_explorer.py` | Retained as a manual structural investigation tool; it is no longer generated or linked by the production dashboard workflow. |
 | Diagnostics tests | `tests/test_mapping_diagnostics_page.py` | Focused renderer tests. |
 
 The mapping inputs and generated Common ESTO data live in the sibling repo:
@@ -49,7 +49,6 @@ The page currently contains:
   coverage sections.
 - Paired raw-source versus mapped-Common-ESTO views for NINTH and LEAP anchor
   cases.
-- A separate **Full mapping tree explorer** page linked from the dashboard.
 
 The SVG and rollup-boundary cards share Dataset, Scenario, and Year controls.
 Values are green only when a rollup target equals the listed contributors within
@@ -405,6 +404,9 @@ Useful current helpers are `_paired_anchor_aggregate_summary()`,
 
 ### 2. Full mapping tree explorer
 
+As of 2026-08-10, the production workflow no longer renders or links this page.
+The standalone renderer is retained only for deliberate manual investigations.
+
 The explorer already offers source-tree selection, year/scenario selectors,
 mapping-label modes, node search, and an ESTO Extended preference checkbox.
 The next agent should make its relationship to the diagnostics page clearer:
@@ -473,9 +475,8 @@ commits and should be retained alongside the diagnostics-page work:
 - `scripts/render_full_mapping_tree_explorer.py` is the active full-tree
   renderer. The older `render_mapping_tree_explorer_prototype.py` is the
   earlier three-case prototype and should not be extended for new work.
-- `common_esto_dashboard_workflow.py` writes the explorer to each economy's
-  `dashboards/mapping_tree_explorer.html` and adds it to the dashboard
-  navigation. The prototype output is only for manual inspection.
+- `common_esto_dashboard_workflow.py` does not write or link the explorer.
+  Outputs from the standalone renderer are only for manual inspection.
 - Explorer numeric values are summed over all economies for the selected
   source system, comparison scope, selected year, and selected scenario. They
   are not a new validator calculation. Repeated `common_row_id` values are

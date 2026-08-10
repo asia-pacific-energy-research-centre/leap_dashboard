@@ -319,7 +319,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "parent", "raw_child_code": "09_total", "component_esto_flow": "09 Total", "component_esto_product": "08.01 Gas", "common_row_id": "parent", "mapped_value": 10.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "parent", "raw_child_code": "09_total", "component_esto_flow": "09 Extra", "component_esto_product": "08.01 Gas", "common_row_id": "extra", "mapped_value": 1.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "child", "raw_child_code": "09_child", "component_esto_flow": "09.00 Total", "component_esto_product": "08.01 Gas", "common_row_id": "common", "mapped_value": 7.0, "mapping_status": "mapped"},
-        {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_child_code": "missing_child", "component_esto_flow": "", "component_esto_product": "", "common_row_id": "", "mapped_value": 0.0, "mapping_status": "missing_source_mapping:missing_child"},
+        {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "child", "raw_child_code": "missing_child", "component_esto_flow": "", "component_esto_product": "", "common_row_id": "", "mapped_value": 0.0, "mapping_status": "missing_source_mapping:missing_child"},
+        {"source_system": "LEAP", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "child", "raw_child_code": "foreign_child", "component_esto_flow": "09 Foreign source row", "component_esto_product": "08.01 Gas", "common_row_id": "foreign", "mapped_value": 999.0, "mapping_status": "mapped"},
     ]).to_csv(tree_root / "source_parent_anchor_mapped_component_context_values.csv", index=False)
     pd.DataFrame([{
         "enabled": False, "source_system": "NINTH", "validation_axis": "flow",
@@ -371,22 +372,23 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "LEAP flow tree: original vs mapped representation" in html
     assert "Original raw source tree" in html
     assert "Original source parent" in html
-    assert "Validator mapped total (detail incomplete)" in html
-    assert "The mapped rows shown above add to" in html
+    assert "Unique mapped comparison total" in html
+    assert "The mapped rows shown above add to" not in html
     assert "Mapped Common ESTO representation" in html
-    assert "Mapped Common ESTO hierarchy" in html
-    assert "09 Total / 08.01 Gas" in html
+    assert "09.00 Total / 08.01 Gas" in html
+    assert "09 Total / 08.01 Gas" not in html
+    assert "09 Foreign source row" not in html
     assert ">10<" in html
     assert ">20<" not in html
     assert "Manual LEAP roll-up" in html
     assert "Raw roll-up: this source parent" not in html
-    assert "Mapped target hierarchy" in html
-    assert "Direct mapping fan-out" not in html
+    assert "Direct mapping fan-out" in html
+    assert "A direct mapping exists for the raw source parent" in html
     assert '<li class="tree-category"><span>Original source children</span></li>' in html
     assert "Show zero-value children and mapped components" in html
     assert "optional-zero" in html
     assert "onchange=\"document.body.classList.toggle('show-zero-children', this.checked)\"" in html
-    assert "Missing source mapping" not in html
+    assert "Unmapped source child: missing_child" in html
     assert "Confirmed source issues attached to anchor evidence" in html
     assert "Confirmed source issues among failed anchor rows" in html
     assert "Unconfirmed failed anchor rows" in html

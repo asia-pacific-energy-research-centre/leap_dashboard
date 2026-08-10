@@ -68,7 +68,6 @@ from common_esto_dashboard_mapping_diagnostics import (  # noqa: E402
     write_mapping_diagnostics_page,
 )
 from mapping_pipeline_provenance import selected_run_metadata  # noqa: E402
-from scripts.render_full_mapping_tree_explorer import render_full_tree_explorer  # noqa: E402
 
 
 #%%
@@ -518,11 +517,6 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         sign_summary_df.to_csv(
             layout["supporting"] / "sign_semantics_summary.csv", index=False
         )
-        tree_link = (
-            "mapping_tree_explorer.html"
-            if definition["is_default"]
-            else f"../../{economy}/dashboards/mapping_tree_explorer.html"
-        )
         manifest_df = render_dashboard(
             visible_df,
             scope_template,
@@ -535,11 +529,6 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
                     "page_key": "mapping_diagnostics",
                     "page_label": "Mapping diagnostics",
                     "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
-                },
-                {
-                    "page_key": "mapping_tree_explorer",
-                    "page_label": "Full mapping tree explorer",
-                    "file": tree_link,
                 },
             ],
         )
@@ -568,11 +557,6 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
 
     if default_layout is None or default_result is None:
         raise RuntimeError("No default comparison-scope dashboard was rendered.")
-    mapping_tree_explorer = render_full_tree_explorer(
-        output_path=default_layout["dashboards"] / "mapping_tree_explorer.html",
-        comparison_data=raw_df,
-        prefer_extended_esto=PREFER_EXTENDED_ESTO,
-    )
     convergence_result = write_capacity_unmet_convergence_page(
         CAPACITY_UNMET_CONVERGENCE_PATH,
         default_layout,
@@ -613,7 +597,6 @@ def run_dashboard_for_economy(economy: str) -> dict[str, object]:
         "default_chart_count": default_result["chart_count"],
         "scope_results": scope_results,
         "mapping_diagnostics": mapping_diagnostics,
-        "mapping_tree_explorer": str(mapping_tree_explorer),
     }
     if convergence_result:
         result["capacity_unmet_convergence"] = convergence_result

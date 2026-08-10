@@ -265,13 +265,39 @@ def _mapped_target_structure_html(
     ESTO parent/child relationship. Mapping routes from source parent/children
     are deliberately not used as hierarchy edges.
     """
+    unresolved = component_rows[
+        ~component_rows["mapping_status"].astype(str).str.startswith("mapped")
+    ].copy()
+    unresolved_items: list[str] = []
+    dedupe_columns = [
+        column for column in ["raw_child_code", "mapping_status"]
+        if column in unresolved.columns
+    ]
+    if dedupe_columns:
+        unresolved = unresolved.drop_duplicates(dedupe_columns)
+    for item in unresolved.itertuples(index=False):
+        status = str(getattr(item, "mapping_status", "unresolved_mapping"))
+        raw_child = str(getattr(item, "raw_child_code", "")).strip()
+        if status.startswith("missing_source_mapping:"):
+            missing_code = status.split(":", 1)[1].strip() or raw_child
+            label = f"Unmapped source child: {missing_code}"
+        elif status == "component_not_registered_in_common_esto":
+            label = f"Mapped component is not registered in Common ESTO: {raw_child}"
+        else:
+            label = f"Unresolved mapped-frontier component: {raw_child or status}"
+        unresolved_items.append(
+            f'<li class="tree-unresolved"><span>{escape(label)}</span><strong>issue</strong></li>'
+        )
+    unresolved_html = "".join(unresolved_items)
+
     mapped = component_rows[
         component_rows["mapping_status"].astype(str).str.startswith("mapped")
         & component_rows["common_row_id"].astype(str).ne("")
     ].copy()
     if mapped.empty:
         return (
-            '<li><span>No mapped Common ESTO rows are available.</span><strong>—</strong></li>',
+            unresolved_html
+            + '<li><span>No mapped Common ESTO frontier rows are available.</span><strong>—</strong></li>',
             "",
             expected_total == 0,
         )
@@ -337,7 +363,7 @@ def _mapped_target_structure_html(
 
     if has_hierarchy:
         roots = sorted(key for key in display_keys if key not in {child for children in hierarchy_children.values() for child in children})
-        body = '<li class="tree-category"><span>Mapped Common ESTO hierarchy</span></li>'
+        body = unresolved_html + '<li class="tree-category"><span>Mapped Common ESTO hierarchy</span></li>'
         def render_node(key: tuple[str, str], depth: int = 0) -> str:
             item = target_item(key, child=depth > 0)
             return item + "".join(
@@ -352,7 +378,7 @@ def _mapped_target_structure_html(
         )
         return body, note, detail_matches_total
 
-    body = '<li class="tree-category"><span>Direct mapping fan-out</span></li>'
+    body = unresolved_html + '<li class="tree-category"><span>Direct mapping fan-out</span></li>'
     for key in sorted(target_keys):
         body += target_item(key)
     note = (
@@ -778,7 +804,8 @@ def _paired_tree_html(
             for child, value in sorted(row.child_totals.items())
         )
         component_rows = mapped_components[
-            (mapped_components["validation_axis"].astype(str) == str(row.validation_axis))
+            (mapped_components["source_system"].astype(str) == source_system)
+            & (mapped_components["validation_axis"].astype(str) == str(row.validation_axis))
             & (mapped_components["other_axis_value"].astype(str) == str(row.other_axis_value))
             & (mapped_components["parent_code"].astype(str) == str(row.parent_code))
             & (mapped_components["economy"].astype(str).str.replace("_", "", regex=False) == economy)
@@ -791,6 +818,21 @@ def _paired_tree_html(
                     component_rows.groupby(component_scope_keys, dropna=False)["_scope_priority"].transform("min")
                 )
             ].drop(columns="_scope_priority")
+        parent_mapping_excluded = False
+        if not component_rows.empty and "raw_node_role" in component_rows.columns:
+            parent_rows = component_rows[
+                component_rows["raw_node_role"].astype(str).eq("parent")
+            ]
+            parent_mapping_excluded = bool(
+                parent_rows["mapping_status"].astype(str).str.startswith("mapped").any()
+            )
+            # Anchor validation compares the raw parent with the de-duplicated
+            # mapped frontier reached from its children. A direct mapping of
+            # the parent is useful provenance, but it is not part of that
+            # tested frontier and must not be displayed as if it reconciled it.
+            component_rows = component_rows[
+                component_rows["raw_node_role"].astype(str).eq("child")
+            ].copy()
         if not component_rows.empty:
             component_rows["mapped_value"] = pd.to_numeric(component_rows["mapped_value"], errors="coerce").fillna(0.0)
             mapped_branch_html, mapped_structure_note, detail_matches_total = _mapped_target_structure_html(
@@ -817,6 +859,12 @@ def _paired_tree_html(
         raw_rollup_note = (
             '<p class="helper-note">Manual LEAP roll-up: this constructed subtotal is compared with its immediate source-tree children.</p>'
             if str(row.parent_code) in manual_rollup_codes else ""
+        )
+        frontier_basis_note = (
+            '<p class="helper-note">A direct mapping exists for the raw source parent, but this '
+            'anchor check does not count it. The tested frontier is built from mapped source '
+            'children, so unmapped children remain an issue.</p>'
+            if parent_mapping_excluded else ""
         )
         source_warning = (
             '<p class="source-warning">Source-data warning: the raw parent is 0 while its children sum to a non-zero value. '
@@ -857,7 +905,7 @@ def _paired_tree_html(
             f'{mapped_branch_html}'
             f'<li class="tree-total"><span>{"Unique mapped comparison total" if detail_matches_total else "Validator mapped total (detail incomplete)"}</span><strong>{format_value(float(row.mapped_frontier_total))}</strong></li>'
             f'<li class="tree-residual"><span>Anchor difference (parent − mapped total)</span><strong>{format_value(float(row.mapped_difference))}</strong></li>'
-            f'</ul>{mapped_structure_note}{detail_shortfall_note}</section></div></article>'
+            f'</ul>{mapped_structure_note}{frontier_basis_note}{detail_shortfall_note}</section></div></article>'
         )
     return "".join(cards)
 

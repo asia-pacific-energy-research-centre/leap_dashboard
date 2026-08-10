@@ -3,7 +3,7 @@
 
 ``common_esto_dashboard_workflow.py`` is the maintainer-facing notebook workflow:
 it resolves sibling-repository paths, refreshes upstream data, renders the shared
-mapping-diagnostics page and the full mapping tree explorer, and executes its own
+mapping-diagnostics page, and executes its own
 run block at import time. That makes it unsuitable for reuse as a library and
 impossible to package for a machine that has no ``leap_mappings`` checkout.
 
@@ -17,7 +17,6 @@ Deliberately **not** included here (they need ``leap_mappings`` artifacts that a
 portable package does not carry):
 
 - the shared mapping-diagnostics page (``common_esto_dashboard_mapping_diagnostics``);
-- the full mapping tree explorer (``scripts/render_full_mapping_tree_explorer``);
 - the capacity-unmet convergence page (needs a ``leap_initialisation`` run CSV);
 - the upstream Common ESTO fast-path data refresh;
 - the Emissions page. ``render_dashboard`` still offers it, but its factor
