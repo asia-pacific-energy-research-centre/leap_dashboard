@@ -43,6 +43,7 @@ from codebase.common_esto_dashboard_renderer import (
     render_dashboard,
     select_transformation_total_rows,
     _build_section_aggregate_charts,
+    _build_flow_group_aggregate_charts,
     _build_td_fuel_chart,
     _build_supply_stack_chart,
     _add_signed_stack_traces,
@@ -2595,6 +2596,80 @@ def test_other_transformation_section_summaries_are_promoted_to_overview() -> No
     ]
     assert all(row["section_label"] == "Overview" for row in chart_rows)
     assert all(row["section_label"] == "Overview" for row in manifest_rows)
+
+
+def test_flow_group_aggregates_replace_hierarchy_parents_with_safe_summaries() -> None:
+    flow_rows = [
+        ("ESTO", "historical", 2022, "09", "09 Total transformation sector", "19 Total", -50.0),
+        ("ESTO", "historical", 2022, "09.06", "09.06 Gas processing plants", "06 Natural gas", -30.0),
+        ("LEAP", "Target", 2023, "09.06.01", "09.06.01 Gas works plants", "06 Natural gas", -12.0),
+        ("LEAP", "Target", 2023, "09.06.02", "09.06.02 Liquefaction/regasification plants", "06 Natural gas", -18.0),
+        ("ESTO", "historical", 2022, "09.08", "09.08 Coal transformation", "01 Coal", -20.0),
+        ("LEAP", "Target", 2023, "09.08.01", "09.08.01 Coke ovens", "01 Coal", -11.0),
+        ("LEAP", "Target", 2023, "09.08.02", "09.08.02 Blast furnaces", "01 Coal", -9.0),
+    ]
+    rows = pd.DataFrame(
+        [
+            {
+                "comparison_scope": "esto_leap_ninth",
+                "economy": "20_USA",
+                "source_system": source,
+                "scenario": scenario,
+                "year": year,
+                "common_flow_code": flow_code,
+                "common_flow_label": flow_label,
+                "common_product_code": product_label.split(" ", 1)[0],
+                "common_product_label": product_label,
+                "is_non_expanding_rollup": False,
+                "_section_label": "Other transformation (including own use)",
+                "value": value,
+            }
+            for source, scenario, year, flow_code, flow_label, product_label, value in flow_rows
+        ]
+    )
+    template = {
+        "chart_generation": {
+            "primary_area_source_system": "LEAP",
+            "primary_area_scenario": "Target",
+            "comparison_source_system": "ESTO",
+            "ninth_source_system": "NINTH",
+            "base_year": 2022,
+            "suppression_threshold": 1.0,
+        }
+    }
+
+    charts, chart_rows, manifest_rows = _build_flow_group_aggregate_charts(
+        rows,
+        page_key="other_transformation",
+        page_label="Other transformation",
+        parent_flow_labels={
+            "09 Total transformation sector",
+            "09.06 Gas processing plants",
+            "09.08 Coal transformation",
+        },
+        template=template,
+        series_labels={"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
+    )
+
+    parent_keys = {
+        "chart__area__flowgroup_parent__other_transformation__09_06__product",
+        "chart__area__flowgroup_parent__other_transformation__09_08__product",
+    }
+    assert parent_keys.issubset(charts)
+    assert "chart__area__flowgroup_parent__other_transformation__09__product" not in charts
+    assert {
+        row["flow_group_label"]
+        for row in chart_rows
+        if row["chart_key"] in parent_keys
+    } == {"09.06 Gas processing plants", "09.08 Coal transformation"}
+    gas_manifest = next(
+        row for row in manifest_rows
+        if row["chart_key"].endswith("09_06__product")
+    )
+    assert gas_manifest["source_flow_labels"] == (
+        "09.06 Gas processing plants | 09.06.01 Gas works plants | "
+        "09.06.02 Liquefaction/regasification plants"
+    )
 
 
 def test_chart_chrome_resolves_duplicate_configured_category_colours() -> None:

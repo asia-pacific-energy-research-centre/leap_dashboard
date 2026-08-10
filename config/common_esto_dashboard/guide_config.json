@@ -10,8 +10,8 @@
     "others": "Use Other demand to review agriculture, fishing, non-specified demand and aggregate-only demand that has not yet been replaced by detailed LEAP branches.",
     "non_energy": "Use Non-energy use to review fuels consumed as feedstocks or materials rather than as an energy source.",
     "power": "Use Power to review electricity and heat generation, fuel inputs and outputs. LEAP's power transformation modules do not measure power-sector own use or losses within the transformation process. These are represented separately, so the charts on this page let you analyse power-sector own use and losses alongside the transformation results.",
-    "refining": "Use Refining to review refinery inputs, oil-product outputs and differences that may indicate a yield, capacity or balance issue.",
-    "other_transformation": "Use Other transformation to review conversion processes and transfers that sit outside power and refining.",
+    "refining": "Use Refining to review refinery inputs, petroleum-product outputs and refinery own use together. In LEAP, refinery own use is measured in the Auxiliary Fuel Use branch of the refining transformation module, so it can be shown separately from the transformation inputs. Review the inputs and own use together when assessing the full refinery process.",
+    "other_transformation": "Use Other transformation to review four distinct parts of the energy balance: Other transformation (including own use), Transfers, Transmission and distribution losses, and Other energy-sector own use. These sections describe different kinds of flows and should not be added together without checking their signs and boundaries.",
     "supply": "Use Supply to review how production, trade and transformation outputs meet the model's fuel requirements.",
     "emissions": "Use Emissions to review the emissions implied by energy demand. Read the page note carefully where aggregate-only demand prevents a detailed sector split.",
     "transport_leap_vs_ninth": "This diagnostic page provides a focused LEAP-versus-9th view of transport detail. Use it alongside, not instead of, the main three-source Transport page.",
@@ -140,7 +140,7 @@
         "id": "refining-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Refining",
-        "copy": "Refining follows the oil-refinery process boundary: feedstocks enter, petroleum products leave, and own use is included where needed to make the source systems comparable. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "copy": "Refining follows the full oil-refinery process: feedstocks enter, petroleum products leave, and energy is used to operate the refinery. LEAP records that own use in the Auxiliary Fuel Use branch of the refining transformation module. This lets the dashboard show own use separately from refinery inputs, although both should be analysed together. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
         "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Refining page contents",
@@ -149,42 +149,27 @@
             ["Flows", "Oil refineries under 09.07", "The specific Refining root takes ownership before the broader transformation root."],
             ["Input products", "Crude oil, NGL, refinery feedstocks and other refinery inputs", "Inputs are normally negative."],
             ["Output products", "LPG, gasoline, kerosene, diesel, fuel oil and other petroleum products", "Outputs are normally positive; compare the product mix as well as total throughput."],
-            ["Including own use", "09.07 Oil refineries (including own use) is the shared comparison boundary", "LEAP does not publish refinery own use separately. Standalone 10.01.11 is therefore suppressed; ESTO and Ninth own use are folded into the inclusive boundary."],
+            ["Own use", "Energy used to operate refineries, measured in LEAP through the Auxiliary Fuel Use branch", "It can be shown separately from refinery inputs, but both belong to the refinery process and should be analysed together."],
             ["Transfers", "Refinery or blending transfers are not shown here", "All flow-08 transfers are deliberately routed to Other transformation > Transfers."]
           ]
         }
-      },
-      {
-        "id": "refining-review",
-        "target": "[data-guide-id='chart-card']",
-        "title": "Read refinery inputs, outputs and own use together",
-        "copy": "Crude and other refinery inputs are normally negative, while petroleum-product outputs are positive. Categories labelled “including own use” deliberately align different source boundaries; they are not ordinary one-to-one mappings.",
-        "table": {
-          "caption": "Refining review sequence",
-          "headers": ["Signal", "What to check next"],
-          "rows": [
-            ["Inputs and outputs move differently", "Refinery yield assumptions, throughput and product mix."],
-            ["Only one product diverges", "Product classification and the common product grouping."],
-            ["Including-own-use row differs", "Check the full adjusted process boundary before inspecting individual own-use rows."],
-            ["Transfer row seems absent", "Transfers are intentionally routed to Other transformation > Transfers."]
-          ]
         }
-      }
     ],
     "other_transformation": [
       {
         "id": "other-transformation-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Other transformation",
-        "copy": "This page owns transformation processes that are not more specifically Power or Refining, plus transfers and the relevant energy-sector own-use and loss boundaries. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "copy": "This page brings together four sections that do not belong on Power or Refining. Other transformation (including own use) covers processes such as gas processing and coal transformation. Transfers records movement between fuel or product categories. Transmission and distribution losses records energy lost while it is delivered. Other energy-sector own use records energy consumed by energy industries while they operate. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
         "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Other transformation page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
           "rows": [
-            ["Transformation flows", "Gas processing, coal transformation, liquefaction/regasification and other 09 processes outside Power and Refining", "Inputs are negative and outputs positive; process boundaries can include own use."],
-            ["Transfers", "Flow 08 movements between product categories", "Transfers have either sign and are routed here through an explicit special case, regardless of refinery wording."],
-            ["Own use and losses", "Relevant 10.01 and 10.02 rows not represented by a more-specific inclusive boundary", "Do not add a standalone own-use row to an inclusive process row."],
+            ["Other transformation (including own use)", "Gas processing, coal transformation, liquefaction/regasification and other conversion processes outside Power and Refining", "Inputs are normally negative and outputs positive. Where the label says including own use, the process boundary also contains the energy used to operate it."],
+            ["Transfers", "Flow 08 movements between fuel or product categories", "A transfer reclassifies energy within the balance; it does not create new supply or demand."],
+            ["Transmission and distribution losses", "Energy lost while electricity, heat, gas or another carrier is transmitted and distributed", "Losses are normally negative."],
+            ["Other energy-sector own use", "Energy consumed by mines, extraction, processing and other energy industries while they operate", "It is normally negative and is shown here only when it is not already included in a transformation boundary."],
             ["Gas works quirk", "09.06.01 Gas works plants (including own use)", "LEAP does not expose 10.01.02 gas-works own use separately, so that standalone row is suppressed just like refinery own use."],
             ["Products", "The input and output fuels appropriate to each conversion process", "Read the flow label first: the same product can be an input in one process and an output in another."]
           ]
@@ -193,16 +178,17 @@
       {
         "id": "transformation-boundaries",
         "target": "[data-guide-id='chart-card']",
-        "title": "Distinguish conversion, transfers and own use",
-        "copy": "Transformation inputs are normally negative and outputs positive. Transfers can have either sign and show movement between product categories. Some comparison rows absorb ESTO own-use or loss rows so their boundary matches LEAP and the 9th Outlook.",
+        "title": "Understand conversion, transfers, losses and own use",
+        "copy": "These flows have different meanings. Read the flow label and sign before comparing totals. Some Common rows combine a transformation process with its associated own use so datasets with different reporting boundaries can still be compared.",
         "table": {
           "caption": "How to interpret a row",
           "headers": ["Row type", "Interpretation"],
           "rows": [
-            ["Transformation", "Compare inputs and outputs as one conversion process."],
-            ["Transfers", "Positive enters a product/category; negative leaves it. Do not interpret it as net supply by itself."],
-            ["Including own use", "An explicit comparison-boundary adjustment, not an extra additive component."],
-            ["Loss or own use", "Normally negative energy consumed or lost inside the energy sector."]
+            ["Transformation or conversion", "Energy enters a process in one form and leaves in another. Inputs are normally negative and outputs positive, so review both sides of the process."],
+            ["Transfers", "Energy is moved or reclassified from one fuel or product category to another within the balance. Positive enters a category and negative leaves it; a transfer is not new supply or demand."],
+            ["Transmission and distribution losses", "Energy that is lost while a carrier is delivered through a network. It is normally negative."],
+            ["Energy-sector own use", "Energy consumed by an energy industry to run its own operations. It is normally negative."],
+            ["Including own use", "The transformation row already includes its associated own use so the source boundaries can be compared. Do not add a separate own-use row to it again."]
           ]
         }
       }

@@ -2209,6 +2209,136 @@ def _build_flow_group_aggregate_charts(
 
     flow_section = non_parent_df.groupby("common_flow_label")["_section_label"].agg(lambda s: s.mode().iloc[0])
 
+    # Parent rows are omitted from the detail charts so users cannot add a
+    # hierarchy parent to its children. Replace each omitted parent with one
+    # aggregate-by-product summary built from a source-specific frontier. A
+    # source that publishes the parent contributes that row; a source that
+    # publishes only children contributes its non-overlapping child rows.
+    # Parents whose descendants cross page sections (for example the broad
+    # flow-10 boundary spanning own use and losses) are intentionally skipped.
+    flow_nodes = get_existing_flow_nodes(page_df)
+    parent_prefixes: list[str] = []
+    for _, node in flow_nodes.iterrows():
+        flow_label = str(node["common_flow_label"])
+        prefix = str(node["canonical_code"])
+        if flow_label in parent_flow_labels and prefix not in parent_prefixes:
+            parent_prefixes.append(prefix)
+    parent_prefixes.sort(key=lambda value: (code_depth(value), value))
+
+    for parent_prefix in parent_prefixes:
+        # Top-level roots are already represented by page overview cards and
+        # can be split across routed pages. A flow-09 subsection on Other
+        # transformation, for example, would be only a partial transformation
+        # total because Power and Refining own more-specific branches.
+        if code_depth(parent_prefix) == 1:
+            continue
+        descendants = flow_nodes[
+            flow_nodes["canonical_code"].astype(str).str.startswith(parent_prefix + ".")
+        ]
+        if descendants.empty:
+            continue
+        labels_by_source = frontier_flow_labels(
+            flow_nodes,
+            parent_prefix,
+            code_depth(parent_prefix) + 1,
+        )
+        source_flow_labels = sorted(
+            {
+                str(label)
+                for source_labels in labels_by_source.values()
+                for label in source_labels
+            }
+        )
+        if not source_flow_labels:
+            continue
+        area_spec = {
+            "aggregate_flow_prefix": parent_prefix,
+            "aggregate_flow_label": "",
+            "source_flow_labels": source_flow_labels,
+            "source_flow_labels_by_system": labels_by_source,
+        }
+        aggregate_df = area_spec_rows(page_df, area_spec)
+        if aggregate_df.empty:
+            continue
+        section_labels = [
+            str(value)
+            for value in aggregate_df["_section_label"].dropna().unique()
+            if str(value).strip()
+        ]
+        if len(section_labels) != 1:
+            continue
+        section_label = section_labels[0]
+        exact_parent_nodes = flow_nodes[
+            (flow_nodes["canonical_code"].astype(str) == parent_prefix)
+            & flow_nodes["common_flow_label"].astype(str).isin(parent_flow_labels)
+        ]
+        parent_candidates = exact_parent_nodes["common_flow_label"].astype(str).tolist()
+        if parent_candidates:
+            parent_label = min(
+                parent_candidates,
+                key=lambda value: (
+                    "including own use" not in value.casefold(),
+                    len(value),
+                    value,
+                ),
+            )
+        else:
+            parent_label = node_label_for_prefix(flow_nodes, parent_prefix)
+        area_spec["aggregate_flow_label"] = parent_label
+
+        chart_key = (
+            f"chart__area__flowgroup_parent__{safe_slug(page_key)}__"
+            f"{safe_slug(parent_prefix)}__product"
+        )
+        metrics = compute_ranking_metrics(
+            aggregate_df,
+            primary_source,
+            primary_scenario,
+            comparison_source,
+            base_year=base_year,
+            ninth_source=ninth_source,
+        )
+        suppressed = metrics["total_abs_value"] < suppression_threshold
+        manifest_rows.append({
+            "page_key": page_key,
+            "page_label": page_label,
+            "section_label": section_label,
+            "chart_type": "stacked_area",
+            "chart_key": chart_key,
+            "common_flow_label": parent_label,
+            "common_product_label": "All products",
+            "row_count": int(len(aggregate_df)),
+            "source_flow_labels": " | ".join(source_flow_labels),
+            "sign_note": sign_note_for_chart(aggregate_df),
+            "suppressed": suppressed,
+            **metrics,
+        })
+        if suppressed:
+            continue
+        figure = build_area_chart(
+            page_df,
+            area_spec,
+            series_labels,
+            template,
+            group_col="common_product_label",
+            title_prefix="Aggregate by product",
+        )
+        if not figure.data:
+            manifest_rows[-1]["suppressed"] = True
+            continue
+        charts[chart_key] = figure
+        chart_rows.append({
+            "chart_key": chart_key,
+            "chart_type": "stacked_area",
+            "title": f"Aggregate by product: {parent_label}",
+            "product_label": f"Aggregate by product: {parent_label}",
+            "section_label": section_label,
+            "flow_group_label": parent_label,
+            "datasets": chart_dataset_tokens_from_figure(figure),
+            "stacked_area_note": stacked_area_note_from_figure(figure),
+            **metrics,
+        })
+
     ordered_flows: list[str] = []
     for flow_label in non_parent_df["common_flow_label"]:
         flow_label = str(flow_label)

@@ -23,7 +23,7 @@ Common ESTO data can contain a parent flow and its child flows simultaneously. B
 
 ### Current rule
 
-Use the third option. When children are present, exclude their parent from peer line-chart generation. The parent may remain as an area overview. Flow hierarchy, not product hierarchy, determines the frontier.
+Use the third option. When children are present, exclude their parent from peer line-chart generation and replace a within-page parent with an aggregate-by-product area summary. Build that summary from a source-specific, non-overlapping frontier: use the parent for a dataset that publishes the parent, and the available children for a dataset that publishes only children. Top-level roots remain page-overview concerns because their descendants can be routed across several pages; do not create a parent summary when its descendants cross different semantic page sections. Flow hierarchy, not product hierarchy, determines the frontier.
 
 ### Validation
 
@@ -32,6 +32,7 @@ For every rendered group, verify that no selected line-chart flow is an ancestor
 ### History
 
 - 2026-06-27: Recorded the implemented frontier rule from the active dashboard plan and renderer.
+- 2026-08-10: Made the parent summary a general subsection rule, including Gas processing and Coal transformation on Other transformation, while retaining source-specific frontiers and section-boundary safeguards.
 
 ## DASH-002: Suppress small charts without dropping their audit record
 

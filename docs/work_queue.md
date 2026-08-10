@@ -40,6 +40,12 @@ These later commits supersede the corresponding snapshot rows below:
   after the header controls, simplifies the shared correction wording, anchors
   placeholder guidance to the yellow page warning, and removes the unused
   chart-sorting controls.
+  A Refining and Other-transformation pass explains LEAP auxiliary fuel use,
+  removes redundant review cards, and defines conversion, transfers, network
+  losses, and energy-sector own use in plain language. Hierarchy parents now
+  open with source-safe aggregate summaries on every page; this restores the
+  Gas processing and Coal transformation totals without adding parent and
+  child rows together.
 
 - **DASHQ-003 and DASHQ-004 are complete in the current documentation
   checkout.** `docs/handover_mapping_diagnostics.md` now retains the original
