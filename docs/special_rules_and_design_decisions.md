@@ -963,6 +963,26 @@ also appear in its stack.
 - 2026-08-10: Replaced projection-only category filtering with the nonzero
   historical/projected union across generic and bespoke composition charts.
 
+## DASH-027: LEAP flow-tree diagnostics remain provisional until exports are verified
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Diagnostic interpretation warning
+**Affected areas:** `codebase/common_esto_dashboard_mapping_diagnostics.py`; LEAP flow-tree comparison
+
+### Current rule
+
+The LEAP flow-tree original-versus-mapped section displays a prominent warning
+that apparent hierarchy or mapping problems can originate in incomplete,
+flattened, inconsistent, or otherwise messy LEAP balance exports. Reviewers
+must verify the relevant LEAP exports before treating this section as reliable
+mapping evidence. The equivalent NINTH section does not inherit this warning.
+
+### History
+
+- 2026-08-10: Added after live review found flat LEAP export structures and
+  inconsistent raw-versus-normalized signs producing misleading issue cards.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

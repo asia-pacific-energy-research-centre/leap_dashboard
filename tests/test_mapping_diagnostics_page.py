@@ -500,6 +500,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert ">7<" in html
     assert "NINTH flow tree: original vs mapped representation" in html
     assert "LEAP flow tree: original vs mapped representation" in html
+    assert "Caution: treat this section as provisional." in html
+    assert "until the relevant LEAP exports have been checked and confirmed" in html
     assert "Original raw source tree" in html
     assert "Original source parent" in html
     assert "Unique mapped comparison total" in html
