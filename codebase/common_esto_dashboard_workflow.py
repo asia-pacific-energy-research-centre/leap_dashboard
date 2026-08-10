@@ -59,6 +59,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     filter_ninth_pre_base_year_data,
     filter_common_esto_data,
     filter_template_for_leap_demand_coverage,
+    load_active_power_interim_branches,
     load_common_esto_data,
     load_source_category_map,
 )
@@ -169,6 +170,17 @@ SOURCE_TO_COMMON_MAP_PATH = _resolve(
     os.getenv(
         "COMMON_ESTO_SOURCE_TO_COMMON_MAP_PATH",
         str(_LEAP_MAPPINGS_RESULTS / "source_to_common_esto_map.csv"),
+    )
+)
+POWER_INTERIM_AUDIT_PATH = _resolve(
+    os.getenv(
+        "COMMON_ESTO_POWER_INTERIM_AUDIT_PATH",
+        str(
+            _LEAP_MAPPINGS_REPO
+            / "results"
+            / "mapping_relationships"
+            / "leap_source_branch_fallback_audit.csv"
+        ),
     )
 )
 ESTO_TO_COMMON_MAP_PATH = _resolve(
@@ -448,6 +460,14 @@ def run_dashboard_for_economy(
     missing_leap_branches = _missing_leap_demand_branches(economy)
     base_template = filter_template_for_leap_demand_coverage(
         base_template, missing_leap_branches
+    )
+    base_template["_power_interim_placeholder_branches"] = (
+        load_active_power_interim_branches(
+            POWER_INTERIM_AUDIT_PATH,
+            economy,
+            min_year=MIN_YEAR,
+            max_year=MAX_YEAR,
+        )
     )
     definitions = configured_comparison_scopes(base_template)
     selector_options = category_basis_options(economy, definitions)

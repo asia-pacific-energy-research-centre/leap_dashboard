@@ -3646,7 +3646,22 @@ def guide_page_mapping_table(
 
 
 def guide_placeholder_status(page_key: str, template: dict) -> str:
-    """Explain the mapping-owned aggregate placeholder for one demand page."""
+    """Explain an active LEAP placeholder for one page."""
+    power_interim_branches = [
+        str(value)
+        for value in template.get("_power_interim_placeholder_branches", [])
+        if str(value).strip()
+    ]
+    if page_key == "power" and power_interim_branches:
+        branch_text = ", ".join(f"'{value}'" for value in power_interim_branches)
+        return (
+            f"The yellow warning means LEAP is using the interim power placeholder "
+            f"branches {branch_text} for at least part of the period shown. A placeholder "
+            "is a temporary branch used when the corresponding completed power-sector "
+            "branch is not available. It preserves the available power results, but the "
+            "detailed technology structure may not yet be available. Treat missing detail "
+            "as unavailable, not as zero."
+        )
     coverage = template.get("leap_demand_sector_coverage", {}) or {}
     placeholder_branch = str(
         coverage.get("aggregate_placeholder_branch", "All demand aggregated")
@@ -3669,7 +3684,19 @@ def guide_placeholder_status(page_key: str, template: dict) -> str:
 
 
 def page_placeholder_note(page_key: str, template: dict) -> str:
-    """Return a visible page-top note when mapped sector detail is unavailable."""
+    """Return a visible page-top note when a LEAP placeholder is active."""
+    power_interim_branches = [
+        str(value)
+        for value in template.get("_power_interim_placeholder_branches", [])
+        if str(value).strip()
+    ]
+    if page_key == "power" and power_interim_branches:
+        branch_text = ", ".join(f"'{value}'" for value in power_interim_branches)
+        return (
+            f"LEAP placeholder in use: interim power branches {branch_text} supply "
+            "at least part of the period shown. Detailed LEAP power technologies may "
+            "not yet be available; missing detail should not be read as zero."
+        )
     coverage = template.get("leap_demand_sector_coverage", {}) or {}
     page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
     sectors = [str(value) for value in page_branches.get(page_key, []) if str(value).strip()]

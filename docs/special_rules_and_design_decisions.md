@@ -465,6 +465,11 @@ become visible once it contains LEAP data.
   permanent skip list.
 - 2026-08-10: Added visible page-top placeholder notices and mapping-backed
   page-content provenance tables to the routed chart-page guides.
+- 2026-08-11: Extended the same placeholder presentation to Power when the
+  upstream source-branch fallback audit records an interim power branch as
+  retained. Merely having an interim mapping is not enough to trigger the
+  warning; the audit must show that interim values are actually in use during
+  the dashboard period.
 
 ## DASH-013: Gas-works own use is shown only in the shared transformation boundary
 

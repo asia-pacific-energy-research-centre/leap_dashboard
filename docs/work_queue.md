@@ -46,6 +46,9 @@ These later commits supersede the corresponding snapshot rows below:
   open with source-safe aggregate summaries on every page; this restores the
   Gas processing and Coal transformation totals without adding parent and
   child rows together.
+  A later Power pass applies the same yellow placeholder terminology when the
+  upstream fallback audit shows that retained LEAP values come from interim
+  power branches, and names those branches in both the page note and guide.
 
 - **DASHQ-003 and DASHQ-004 are complete in the current documentation
   checkout.** `docs/handover_mapping_diagnostics.md` now retains the original

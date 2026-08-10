@@ -15,6 +15,7 @@ from codebase.common_esto_dashboard_data import (
     filter_common_esto_data,
     filter_ninth_pre_base_year_data,
     filter_template_for_leap_demand_coverage,
+    load_active_power_interim_branches,
     load_source_category_map,
     load_common_esto_data,
 )
@@ -68,6 +69,62 @@ def _load_template() -> dict:
 def _load_series_config() -> dict:
     config_path = REPO_ROOT / "config" / "common_esto_dashboard" / "series_config.json"
     return json.loads(config_path.read_text(encoding="utf-8"))
+
+
+def test_power_interim_placeholder_uses_only_retained_audit_rows(tmp_path: Path) -> None:
+    audit_path = tmp_path / "leap_source_branch_fallback_audit.csv"
+    pd.DataFrame(
+        [
+            {
+                "economy": "20_USA",
+                "year": "2022",
+                "status": "interim_only_retained",
+                "interim_branch": "Electricity interim",
+            },
+            {
+                "economy": "20_USA",
+                "year": "2023",
+                "status": "interim_zeroed",
+                "interim_branch": "CHP interim",
+            },
+            {
+                "economy": "20_USA",
+                "year": "2061",
+                "status": "interim_only_retained",
+                "interim_branch": "Heat plant interim",
+            },
+            {
+                "economy": "05_PRC",
+                "year": "2022",
+                "status": "interim_only_retained",
+                "interim_branch": "CHP interim",
+            },
+        ]
+    ).to_csv(audit_path, index=False)
+
+    branches = load_active_power_interim_branches(
+        audit_path, "20USA", min_year=2010, max_year=2060
+    )
+
+    assert branches == ["Electricity interim"]
+
+
+def test_power_interim_placeholder_adds_page_note_and_guide_status() -> None:
+    template = _load_template()
+    template["_power_interim_placeholder_branches"] = [
+        "Electricity interim",
+        "CHP interim",
+    ]
+
+    note = page_placeholder_note("power", template)
+    status = guide_placeholder_status("power", template)
+    context = guide_page_context("power", [], template)
+
+    assert "LEAP placeholder in use" in note
+    assert "'Electricity interim', 'CHP interim'" in note
+    assert "interim power placeholder branches" in status
+    assert "missing detail as unavailable, not as zero" in status
+    assert context["placeholder_in_use"] is True
 
 
 def test_emissions_components_keep_demand_sectors_and_combine_signed_transformation_use() -> None:

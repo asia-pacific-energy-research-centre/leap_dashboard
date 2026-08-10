@@ -158,6 +158,38 @@ SOURCE_CATEGORY_MAP_COLUMNS = [
 ]
 
 
+def load_active_power_interim_branches(
+    audit_path: Path,
+    economy: str,
+    *,
+    min_year: int | None = None,
+    max_year: int | None = None,
+) -> list[str]:
+    """Return interim LEAP power branches retained in the rendered period."""
+    path = Path(audit_path)
+    if not path.exists():
+        return []
+    required = ["economy", "year", "status", "interim_branch"]
+    audit = pd.read_csv(path, usecols=required, dtype=str).fillna("")
+    audit["economy"] = (
+        audit["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
+    )
+    audit["year"] = pd.to_numeric(audit["year"], errors="coerce")
+    active = audit[
+        audit["economy"].eq(str(economy).replace("_", "").strip())
+        & audit["status"].astype(str).str.casefold().eq("interim_only_retained")
+    ].copy()
+    if min_year is not None:
+        active = active[active["year"] >= min_year]
+    if max_year is not None:
+        active = active[active["year"] <= max_year]
+    return [
+        str(value)
+        for value in active["interim_branch"].drop_duplicates()
+        if str(value).strip()
+    ]
+
+
 def load_source_category_map(
     source_to_common_map_path: Path | None = None,
     esto_to_common_map_path: Path | None = None,
