@@ -38,7 +38,7 @@ GUIDE_CSS = """
 .dashboard-guide-close { float:right;border:0;background:transparent;color:#64748b;font-size:24px;line-height:.8;cursor:pointer; }
 .dashboard-guide-kicker { margin-top:15px;color:#e7672a;font-size:10px;font-weight:850;letter-spacing:.14em; }
 .dashboard-guide-title { margin:5px 0 8px;font-size:23px;line-height:1.18; }
-.dashboard-guide-copy { margin:0;color:#475569;font-size:15px;line-height:1.58; }
+.dashboard-guide-copy { margin:0;color:#475569;font-size:15px;line-height:1.58;white-space:pre-line; }
 .dashboard-guide-image { display:block;width:100%;max-height:58vh;margin-top:14px;object-fit:contain;border:1px solid #cbd8e7;border-radius:6px;background:#f8fafc; }
 .dashboard-guide-gallery { display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin-top:14px; }
 .dashboard-guide-gallery figure { min-width:0;margin:0; }
@@ -189,11 +189,13 @@ def _resolved_steps(
         source_steps[insert_at:insert_at] = page_specific_steps
     purposes = config["page_purposes"]
     page_purpose = str(purposes.get(page_key, purposes["default"]))
+    page_note = str((config.get("page_notes", {}) or {}).get(page_key, ""))
     context = page_context or {}
     replacements = {
         "page_key": page_key,
         "page_label": page_label,
         "page_purpose": page_purpose,
+        "page_note": page_note,
         "placeholder_status": str(
             context.get(
                 "placeholder_status",

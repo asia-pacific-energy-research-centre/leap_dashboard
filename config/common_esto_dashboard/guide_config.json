@@ -17,6 +17,9 @@
     "transport_leap_vs_ninth": "This diagnostic page provides a focused LEAP-versus-9th view of transport detail. Use it alongside, not instead of, the main three-source Transport page.",
     "datacentres_leap_vs_ninth": "This diagnostic page provides a focused LEAP-versus-9th view of datacentre demand. Use it alongside the main Buildings page."
   },
+  "page_notes": {
+    "industry": "Note: Occasional mapping errors can make a chart show something unexpected. If you think you have found one, please let the dashboard developer know."
+  },
   "page_steps": {
     "total_demand": [
       {
@@ -411,7 +414,7 @@
       "id": "page-purpose",
       "target": "[data-guide-id='page-purpose']",
       "title": "What this page is for",
-      "copy": "{page_purpose} If something looks wrong, correct it in the model or source data, then rerun the dashboard."
+      "copy": "{page_purpose} If something looks wrong, correct it in the model or source data, then rerun the dashboard.\n\n{page_note}"
     },
     {
       "id": "top-controls",

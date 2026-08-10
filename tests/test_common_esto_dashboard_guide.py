@@ -23,6 +23,14 @@ def test_guide_config_is_valid_and_page_copy_is_resolved() -> None:
     assert ".dashboard-guide-highlight" in fragments["css"]
 
 
+def test_industry_purpose_warns_about_possible_mapping_errors() -> None:
+    fragments = build_guide_fragments("chart", "industry", "Industry")
+
+    assert "Occasional mapping errors can make a chart show something unexpected" in fragments["script"]
+    assert "please let the dashboard developer know" in fragments["script"]
+    assert "white-space:pre-line" in fragments["css"]
+
+
 def test_index_and_chart_guides_have_different_steps() -> None:
     chart_script = build_guide_fragments("chart", "supply", "Supply")["script"]
     index_script = build_guide_fragments("index", "index", "Common ESTO Dashboard")["script"]
