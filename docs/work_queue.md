@@ -136,6 +136,12 @@ These later commits supersede the corresponding snapshot rows below:
   traces are absent from ordinary chart legends. Difference series remain in
   the chart manifest for ranking and audit diagnostics.
 
+- **DASHQ-045 is `complete_unpushed`.** Other transformation now presents
+  inclusive process-level cards rather than unclear cross-page `09`/`10`
+  totals. Residual other own use, transmission/distribution losses and
+  transfers remain separately aggregated, with absorbed own use determined
+  from upstream component and non-expanding-rollup contributor metadata.
+
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
 checked against git and the artifacts on disk during this audit and did not

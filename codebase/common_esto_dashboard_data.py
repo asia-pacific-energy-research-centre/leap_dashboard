@@ -143,6 +143,8 @@ COMPONENT_METADATA_COLUMNS = [
     "aggregate_group_source",
     "aggregate_group_source_id",
     "aggregation_reason",
+    "non_expanding_rollup_id",
+    "non_expanding_contributor_inputs",
 ]
 
 
@@ -812,11 +814,41 @@ def load_common_esto_component_metadata(common_rows_path: Path) -> pd.DataFrame:
     )
 
 
+def _attach_non_expanding_contributor_metadata(
+    metadata: pd.DataFrame,
+    common_rows_path: Path,
+) -> pd.DataFrame:
+    """Attach contributor labels from the upstream non-expanding-rollup QA."""
+    qa_path = common_rows_path.parent / "qa_common_esto_non_expanding_rollups.csv"
+    required_columns = [
+        "comparison_scope",
+        "non_expanding_rollup_id",
+        "contributor_inputs",
+    ]
+    if not qa_path.exists() or "non_expanding_rollup_id" not in metadata.columns:
+        return metadata
+
+    rollups = pd.read_csv(qa_path, low_memory=False).fillna("")
+    if not set(required_columns).issubset(rollups.columns):
+        return metadata
+    rollups = (
+        rollups[required_columns]
+        .rename(columns={"contributor_inputs": "non_expanding_contributor_inputs"})
+        .drop_duplicates(["comparison_scope", "non_expanding_rollup_id"])
+    )
+    return metadata.merge(
+        rollups,
+        on=["comparison_scope", "non_expanding_rollup_id"],
+        how="left",
+    )
+
+
 def enrich_with_component_metadata(df: pd.DataFrame, common_rows_path: Path | None) -> pd.DataFrame:
     """Attach component membership metadata without duplicating chart values."""
     if common_rows_path is None or not common_rows_path.exists() or df.empty:
         return df.copy()
     metadata = load_common_esto_component_metadata(common_rows_path)
+    metadata = _attach_non_expanding_contributor_metadata(metadata, common_rows_path)
     if "common_row_id" in df.columns and "common_row_id" in metadata.columns:
         merge_keys = ["comparison_scope", "common_row_id"]
     else:

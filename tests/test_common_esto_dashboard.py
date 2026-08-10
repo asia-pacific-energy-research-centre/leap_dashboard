@@ -11,6 +11,7 @@ from codebase.common_esto_dashboard_data import (
     ALL_SCOPES,
     DEFAULT_WIDE_FILE_SCOPE,
     apply_sign_semantics,
+    enrich_with_component_metadata,
     filter_common_esto_data,
     filter_ninth_pre_base_year_data,
     filter_template_for_leap_demand_coverage,
@@ -33,6 +34,7 @@ from codebase.common_esto_dashboard_renderer import (
     color_for_plotting_name,
     drop_excluded_flow_rows,
     pick_area_specs,
+    prepare_other_transformation_page_rows,
     render_dashboard,
     select_transformation_total_rows,
     _build_section_aggregate_charts,
@@ -1427,6 +1429,128 @@ def test_refining_page_keeps_only_inclusive_comparison_boundary() -> None:
     assert filtered["common_flow_label"].tolist() == [
         "09.07 Oil refineries (including own use)"
     ]
+
+
+def test_other_transformation_page_uses_inclusive_boundaries_and_residual_sections() -> None:
+    rows = pd.DataFrame([
+        {
+            "common_flow_code": "09.06.01",
+            "common_flow_label": "09.06.01 Gas works plants",
+            "component_flow_code": "09.06.01",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "09.06.01",
+            "common_flow_label": "09.06.01 Gas works plants (including own use)",
+            "component_flow_code": "09.06.01",
+            "non_expanding_contributor_inputs": (
+                "ESTO: 09.06.01 Gas works plants|ESTO: 10.01.02 Gas works plants"
+            ),
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "10.01.02",
+            "common_flow_label": "10.01.02 Gas works plants",
+            "component_flow_code": "10.01.02",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "09.13.03",
+            "common_flow_label": "09.13.03 SMR w CCS",
+            "component_flow_code": "09.13.03",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "10.01.06",
+            "common_flow_label": "10.01.06 Coal mines",
+            "component_flow_code": "10.01.06",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "10.02",
+            "common_flow_label": "10.02 Transmission and distribution losses",
+            "component_flow_code": "10.02",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "08",
+            "common_flow_label": "08 Transfers",
+            "component_flow_code": "08",
+            "_section_label": "Transfers",
+        },
+    ])
+    config = _load_template()["other_transformation_page"]
+
+    prepared = prepare_other_transformation_page_rows(rows, rows, config)
+
+    assert set(prepared["common_flow_label"]) == {
+        "09.06.01 Gas works plants (including own use)",
+        "09.13.03 SMR w CCS (including own use)",
+        "10.01.06 Coal mines",
+        "10.02 Transmission and distribution losses",
+        "08 Transfers",
+    }
+    sections = dict(zip(prepared["common_flow_code"], prepared["_section_label"]))
+    assert sections["09.13.03"] == "Other transformation (including own use)"
+    assert sections["10.01.06"] == "Other energy-sector own use"
+    assert sections["10.02"] == "Transmission and distribution losses"
+    assert sections["08"] == "Transfers"
+
+
+def test_component_metadata_includes_upstream_rollup_contributors(tmp_path: Path) -> None:
+    common_rows_path = tmp_path / "common_esto_rows.csv"
+    pd.DataFrame([
+        {
+            "comparison_scope": "esto_leap",
+            "common_row_id": "inclusive_coke_ovens",
+            "common_flow_label": "09.08.01 Coke ovens (including own use)",
+            "common_product_label": "17 Electricity",
+            "component_flow_code": "09.08.01",
+            "non_expanding_rollup_id": "nonexp_coke_ovens",
+        }
+    ]).to_csv(common_rows_path, index=False)
+    pd.DataFrame([
+        {
+            "comparison_scope": "esto_leap",
+            "non_expanding_rollup_id": "nonexp_coke_ovens",
+            "contributor_inputs": (
+                "ESTO: 09.08.01 Coke ovens|ESTO: 10.01.05 Coke ovens"
+            ),
+        }
+    ]).to_csv(
+        tmp_path / "qa_common_esto_non_expanding_rollups.csv",
+        index=False,
+    )
+    facts = pd.DataFrame([
+        {
+            "comparison_scope": "esto_leap",
+            "common_row_id": "inclusive_coke_ovens",
+        }
+    ])
+
+    enriched = enrich_with_component_metadata(facts, common_rows_path)
+
+    assert enriched.iloc[0]["non_expanding_contributor_inputs"] == (
+        "ESTO: 09.08.01 Coke ovens|ESTO: 10.01.05 Coke ovens"
+    )
+
+
+def test_pump_storage_own_use_routes_to_power() -> None:
+    template = _load_template()
+    rows = pd.DataFrame([
+        {
+            "common_flow_code": "10.01.13",
+            "common_flow_label": "10.01.13 Pump storage plants",
+        }
+    ])
+
+    routed = assign_pages(
+        rows,
+        template["sector_pages"],
+        template["routing_special_cases"],
+    )
+
+    assert routed.iloc[0]["_page_key"] == "power"
 
 
 def test_product_chart_omits_optional_difference_traces() -> None:

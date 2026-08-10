@@ -892,6 +892,34 @@ longer added to ordinary chart legends. The renderer still computes and stores
 the historical and projection difference series used by manifest diagnostics,
 sorting and audit workflows; only the optional visual traces were removed.
 
+## DASH-025: Other transformation shows inclusive process detail and separate residual operations
+
+**Status:** Implemented.
+
+The **Other transformation** page no longer presents the broad `09 Total
+transformation sector`, the combined `10 Losses and own use`, or a section-wide
+Other-transformation aggregate. Those totals were unclear and could cross into
+the separately owned Power and Refining pages.
+
+Instead, transformation processes are shown as individual charts and their
+titles explicitly state `(including own use)`, because LEAP necessarily carries
+auxiliary-fuel own use inside its transformation inputs. When upstream Common
+ESTO output supplies both plain and inclusive forms, the inclusive boundary is
+preferred and the plain duplicate is suppressed.
+
+The same page retains three separate operational sections where data exist:
+
+- **Other energy-sector own use** contains explicit own-use rows not absorbed
+  into an upstream inclusive transformation boundary;
+- **Transmission and distribution losses** contains `10.02`; and
+- **Transfers** contains `08` and is absent when an economy has no transfer
+  rows.
+
+Absorbed own-use membership is read from upstream Common ESTO component
+metadata and the non-expanding-rollup contributor QA emitted alongside it.
+The dashboard does not maintain a second list of mapping relationships.
+Power-related pump-storage own use is routed to Power.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

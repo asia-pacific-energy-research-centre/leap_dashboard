@@ -728,6 +728,117 @@ def assign_pages(
     return out
 
 
+def _metadata_tokens(value: object) -> set[str]:
+    """Return normalized tokens from semicolon-delimited component metadata."""
+    return {
+        part.strip()
+        for part in str(value or "").split(";")
+        if part.strip()
+    }
+
+
+def _rollup_contributor_codes(value: object) -> set[str]:
+    """Return codes from upstream ``SOURCE: code label`` contributor metadata."""
+    codes: set[str] = set()
+    for contributor in str(value or "").split("|"):
+        label = contributor.split(":", 1)[-1].strip()
+        code = canonical_code(label)
+        if code:
+            codes.add(code)
+    return codes
+
+
+def prepare_other_transformation_page_rows(
+    page_df: pd.DataFrame,
+    comparison_context_df: pd.DataFrame,
+    config: dict,
+) -> pd.DataFrame:
+    """Apply the declared presentation boundary for Other transformation.
+
+    Transformation rows keep the own use embedded in LEAP auxiliary-fuel
+    inputs and therefore receive an explicit inclusive display label. Exact
+    own-use rows already represented by an upstream ``(including own use)``
+    Common ESTO boundary are suppressed from the residual own-use section.
+    This consumes component and non-expanding-rollup contributor metadata
+    emitted by ``leap_mappings``; it does not recreate rollup membership in
+    dashboard configuration.
+    """
+    if page_df.empty or not config.get("enabled", False):
+        return page_df
+
+    out = page_df.copy()
+    context = comparison_context_df if not comparison_context_df.empty else out
+    inclusive_mask = context["common_flow_label"].astype(str).str.contains(
+        "(including own use)", case=False, regex=False
+    )
+    inclusive_context = context[inclusive_mask]
+
+    inclusive_codes = {
+        canonical_code(value)
+        for value in inclusive_context.get("common_flow_code", pd.Series(dtype=object))
+        if canonical_code(value)
+    }
+    absorbed_own_use_codes: set[str] = set()
+    if "component_flow_code" in inclusive_context.columns:
+        for value in inclusive_context["component_flow_code"]:
+            absorbed_own_use_codes.update(
+                code
+                for token in _metadata_tokens(value)
+                if (code := canonical_code(token)).startswith("10.01")
+            )
+    if "non_expanding_contributor_inputs" in inclusive_context.columns:
+        for value in inclusive_context["non_expanding_contributor_inputs"]:
+            absorbed_own_use_codes.update(
+                code
+                for code in _rollup_contributor_codes(value)
+                if code.startswith("10.01")
+            )
+
+    codes = out["common_flow_code"].map(canonical_code)
+    labels = out["common_flow_label"].astype(str)
+    already_inclusive = labels.str.contains(
+        "(including own use)", case=False, regex=False
+    )
+
+    # Prefer the real inclusive Common ESTO row when both forms exist.
+    duplicate_plain_boundary = (
+        codes.isin(inclusive_codes)
+        & codes.str.startswith("09")
+        & ~already_inclusive
+    )
+    absorbed_exact_own_use = codes.isin(absorbed_own_use_codes) & ~already_inclusive
+    out = out[~(duplicate_plain_boundary | absorbed_exact_own_use)].copy()
+    if out.empty:
+        return out
+
+    codes = out["common_flow_code"].map(canonical_code)
+    labels = out["common_flow_label"].astype(str)
+    already_inclusive = labels.str.contains(
+        "(including own use)", case=False, regex=False
+    )
+    transformation_mask = codes.str.startswith("09")
+    if config.get("append_inclusive_transformation_label", True):
+        out.loc[transformation_mask & ~already_inclusive, "common_flow_label"] = (
+            labels[transformation_mask & ~already_inclusive]
+            + " (including own use)"
+        )
+
+    section_rules = config.get("section_labels", {})
+    out.loc[transformation_mask, "_section_label"] = str(
+        section_rules.get("transformation", "Other transformation (including own use)")
+    )
+    out.loc[codes.str.startswith("10.01"), "_section_label"] = str(
+        section_rules.get("own_use", "Other energy-sector own use")
+    )
+    out.loc[codes.str.startswith("10.02"), "_section_label"] = str(
+        section_rules.get("losses", "Transmission and distribution losses")
+    )
+    out.loc[codes.str.startswith("08"), "_section_label"] = str(
+        section_rules.get("transfers", "Transfers")
+    )
+    return out
+
+
 def page_keys_without_required_source(
     assigned_df: pd.DataFrame,
     required_page_keys: list[object],
@@ -1937,7 +2048,23 @@ def _build_section_aggregate_charts(
         if section_label not in ordered_sections:
             ordered_sections.append(section_label)
 
+    suppressed_sections = {
+        str(value).strip().casefold()
+        for value in template.get("other_transformation_page", {}).get(
+            "suppress_section_aggregate_labels", []
+        )
+        if str(value).strip()
+    }
     for section_label in ordered_sections:
+        if (
+            page_key == safe_slug(
+                template.get("other_transformation_page", {}).get(
+                    "page_key", "other_transformation"
+                )
+            )
+            and section_label.casefold() in suppressed_sections
+        ):
+            continue
         flow_labels = sorted(set(section_flows.get(section_label, [])))
         if not flow_labels:
             continue
@@ -4783,10 +4910,30 @@ def render_dashboard(
         if page_df.empty:
             continue
 
+        other_transformation_config = template.get("other_transformation_page", {})
+        other_transformation_page_key = safe_slug(
+            other_transformation_config.get("page_key", "other_transformation")
+        )
+        if page_key == other_transformation_page_key:
+            comparison_context_df = scope_df if scope_df is not None else assigned_df
+            page_df = prepare_other_transformation_page_rows(
+                page_df,
+                comparison_context_df,
+                other_transformation_config,
+            )
+            if page_df.empty:
+                continue
+
         charts: dict[str, go.Figure] = {}
         chart_rows: list[dict] = []
 
-        for area_spec in pick_area_specs(page_df, template):
+        area_specs = (
+            []
+            if page_key == other_transformation_page_key
+            and other_transformation_config.get("hide_generic_overview", False)
+            else pick_area_specs(page_df, template)
+        )
+        for area_spec in area_specs:
             chart_key = f"chart__area__{safe_slug(area_spec['aggregate_flow_prefix'])}__{safe_slug(area_spec['aggregate_flow_label'])}"
             area_df = area_spec_rows(page_df, area_spec)
             if not area_chart_allowed_for_demand_coverage(
