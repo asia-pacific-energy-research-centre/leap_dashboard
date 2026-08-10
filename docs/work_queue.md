@@ -31,9 +31,9 @@ These later commits supersede the corresponding snapshot rows below:
   interpretation without changing mapping semantics.
   A 2026-08-10 guide refinement merges the header controls into one step,
   explains how comparison scope changes the lowest common category detail,
-  builds the Buildings category-provenance table from the rendered page and
-  published source mappings, and reports its mapping-resolved aggregate
-  placeholder both in the guide and at the top of the page. The redundant
+  builds mapping-backed category-provenance tables for the routed chart pages,
+  and reports a mapping-resolved aggregate placeholder both in the guide and
+  at the top of every affected page. The redundant
   **Charts containing** control is hidden while card-level dataset membership
   remains available.
 

@@ -3325,6 +3325,7 @@ def guide_page_mapping_table(
     chart_rows: list[dict],
     source_category_map: pd.DataFrame | None,
     comparison_scope: str,
+    category_label: str = "sector",
 ) -> dict[str, object]:
     """Build a native-source provenance table for visible detail charts."""
     mapping = (
@@ -3379,13 +3380,13 @@ def guide_page_mapping_table(
     return {
         "caption": "Page categories and published source mappings",
         "headers": [
-            "Common sector",
+            f"Common {category_label}",
             "Common fuel",
-            "ESTO sector",
+            f"ESTO {category_label}",
             "ESTO fuel",
-            "LEAP sector",
+            f"LEAP {category_label}",
             "LEAP fuel",
-            "9th sector",
+            f"9th {category_label}",
             "9th fuel",
         ],
         "rows": table_rows,
@@ -3438,14 +3439,40 @@ def guide_page_context(
     source_category_map: pd.DataFrame | None = None,
 ) -> dict:
     """Build economy- and scope-specific guide content from the rendered page."""
-    context = {
-        "placeholder_status": guide_placeholder_status(page_key, template),
+    mapping_table_pages = {
+        "supply",
+        "bunkers",
+        "power",
+        "refining",
+        "other_transformation",
+        "industry",
+        "transport",
+        "buildings",
+        "others",
+        "non_energy",
+        "transport_leap_vs_ninth",
+        "datacentres_leap_vs_ninth",
     }
-    if page_key == "buildings":
+    sector_pages = {
+        "industry",
+        "transport",
+        "buildings",
+        "others",
+        "transport_leap_vs_ninth",
+        "datacentres_leap_vs_ninth",
+    }
+    placeholder_status = guide_placeholder_status(page_key, template)
+    placeholder_in_use = bool(page_placeholder_note(page_key, template))
+    context = {
+        "placeholder_status": placeholder_status,
+        "placeholder_in_use": placeholder_in_use,
+    }
+    if page_key in mapping_table_pages:
         context["page_mapping_table"] = guide_page_mapping_table(
             chart_rows,
             source_category_map,
             str(template.get("_active_comparison_scope", "")),
+            category_label="sector" if page_key in sector_pages else "flow",
         )
     return context
 

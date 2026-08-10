@@ -56,7 +56,8 @@
         "id": "supply-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Supply",
-        "copy": "Supply is organised by the balance flows that add energy to, or remove energy from, the economy. Detail charts cross those flows with the available Common ESTO products.",
+        "copy": "Supply is organised by the balance flows that add energy to, or remove energy from, the economy. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Supply page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
@@ -91,7 +92,8 @@
         "id": "bunkers-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Bunkers",
-        "copy": "Bunkers contains fuel supplied to international transport, kept outside the domestic Transport page and domestic demand totals.",
+        "copy": "Bunkers contains fuel supplied to international transport, kept outside the domestic Transport page and domestic demand totals. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Bunkers page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
@@ -115,7 +117,8 @@
         "id": "power-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Power",
-        "copy": "Power covers electricity and heat transformation, combining the plant boundaries needed to compare sources that organise producers and technologies differently.",
+        "copy": "Power covers electricity and heat transformation, combining the plant boundaries needed to compare sources that organise producers and technologies differently. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Power page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
@@ -149,7 +152,8 @@
         "id": "refining-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Refining",
-        "copy": "Refining follows the oil-refinery process boundary: feedstocks enter, petroleum products leave, and own use is included where needed to make the source systems comparable.",
+        "copy": "Refining follows the oil-refinery process boundary: feedstocks enter, petroleum products leave, and own use is included where needed to make the source systems comparable. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Refining page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
@@ -184,7 +188,8 @@
         "id": "other-transformation-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Other transformation",
-        "copy": "This page owns transformation processes that are not more specifically Power or Refining, plus transfers and the relevant energy-sector own-use and loss boundaries.",
+        "copy": "This page owns transformation processes that are not more specifically Power or Refining, plus transfers and the relevant energy-sector own-use and loss boundaries. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Other transformation page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
@@ -219,7 +224,8 @@
         "id": "industry-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Industry",
-        "copy": "Industry owns the complete Common ESTO flow tree below 14, from the sector total through mining, construction, manufacturing and available subsectors.",
+        "copy": "Industry owns the Common ESTO tree below 14, from the sector total through mining, construction, manufacturing and available subsectors. The table shows each Common sector and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Industry page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
@@ -243,7 +249,8 @@
         "id": "transport-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Transport",
-        "copy": "Transport owns the domestic final-demand tree below 15, covering the modes and fuels used within the economy.",
+        "copy": "Transport owns the domestic final-demand tree below 15, covering the modes and fuels used within the economy. The table shows each Common sector and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Transport page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
@@ -267,15 +274,8 @@
         "id": "buildings-page-scope",
         "target": "[data-guide-id='section-navigation'], [data-guide-id='chart-card']",
         "title": "What appears on Buildings",
-        "copy": "This table is generated from the Buildings charts and the published mappings. It shows each Common sector and fuel on this page beside the native ESTO, LEAP and 9th categories mapped into it. The contents can change with the economy and comparison basis.",
+        "copy": "This table is generated from the Buildings charts and published mappings. It shows each Common sector and fuel on this page beside the native categories mapped into it for the participating datasets. The contents can change with the economy and comparison basis.",
         "dynamic_content": "page_mapping_table"
-      },
-      {
-        "id": "buildings-review",
-        "target": "[data-guide-id='chart-card']",
-        "title": "Check whether Buildings uses a placeholder",
-        "copy": "{placeholder_status}",
-        "dynamic_content": "placeholder_status"
       }
     ],
     "others": [
@@ -283,7 +283,8 @@
         "id": "other-demand-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Other demand",
-        "copy": "Other demand owns final energy uses outside Industry, Transport and Buildings, plus one temporary combined placeholder used where LEAP detail is not yet separable.",
+        "copy": "Other demand owns final energy uses outside Industry, Transport and Buildings, plus one temporary combined placeholder used where LEAP detail is not yet separable. The table shows each Common sector and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Other demand page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
@@ -307,7 +308,8 @@
         "id": "non-energy-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Non-energy use",
-        "copy": "Non-energy use owns exact flow 17: fuels used as chemical feedstocks, materials or other non-combustion inputs rather than for their energy content.",
+        "copy": "Non-energy use owns exact flow 17: fuels used as chemical feedstocks, materials or other non-combustion inputs rather than for their energy content. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Non-energy page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
@@ -366,7 +368,8 @@
         "id": "transport-diagnostic-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on diagnostic Transport",
-        "copy": "This optional page isolates LEAP and 9th Outlook transport rows in the alternate leap_vs_ninth comparison scope.",
+        "copy": "This optional page isolates LEAP and 9th Outlook transport rows in the alternate leap_vs_ninth comparison scope. The table shows each Common sector and fuel beside the native categories mapped into it for those datasets.",
+        "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Diagnostic Transport contents",
           "headers": ["Area", "Generally included", "Important quirk"],
@@ -389,7 +392,8 @@
         "id": "datacentres-diagnostic-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on diagnostic Datacentres",
-        "copy": "This optional page isolates datacentre demand rows that can be compared between LEAP and the 9th Outlook.",
+        "copy": "This optional page isolates datacentre demand rows that can be compared between LEAP and the 9th Outlook. The table shows each Common sector and fuel beside the native categories mapped into it for those datasets.",
+        "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Diagnostic Datacentres contents",
           "headers": ["Area", "Generally included", "Important quirk"],
@@ -432,13 +436,20 @@
       "id": "overview-first",
       "target": "[data-guide-id='chart-card']",
       "title": "Start with the summaries, not every chart",
-      "copy": "Start with the summary charts at the top of the page. Use the section summaries to spot important differences or unusual trends, then open the detailed sector-and-fuel charts only where you need to investigate further."
+      "copy": "Start with the summary charts at the top of the page. Use the section summaries to spot important differences or unusual trends, then open the detailed charts only where you need to investigate further."
     },
     {
       "id": "chart-card",
       "target": "[data-guide-id='category-basis-switcher'], [data-guide-id='chart-card']",
       "title": "How the comparison basis sets the detail",
       "copy": "The comparison basis chooses which datasets define the common categories. It shows the most detailed category every participating dataset can represent without splitting a value, while keeping ESTO-style codes and names where possible. For example, the 9th Outlook has one category for coal products, so LEAP + ESTO + Ninth shows 02.01-02.08 Coal products; with only LEAP + ESTO, the basis can show the individual 02.x fuels."
+    },
+    {
+      "id": "placeholder-status",
+      "target": "[data-guide-id='chart-card']",
+      "title": "Check whether this page uses a placeholder",
+      "copy": "{placeholder_status}",
+      "dynamic_content": "placeholder_status"
     },
     {
       "id": "chart-tools",

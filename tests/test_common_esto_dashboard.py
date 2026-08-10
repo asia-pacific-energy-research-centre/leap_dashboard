@@ -34,6 +34,7 @@ from codebase.common_esto_dashboard_renderer import (
     color_for_code,
     color_for_plotting_name,
     drop_excluded_flow_rows,
+    guide_page_context,
     guide_page_mapping_table,
     guide_placeholder_status,
     page_placeholder_note,
@@ -874,6 +875,38 @@ def test_buildings_guide_context_uses_source_mapping_and_placeholder() -> None:
     note = page_placeholder_note("buildings", template)
     assert "LEAP placeholder in use" in note
     assert "missing detail should not be read as zero" in note
+
+
+def test_mapping_guide_context_applies_to_other_chart_pages() -> None:
+    chart_rows = [
+        {
+            "chart_type": "line",
+            "flow_group_label": "01 Production",
+            "product_label": "08.01 Natural gas",
+            "common_row_id": "production_gas",
+        }
+    ]
+    source_map = pd.DataFrame(
+        [
+            {
+                "comparison_scope": "esto_leap_ninth",
+                "source_system": "ESTO",
+                "source_flow": "01 Production",
+                "source_product": "08.01 Natural gas",
+                "common_flow_label": "01 Production",
+                "common_product_label": "08.01 Natural gas",
+                "common_row_id": "production_gas",
+            }
+        ]
+    )
+    template = _load_template()
+    template["_active_comparison_scope"] = "esto_leap_ninth"
+
+    context = guide_page_context("supply", chart_rows, template, source_map)
+
+    assert context["page_mapping_table"]["headers"][0] == "Common flow"
+    assert context["page_mapping_table"]["rows"][0][2] == "01 Production"
+    assert context["placeholder_in_use"] is False
 
 
 def test_source_category_map_combines_native_and_esto_mappings(tmp_path: Path) -> None:

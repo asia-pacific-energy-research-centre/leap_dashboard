@@ -272,13 +272,16 @@ because the valid LEAP-comparable row is the inclusive refinery boundary.
 
 To edit the tour, change a step's `title` or `copy`, or add a step with a unique
 `id` and a stable CSS `target`. A step may include a `table` object with a
-`caption`, `headers`, and `rows`. The Buildings page also uses
+`caption`, `headers`, and `rows`. Routed chart pages use
 `dynamic_content: page_mapping_table` to list each visible Common flow/product
-pair alongside its published ESTO, LEAP and 9th native source categories. The
-table reads `source_to_common_esto_map.csv` for LEAP/9th and
+pair alongside its published ESTO, LEAP and 9th native source categories.
+Energy balance overview and Emissions retain bespoke contents tables because
+they are summary surfaces rather than ordinary flow/product detail trees. The
+mapping table reads `source_to_common_esto_map.csv` for LEAP/9th and
 `esto_to_common_esto_map.csv` for ESTO; it does not infer mappings from labels.
 `dynamic_content: placeholder_status` explains economy-specific aggregate LEAP
-coverage resolved from the upstream mappings record. Use `optional: true`
+coverage resolved from the upstream mappings record and is omitted when the
+page does not use a placeholder. Use `optional: true`
 only when the target is legitimately absent on some rendered pages. The
 renderer validates required fields and duplicate IDs before it writes HTML;
 guide markup, styling, page-step insertion, and interaction code live in

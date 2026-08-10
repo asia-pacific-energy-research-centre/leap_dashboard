@@ -463,7 +463,7 @@ become visible once it contains LEAP data.
   made Non-energy visibility depend on usable LEAP coverage rather than a
   permanent skip list.
 - 2026-08-10: Added visible page-top placeholder notices and mapping-backed
-  page-content provenance tables to the dashboard guide.
+  page-content provenance tables to the routed chart-page guides.
 
 ## DASH-013: Gas-works own use is shown only in the shared transformation boundary
 

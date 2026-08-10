@@ -200,9 +200,19 @@ def _resolved_steps(
             )
         ),
     }
+    placeholder_in_use = context.get("placeholder_in_use")
+    if placeholder_in_use is None:
+        placeholder_in_use = str(context.get("placeholder_status", "")).startswith(
+            "Placeholder in use:"
+        )
     resolved: list[dict] = []
     for source in source_steps:
         step = dict(source)
+        if (
+            step.get("dynamic_content") == "placeholder_status"
+            and not placeholder_in_use
+        ):
+            continue
         for field in ("title", "copy"):
             step[field] = str(step[field]).format(**replacements)
         if (

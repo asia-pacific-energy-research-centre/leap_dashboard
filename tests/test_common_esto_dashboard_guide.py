@@ -49,6 +49,31 @@ def test_chart_guide_adds_only_the_current_pages_review_content() -> None:
     assert "Included and excluded boundaries" in emissions_script
 
 
+def test_routed_chart_pages_use_mapping_backed_contents_tables() -> None:
+    config = json.loads(DEFAULT_GUIDE_CONFIG_PATH.read_text(encoding="utf-8"))
+    routed_pages = {
+        "supply",
+        "bunkers",
+        "power",
+        "refining",
+        "other_transformation",
+        "industry",
+        "transport",
+        "buildings",
+        "others",
+        "non_energy",
+        "transport_leap_vs_ninth",
+        "datacentres_leap_vs_ninth",
+    }
+
+    for page_key in routed_pages:
+        scope_step = config["page_steps"][page_key][0]
+        assert scope_step["dynamic_content"] == "page_mapping_table"
+
+    assert "dynamic_content" not in config["page_steps"]["total_demand"][0]
+    assert "dynamic_content" not in config["page_steps"]["emissions"][0]
+
+
 @pytest.mark.parametrize(
     ("page_key", "page_label", "scope_title"),
     [
@@ -102,7 +127,7 @@ def test_chart_guide_explains_the_overview_first_review_strategy() -> None:
 
     assert "Start with the summaries, not every chart" in chart_script
     assert "Start with the summary charts at the top" in chart_script
-    assert "detailed sector-and-fuel charts" in chart_script
+    assert "then open the detailed charts only" in chart_script
     assert "Recommended way to use a dense page" not in chart_script
     assert chart_script.index("Start with the summaries") < chart_script.index(
         "How the comparison basis sets the detail"
@@ -131,6 +156,20 @@ def test_buildings_guide_accepts_mapping_table_and_placeholder_context() -> None
     assert "dashboard-guide-table" in build_guide_fragments(
         "chart", "buildings", "Buildings", context
     )["dialog_html"]
+
+
+def test_shared_placeholder_step_is_omitted_when_page_has_no_placeholder() -> None:
+    script = build_guide_fragments(
+        "chart",
+        "industry",
+        "Industry",
+        {
+            "placeholder_status": "No aggregate LEAP placeholder is identified.",
+            "placeholder_in_use": False,
+        },
+    )["script"]
+
+    assert "Check whether this page uses a placeholder" not in script
 
 
 def test_chart_guide_combines_top_controls_and_drops_review_action() -> None:
