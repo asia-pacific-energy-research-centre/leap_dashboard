@@ -880,6 +880,60 @@ def test_jump_navigation_replaces_page_name_with_buildings_tree_nodes() -> None:
     assert 'data-level="2" data-hierarchy-depth="2">16.01.01 Datacentres</a>' in html
 
 
+def test_jump_navigation_restores_real_industry_overview_parent() -> None:
+    rows = [
+        {"section_label": "Industry", "flow_group_label": label}
+        for label in [
+            "14.01 Mining and quarrying",
+            "14.02 Construction",
+            "14.03 Manufacturing",
+            "14.03.01 Iron and steel",
+            "14.03.11 Non-specified industry",
+        ]
+    ]
+    roots = [{"label": "14 Industry sector", "target": "overview-industry__14_industry_sector"}]
+
+    html = _jump_nav_html("Industry", line_section_tree(rows, roots))
+
+    assert 'href="#overview-industry__14_industry_sector"' in html
+    assert 'data-level="1" data-hierarchy-depth="1">14 Industry sector</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">14.01 Mining and quarrying</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">14.02 Construction</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">14.03 Manufacturing</a>' in html
+    assert 'data-level="3" data-hierarchy-depth="3">14.03.01 Iron and steel</a>' in html
+    assert 'data-level="3" data-hierarchy-depth="3">14.03.11 Non-specified industry</a>' in html
+
+
+def test_jump_navigation_preserves_compound_rollup_containment() -> None:
+    rows = [
+        {"section_label": "International transport", "flow_group_label": label}
+        for label in [
+            "04 International marine bunkers",
+            "04-05 International transport (bunkers)",
+            "05 International aviation bunkers",
+        ]
+    ]
+
+    html = _jump_nav_html("International transport", line_section_tree(rows))
+
+    assert 'data-level="1" data-hierarchy-depth="1">04-05 International transport (bunkers)</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">04 International marine bunkers</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">05 International aviation bunkers</a>' in html
+
+
+def test_unparented_top_level_flows_remain_level_one() -> None:
+    rows = [
+        {"section_label": "Supply", "flow_group_label": "01 Production"},
+        {"section_label": "Supply", "flow_group_label": "02 Imports"},
+        {"section_label": "Supply", "flow_group_label": "03 Exports"},
+    ]
+
+    html = _jump_nav_html("Supply", line_section_tree(rows))
+
+    assert html.count('class="jump-chip" data-level="1" data-hierarchy-depth="1"') == 3
+    assert 'data-level="2"' not in html
+
+
 def test_single_visible_flow_is_a_level_one_aggregate() -> None:
     rows = [{"section_label": "Transfers", "flow_group_label": "08 Transfers"}]
 
@@ -2843,6 +2897,59 @@ def test_flow_group_aggregates_replace_hierarchy_parents_with_safe_summaries() -
     assert gas_manifest["source_flow_labels"] == (
         "09.06 Gas processing plants | 09.06.01 Gas works plants | "
         "09.06.02 Liquefaction/regasification plants"
+    )
+
+
+def test_flow_group_aggregate_synthesizes_configured_missing_intermediate_parent() -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "source_system": "ESTO",
+                "scenario": "historical",
+                "year": 2022,
+                "common_flow_code": flow_code,
+                "common_flow_label": flow_label,
+                "common_product_code": "17",
+                "common_product_label": "17 Electricity",
+                "_section_label": "Industry",
+                "value": value,
+            }
+            for flow_code, flow_label, value in [
+                ("14.03.01", "14.03.01 Iron and steel", 10.0),
+                ("14.03.02", "14.03.02 Chemical (incl. petrochemical)", 20.0),
+            ]
+        ]
+    )
+    template = {
+        "chart_generation": {
+            "primary_area_source_system": "LEAP",
+            "primary_area_scenario": "Target",
+            "comparison_source_system": "ESTO",
+            "ninth_source_system": "NINTH",
+            "base_year": 2022,
+            "suppression_threshold": 1.0,
+            "synthetic_intermediate_flow_labels": {
+                "14.03": "14.03 Manufacturing",
+            },
+        }
+    }
+
+    charts, chart_rows, manifest_rows = _build_flow_group_aggregate_charts(
+        rows,
+        page_key="industry",
+        page_label="Industry",
+        parent_flow_labels=set(),
+        template=template,
+        series_labels={"ESTO|historical": "ESTO historical"},
+    )
+
+    parent_key = "chart__area__flowgroup_parent__industry__14_03__product"
+    assert parent_key in charts
+    parent_row = next(row for row in chart_rows if row["chart_key"] == parent_key)
+    assert parent_row["flow_group_label"] == "14.03 Manufacturing"
+    parent_manifest = next(row for row in manifest_rows if row["chart_key"] == parent_key)
+    assert parent_manifest["source_flow_labels"] == (
+        "14.03.01 Iron and steel | 14.03.02 Chemical (incl. petrochemical)"
     )
 
 

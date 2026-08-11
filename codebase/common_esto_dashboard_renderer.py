@@ -2200,6 +2200,13 @@ def _build_flow_group_aggregate_charts(
     base_year = int(chart_config.get("base_year", 2023))
     ninth_source = str(chart_config.get("ninth_source_system", "NINTH"))
     suppression_threshold = float(chart_config.get("suppression_threshold", 1.0))
+    synthetic_intermediate_labels = {
+        str(code).strip(): str(label).strip()
+        for code, label in chart_config.get(
+            "synthetic_intermediate_flow_labels", {}
+        ).items()
+        if str(code).strip() and str(label).strip()
+    }
 
     page_df = page_df.copy()
     if "component_flow_name" in page_df.columns:
@@ -2224,6 +2231,12 @@ def _build_flow_group_aggregate_charts(
         flow_label = str(node["common_flow_label"])
         prefix = str(node["canonical_code"])
         if flow_label in parent_flow_labels and prefix not in parent_prefixes:
+            parent_prefixes.append(prefix)
+    for prefix in synthetic_intermediate_labels:
+        descendant_count = flow_nodes[
+            flow_nodes["canonical_code"].astype(str).str.startswith(prefix + ".")
+        ]["common_flow_label"].nunique()
+        if descendant_count >= 2 and prefix not in parent_prefixes:
             parent_prefixes.append(prefix)
     parent_prefixes.sort(key=lambda value: (code_depth(value), value))
 
@@ -2275,7 +2288,10 @@ def _build_flow_group_aggregate_charts(
             & flow_nodes["common_flow_label"].astype(str).isin(parent_flow_labels)
         ]
         parent_candidates = exact_parent_nodes["common_flow_label"].astype(str).tolist()
-        if parent_candidates:
+        configured_parent_label = synthetic_intermediate_labels.get(parent_prefix, "")
+        if configured_parent_label:
+            parent_label = configured_parent_label
+        elif parent_candidates:
             parent_label = min(
                 parent_candidates,
                 key=lambda value: (
@@ -3410,7 +3426,7 @@ def _jump_nav_html(
     visible_nodes: list[dict[str, object]] = []
     for section_label, subsection_nodes in section_tree:
         for node in subsection_nodes:
-            target = _section_anchor(
+            target = str(node.get("target") or "") or _section_anchor(
                 page_label,
                 section_label,
                 str(node["label"]) if bool(node["use_subsection_anchor"]) else None,
@@ -3472,8 +3488,14 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
         for i, row in enumerate(group_rows):
             caption = escape(str(row.get("title", "")))
             key = escape(row["chart_key"])
+            navigation_root_label = str(row.get("navigation_root_label") or "").strip()
+            figure_id = (
+                f' id="{escape(_overview_navigation_anchor(page_label, navigation_root_label))}"'
+                if navigation_root_label
+                else ""
+            )
             cards.append(
-                f'<figure class="chart-card" data-guide-id="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
+                f'<figure{figure_id} class="chart-card" data-guide-id="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
                 f'<figcaption class="chart-caption">{caption}</figcaption>'
                 f'<div class="meta-subline">{escape(page_label)} &gt; {escape(group_label)}</div>'
                 f'<div class="area-data-note">{escape(str(row.get("stacked_area_note", "")))}</div>'
@@ -3532,15 +3554,25 @@ def _sort_bar_html() -> str:
     return ""
 
 
-def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[dict[str, object]]]]:
+def _overview_navigation_anchor(page_label: str, flow_label: str) -> str:
+    """Return the anchor for a real flow parent represented by an overview chart."""
+    return "overview-" + safe_slug(page_label) + "__" + safe_slug(flow_label)
+
+
+def line_section_tree(
+    line_rows: list[dict],
+    navigation_roots: list[dict[str, str]] | None = None,
+) -> list[tuple[str, list[dict[str, object]]]]:
     """Return visible flow-tree nodes grouped by renderer section.
 
     Renderer sections can be page-oriented groups rather than real Common ESTO
     nodes, so only ``flow_group_label`` values become navigation pills. Levels
     are relative to the visible tree: aggregate roots with visible children are
-    level 1, their immediate visible children are level 2, and so on. Orphan
-    leaves in a multi-node section start at level 2; a single-node section is
-    itself the visible level-1 aggregate.
+    level 1, their immediate visible children are level 2, and so on. Real
+    parent flows represented only by overview charts are restored through
+    ``navigation_roots``. Compound code expressions remain intact so manual
+    rollups can contain their visible children. Unparented top-level codes stay
+    at level 1; deeper orphan leaves in a multi-node section start at level 2.
     """
     tree: list[tuple[str, list[str]]] = []
     seen_sections: dict[str, list[str]] = {}
@@ -3552,9 +3584,33 @@ def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[dict[str, o
         group = str(row.get("flow_group_label") or "").strip()
         if group and group not in seen_sections[section_label]:
             seen_sections[section_label].append(group)
+
+    root_targets: dict[str, str] = {}
+    existing_groups = {group for groups in seen_sections.values() for group in groups}
+    for root in navigation_roots or []:
+        root_label = str(root.get("label") or "").strip()
+        root_code = code_candidate_text(root_label)
+        if not root_label or not root_code or root_label in existing_groups:
+            continue
+        scored_sections: list[tuple[int, int, str]] = []
+        for order, (section_label, groups) in enumerate(tree):
+            contained = sum(
+                1
+                for group in groups
+                if _code_expression_contains_expression(root_code, code_candidate_text(group))
+            )
+            if contained:
+                scored_sections.append((contained, -order, section_label))
+        if not scored_sections:
+            continue
+        section_label = max(scored_sections)[2]
+        seen_sections[section_label].insert(0, root_label)
+        existing_groups.add(root_label)
+        root_targets[root_label] = str(root.get("target") or "").strip()
+
     hierarchy_tree: list[tuple[str, list[dict[str, object]]]] = []
     for section_label, groups in tree:
-        coded_groups = [(group, canonical_code(group)) for group in groups]
+        coded_groups = [(group, code_candidate_text(group)) for group in groups]
         coded_groups = [(group, code) for group, code in coded_groups if code]
         if not coded_groups:
             hierarchy_tree.append((section_label, []))
@@ -3587,7 +3643,7 @@ def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[dict[str, o
             parent = parent_by_group.get(group)
             if parent:
                 depth = visible_depth(parent, visiting) + 1
-            elif group in groups_with_children or len(coded_groups) == 1:
+            elif group in groups_with_children or len(coded_groups) == 1 or code_depth(code) == 1:
                 depth = 1
             else:
                 depth = 2
@@ -3601,6 +3657,7 @@ def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[dict[str, o
                 "code": code,
                 "depth": visible_depth(group),
                 "use_subsection_anchor": len(groups) > 1,
+                "target": root_targets.get(group, ""),
             })
         hierarchy_tree.append((section_label, nodes))
     return hierarchy_tree
@@ -3939,7 +3996,18 @@ def write_dashboard_page(
     page_file = output_path.name
     area_rows = [r for r in chart_rows if r.get("chart_type") == "stacked_area" and str(r.get("section_label")) == "Overview"]
     line_rows = [r for r in chart_rows if not (r.get("chart_type") == "stacked_area" and str(r.get("section_label")) == "Overview")]
-    section_tree = line_section_tree(line_rows)
+    navigation_roots = [
+        {
+            "label": str(row["navigation_root_label"]),
+            "target": _overview_navigation_anchor(
+                page_label,
+                str(row["navigation_root_label"]),
+            ),
+        }
+        for row in area_rows
+        if str(row.get("navigation_root_label") or "").strip()
+    ]
+    section_tree = line_section_tree(line_rows, navigation_roots)
 
     page_datasets: list[str] = [
         str(token).strip().upper()
@@ -5573,6 +5641,11 @@ def render_dashboard(
             and other_transformation_config.get("hide_generic_overview", False)
             else pick_area_specs(page_df, template)
         )
+        page_flow_labels = {
+            str(value).strip()
+            for value in page_df["common_flow_label"].dropna().unique()
+            if str(value).strip()
+        }
         for area_spec in area_specs:
             chart_key = f"chart__area__{safe_slug(area_spec['aggregate_flow_prefix'])}__{safe_slug(area_spec['aggregate_flow_label'])}"
             area_df = area_spec_rows(page_df, area_spec)
@@ -5605,12 +5678,18 @@ def render_dashboard(
                 manifest_rows[-1]["suppressed"] = True
                 continue
             charts[chart_key] = figure
+            aggregate_flow_label = str(area_spec["aggregate_flow_label"])
             chart_rows.append({
                 "chart_key": chart_key,
                 "chart_type": "stacked_area",
-                "title": str(area_spec["aggregate_flow_label"]),
-                "product_label": str(area_spec["aggregate_flow_label"]),
+                "title": aggregate_flow_label,
+                "product_label": aggregate_flow_label,
                 "section_label": "Overview",
+                "navigation_root_label": (
+                    aggregate_flow_label
+                    if aggregate_flow_label in page_flow_labels
+                    else ""
+                ),
                 "datasets": chart_dataset_tokens_from_figure(figure),
                 "stacked_area_note": stacked_area_note_from_figure(figure),
                 **metrics,
