@@ -22,6 +22,7 @@ from codebase.common_esto_dashboard_data import (
 from codebase.common_esto_dashboard_emissions import select_emissions_component_rows
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
 from codebase.common_esto_dashboard_renderer import (
+    _PAGE_CSS,
     _build_td_fuel_chart,
     apply_chart_chrome,
     assert_unique_line_trace_x,
@@ -62,6 +63,13 @@ from codebase.common_esto_dashboard_renderer import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORE_PAGES = ["index", "total_demand", "transport"]
 DEFAULT_DIAGNOSTIC_PAGES = ["transport_leap_vs_ninth", "datacentres_leap_vs_ninth"]
+
+
+def test_page_navigation_stays_on_one_scrollable_row() -> None:
+    navigation_css = _PAGE_CSS.split(".header-inline-controls {", 1)[1].split("}", 1)[0]
+
+    assert "flex-wrap:nowrap" in navigation_css
+    assert "overflow-x:auto" in navigation_css
 
 
 def _load_template() -> dict:
