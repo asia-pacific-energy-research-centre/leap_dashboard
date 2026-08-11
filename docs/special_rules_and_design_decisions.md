@@ -1103,11 +1103,21 @@ and renders the same original-versus-mapped card, related economy rows, review
 fields, and source-review candidates as the default issue queue. Missing class
 labels are grouped as `unclassified_exception`.
 
+Show a brief meaning beneath each classification heading. The dashboard may
+explain the review semantics, but it must retain and display the upstream class
+code rather than inventing a replacement taxonomy. In particular,
+`source_non_additivity` means the raw parent/children already disagree;
+`intentional_detail_exclusion` means detail is outside the shared comparison
+boundary; and `provisional_apec_anchor_review` is temporary pending a final
+root-cause classification.
+
 ### History
 
 - 2026-08-11: Replaced the two-class final-exception allowlist. Provisional and
   unclassified exception-set matches now leave the default queue but remain
   available in the classification browser.
+- 2026-08-11: Added short classification descriptions beside the retained
+  upstream class codes.
 
 ## End-to-end run report
 

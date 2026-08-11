@@ -203,6 +203,17 @@ These later commits supersede the corresponding snapshot rows below:
   queue. A collapsed classification selector retains the same paired cards,
   related economy evidence, review fields, and source-review candidates for
   audit without mixing known exceptions back into unresolved issues.
+- **DASHQ-050 is `upstream_decision_required`.** The four current ESTO
+  flow-tree cards reduce to one mapped 2022 China component,
+  `10.01.01 Electricity, CHP and heat plants / 02.07 Coal tar` (-0.060290 PJ),
+  which the active Common ESTO build prunes because ESTO component relevance
+  uses the latest available year (2023, where the component is zero). The raw
+  ESTO hierarchy reconciles and the published structural map includes the
+  component, so this is neither source non-additivity nor a general 10.x-to-09.x
+  boundary-adjustment failure. Decide upstream whether to retain this component
+  narrowly or classify its historical omission as `intentional_detail_exclusion`;
+  do not change ESTO relevance globally because that would restore 284 pruned
+  2022 pairs totaling about 19 million PJ, mostly 18.x generation categories.
 
 Do not mark an item complete because a handover note or prompt says it is
 complete. Several statements in `docs/handover_mapping_diagnostics.md` were
@@ -326,6 +337,7 @@ decisions can be made without review.
 |---|---|---|---|---|---|---|
 | DASHQ-038 | P1 | 2026-08-10 | `complete_on_master` | none | Remove the production mapping-tree explorer page and make failed NINTH/LEAP anchor cards show the tested child frontier | The production workflow no longer renders or links `mapping_tree_explorer.html`; the standalone script remains available for manual investigation. Paired diagnostic cards now constrain component evidence by source system and show only child-frontier rows, explicitly identifying excluded parent mappings and unmapped children. Focused diagnostics tests pass, and the shared APEC diagnostics plus 16RUS dashboard were regenerated. |
 | DASHQ-049 | P1 | 2026-08-11 | `complete_on_master` | DASHQ-038 | Separate exception-set matches from the default paired-tree issue queue | Every `known_data_quality_exception` context is hidden from the default NINTH/LEAP/ESTO issue trees and retained in a collapsed `exception_issue_class` selector using the same paired cards and evidence drill-down. Focused diagnostics tests and the regenerated shared diagnostics page verify the split. |
+| DASHQ-050 | P1 | 2026-08-11 | `upstream_decision_required` | `leap_mappings` relevance policy | Resolve four duplicate ESTO flow-tree failures caused by one pruned historical coal-tar component | The structural map includes `10.01.01 / 02.07`, and raw 2022 ESTO reconciles, but latest-year relevance removes its -0.060290 PJ China value because 2023 is zero. Prefer a narrow upstream retention rule if historical anchor completeness is intended; otherwise record `intentional_detail_exclusion`. A global all-period ESTO policy is unsafe: it restores 284 pruned 2022 pairs totaling about 19 million PJ. |
 | DASHQ-037 | P1 | 2026-08-08 | `complete_in_worktree` | none | Add an interactive guide to every dashboard page | Complete in `codex/dashboard-guided-tour`: a top-right Guide button opens keyboard-accessible, page-aware walkthroughs on the index, every chart page, mapping diagnostics, and the full mapping-tree explorer. Content is editable in `guide_config.json`; stable targets are generated with each page. The content pass adds page-specific boundaries and review prompts for every configured chart page, rich sign/method tables, a recommended landing-page route, and evidence-led diagnostics wording. Verification: all 163 tests pass; the tracked USA fixture renders 579 charts; every rendered HTML page contains the launcher and representative page-specific content; publication readiness passes; page-noise reports zero flags; browser QA confirms landing and Power tables, correct 7-of-10 insertion, reachable controls, and chart lazy loading. |
 | DASHQ-030 | P0 | 2026-08-03 | `complete_on_master` | none | Prevent detached common aggregates from stacking with their components | Done in `746bcc7`. Aggregate charts now select one observation-specific common-code frontier even when the broad row is not flagged NON_EXPANDING. The USA Other demand production bundle contains only `16.03-16.05,17`; a source without that row retains `16.03-16.04` and `16.05`. Verification: 47 focused tests pass, fixture and production USA renders completed, required bundles/manifests exist, publication readiness passes, and page-noise flags are unrelated existing density/suppression findings. |
 | DASHQ-031 | P0 | 2026-08-03 | `complete_on_master` | none | Include every compound-range endpoint in overview-card scopes | Done in `6142240`. Range-aware subtree closure removes the incomplete `16.01`-derived Buildings card while retaining the valid all-Buildings and Residential views. Verification: 48 focused tests pass; the production USA render contains 520 charts and its all-Buildings frontier includes Ninth Commercial plus Residential; publication readiness passes and page-noise findings are unrelated. |

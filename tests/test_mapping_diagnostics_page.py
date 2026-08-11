@@ -7,6 +7,7 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     _anchor_value_summary,
     _context_value_formatter,
     _direct_parent_mapping_reconciles,
+    _exception_classification_description,
     _partition_paired_tree_exceptions,
     _mapping_cardinality_diagnostics,
     _mapped_target_structure_html,
@@ -20,6 +21,23 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     prefer_compressed_csv_path,
     write_mapping_diagnostics_page,
 )
+
+
+def test_exception_classification_descriptions_cover_current_upstream_classes() -> None:
+    descriptions = {
+        classification: _exception_classification_description(classification)
+        for classification in [
+            "source_non_additivity",
+            "intentional_detail_exclusion",
+            "provisional_apec_anchor_review",
+            "unclassified_exception",
+        ]
+    }
+
+    assert "source hierarchy" in descriptions["source_non_additivity"]
+    assert "deliberately omits" in descriptions["intentional_detail_exclusion"]
+    assert "temporary APEC-wide review" in descriptions["provisional_apec_anchor_review"]
+    assert "did not supply an issue class" in descriptions["unclassified_exception"]
 
 
 def test_paired_tree_excludes_every_matched_exception() -> None:
@@ -567,6 +585,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "All classifications" in html
     assert 'data-exception-classification="confirmed_source_non_additivity"' in html
     assert "Confirmed source non additivity (1)" in html
+    assert "The raw source parent and its declared children do not reconcile." in html
+    assert "not created by the Common ESTO mapping" in html
     assert "Every context matched by the upstream exception set is omitted" in html
     assert "other_economy_parent" not in html
     assert "SRC-OTHER" not in html
