@@ -2773,7 +2773,7 @@ a:hover { text-decoration: underline; }
 .jump-nav-row { display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0; }
 .jump-nav-row[data-level="2"] { padding-left:18px; }
 .jump-nav-row[data-level="3"] { padding-left:36px; }
-.jump-nav-row[data-level="leaf"] { padding-left:54px; }
+.jump-nav-row[data-level="4"] { padding-left:54px; }
 .jump-chip {
   position:relative;display:inline-flex;align-items:center;gap:6px;
   padding:4px 9px;border:1px solid #c5ccd3;border-radius:999px;
@@ -2787,8 +2787,8 @@ a:hover { text-decoration: underline; }
 .jump-chip[data-level="2"]::before { background:#22c55e; }
 .jump-chip[data-level="3"] { background:#eff6ff;border-color:#93c5fd;color:#1e40af; }
 .jump-chip[data-level="3"]::before { background:#3b82f6; }
-.jump-chip[data-level="leaf"] { background:#f5edff;border-color:#c69af0;color:#4c1d70; }
-.jump-chip[data-level="leaf"]::before { background:#9333ea; }
+.jump-chip[data-level="4"] { background:#f5edff;border-color:#c69af0;color:#4c1d70; }
+.jump-chip[data-level="4"]::before { background:#9333ea; }
 .visible-note { margin:8px 0 10px 0;padding:8px 12px;background:#fffbe6;border-left:3px solid #f0a500;border-radius:4px;font-size:13px;color:#5a3e00;line-height:1.5; }
 .scenario-toggle {
   display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
@@ -3398,52 +3398,41 @@ def _jump_nav_html(
     page_label: str,
     section_tree: list[tuple[str, list[dict[str, object]]]],
 ) -> str:
-    """Build hierarchy-aware section jump navigation.
+    """Build jump navigation from real visible flow nodes and levels.
 
-    Orange section chips stay on the first row. Within each section, hierarchy
-    parents are split onto depth-specific rows before the purple leaf row. The
-    parent pills therefore point directly to their safe aggregate charts.
+    Page names and renderer-only section groups are not tree nodes, so they do
+    not receive pills. Visible flow nodes are grouped by their effective tree
+    level whether or not they have children: level 1 is orange, level 2 green,
+    level 3 blue, and level 4 or deeper purple.
     """
     if not section_tree:
         return ""
-    top_chips = "".join(
-        f'<a href="#{_section_anchor(page_label, sl)}" class="jump-chip" data-level="1">{escape(sl)}</a>'
-        for sl, _ in section_tree
-    )
-    rows = [f'<div class="jump-nav-row" data-level="1">{top_chips}</div>']
+    visible_nodes: list[dict[str, object]] = []
     for section_label, subsection_nodes in section_tree:
-        if len(subsection_nodes) < 2:
-            continue
-        intermediate_depths = sorted({
-            int(node["depth"])
-            for node in subsection_nodes
-            if bool(node["has_children"])
-        })
-        for depth in intermediate_depths:
-            visual_level = "2" if depth <= 2 else "3"
-            level_nodes = [
-                node for node in subsection_nodes
-                if bool(node["has_children"]) and int(node["depth"]) == depth
-            ]
-            level_chips = "".join(
-                f'<a href="#{_section_anchor(page_label, section_label, str(node["label"]))}" '
-                f'class="jump-chip" data-level="{visual_level}" data-hierarchy-depth="{depth}">'
-                f'{escape(str(node["label"]))}</a>'
-                for node in level_nodes
+        for node in subsection_nodes:
+            target = _section_anchor(
+                page_label,
+                section_label,
+                str(node["label"]) if bool(node["use_subsection_anchor"]) else None,
             )
-            rows.append(
-                f'<div class="jump-nav-row" data-level="{visual_level}" '
-                f'data-hierarchy-depth="{depth}">{level_chips}</div>'
-            )
-        leaf_nodes = [node for node in subsection_nodes if not bool(node["has_children"])]
-        if leaf_nodes:
-            leaf_chips = "".join(
-                f'<a href="#{_section_anchor(page_label, section_label, str(node["label"]))}" '
-                f'class="jump-chip" data-level="leaf" data-hierarchy-depth="{int(node["depth"])}">'
-                f'{escape(str(node["label"]))}</a>'
-                for node in leaf_nodes
-            )
-            rows.append(f'<div class="jump-nav-row" data-level="leaf">{leaf_chips}</div>')
+            visible_nodes.append({**node, "target": target})
+    if not visible_nodes:
+        return ""
+
+    rows: list[str] = []
+    for depth in sorted({int(node["depth"]) for node in visible_nodes}):
+        level_nodes = [node for node in visible_nodes if int(node["depth"]) == depth]
+        visual_level = min(max(depth, 1), 4)
+        chips = "".join(
+            f'<a href="#{escape(str(node["target"]))}" class="jump-chip" '
+            f'data-level="{visual_level}" data-hierarchy-depth="{depth}">'
+            f'{escape(str(node["label"]))}</a>'
+            for node in level_nodes
+        )
+        rows.append(
+            f'<div class="jump-nav-row" data-level="{visual_level}" '
+            f'data-hierarchy-depth="{depth}">{chips}</div>'
+        )
     return (
         f'<div class="jump-nav" data-guide-id="section-navigation"><span class="jump-nav-label">Sections:</span>'
         f'<div class="jump-nav-groups">{"".join(rows)}</div></div>'
@@ -3544,13 +3533,13 @@ def _sort_bar_html() -> str:
 
 
 def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[dict[str, object]]]]:
-    """Return ordered section and hierarchy-node pairs for the jump nav.
+    """Return visible flow-tree nodes grouped by renderer section.
 
-    A section only gets subsections when it contains more than one distinct
-    ``flow_group_label`` — sections that are already a single flow (e.g. Refining)
-    stay flat rather than gaining a pointless one-item subsection row. A node
-    is intermediate when its code prefixes another visible node in the same
-    section; otherwise it is a leaf.
+    Renderer sections can be page-oriented groups rather than real Common ESTO
+    nodes, so only ``flow_group_label`` values become navigation pills. When a
+    section omits its container node, its shallowest visible flow is promoted
+    to level 2 and all descendants shift with it. This keeps e.g. 10.01.xx own
+    use leaves at the visible level 2 instead of inventing a missing 10.01 pill.
     """
     tree: list[tuple[str, list[str]]] = []
     seen_sections: dict[str, list[str]] = {}
@@ -3564,23 +3553,20 @@ def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[dict[str, o
             seen_sections[section_label].append(group)
     hierarchy_tree: list[tuple[str, list[dict[str, object]]]] = []
     for section_label, groups in tree:
-        if len(groups) <= 1:
+        coded_groups = [(group, canonical_code(group)) for group in groups]
+        coded_groups = [(group, code) for group, code in coded_groups if code]
+        if not coded_groups:
             hierarchy_tree.append((section_label, []))
             continue
-        codes = {group: canonical_code(group) for group in groups}
+        raw_depths = [code_depth(code) for _, code in coded_groups]
+        depth_shift = max(0, min(raw_depths) - 2)
         nodes: list[dict[str, object]] = []
-        for group in groups:
-            code = codes[group]
-            has_children = bool(code) and any(
-                other_code.startswith(code + ".")
-                for other_group, other_code in codes.items()
-                if other_group != group and other_code
-            )
+        for group, code in coded_groups:
             nodes.append({
                 "label": group,
                 "code": code,
-                "depth": code_depth(code) if code else 0,
-                "has_children": has_children,
+                "depth": max(1, code_depth(code) - depth_shift),
+                "use_subsection_anchor": len(groups) > 1,
             })
         hierarchy_tree.append((section_label, nodes))
     return hierarchy_tree
