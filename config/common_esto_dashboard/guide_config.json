@@ -397,7 +397,7 @@
       "id": "section-navigation",
       "target": "[data-guide-id='section-navigation']",
       "title": "Jump to the part you need",
-      "copy": "Orange chips identify major sections and purple chips identify subsections. They move within this page without changing the data or scenario.",
+      "copy": "Orange chips identify major sections. Green chips identify level-2 parent sectors and blue chips identify deeper parent sectors; both open aggregate views of their descendant flows. Purple chips identify the detailed leaf sectors. Each hierarchy level appears on its own line, and every chip moves within this page without changing the data or scenario.",
       "optional": true
     },
     {

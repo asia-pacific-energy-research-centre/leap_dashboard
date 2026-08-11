@@ -2772,6 +2772,8 @@ a:hover { text-decoration: underline; }
 .jump-nav-groups { display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 640px; }
 .jump-nav-row { display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0; }
 .jump-nav-row[data-level="2"] { padding-left:18px; }
+.jump-nav-row[data-level="3"] { padding-left:36px; }
+.jump-nav-row[data-level="leaf"] { padding-left:54px; }
 .jump-chip {
   position:relative;display:inline-flex;align-items:center;gap:6px;
   padding:4px 9px;border:1px solid #c5ccd3;border-radius:999px;
@@ -2781,8 +2783,12 @@ a:hover { text-decoration: underline; }
 .jump-chip::before { content:"";display:block;width:8px;height:8px;border-radius:999px;flex:0 0 auto;background:#94a3b8; }
 .jump-chip[data-level="1"] { background:#fff4e6;border-color:#f2a65a;color:#7a3b00; }
 .jump-chip[data-level="1"]::before { background:#f97316; }
-.jump-chip[data-level="2"] { background:#f5edff;border-color:#c69af0;color:#4c1d70; }
-.jump-chip[data-level="2"]::before { background:#9333ea; }
+.jump-chip[data-level="2"] { background:#ecfdf3;border-color:#86d5a6;color:#166534; }
+.jump-chip[data-level="2"]::before { background:#22c55e; }
+.jump-chip[data-level="3"] { background:#eff6ff;border-color:#93c5fd;color:#1e40af; }
+.jump-chip[data-level="3"]::before { background:#3b82f6; }
+.jump-chip[data-level="leaf"] { background:#f5edff;border-color:#c69af0;color:#4c1d70; }
+.jump-chip[data-level="leaf"]::before { background:#9333ea; }
 .visible-note { margin:8px 0 10px 0;padding:8px 12px;background:#fffbe6;border-left:3px solid #f0a500;border-radius:4px;font-size:13px;color:#5a3e00;line-height:1.5; }
 .scenario-toggle {
   display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
@@ -3388,13 +3394,15 @@ def _dataset_filter_html(datasets: list[str], comparison_scope: str = "default")
     )
 
 
-def _jump_nav_html(page_label: str, section_tree: list[tuple[str, list[str]]]) -> str:
-    """Build the section jump-navigation block.
+def _jump_nav_html(
+    page_label: str,
+    section_tree: list[tuple[str, list[dict[str, object]]]],
+) -> str:
+    """Build hierarchy-aware section jump navigation.
 
-    ``section_tree`` is an ordered list of (section_label, subsection_labels) pairs.
-    The top-level section chips render on row 1; each section that has more than one
-    subsection gets its own indented row directly beneath row 1, in section order, so a
-    page with several subdivided sections ends up with rows 2, 3, 4... one per parent.
+    Orange section chips stay on the first row. Within each section, hierarchy
+    parents are split onto depth-specific rows before the purple leaf row. The
+    parent pills therefore point directly to their safe aggregate charts.
     """
     if not section_tree:
         return ""
@@ -3403,14 +3411,39 @@ def _jump_nav_html(page_label: str, section_tree: list[tuple[str, list[str]]]) -
         for sl, _ in section_tree
     )
     rows = [f'<div class="jump-nav-row" data-level="1">{top_chips}</div>']
-    for sl, subsection_labels in section_tree:
-        if len(subsection_labels) < 2:
+    for section_label, subsection_nodes in section_tree:
+        if len(subsection_nodes) < 2:
             continue
-        sub_chips = "".join(
-            f'<a href="#{_section_anchor(page_label, sl, sub)}" class="jump-chip" data-level="2">{escape(sub)}</a>'
-            for sub in subsection_labels
-        )
-        rows.append(f'<div class="jump-nav-row" data-level="2">{sub_chips}</div>')
+        intermediate_depths = sorted({
+            int(node["depth"])
+            for node in subsection_nodes
+            if bool(node["has_children"])
+        })
+        for depth in intermediate_depths:
+            visual_level = "2" if depth <= 2 else "3"
+            level_nodes = [
+                node for node in subsection_nodes
+                if bool(node["has_children"]) and int(node["depth"]) == depth
+            ]
+            level_chips = "".join(
+                f'<a href="#{_section_anchor(page_label, section_label, str(node["label"]))}" '
+                f'class="jump-chip" data-level="{visual_level}" data-hierarchy-depth="{depth}">'
+                f'{escape(str(node["label"]))}</a>'
+                for node in level_nodes
+            )
+            rows.append(
+                f'<div class="jump-nav-row" data-level="{visual_level}" '
+                f'data-hierarchy-depth="{depth}">{level_chips}</div>'
+            )
+        leaf_nodes = [node for node in subsection_nodes if not bool(node["has_children"])]
+        if leaf_nodes:
+            leaf_chips = "".join(
+                f'<a href="#{_section_anchor(page_label, section_label, str(node["label"]))}" '
+                f'class="jump-chip" data-level="leaf" data-hierarchy-depth="{int(node["depth"])}">'
+                f'{escape(str(node["label"]))}</a>'
+                for node in leaf_nodes
+            )
+            rows.append(f'<div class="jump-nav-row" data-level="leaf">{leaf_chips}</div>')
     return (
         f'<div class="jump-nav" data-guide-id="section-navigation"><span class="jump-nav-label">Sections:</span>'
         f'<div class="jump-nav-groups">{"".join(rows)}</div></div>'
@@ -3510,12 +3543,14 @@ def _sort_bar_html() -> str:
     return ""
 
 
-def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[str]]]:
-    """Return ordered (section_label, subsection_labels) pairs for the jump nav.
+def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[dict[str, object]]]]:
+    """Return ordered section and hierarchy-node pairs for the jump nav.
 
     A section only gets subsections when it contains more than one distinct
     ``flow_group_label`` — sections that are already a single flow (e.g. Refining)
-    stay flat rather than gaining a pointless one-item subsection row.
+    stay flat rather than gaining a pointless one-item subsection row. A node
+    is intermediate when its code prefixes another visible node in the same
+    section; otherwise it is a leaf.
     """
     tree: list[tuple[str, list[str]]] = []
     seen_sections: dict[str, list[str]] = {}
@@ -3527,7 +3562,28 @@ def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[str]]]:
         group = str(row.get("flow_group_label") or "").strip()
         if group and group not in seen_sections[section_label]:
             seen_sections[section_label].append(group)
-    return [(sl, subs if len(subs) > 1 else []) for sl, subs in tree]
+    hierarchy_tree: list[tuple[str, list[dict[str, object]]]] = []
+    for section_label, groups in tree:
+        if len(groups) <= 1:
+            hierarchy_tree.append((section_label, []))
+            continue
+        codes = {group: canonical_code(group) for group in groups}
+        nodes: list[dict[str, object]] = []
+        for group in groups:
+            code = codes[group]
+            has_children = bool(code) and any(
+                other_code.startswith(code + ".")
+                for other_group, other_code in codes.items()
+                if other_group != group and other_code
+            )
+            nodes.append({
+                "label": group,
+                "code": code,
+                "depth": code_depth(code) if code else 0,
+                "has_children": has_children,
+            })
+        hierarchy_tree.append((section_label, nodes))
+    return hierarchy_tree
 
 
 def _mapping_cell(rows: pd.DataFrame, column: str) -> str:

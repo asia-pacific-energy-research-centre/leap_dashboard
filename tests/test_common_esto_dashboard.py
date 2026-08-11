@@ -38,6 +38,7 @@ from codebase.common_esto_dashboard_renderer import (
     guide_page_context,
     guide_page_mapping_table,
     guide_placeholder_status,
+    line_section_tree,
     page_placeholder_note,
     pick_area_specs,
     prepare_other_transformation_page_rows,
@@ -53,6 +54,7 @@ from codebase.common_esto_dashboard_renderer import (
     _select_total_rows_by_source,
     _non_overlapping_common_row_frontier,
     _non_overlapping_flow_rows,
+    _jump_nav_html,
 )
 
 
@@ -827,6 +829,31 @@ def test_chart_dataset_tokens_come_from_final_traces() -> None:
     })
 
     assert chart_dataset_tokens_from_figure(figure) == "ESTO"
+
+
+def test_jump_navigation_separates_parent_depths_from_leaf_flows() -> None:
+    rows = [
+        {"section_label": "Other transformation", "flow_group_label": label}
+        for label in [
+            "09.06 Gas processing plants",
+            "09.06.02 Liquefaction/regasification plants",
+            "09.06.01 Gas works plants",
+            "09.06.02.01 Liquefaction",
+            "09.08.01 Coke ovens",
+        ]
+    ]
+
+    html = _jump_nav_html("Other transformation", line_section_tree(rows))
+
+    assert html.count('<div class="jump-nav-row" data-level="2"') == 1
+    assert html.count('<div class="jump-nav-row" data-level="3"') == 1
+    assert html.count('<div class="jump-nav-row" data-level="leaf"') == 1
+    assert 'data-level="2" data-hierarchy-depth="2">09.06 Gas processing plants</a>' in html
+    assert 'data-level="3" data-hierarchy-depth="3">09.06.02 Liquefaction/regasification plants</a>' in html
+    assert 'data-level="leaf" data-hierarchy-depth="3">09.06.01 Gas works plants</a>' in html
+    assert 'data-level="leaf" data-hierarchy-depth="4">09.06.02.01 Liquefaction</a>' in html
+    assert html.index('data-hierarchy-depth="2"') < html.index('data-hierarchy-depth="3"')
+    assert html.index('data-level="3"') < html.index('data-level="leaf"')
 
 
 def test_aggregate_only_domestic_demand_pages_remain_visible() -> None:
