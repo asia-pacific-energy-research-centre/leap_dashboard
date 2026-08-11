@@ -49,6 +49,11 @@ These later commits supersede the corresponding snapshot rows below:
   A later Power pass applies the same yellow placeholder terminology when the
   upstream fallback audit shows that retained LEAP values come from interim
   power branches, and names those branches in both the page note and guide.
+  A Supply pass keeps marine (`04`) and aviation (`05`) bunkers separate and
+  removes their combined `04-05` parent from that page. USA LEAP aviation and
+  marine remain unavailable because the current source provides only the
+  combined `All demand aggregated/International transport` placeholder; the
+  separate mappings are ready for Air and Shipping data when supplied.
 
 - **DASHQ-003 and DASHQ-004 are complete in the current documentation
   checkout.** `docs/handover_mapping_diagnostics.md` now retains the original

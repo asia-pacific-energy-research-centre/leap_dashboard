@@ -65,7 +65,7 @@
           "caption": "Supply page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
           "rows": [
-            ["Core flows", "Production (01), imports (02), exports (03), and international transport (04-05)", "Exports and international transport are displayed as negative because they leave domestic supply. International transport also has its own focused review page."],
+            ["Core flows", "Production (01), imports (02), exports (03), international marine bunkers (04), and international aviation bunkers (05)", "Exports and international transport are displayed as negative because they leave domestic supply. Marine and aviation are kept separate here; their combined 04-05 parent is not shown on this page."],
             ["Balancing flows", "Stock changes (06) and statistical discrepancy (11) belong to the Supply family", "Where comparison rows are available, they are shown as base-year bar charts because they do not form a comparable projection series. Either sign can be meaningful."],
             ["Products", "Primary fuels, petroleum products, gas, electricity, heat and other reported carriers", "The exact fuel detail depends on the selected Common-category scope and source coverage."],
             ["How to use it", "Start with supply composition, then open the material flow-product pair", "A supply difference can come from quantity, sign convention, product grouping or source coverage."]

@@ -267,8 +267,9 @@
   },
   "supply_page": {
     "page_key": "supply",
+    "exclude_flow_codes": ["04-05"],
     "base_year_bar_flow_codes": ["06", "11"],
-    "_note": "Stock changes and statistical discrepancy are balancing rows rather than projection series. When the Common ESTO input publishes them, show their available base-year fuel values as grouped bars and exclude them from ordinary line and area charts."
+    "_note": "Show international marine bunkers (04) and international aviation bunkers (05) separately on Supply; do not show their combined 04-05 parent there. The combined row remains available to the Energy balance overview so its supply total can use one non-overlapping bunker boundary. Stock changes and statistical discrepancy are balancing rows rather than projection series. When the Common ESTO input publishes them, show their available base-year fuel values as grouped bars and exclude them from ordinary line and area charts."
   },
   "emissions_page": {
     "enabled": true,
@@ -286,8 +287,9 @@
   "leap_demand_sector_coverage": {
     "enabled": true,
     "aggregate_placeholder_branch": "All demand aggregated",
-    "show_aggregate_only_page_keys": ["industry", "transport", "buildings", "others"],
+    "show_aggregate_only_page_keys": ["supply", "industry", "transport", "buildings", "others"],
     "page_leap_branches": {
+      "supply": ["International transport"],
       "industry": ["Industry"],
       "transport": ["Passenger road", "Freight road", "Transport non road"],
       "buildings": ["Buildings"],

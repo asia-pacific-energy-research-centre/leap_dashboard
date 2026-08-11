@@ -1056,6 +1056,33 @@ directly in the dashboard when they are absent from the Common ESTO fact.
   comparison fact contains no flow-06 or flow-11 rows, so activation remains
   blocked on a consistent upstream mapping generation.
 
+## DASH-031: Keep marine and aviation bunkers separate on Supply
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / source-coverage warning
+**Affected areas:** Supply; international marine bunkers (`04`); international aviation bunkers (`05`)
+
+### Current rule
+
+Show flow `04` and flow `05` separately on Supply and omit their combined
+`04-05 International transport (bunkers)` parent from that page. Continue to
+use the combined row as the non-overlapping bunker boundary in the Energy
+balance overview supply total.
+
+When the upstream coverage record says International transport is still part
+of `All demand aggregated`, show a yellow placeholder warning. The current USA
+LEAP input supplies only `All demand aggregated/International transport`; its
+separate mapped Air and Shipping branches are absent. Do not allocate that
+combined value between marine and aviation. The separate Supply charts must
+therefore show LEAP as unavailable until detailed source data are supplied.
+
+### History
+
+- 2026-08-11: Confirmed from the upstream raw LEAP fact, converted ESTO fact,
+  published source map, and Common ESTO comparison fact. The detailed mappings
+  exist, but only the combined source placeholder has values for USA.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

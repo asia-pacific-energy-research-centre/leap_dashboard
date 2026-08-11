@@ -3668,6 +3668,16 @@ def guide_placeholder_status(page_key: str, template: dict) -> str:
     ).strip()
     page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
     sectors = [str(value) for value in page_branches.get(page_key, []) if str(value).strip()]
+    if page_key == "supply" and "International transport" in sectors:
+        return (
+            "The yellow warning means LEAP currently supplies international transport "
+            "through the combined 'All demand aggregated/International transport' "
+            "placeholder. Supply shows marine bunkers (04) and aviation bunkers (05) "
+            "separately, so the combined LEAP value cannot be placed in either chart "
+            "without guessing a split. The detailed LEAP mappings are ready, but the "
+            "separate Air and Shipping source branches have not yet been supplied. Treat "
+            "the missing LEAP detail as unavailable, not as zero."
+        )
     if not sectors:
         return (
             "No aggregate LEAP placeholder is identified for this page in this economy. "
@@ -3700,6 +3710,13 @@ def page_placeholder_note(page_key: str, template: dict) -> str:
     coverage = template.get("leap_demand_sector_coverage", {}) or {}
     page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
     sectors = [str(value) for value in page_branches.get(page_key, []) if str(value).strip()]
+    if page_key == "supply" and "International transport" in sectors:
+        return (
+            "LEAP placeholder in use: 'All demand aggregated/International transport' "
+            "provides only a combined international-transport value. Supply shows marine "
+            "(04) and aviation (05) separately, so LEAP is unavailable for those charts "
+            "until separate Air and Shipping data are supplied; missing values are not zero."
+        )
     if not sectors:
         return ""
     placeholder_branch = str(
@@ -5446,6 +5463,15 @@ def render_dashboard(
         supply_config = template.get("supply_page", {})
         supply_page_key = safe_slug(supply_config.get("page_key", "supply"))
         if page_key == supply_page_key:
+            excluded_flow_codes = {
+                str(value).strip()
+                for value in supply_config.get("exclude_flow_codes", [])
+                if str(value).strip()
+            }
+            if excluded_flow_codes and "common_flow_code" in page_df.columns:
+                page_df = page_df[
+                    ~page_df["common_flow_code"].astype(str).isin(excluded_flow_codes)
+                ].copy()
             bar_charts, bar_chart_rows, bar_manifest_rows, page_df = (
                 _build_supply_base_year_bar_charts(
                     page_df=page_df,

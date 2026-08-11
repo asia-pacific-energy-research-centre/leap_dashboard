@@ -1189,6 +1189,43 @@ def test_common_esto_dashboard_renders_international_transport_as_secondary_supp
                 "common_product_label": "07.05 Kerosene type jet fuel",
                 "value": value,
             })
+    for flow_code, flow_name, flow_label, product_code, product_name, product_label in [
+        (
+            "04",
+            "International marine bunkers",
+            "04 International marine bunkers",
+            "07.08",
+            "Fuel oil",
+            "07.08 Fuel oil",
+        ),
+        (
+            "05",
+            "International aviation bunkers",
+            "05 International aviation bunkers",
+            "07.05",
+            "Kerosene type jet fuel",
+            "07.05 Kerosene type jet fuel",
+        ),
+    ]:
+        for source_system, scenario, value in [
+            ("ESTO", "historical", -3.0),
+            ("NINTH", "Target", -3.2),
+        ]:
+            for year in [2022, 2024]:
+                bunker_rows.append({
+                    "comparison_scope": "leap_vs_esto_vs_ninth",
+                    "source_system": source_system,
+                    "economy": "20_USA",
+                    "scenario": scenario,
+                    "year": year,
+                    "common_flow_code": flow_code,
+                    "common_flow_name": flow_name,
+                    "common_flow_label": flow_label,
+                    "common_product_code": product_code,
+                    "common_product_name": product_name,
+                    "common_product_label": product_label,
+                    "value": value,
+                })
     rows = pd.concat([rows, pd.DataFrame(bunker_rows)], ignore_index=True, sort=False)
     df = apply_sign_semantics(rows, template["sign_semantics"])
     main_df = df[df["comparison_scope"] == "leap_vs_esto_vs_ninth"].copy()
@@ -1205,9 +1242,29 @@ def test_common_esto_dashboard_renders_international_transport_as_secondary_supp
     assert 'href="international_transport.html"' in supply_html
     assert "International transport" in international_html
 
+    supply_flows = set(manifest.loc[manifest["page_key"].eq("supply"), "common_flow_label"])
+    assert "04 International marine bunkers" in supply_flows
+    assert "05 International aviation bunkers" in supply_flows
+    assert "04-05 International transport (bunkers)" not in supply_flows
+
     assignments = pd.read_csv(layout["supporting"] / "page_assignment_summary.csv")
     assert "international_transport" not in set(assignments["page_key"])
     assert "supply" in set(assignments["page_key"])
+
+
+def test_supply_placeholder_explains_missing_marine_and_aviation_leap_detail() -> None:
+    template = _load_template()
+    template["leap_demand_sector_coverage"]["_aggregate_only_page_branches"] = {
+        "supply": ["International transport"]
+    }
+
+    note = page_placeholder_note("supply", template)
+    status = guide_placeholder_status("supply", template)
+
+    assert "All demand aggregated/International transport" in note
+    assert "marine (04) and aviation (05) separately" in note
+    assert "separate Air and Shipping source branches" in status
+    assert "unavailable, not as zero" in status
 
 
 def test_common_esto_dashboard_switcher_uses_current_dashboard_label(tmp_path: Path) -> None:
