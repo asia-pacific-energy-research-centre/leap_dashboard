@@ -57,6 +57,7 @@ from codebase.common_esto_dashboard_renderer import (
     _non_overlapping_flow_rows,
     _flow_subtree_is_page_complete,
     _jump_nav_html,
+    _line_sections_html,
 )
 
 
@@ -992,6 +993,66 @@ def test_unparented_top_level_flows_remain_level_one() -> None:
 
     assert html.count('class="jump-chip" data-level="1" data-hierarchy-depth="1"') == 3
     assert 'data-level="2"' not in html
+
+
+def test_supply_sections_are_alphabetical_by_name_without_esto_code() -> None:
+    labels = [
+        "06 Stock changes",
+        "11 Statistical discrepancy",
+        "01 Production",
+        "02 Imports",
+        "03 Exports",
+        "04 International marine bunkers",
+        "05 International aviation bunkers",
+    ]
+    rows = [
+        {
+            "section_label": "Supply",
+            "flow_group_label": label,
+            "chart_key": f"chart-{index}",
+            "product_label": "All products",
+        }
+        for index, label in enumerate(labels)
+    ]
+    expected = [
+        "03 Exports",
+        "02 Imports",
+        "05 International aviation bunkers",
+        "04 International marine bunkers",
+        "01 Production",
+        "11 Statistical discrepancy",
+        "06 Stock changes",
+    ]
+
+    navigation_html = _jump_nav_html("Supply", line_section_tree(rows))
+    body_html = _line_sections_html(rows, "Supply")
+
+    assert [navigation_html.index(f">{label}</a>") for label in expected] == sorted(
+        navigation_html.index(f">{label}</a>") for label in expected
+    )
+    assert [body_html.index(f">{label}</h3>") for label in expected] == sorted(
+        body_html.index(f">{label}</h3>") for label in expected
+    )
+
+
+def test_section_sorting_is_alphabetical_within_each_hierarchy_level() -> None:
+    rows = [
+        {"section_label": "Industry", "flow_group_label": label}
+        for label in [
+            "14.03 Manufacturing",
+            "14.01 Mining and quarrying",
+            "14.03.11 Non-specified industry",
+            "14.03.01 Iron and steel",
+            "14.02 Construction",
+        ]
+    ]
+    roots = [{"label": "14 Industry sector", "target": "overview-industry"}]
+
+    html = _jump_nav_html("Industry", line_section_tree(rows, roots))
+
+    assert html.index(">14.02 Construction</a>") < html.index(">14.03 Manufacturing</a>")
+    assert html.index(">14.03 Manufacturing</a>") < html.index(">14.01 Mining and quarrying</a>")
+    assert html.index(">14.03.01 Iron and steel</a>") < html.index(">14.03.11 Non-specified industry</a>")
 
 
 def test_single_visible_flow_is_a_level_one_aggregate() -> None:

@@ -1094,6 +1094,25 @@ therefore show LEAP as unavailable until detailed source data are supplied.
   published source map, and Common ESTO comparison fact. The detailed mappings
   exist, but only the combined source placeholder has values for USA.
 
+## DASH-033: Section siblings use alphabetical display-name order
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Navigation and page presentation
+**Affected areas:** Section jump navigation; line-chart section headings
+
+### Current rule
+
+Sort visible sibling sections alphabetically at each hierarchy level on every
+dashboard page. Ignore the leading ESTO code when comparing names, but retain
+the code in the displayed label. Apply the same ordering to the corresponding
+body sections so jump navigation and page content agree. Parent-child depth is
+unchanged.
+
+### History
+
+- 2026-08-12: Applied the rule globally after the Supply balancing-flow review.
+
 ## DASH-032: Exception-set matches leave the default paired-tree issue queue
 
 **Status:** Confirmed and implemented
