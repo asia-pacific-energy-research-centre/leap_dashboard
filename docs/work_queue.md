@@ -191,15 +191,15 @@ These later commits supersede the corresponding snapshot rows below:
   Do not activate this during a mixed economy-by-economy rollout and do not
   split the existing combined Other/non-energy value in the dashboard.
 
-- **DASHQ-048 is `dashboard_ready_upstream_blocked`.** Supply treats Stock
+- **DASHQ-048 is `implemented_pending_production_rerun`.** Supply treats Stock
   changes (`06`) and Statistical discrepancy (`11`) as base-year balancing
   diagnostics and renders each available flow as a grouped fuel bar chart
-  instead of a projection line or area. The current upstream Common ESTO fact
-  contains no flow-06 or flow-11 rows for any economy, so the production USA
-  page cannot display these charts yet. `leap_mappings` must publish valid
-  Common rows first; the dashboard must not reconstruct them directly from
-  native ESTO or LEAP data. The current LEAP-to-ESTO lineage also contains no
-  USA observations for either flow.
+  instead of a projection line or area. The mapping fix enables both flows in
+  the upstream `esto_leap` scope, and the default dashboard now reads that
+  declared scope for these charts while retaining `esto_leap_ninth` for its
+  ordinary Supply series. Charts state that they compare ESTO and LEAP only;
+  missing 9th Outlook rows are not treated as zero. Complete the production
+  mapping and dashboard rerun before marking this item verified.
 
 - **DASHQ-049 is `complete_on_master`.** Every anchor context matched by the
   active upstream exception set is omitted from the default paired-tree issue

@@ -21,7 +21,7 @@
   },
   "dashboard_mode": "auto_tree",
   "default_chart_type": "line",
-  "excluded_flow_code_prefixes": ["06", "10.01.02", "10.01.11", "11", "13", "18", "19"],
+  "excluded_flow_code_prefixes": ["10.01.02", "10.01.11", "13", "18", "19"],
   "excluded_flow_labels": ["09.07 Oil refineries"],
   "chart_generation": {
     "deep_chain_min_depth": 3,
@@ -276,7 +276,9 @@
     "page_key": "supply",
     "exclude_flow_codes": ["04-05"],
     "base_year_bar_flow_codes": ["06", "11"],
-    "_note": "Show international marine bunkers (04) and international aviation bunkers (05) separately on Supply; do not show their combined 04-05 parent there. The combined row remains available to the Energy balance overview so its supply total can use one non-overlapping bunker boundary. Stock changes and statistical discrepancy are balancing rows rather than projection series. When the Common ESTO input publishes them, show their available base-year fuel values as grouped bars and exclude them from ordinary line and area charts."
+    "base_year_bar_comparison_scope": "esto_leap",
+    "base_year_bar_scope_label": "ESTO and LEAP only",
+    "_note": "Show international marine bunkers (04) and international aviation bunkers (05) separately on Supply; do not show their combined 04-05 parent there. The combined row remains available to the Energy balance overview so its supply total can use one non-overlapping bunker boundary. Stock changes and statistical discrepancy are balancing rows rather than projection series. Source their base-year fuel values from the ESTO and LEAP comparison scope, label the boundary explicitly, and exclude them from ordinary line and area charts. Missing 9th Outlook values are unavailable, not zero."
   },
   "emissions_page": {
     "enabled": true,

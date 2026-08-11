@@ -1051,13 +1051,17 @@ structure explorer.
 ### Current rule
 
 Stock changes and Statistical discrepancy do not form ordinary comparable
-projection series. When the upstream Common ESTO input supplies these flows,
-exclude them from normal area and line generation and show one grouped bar
-chart per flow using the configured base year, with fuels on the x-axis and
-available datasets as the comparison series. Do not source or map the rows
-directly in the dashboard when they are absent from the Common ESTO fact.
+projection series. Source these rows from the upstream `esto_leap` Common ESTO
+scope, exclude them from normal area and line generation, and show one grouped
+bar chart per flow using the configured base year. Fuels are on the x-axis and
+ESTO and LEAP are the comparison series. Label this two-source boundary on the
+chart. The 9th Outlook does not report these rows, so its absence is unavailable
+data rather than zero. Do not source or map the rows directly in the dashboard.
 
 ### History
+
+- 2026-08-12: Activated the upstream `esto_leap` balancing-flow boundary and
+  labelled the base-year bars as ESTO and LEAP only.
 
 - 2026-08-10: Added conditional base-year bar rendering. The current upstream
   comparison fact contains no flow-06 or flow-11 rows, so activation remains

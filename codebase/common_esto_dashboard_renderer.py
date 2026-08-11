@@ -1851,8 +1851,10 @@ def _apply_total_series_chrome(fig: go.Figure) -> None:
             trace_line.dash = style["dash"]
         if getattr(trace, "marker", None) is not None:
             trace.marker.color = color
-            trace.marker.size = max(float(trace.marker.size or 0), 6.0)
-            trace.marker.symbol = style["marker_symbol"]
+            if hasattr(trace.marker, "size"):
+                trace.marker.size = max(float(trace.marker.size or 0), 6.0)
+            if hasattr(trace.marker, "symbol"):
+                trace.marker.symbol = style["marker_symbol"]
             trace.marker.line.color = "#ffffff"
             trace.marker.line.width = max(float(trace.marker.line.width or 0), 1.5)
         trace_mode = str(getattr(trace, "mode", "") or "")
@@ -2620,6 +2622,7 @@ def build_base_year_product_bar(
     flow_label: str,
     series_labels: dict[str, str],
     base_year: int,
+    comparison_scope_label: str = "",
 ) -> go.Figure:
     """Build a grouped fuel bar chart for one base-year-only balance flow."""
     base_df = chart_df[chart_df["year"] == base_year].copy()
@@ -2655,8 +2658,12 @@ def build_base_year_product_bar(
             )
         )
         trace_meta.append(trace_meta_entry(source_system, scenario, True))
+    scope_suffix = f" ({comparison_scope_label})" if comparison_scope_label else ""
     fig.update_layout(
-        title=title_with_sign_note(f"{flow_label}: base year {base_year}", base_df),
+        title=title_with_sign_note(
+            f"{flow_label}: base year {base_year}{scope_suffix}",
+            base_df,
+        ),
         xaxis_title="Fuel",
         yaxis_title=f"Signed energy ({chart_unit})",
         barmode="group",
@@ -2681,6 +2688,9 @@ def _build_supply_base_year_bar_charts(
     comparison_source: str,
     ninth_source: str,
     series_labels: dict[str, str],
+    comparison_scope: str = "",
+    comparison_scope_label: str = "",
+    ordinary_page_df: pd.DataFrame | None = None,
 ) -> tuple[dict[str, go.Figure], list[dict], list[dict], pd.DataFrame]:
     """Build base-year bars and return rows left for ordinary chart generation."""
     configured_codes = {canonical_code(value) for value in flow_codes if canonical_code(value)}
@@ -2689,7 +2699,11 @@ def _build_supply_base_year_bar_charts(
 
     balance_mask = page_df["common_flow_code"].map(canonical_code).isin(configured_codes)
     balance_df = page_df[balance_mask & page_df["year"].eq(base_year)].copy()
-    remaining_df = page_df[~balance_mask].copy()
+    ordinary_df = page_df if ordinary_page_df is None else ordinary_page_df
+    ordinary_balance_mask = ordinary_df["common_flow_code"].map(canonical_code).isin(
+        configured_codes
+    )
+    remaining_df = ordinary_df[~ordinary_balance_mask].copy()
     charts: dict[str, go.Figure] = {}
     chart_rows: list[dict] = []
     manifest_rows: list[dict] = []
@@ -2717,7 +2731,12 @@ def _build_supply_base_year_bar_charts(
             "chart_type": "bar",
             "chart_key": chart_key,
             "common_flow_label": flow_label,
-            "common_product_label": f"Base-year fuels ({base_year})",
+            "common_product_label": (
+                f"Base-year fuels ({base_year}, {comparison_scope_label})"
+                if comparison_scope_label
+                else f"Base-year fuels ({base_year})"
+            ),
+            "data_comparison_scope": comparison_scope,
             "row_count": int(len(flow_df)),
             "source_flow_labels": flow_label,
             "sign_note": sign_note_for_chart(flow_df),
@@ -2731,6 +2750,7 @@ def _build_supply_base_year_bar_charts(
             flow_label,
             series_labels,
             base_year,
+            comparison_scope_label=comparison_scope_label,
         )
         if not figure.data:
             manifest_rows[-1]["suppressed"] = True
@@ -2739,11 +2759,20 @@ def _build_supply_base_year_bar_charts(
         chart_rows.append({
             "chart_key": chart_key,
             "chart_type": "bar",
-            "title": f"{flow_label}: base year {base_year}",
-            "product_label": f"Base-year fuel comparison: {flow_label}",
+            "title": (
+                f"{flow_label}: base year {base_year} ({comparison_scope_label})"
+                if comparison_scope_label
+                else f"{flow_label}: base year {base_year}"
+            ),
+            "product_label": (
+                f"Base-year fuel comparison ({comparison_scope_label}): {flow_label}"
+                if comparison_scope_label
+                else f"Base-year fuel comparison: {flow_label}"
+            ),
             "section_label": section_label,
             "flow_group_label": flow_label,
             "datasets": chart_dataset_tokens_from_figure(figure),
+            "data_comparison_scope": comparison_scope,
             **metrics,
         })
     return charts, chart_rows, manifest_rows, remaining_df
@@ -5713,9 +5742,37 @@ def render_dashboard(
                 page_df = page_df[
                     ~page_df["common_flow_code"].astype(str).isin(excluded_flow_codes)
                 ].copy()
+            balancing_page_df = page_df
+            balancing_scope = str(
+                supply_config.get("base_year_bar_comparison_scope", "")
+            ).strip()
+            active_scope = str(template.get("_active_comparison_scope", "")).strip()
+            if (
+                balancing_scope
+                and balancing_scope != active_scope
+                and scope_df is not None
+                and "comparison_scope" in scope_df.columns
+            ):
+                balancing_scope_df = scope_df[
+                    scope_df["comparison_scope"].astype(str).eq(balancing_scope)
+                ].copy()
+                if not balancing_scope_df.empty:
+                    balancing_assigned_df = assign_pages(
+                        balancing_scope_df,
+                        page_rules,
+                        routing_special_cases,
+                    )
+                    balancing_assigned_df = assign_bespoke_overview_rows(
+                        balancing_assigned_df,
+                        template.get("total_demand_page", {}),
+                    )
+                    balancing_page_df = balancing_assigned_df[
+                        balancing_assigned_df["_page_key"].apply(safe_slug)
+                        == supply_page_key
+                    ].copy()
             bar_charts, bar_chart_rows, bar_manifest_rows, page_df = (
                 _build_supply_base_year_bar_charts(
-                    page_df=page_df,
+                    page_df=balancing_page_df,
                     page_key=page_key,
                     page_label=page_label,
                     flow_codes=list(supply_config.get("base_year_bar_flow_codes", [])),
@@ -5726,6 +5783,11 @@ def render_dashboard(
                     comparison_source=comparison_source,
                     ninth_source=ninth_source,
                     series_labels=series_labels,
+                    comparison_scope=balancing_scope or active_scope,
+                    comparison_scope_label=str(
+                        supply_config.get("base_year_bar_scope_label", "")
+                    ).strip(),
+                    ordinary_page_df=page_df,
                 )
             )
             charts.update(bar_charts)

@@ -3050,6 +3050,8 @@ def test_supply_balancing_flows_use_base_year_bar_charts() -> None:
         comparison_source="ESTO",
         ninth_source="NINTH",
         series_labels={"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
+        comparison_scope="esto_leap",
+        comparison_scope_label="ESTO and LEAP only",
     )
 
     assert set(charts) == {
@@ -3061,6 +3063,85 @@ def test_supply_balancing_flows_use_base_year_bar_charts() -> None:
     assert set(remaining_rows["common_flow_code"]) == {"01"}
     stock_chart = charts["chart__bar__base_year__supply__06_stock_changes"]
     assert {value for trace in stock_chart.data for value in trace.y} == {5.0, 7.0}
+    assert "ESTO and LEAP only" in stock_chart.layout.title.text
+    assert {row["data_comparison_scope"] for row in manifest_rows} == {"esto_leap"}
+
+
+def test_supply_balancing_bars_use_estoleap_scope_on_default_dashboard(
+    tmp_path: Path,
+) -> None:
+    template = _load_template()
+    template["_active_comparison_scope"] = "esto_leap_ninth"
+    series_config = _load_series_config()
+    rows = []
+    for source_system, scenario, value in [
+        ("ESTO", "historical", 20.0),
+        ("LEAP", "Target", 22.0),
+        ("NINTH", "Target", 21.0),
+    ]:
+        rows.append({
+            "comparison_scope": "esto_leap_ninth",
+            "source_system": source_system,
+            "economy": "16_RUS",
+            "scenario": scenario,
+            "year": 2022,
+            "common_flow_code": "01",
+            "common_flow_name": "Production",
+            "common_flow_label": "01 Production",
+            "common_product_code": "08.01",
+            "common_product_name": "Natural gas",
+            "common_product_label": "08.01 Natural gas",
+            "common_row_id": f"production_{source_system}",
+            "value": value,
+        })
+    for source_system, scenario, flow_code, flow_label, value in [
+        ("ESTO", "historical", "06", "06 Stock changes", -2.0),
+        ("LEAP", "Target", "06", "06 Stock changes", -3.0),
+        ("ESTO", "historical", "11", "11 Statistical discrepancy", 4.0),
+        ("LEAP", "Target", "11", "11 Statistical discrepancy", 5.0),
+    ]:
+        rows.append({
+            "comparison_scope": "esto_leap",
+            "source_system": source_system,
+            "economy": "16_RUS",
+            "scenario": scenario,
+            "year": 2022,
+            "common_flow_code": flow_code,
+            "common_flow_name": flow_label.split(" ", 1)[1],
+            "common_flow_label": flow_label,
+            "common_product_code": "08.01",
+            "common_product_name": "Natural gas",
+            "common_product_label": "08.01 Natural gas",
+            "common_row_id": f"balancing_{flow_code}_{source_system}",
+            "value": value,
+        })
+    all_rows = apply_sign_semantics(pd.DataFrame(rows), template["sign_semantics"])
+    main_rows = all_rows[all_rows["comparison_scope"].eq("esto_leap_ninth")].copy()
+    layout = build_output_layout(tmp_path / "outputs", "16RUS", clear_existing=True)
+
+    manifest = render_dashboard(
+        main_rows,
+        template,
+        series_config,
+        layout,
+        scope_df=all_rows,
+    )
+
+    balancing_manifest = manifest[manifest["chart_key"].astype(str).str.contains(
+        "chart__bar__base_year__supply"
+    )]
+    assert set(balancing_manifest["common_flow_label"]) == {
+        "06 Stock changes",
+        "11 Statistical discrepancy",
+    }
+    assert set(balancing_manifest["data_comparison_scope"]) == {"esto_leap"}
+    bundle = json.loads(
+        (layout["chart_bundles"] / "supply__charts.json").read_text(encoding="utf-8")
+    )["charts"]
+    for chart_key in balancing_manifest["chart_key"]:
+        figure = bundle[chart_key]
+        assert "ESTO and LEAP only" in figure["layout"]["title"]["text"]
+        assert all("9th" not in trace["name"] for trace in figure["data"])
 
 
 def test_chart_chrome_resolves_duplicate_configured_category_colours() -> None:
