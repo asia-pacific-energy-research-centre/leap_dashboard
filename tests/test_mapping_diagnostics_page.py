@@ -7,6 +7,7 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     _anchor_value_summary,
     _context_value_formatter,
     _direct_parent_mapping_reconciles,
+    _exclude_confirmed_paired_tree_exceptions,
     _mapping_cardinality_diagnostics,
     _mapped_target_structure_html,
     _paired_anchor_aggregate_summary,
@@ -19,6 +20,51 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     prefer_compressed_csv_path,
     write_mapping_diagnostics_page,
 )
+
+
+def test_paired_tree_excludes_only_final_confirmed_source_exceptions() -> None:
+    context_rows = []
+    validation_rows = []
+    cases = [
+        ("source_issue", True, "confirmed", "source_non_additivity", False),
+        ("detail_exclusion", True, "confirmed", "intentional_detail_exclusion", False),
+        ("provisional_review", True, "confirmed", "provisional_apec_anchor_review", True),
+        ("unreviewed_source_issue", True, "provisional", "source_non_additivity", True),
+        ("ordinary_failure", False, "", "", True),
+    ]
+    for parent_code, known_exception, review_status, issue_class, _ in cases:
+        identity = {
+            "comparison_scope": "esto_leap_ninth",
+            "source_system": "NINTH",
+            "validation_axis": "flow",
+            "economy": "00APEC",
+            "scenario": "reference",
+            "year": 2030,
+            "other_axis_value": "17_electricity",
+            "parent_code": parent_code,
+        }
+        context_rows.append({
+            **identity,
+            "child_code": f"{parent_code}_child",
+            "parent_value": 10.0,
+            "frontier_sum": 0.0,
+            "raw_child_value": 8.0,
+        })
+        validation_rows.append({
+            **identity,
+            "known_data_quality_exception": known_exception,
+            "exception_review_status": review_status,
+            "exception_issue_class": issue_class,
+        })
+
+    filtered = _exclude_confirmed_paired_tree_exceptions(
+        pd.DataFrame(context_rows),
+        pd.DataFrame(validation_rows),
+    )
+
+    assert set(filtered["parent_code"]) == {
+        parent_code for parent_code, _, _, _, should_remain in cases if should_remain
+    }
 
 
 def test_direct_parent_mapping_with_zero_difference_is_not_an_issue_card() -> None:

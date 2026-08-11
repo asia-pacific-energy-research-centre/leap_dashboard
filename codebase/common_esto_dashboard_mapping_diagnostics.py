@@ -703,6 +703,63 @@ def _paired_anchor_aggregate_summary(
     return pd.DataFrame(rows).sort_values("absolute_mismatch", ascending=False, kind="mergesort")
 
 
+PAIRED_TREE_CONFIRMED_EXCEPTION_CLASSES = {
+    "intentional_detail_exclusion",
+    "source_non_additivity",
+}
+
+
+def _exclude_confirmed_paired_tree_exceptions(
+    context_values: pd.DataFrame,
+    anchor_validation: pd.DataFrame,
+) -> pd.DataFrame:
+    """Remove reviewed source conditions from the paired issue-card inputs.
+
+    Confirmed exceptions remain numerical failures in the validation tables and
+    summaries.  The paired trees are narrower: they are a queue of unresolved
+    mapping/source cases, so source conditions explicitly classified as
+    non-additive or intentionally lacking detail should not reappear there.
+    Provisional APEC reviews deliberately remain visible.
+    """
+    match_columns = [
+        "comparison_scope", "source_system", "validation_axis", "economy",
+        "scenario", "year", "other_axis_value", "parent_code",
+    ]
+    required_anchor_columns = {
+        *match_columns,
+        "known_data_quality_exception",
+        "exception_review_status",
+        "exception_issue_class",
+    }
+    if (
+        context_values.empty
+        or anchor_validation.empty
+        or not set(match_columns).issubset(context_values.columns)
+        or not required_anchor_columns.issubset(anchor_validation.columns)
+    ):
+        return context_values.copy()
+
+    confirmed = anchor_validation[
+        anchor_validation["known_data_quality_exception"]
+        .astype(str).str.strip().str.lower().eq("true")
+        & anchor_validation["exception_review_status"]
+        .astype(str).str.strip().str.lower().eq("confirmed")
+        & anchor_validation["exception_issue_class"]
+        .astype(str).str.strip().str.lower().isin(PAIRED_TREE_CONFIRMED_EXCEPTION_CLASSES)
+    ][match_columns].drop_duplicates()
+    if confirmed.empty:
+        return context_values.copy()
+
+    filtered = context_values.merge(
+        confirmed.assign(_confirmed_paired_tree_exception=True),
+        on=match_columns,
+        how="left",
+    )
+    return filtered[
+        filtered["_confirmed_paired_tree_exception"].isna()
+    ].drop(columns="_confirmed_paired_tree_exception")
+
+
 def _tree_label_lookup(tree: pd.DataFrame) -> dict[str, str]:
     if tree.empty or not {"code", "label"}.issubset(tree.columns):
         return {}
@@ -1483,14 +1540,18 @@ def write_mapping_diagnostics_page(
         leaf_reconciliation_candidates,
         dashboard_economy,
     )
+    paired_anchor_context_values = _exclude_confirmed_paired_tree_exceptions(
+        anchor_child_context_values,
+        scoped_anchor,
+    )
     ninth_paired_summary = _paired_anchor_aggregate_summary(
-        anchor_child_context_values, "NINTH", dashboard_economy
+        paired_anchor_context_values, "NINTH", dashboard_economy
     )
     leap_paired_summary = _paired_anchor_aggregate_summary(
-        anchor_child_context_values, "LEAP", dashboard_economy
+        paired_anchor_context_values, "LEAP", dashboard_economy
     )
     esto_paired_summary = _paired_anchor_aggregate_summary(
-        anchor_child_context_values, "ESTO", dashboard_economy
+        paired_anchor_context_values, "ESTO", dashboard_economy
     )
     coverage_summary = (
         coverage.groupby([column for column in ["coverage_status", "mapping_status"] if column in coverage.columns], dropna=False)

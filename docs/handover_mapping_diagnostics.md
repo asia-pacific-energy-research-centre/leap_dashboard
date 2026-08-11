@@ -1,6 +1,6 @@
 # Handover: Mapping diagnostics development
 
-Updated: 2026-08-10
+Updated: 2026-08-11
 
 ## Purpose
 
@@ -49,6 +49,13 @@ The page currently contains:
   coverage sections.
 - Paired raw-source versus mapped-Common-ESTO views for NINTH and LEAP anchor
   cases.
+
+The paired-tree views are an unresolved-review queue, not a second copy of the
+full numerical failure table. Contexts confirmed in the upstream exception
+workbook as `source_non_additivity` or `intentional_detail_exclusion` stay
+failed in validation totals and reviewed-exception evidence, but are omitted
+from paired issue cards. `provisional_apec_anchor_review` rows remain visible
+until they receive a final classification.
 
 The SVG and rollup-boundary cards share Dataset, Scenario, and Year controls.
 Values are green only when a rollup target equals the listed contributors within
