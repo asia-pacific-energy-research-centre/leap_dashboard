@@ -1812,6 +1812,13 @@ _TOTAL_SERIES_COLORS: dict[str, str] = {
     "9TH": "#009E73",
 }
 
+_TOTAL_SERIES_STYLES: dict[str, dict[str, str]] = {
+    "ESTO": {"dash": "dot", "marker_symbol": "circle"},
+    "LEAP": {"dash": "dash", "marker_symbol": "diamond"},
+    "NINTH": {"dash": "dashdot", "marker_symbol": "square"},
+    "9TH": {"dash": "dashdot", "marker_symbol": "square"},
+}
+
 
 def _apply_total_series_chrome(fig: go.Figure) -> None:
     """Give ESTO, LEAP, and 9th comparison lines stable visual roles.
@@ -1836,12 +1843,21 @@ def _apply_total_series_chrome(fig: go.Figure) -> None:
         if source is None:
             continue
         color = _TOTAL_SERIES_COLORS[source]
+        style = _TOTAL_SERIES_STYLES[source]
         trace_line = getattr(trace, "line", None)
         if trace_line is not None:
             trace_line.color = color
             trace_line.width = max(float(trace_line.width or 0), 2.25)
+            trace_line.dash = style["dash"]
         if getattr(trace, "marker", None) is not None:
             trace.marker.color = color
+            trace.marker.size = max(float(trace.marker.size or 0), 6.0)
+            trace.marker.symbol = style["marker_symbol"]
+            trace.marker.line.color = "#ffffff"
+            trace.marker.line.width = max(float(trace.marker.line.width or 0), 1.5)
+        trace_mode = str(getattr(trace, "mode", "") or "")
+        if "lines" in trace_mode and "markers" not in trace_mode:
+            trace.mode = "lines+markers"
 
 
 def apply_chart_chrome(fig: go.Figure, base_year: int | None = None, code_axis: str | None = None) -> go.Figure:
