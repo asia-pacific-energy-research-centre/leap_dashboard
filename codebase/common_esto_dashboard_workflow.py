@@ -731,24 +731,12 @@ def run_dashboard_workflow() -> dict[str, object]:
     }
 
 
-def _chime() -> None:
-    try:
-        import time
-        import winsound  # type: ignore
-        for freq, dur in [(659, 90), (784, 90), (988, 140)]:
-            winsound.Beep(freq, dur)
-            time.sleep(0.04)
-    except Exception:
-        pass
-
-
 #%%
 with _log_to_file(_WORKFLOW_LOG_PATH) as _log_path:
     print(f"[LOG] Writing output to: {_log_path}")
     try:
         if RUN_DASHBOARD_WORKFLOW:
             WORKFLOW_RESULT = run_dashboard_workflow()
-            _chime()
         else:
             print("Set RUN_DASHBOARD_WORKFLOW = True to render the dashboard.")
     except Exception as exc:
