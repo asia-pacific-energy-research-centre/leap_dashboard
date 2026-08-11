@@ -3536,10 +3536,11 @@ def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[dict[str, o
     """Return visible flow-tree nodes grouped by renderer section.
 
     Renderer sections can be page-oriented groups rather than real Common ESTO
-    nodes, so only ``flow_group_label`` values become navigation pills. When a
-    section omits its container node, its shallowest visible flow is promoted
-    to level 2 and all descendants shift with it. This keeps e.g. 10.01.xx own
-    use leaves at the visible level 2 instead of inventing a missing 10.01 pill.
+    nodes, so only ``flow_group_label`` values become navigation pills. Levels
+    are relative to the visible tree: aggregate roots with visible children are
+    level 1, their immediate visible children are level 2, and so on. Orphan
+    leaves in a multi-node section start at level 2; a single-node section is
+    itself the visible level-1 aggregate.
     """
     tree: list[tuple[str, list[str]]] = []
     seen_sections: dict[str, list[str]] = {}
@@ -3558,14 +3559,47 @@ def line_section_tree(line_rows: list[dict]) -> list[tuple[str, list[dict[str, o
         if not coded_groups:
             hierarchy_tree.append((section_label, []))
             continue
-        raw_depths = [code_depth(code) for _, code in coded_groups]
-        depth_shift = max(0, min(raw_depths) - 2)
+        parent_by_group: dict[str, str] = {}
+        for child_group, child_code in coded_groups:
+            candidates = [
+                (parent_group, parent_code)
+                for parent_group, parent_code in coded_groups
+                if parent_group != child_group
+                and parent_code != child_code
+                and _code_expression_contains_expression(parent_code, child_code)
+            ]
+            if candidates:
+                parent_by_group[child_group] = max(
+                    candidates,
+                    key=lambda item: (code_depth(item[1]), len(item[1])),
+                )[0]
+
+        groups_with_children = set(parent_by_group.values())
+        depth_by_group: dict[str, int] = {}
+
+        def visible_depth(group: str, visiting: set[str] | None = None) -> int:
+            if group in depth_by_group:
+                return depth_by_group[group]
+            visiting = set(visiting or set())
+            if group in visiting:
+                return 2
+            visiting.add(group)
+            parent = parent_by_group.get(group)
+            if parent:
+                depth = visible_depth(parent, visiting) + 1
+            elif group in groups_with_children or len(coded_groups) == 1:
+                depth = 1
+            else:
+                depth = 2
+            depth_by_group[group] = depth
+            return depth
+
         nodes: list[dict[str, object]] = []
         for group, code in coded_groups:
             nodes.append({
                 "label": group,
                 "code": code,
-                "depth": max(1, code_depth(code) - depth_shift),
+                "depth": visible_depth(group),
                 "use_subsection_anchor": len(groups) > 1,
             })
         hierarchy_tree.append((section_label, nodes))

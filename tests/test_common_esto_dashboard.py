@@ -844,20 +844,20 @@ def test_jump_navigation_uses_flow_levels_not_parent_or_leaf_status() -> None:
 
     html = _jump_nav_html("Other transformation", line_section_tree(rows))
 
+    assert html.count('<div class="jump-nav-row" data-level="1"') == 1
     assert html.count('<div class="jump-nav-row" data-level="2"') == 1
     assert html.count('<div class="jump-nav-row" data-level="3"') == 1
-    assert html.count('<div class="jump-nav-row" data-level="4"') == 1
-    assert 'data-level="2" data-hierarchy-depth="2">09.06 Gas processing plants</a>' in html
+    assert 'data-level="1" data-hierarchy-depth="1">09.06 Gas processing plants</a>' in html
     assert 'data-level="2" data-hierarchy-depth="2">09.12 Non-specified transformation</a>' in html
     assert 'data-level="2" data-hierarchy-depth="2">10.01.06 Coal mines</a>' in html
     assert 'data-level="2" data-hierarchy-depth="2">10.01.12 Oil and gas extraction</a>' in html
-    assert 'data-level="3" data-hierarchy-depth="3">09.06.02 Liquefaction/regasification plants</a>' in html
-    assert 'data-level="3" data-hierarchy-depth="3">09.06.01 Gas works plants</a>' in html
-    assert 'data-level="4" data-hierarchy-depth="4">09.06.02.01 Liquefaction</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">09.06.02 Liquefaction/regasification plants</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">09.06.01 Gas works plants</a>' in html
+    assert 'data-level="3" data-hierarchy-depth="3">09.06.02.01 Liquefaction</a>' in html
     assert '>Other transformation (including own use)</a>' not in html
     assert '>Other energy-sector own use</a>' not in html
-    assert html.index('data-hierarchy-depth="2"') < html.index('data-hierarchy-depth="3"')
-    assert html.index('data-level="3"') < html.index('data-level="4"')
+    assert html.index('data-hierarchy-depth="1"') < html.index('data-hierarchy-depth="2"')
+    assert html.index('data-level="2"') < html.index('data-level="3"')
 
 
 def test_jump_navigation_replaces_page_name_with_buildings_tree_nodes() -> None:
@@ -874,10 +874,18 @@ def test_jump_navigation_replaces_page_name_with_buildings_tree_nodes() -> None:
     html = _jump_nav_html("Buildings", line_section_tree(rows))
 
     assert '>Buildings</a>' not in html
-    assert 'data-level="2" data-hierarchy-depth="2">16.01-16.02 Buildings</a>' in html
+    assert 'data-level="1" data-hierarchy-depth="1">16.01-16.02 Buildings</a>' in html
     assert 'data-level="2" data-hierarchy-depth="2">16.02 Residential</a>' in html
-    assert 'data-level="3" data-hierarchy-depth="3">16.01.99 Commercial and public services unallocated</a>' in html
-    assert 'data-level="3" data-hierarchy-depth="3">16.01.01 Datacentres</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">16.01.99 Commercial and public services unallocated</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">16.01.01 Datacentres</a>' in html
+
+
+def test_single_visible_flow_is_a_level_one_aggregate() -> None:
+    rows = [{"section_label": "Transfers", "flow_group_label": "08 Transfers"}]
+
+    html = _jump_nav_html("Other transformation", line_section_tree(rows))
+
+    assert 'data-level="1" data-hierarchy-depth="1">08 Transfers</a>' in html
 
 
 def test_aggregate_only_domestic_demand_pages_remain_visible() -> None:

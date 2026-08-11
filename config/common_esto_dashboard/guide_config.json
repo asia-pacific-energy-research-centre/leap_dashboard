@@ -397,7 +397,7 @@
       "id": "section-navigation",
       "target": "[data-guide-id='section-navigation']",
       "title": "Jump to the part you need",
-      "copy": "The chips reproduce the visible Common ESTO flow tree rather than repeating the page name. Orange is level 1, green is level 2, blue is level 3, and purple is level 4 or deeper. A leaf keeps the colour of its real level, and each hierarchy level appears on its own line. Every chip moves within this page without changing the data or scenario.",
+      "copy": "The chips reproduce the visible Common ESTO flow tree rather than repeating the page name. The broadest visible aggregate is level 1 (orange), its immediate visible children are level 2 (green), their children are level 3 (blue), and level 4 or deeper is purple. Standalone leaves in a multi-node section stay on level 2. Each visible hierarchy level appears on its own line, and every chip moves within this page without changing the data or scenario.",
       "optional": true
     },
     {
