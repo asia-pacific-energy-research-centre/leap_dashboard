@@ -505,12 +505,6 @@
       }
     },
     {
-      "id": "diagnostics-metrics",
-      "target": ".metrics",
-      "title": "Use counts as an entry point",
-      "copy": "The summary cards show how much evidence is present. Counts indicate where to investigate; they do not by themselves establish severity or confirm the cause of a mismatch."
-    },
-    {
       "id": "diagnostics-graph",
       "target": "#rollup-graph",
       "title": "Inspect hierarchy and rollup structure",

@@ -538,7 +538,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert 'id="dashboard-guide-launch"' in html
     assert 'id="dashboard-guide-dialog"' in html
     assert "What mapping diagnostics are for" in html
-    assert "How the anchor validator connects the hierarchies" in html
+    assert "How the anchor validator connects the hierarchies" not in html
+    assert 'class="metrics"' not in html
     assert "How to read a hierarchy case" in html
     assert "One-to-many fan-out" in html
     assert "De-duplicated frontier" in html
@@ -577,8 +578,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Unmapped source child: missing_child" in html
     assert "Why did this fail? Economy evidence (1 failed, 0 supporting rows)" in html
     assert "Matched rows are kept with this failure" in html
-    assert "Confirmed source issues among failed anchor rows" in html
-    assert "Unconfirmed failed anchor rows" in html
+    assert "Confirmed source issues among failed anchor rows" not in html
+    assert "Unconfirmed failed anchor rows" not in html
     assert "SRC-001" in html
     assert "Exception cases by classification" in html
     assert 'id="paired-exception-classification"' in html
