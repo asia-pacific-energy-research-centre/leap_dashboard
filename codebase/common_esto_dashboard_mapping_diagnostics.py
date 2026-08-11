@@ -703,23 +703,16 @@ def _paired_anchor_aggregate_summary(
     return pd.DataFrame(rows).sort_values("absolute_mismatch", ascending=False, kind="mergesort")
 
 
-PAIRED_TREE_CONFIRMED_EXCEPTION_CLASSES = {
-    "intentional_detail_exclusion",
-    "source_non_additivity",
-}
-
-
-def _exclude_confirmed_paired_tree_exceptions(
+def _partition_paired_tree_exceptions(
     context_values: pd.DataFrame,
     anchor_validation: pd.DataFrame,
-) -> pd.DataFrame:
-    """Remove reviewed source conditions from the paired issue-card inputs.
+) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+    """Split ordinary issue contexts from every matched exception context.
 
-    Confirmed exceptions remain numerical failures in the validation tables and
-    summaries.  The paired trees are narrower: they are a queue of unresolved
-    mapping/source cases, so source conditions explicitly classified as
-    non-additive or intentionally lacking detail should not reappear there.
-    Provisional APEC reviews deliberately remain visible.
+    The default paired trees are an unresolved queue, so any context marked as
+    a known data-quality exception is removed from that queue. Exception rows
+    remain numerical failures in the validation summaries and are returned by
+    classification for the separate read-only exception browser.
     """
     match_columns = [
         "comparison_scope", "source_system", "validation_axis", "economy",
@@ -728,8 +721,6 @@ def _exclude_confirmed_paired_tree_exceptions(
     required_anchor_columns = {
         *match_columns,
         "known_data_quality_exception",
-        "exception_review_status",
-        "exception_issue_class",
     }
     if (
         context_values.empty
@@ -737,27 +728,49 @@ def _exclude_confirmed_paired_tree_exceptions(
         or not set(match_columns).issubset(context_values.columns)
         or not required_anchor_columns.issubset(anchor_validation.columns)
     ):
-        return context_values.copy()
+        return context_values.copy(), {}
 
-    confirmed = anchor_validation[
+    exceptions = anchor_validation[
         anchor_validation["known_data_quality_exception"]
         .astype(str).str.strip().str.lower().eq("true")
-        & anchor_validation["exception_review_status"]
-        .astype(str).str.strip().str.lower().eq("confirmed")
-        & anchor_validation["exception_issue_class"]
-        .astype(str).str.strip().str.lower().isin(PAIRED_TREE_CONFIRMED_EXCEPTION_CLASSES)
-    ][match_columns].drop_duplicates()
-    if confirmed.empty:
-        return context_values.copy()
+    ].copy()
+    if exceptions.empty:
+        return context_values.copy(), {}
 
-    filtered = context_values.merge(
-        confirmed.assign(_confirmed_paired_tree_exception=True),
+    if "exception_issue_class" in exceptions.columns:
+        exceptions["_exception_classification"] = (
+            exceptions["exception_issue_class"].astype(str).str.strip()
+        )
+    else:
+        exceptions["_exception_classification"] = ""
+    exceptions.loc[
+        exceptions["_exception_classification"].eq(""),
+        "_exception_classification",
+    ] = "unclassified_exception"
+    exceptions = (
+        exceptions[match_columns + ["_exception_classification"]]
+        .sort_values("_exception_classification", kind="mergesort")
+        .drop_duplicates(match_columns, keep="first")
+    )
+
+    partitioned = context_values.merge(
+        exceptions,
         on=match_columns,
         how="left",
     )
-    return filtered[
-        filtered["_confirmed_paired_tree_exception"].isna()
-    ].drop(columns="_confirmed_paired_tree_exception")
+    ordinary = partitioned[
+        partitioned["_exception_classification"].isna()
+    ].drop(columns="_exception_classification")
+    exception_rows = partitioned[
+        partitioned["_exception_classification"].notna()
+    ]
+    grouped = {
+        str(classification): group.drop(columns="_exception_classification").copy()
+        for classification, group in exception_rows.groupby(
+            "_exception_classification", sort=True
+        )
+    }
+    return ordinary, grouped
 
 
 def _tree_label_lookup(tree: pd.DataFrame) -> dict[str, str]:
@@ -963,6 +976,82 @@ def _paired_tree_html(
     if not cards:
         return '<p class="empty-state">No unresolved anchor differences for this dashboard economy.</p>'
     return "".join(cards)
+
+
+def _exception_classification_label(classification: str) -> str:
+    """Return a readable label while retaining the upstream class as data."""
+    return str(classification).replace("_", " ").strip().capitalize()
+
+
+def _paired_tree_exception_browser_html(
+    exception_context_groups: dict[str, pd.DataFrame],
+    source_trees: dict[str, pd.DataFrame],
+    target_tree: pd.DataFrame,
+    mapped_components: pd.DataFrame,
+    economy: str,
+    economy_examples: pd.DataFrame,
+    review_candidates: pd.DataFrame,
+) -> str:
+    """Render exception cards through the same paired-tree evidence path."""
+    rendered_groups: list[tuple[str, int, str]] = []
+    for classification, context_values in sorted(exception_context_groups.items()):
+        source_sections: list[str] = []
+        case_count = 0
+        for source_system in ["NINTH", "LEAP", "ESTO"]:
+            summary = _paired_anchor_aggregate_summary(
+                context_values,
+                source_system,
+                economy,
+            )
+            if summary.empty:
+                continue
+            source_html = _paired_tree_html(
+                summary,
+                source_trees.get(source_system, pd.DataFrame()),
+                target_tree,
+                source_system,
+                mapped_components,
+                economy,
+                economy_examples,
+                review_candidates,
+            )
+            source_case_count = source_html.count('<article class="paired-case">')
+            if source_case_count == 0:
+                continue
+            case_count += source_case_count
+            source_sections.append(
+                f'<h3>{escape(source_system)} flow-tree exceptions</h3>'
+                + source_html
+            )
+        if source_sections:
+            rendered_groups.append(
+                (classification, case_count, "".join(source_sections))
+            )
+
+    if not rendered_groups:
+        return '<p class="empty-state">No matched exception cases for this dashboard economy.</p>'
+
+    options = '<option value="ALL">All classifications</option>' + "".join(
+        f'<option value="{escape(classification)}">'
+        f'{escape(_exception_classification_label(classification))} ({case_count:,})</option>'
+        for classification, case_count, _ in rendered_groups
+    )
+    groups_html = "".join(
+        f'<section class="exception-class-group" data-exception-classification="{escape(classification)}">'
+        f'<h2>{escape(_exception_classification_label(classification))}</h2>'
+        f'<p class="subtle"><code>{escape(classification)}</code> · {case_count:,} paired case(s)</p>'
+        f'{content}</section>'
+        for classification, case_count, content in rendered_groups
+    )
+    return (
+        '<div class="exception-browser-controls"><label>Exception classification'
+        '<select id="paired-exception-classification" autocomplete="off" '
+        'onchange="document.querySelectorAll(\'[data-exception-classification]\').forEach('
+        'group => group.hidden = this.value !== \'ALL\' && '
+        'group.dataset.exceptionClassification !== this.value)">'
+        f'{options}</select></label></div>'
+        f'{groups_html}'
+    )
 
 
 def _case_evidence_html(
@@ -1540,9 +1629,11 @@ def write_mapping_diagnostics_page(
         leaf_reconciliation_candidates,
         dashboard_economy,
     )
-    paired_anchor_context_values = _exclude_confirmed_paired_tree_exceptions(
-        anchor_child_context_values,
-        scoped_anchor,
+    paired_anchor_context_values, paired_exception_context_groups = (
+        _partition_paired_tree_exceptions(
+            anchor_child_context_values,
+            scoped_anchor,
+        )
     )
     ninth_paired_summary = _paired_anchor_aggregate_summary(
         paired_anchor_context_values, "NINTH", dashboard_economy
@@ -1552,6 +1643,15 @@ def write_mapping_diagnostics_page(
     )
     esto_paired_summary = _paired_anchor_aggregate_summary(
         paired_anchor_context_values, "ESTO", dashboard_economy
+    )
+    paired_exception_browser = _paired_tree_exception_browser_html(
+        paired_exception_context_groups,
+        {"NINTH": ninth_tree, "LEAP": leap_tree, "ESTO": esto_tree},
+        common_esto_tree,
+        anchor_mapped_component_context_values,
+        dashboard_economy,
+        case_economy_examples,
+        scoped_leaf_reconciliation_candidates,
     )
     coverage_summary = (
         coverage.groupby([column for column in ["coverage_status", "mapping_status"] if column in coverage.columns], dropna=False)
@@ -1654,6 +1754,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 .metric-card,.panel {{ background:white; border:1px solid #d9e1ea; border-radius:10px; padding:14px; }} .metric-card span {{ display:block; color:#5f6b7a; font-size:13px; }} .metric-card strong {{ font-size:28px; }} .collapsed-panel summary {{ cursor:pointer; display:flex; align-items:center; justify-content:space-between; }} .collapsed-panel summary h2 {{ margin:0; }} .collapsed-panel summary span {{ color:#1b5e9a; font-size:0; }} .collapsed-panel[open] summary span::after {{ content:'Hide'; font-size:13px; }} .collapsed-panel:not([open]) summary span::after {{ content:'Show'; font-size:13px; }} .collapsed-panel > div {{ margin-top:14px; }}
 .grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(480px,1fr)); gap:16px; }} .guide-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; }} .guide-card {{ border-radius:8px; padding:10px; font-size:13px; line-height:1.4; }} .guide-card strong {{ display:block; margin-bottom:3px; }} .guide-good {{ background:#e8f5e9; color:#176b35; }} .guide-warning {{ background:#fff4e5; color:#8a4b08; }} .guide-neutral {{ background:#e8f0fa; color:#294f78; }} .flow {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:12px 0; }} .flow div {{ background:#e8f0fa; border:1px solid #adc4df; border-radius:8px; padding:10px; font-size:13px; }} .arrow {{ color:#53718f; font-size:22px; }}
 .paired-case {{ border-top:1px solid #d9e1ea; padding:18px 0; }} .paired-case:first-child {{ border-top:0; padding-top:0; }} .paired-trees {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }} .paired-trees section {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .paired-trees h4 {{ margin:0 0 8px; }} .value-tree {{ list-style:none; padding:0; margin:0; }} .value-tree li {{ display:flex; gap:12px; justify-content:space-between; padding:5px 0; border-bottom:1px solid #e5ebf1; }} .value-tree li:last-child {{ border-bottom:0; }} .value-tree strong {{ font-variant-numeric:tabular-nums; white-space:nowrap; }} .value-tree li.tree-category {{ display:block; border-bottom:0; color:#5f6b7a; font-size:12px; font-weight:600; padding-top:10px; }} .value-tree li.tree-structural {{ color:#5f6b7a; font-style:italic; }} .tree-total {{ font-weight:600; }} .tree-residual {{ color:#9b1c1c; }} .helper-note,.source-warning {{ font-size:12px; line-height:1.4; margin:10px 0 0; padding:8px; border-radius:6px; }} .helper-note {{ background:#e8f5e9; color:#176b35; }} .source-warning {{ background:#fff4e5; color:#8a4b08; }} .case-evidence {{ margin-top:12px; border:1px solid #d9e1ea; border-radius:7px; background:#fff; }} .case-evidence summary {{ cursor:pointer; padding:10px 12px; font-weight:700; color:#274f73; }} .case-evidence > div {{ padding:0 12px 12px; }} .value-tree li.optional-zero {{ display:none; }} body.show-zero-children .value-tree li.optional-zero {{ display:flex; }} .zero-toggle {{ display:block; margin:12px 0; }} @media (max-width:760px) {{ .paired-trees {{ grid-template-columns:1fr; }} }}
+.exception-browser-controls {{ position:sticky; top:0; z-index:2; background:white; padding:4px 0 12px; }} .exception-browser-controls label {{ display:grid; gap:4px; max-width:420px; color:#5f6b7a; font-size:12px; }} .exception-browser-controls select {{ padding:7px; }} .exception-class-group {{ border-top:1px solid #d9e1ea; padding-top:16px; margin-top:12px; }} .exception-class-group code {{ color:#334155; }}
 .transformation-diagram {{ display:grid; grid-template-columns:minmax(260px,0.8fr) minmax(520px,2fr); gap:16px; }} .ordinary-hierarchy,.rollup-boundaries {{ background:#f7fafc; border:1px solid #d9e1ea; border-radius:8px; padding:12px; }} .ordinary-hierarchy h3,.rollup-boundaries h3,.rollup-boundary h3,.rollup-boundary h4 {{ margin:0 0 8px; }} .tree-root {{ background:#dceaf8; border:1px solid #8eb2d4; border-radius:6px; font-weight:600; padding:8px; }} .ordinary-hierarchy ul,.rollup-boundary ul {{ list-style:none; padding-left:12px; margin:8px 0; }} .ordinary-hierarchy li,.rollup-boundary li {{ margin:5px 0; }} .solid-edge {{ color:#2d6a9f; font-weight:700; margin-right:4px; }} .dashed-edge {{ color:#7c5b00; font-weight:700; margin-left:6px; }} .rollup-boundary {{ border:1px solid #d9e1ea; border-left:5px solid #3d7fb1; border-radius:8px; padding:10px; margin-top:10px; background:#fff; }} .rollup-boundary.detached {{ border-left-color:#9b5c00; background:#fffaf0; }} .mode-pill {{ display:inline-block; font-size:11px; padding:2px 6px; border-radius:999px; background:#dceaf8; color:#174b73; }} .detached .mode-pill {{ background:#ffe7ba; color:#754300; }} .boundary-columns {{ display:grid; grid-template-columns:1fr 1fr; gap:12px; font-size:13px; }} .artifact-id {{ margin:8px 0 0; color:#5f6b7a; font-family:ui-monospace,monospace; font-size:11px; }} .rollup-controls {{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:12px 0; }} .rollup-controls label {{ display:grid; gap:3px; color:#5f6b7a; font-size:12px; }} .rollup-controls select {{ min-width:140px; padding:6px; }} .rollup-value {{ float:right; font-variant-numeric:tabular-nums; color:#5f6b7a; }} .rollup-check.value-pass,.rollup-boundary.value-pass {{ background:#ecf8ef; border-color:#5dae70; }} .rollup-check.value-fail,.rollup-boundary.value-fail {{ background:#fff0f0; border-color:#c95d5d; }} .rollup-check.value-pass .rollup-value,.rollup-boundary.value-pass .rollup-value {{ color:#176b35; }} .rollup-check.value-fail .rollup-value,.rollup-boundary.value-fail .rollup-value {{ color:#9b1c1c; }} @media (max-width:760px) {{ .paired-trees,.transformation-diagram,.boundary-columns {{ grid-template-columns:1fr; }} }}
 .rollup-explainer {{ display:grid; grid-template-columns:repeat(4,minmax(180px,1fr)); gap:8px; margin:10px 0 14px; }} .rollup-explainer div {{ border:1px solid #d9e1ea; border-radius:7px; padding:9px; font-size:12px; line-height:1.4; }} .rollup-explainer strong {{ display:block; margin-bottom:3px; }} .rollup-filter-grid {{ display:flex; flex-wrap:wrap; gap:10px; align-items:end; margin:8px 0; }} .rollup-filter-grid label {{ display:grid; gap:3px; color:#5f6b7a; font-size:12px; }} .rollup-filter-grid select,.rollup-filter-grid input {{ min-width:150px; padding:6px; }} .rollup-filter-grid input {{ min-width:230px; }} .rollup-filter-grid .special-rollup-toggle {{ align-self:center; display:flex; align-items:center; gap:7px; max-width:210px; color:#334155; }} .rollup-filter-grid .special-rollup-toggle input {{ min-width:0; width:auto; padding:0; }} .basis-state {{ align-self:center; border-radius:999px; background:#e8f0fa; color:#174b73; font-size:12px; font-weight:700; padding:6px 10px; }} .rollup-legend {{ display:flex; flex-wrap:wrap; gap:12px; margin:8px 0; color:#445266; font-size:12px; }} .legend-line {{ display:inline-block; width:28px; border-top:3px solid #53718f; margin-right:5px; vertical-align:middle; }} .legend-line.rollup {{ border-color:#987216; border-top-style:dotted; }} .legend-line.detached {{ border-color:#9b5c00; border-top-style:dashed; }} .rollup-graph-toolbar {{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:10px 0 8px; }} .rollup-graph-toolbar button {{ padding:5px 10px; cursor:pointer; }} .rollup-graph-help {{ color:#5f6b7a; font-size:12px; }} .rollup-graph-wrap {{ height:620px; overflow:auto; border:1px solid #d9e1ea; border-radius:8px; background:#fbfdff; }} #rollup-graph {{ min-height:200px; }} #rollup-graph svg {{ display:block; }} #rollup-graph text {{ font-family:Inter,Segoe UI,Arial,sans-serif; font-size:13px; fill:#172033; pointer-events:none; }} #rollup-graph .node {{ cursor:pointer; }} #rollup-graph .node rect {{ fill:#fff; stroke:#8eb2d4; stroke-width:1.6; rx:8; }} #rollup-graph .node.root rect {{ fill:#edf5fc; stroke:#3d7fb1; }} #rollup-graph .node.extended-only rect {{ fill:#f1edff; stroke:#7656b5; }} #rollup-graph .node.boundary rect {{ fill:#edf5fc; stroke-width:2.2; }} #rollup-graph .node.expanding rect {{ fill:#e9f6ee; stroke:#438a5b; }} #rollup-graph .node.non_expanding rect {{ fill:#eaf3ff; stroke:#356c9b; stroke-dasharray:5 3; }} #rollup-graph .node.detached rect {{ fill:#fff5df; stroke:#b77b13; stroke-dasharray:2 3; }} #rollup-graph .node.selected rect {{ stroke:#13233a; stroke-width:4; }} #rollup-graph .node.neighbour rect {{ stroke-width:3; }} #rollup-graph .node.issue rect {{ fill:#fff0f0; stroke:#c95d5d; }} #rollup-graph .node.value-pass rect {{ filter:drop-shadow(0 0 2px #5dae70); }} #rollup-graph .node.value-fail rect {{ fill:#fff0f0; stroke:#c95d5d; }} #rollup-graph .edge {{ fill:none; stroke:#53718f; stroke-width:1.8; marker-end:url(#hierarchy-arrow); }} #rollup-graph .edge.rollup {{ stroke:#987216; stroke-width:2.2; stroke-dasharray:3 5; marker-end:url(#rollup-arrow); }} #rollup-graph .edge.detached {{ stroke:#9b5c00; stroke-dasharray:10 5; }} #rollup-graph .edge.dimmed,.node.dimmed {{ opacity:.16; }} #rollup-graph .mode {{ font-size:10px; font-weight:800; letter-spacing:.4px; fill:#335b7d; }} #rollup-graph .value {{ font-size:11px; font-weight:700; fill:#5f6b7a; }} #rollup-graph .origin {{ font-size:10px; fill:#7656b5; }} .graph-empty {{ padding:34px; color:#5f6b7a; text-align:center; }} .rollup-summary {{ margin-top:14px; }} .rollup-summary h3 {{ margin-bottom:6px; }} .rollup-summary-status {{ color:#5f6b7a; font-size:12px; margin:0 0 8px; }} #rollup-summary-table tr.issue-row td {{ background:#fff4f4; }} #rollup-summary-table tr.detached-row td {{ background:#fffaf0; }} @media (max-width:900px) {{ .rollup-explainer {{ grid-template-columns:1fr 1fr; }} }} @media (max-width:620px) {{ .rollup-explainer {{ grid-template-columns:1fr; }} }}
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
@@ -1667,6 +1768,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 <section class="panel"><h2>NINTH flow tree: original vs mapped representation</h2><p class="subtle">Start with each raw-vs-mapped failure. Open “Why did this fail?” beneath that case for its matched economy and review evidence.</p>{_paired_tree_html(ninth_paired_summary, ninth_tree, common_esto_tree, 'NINTH', anchor_mapped_component_context_values, dashboard_economy, case_economy_examples, scoped_leaf_reconciliation_candidates)}</section>
 <section class="panel"><h2>LEAP flow tree: original vs mapped representation</h2><p class="source-warning"><strong>Caution: treat this section as provisional.</strong> Apparent hierarchy or mapping problems can be caused by incomplete, flattened, inconsistent, or otherwise messy LEAP balance exports rather than by the mappings themselves. Do not rely on conclusions from this section until the relevant LEAP exports have been checked and confirmed.</p><p class="subtle">Start with each raw-vs-mapped failure. Open “Why did this fail?” beneath that case for its matched economy and review evidence.</p>{_paired_tree_html(leap_paired_summary, leap_tree, common_esto_tree, 'LEAP', anchor_mapped_component_context_values, dashboard_economy, case_economy_examples, scoped_leaf_reconciliation_candidates)}</section>
 <section class="panel"><h2>ESTO flow tree: original vs mapped representation</h2><p class="subtle">Start with each raw-vs-mapped failure. Open “Why did this fail?” beneath that case for its matched economy and review evidence.</p>{_paired_tree_html(esto_paired_summary, esto_tree, common_esto_tree, 'ESTO', anchor_mapped_component_context_values, dashboard_economy, case_economy_examples, scoped_leaf_reconciliation_candidates)}</section>
+<details class="panel collapsed-panel"><summary><h2>Exception cases by classification</h2><span></span></summary><div><p class="subtle">Every context matched by the upstream exception set is omitted from the default issue trees above. Use this classification selector to inspect the same original-versus-mapped cards and their related economy evidence.</p>{paired_exception_browser}</div></details>
 <details class="panel collapsed-panel"><summary><h2>Direct mapping coverage review</h2><span></span></summary><div><h3>Actionable partial coverage</h3>{_table_html(partial, ['source_system','comparison_scope','common_row_id','missing_component_pairs','relevance_evidence','mapping_action','mapping_sheet_to_review'])}<h3>Non-zero unmapped LEAP branches</h3>{_table_html(unmapped, ['leap_flow','leap_product','indirect_esto_flow','indirect_esto_product','qa_status'])}<h3>LEAP source-presence conflicts</h3>{_table_html(conflicts, ['leap_sector_name_full_path','raw_leap_fuel_name','presence_status','in_leap_combined_esto','in_leap_combined_ninth'])}<h3>Source-coverage audit summary</h3>{_table_html(coverage_summary, ['coverage_status','mapping_status','rows'])}{cardinality_sections}</div></details>
 <footer><strong>Artifact provenance</strong><br>{artifact_notes}<br>{escape(_artifact_note(anchor_child_values_path))}<br>{escape(_artifact_note(anchor_child_context_values_path))}<br>{escape(_artifact_note(anchor_mapped_component_context_values_path))}<br>{escape(_artifact_note(leaf_reconciliation_candidates_path))}</footer></div><script>const ROLLUP_GRAPH={transformation_graph_json},ROLLUP_VALUES={rollup_value_json};const rs=document.querySelector('#rollup-source'),rc=document.querySelector('#rollup-scenario'),ry=document.querySelector('#rollup-year');const unique=a=>[...new Set(a)].sort();const fill=(el,items,selected)=>{{el.innerHTML='';items.forEach(x=>el.add(new Option(x,x,false,String(x)===String(selected)));}};function esc(s){{return String(s).replace(/[&<>]/g,c=>({{'&':'&amp;','<':'&lt;','>':'&gt;'}}[c]));}}function drawGraph(){{let h=230+ROLLUP_GRAPH.boundaries.length*150,w=1300,kids=ROLLUP_GRAPH.children;let childX=i=>70+i*(1160/Math.max(kids.length-1,1));let svg=`<svg viewBox="0 0 ${{w}} ${{h}}" width="100%" height="${{h}}"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#53718f"/></marker></defs>`;svg+=`<g class="node rollup-check" data-rollup-target="${{esc(ROLLUP_GRAPH.parent)}}" data-rollup-inputs="${{esc(kids.join('|'))}}"><rect x="510" y="20" width="280" height="48"/><text x="525" y="43">${{esc(ROLLUP_GRAPH.parent)}}</text><text class="value" data-rollup-flow="${{esc(ROLLUP_GRAPH.parent)}}" x="525" y="59">—</text></g>`;kids.forEach((x,i)=>{{let cx=childX(i);svg+=`<line class="edge" x1="650" y1="68" x2="${{cx}}" y2="118"/><g class="node"><rect x="${{cx-62}}" y="118" width="124" height="48"/><text x="${{cx-54}}" y="140">${{esc(x).replace(' plants','')}}</text><text class="value" data-rollup-flow="${{esc(x)}}" x="${{cx-54}}" y="157">—</text></g>`;}});ROLLUP_GRAPH.boundaries.forEach((b,i)=>{{let y=210+i*150,targetX=850;svg+=`<g class="node boundary ${{b.mode==='DETACHED'?'detached':''}} rollup-check" data-rollup-target="${{esc(b.label)}}" data-rollup-inputs="${{esc(b.inputs.join('|'))}}"><rect x="${{targetX}}" y="${{y}}" width="350" height="58"/><text class="mode" x="${{targetX+12}}" y="${{y+18}}">${{esc(b.mode)}}</text><text x="${{targetX+12}}" y="${{y+35}}">${{esc(b.label)}}</text><text class="value" data-rollup-flow="${{esc(b.label)}}" x="${{targetX+12}}" y="${{y+51}}">—</text></g>`;b.inputs.forEach((x,j)=>{{let iy=y+j*28,ix=110+j*250;svg+=`<line class="edge dashed" x1="${{ix+175}}" y1="${{iy+12}}" x2="${{targetX}}" y2="${{y+29}}"/><g class="node"><rect x="${{ix}}" y="${{iy}}" width="175" height="25"/><text x="${{ix+7}}" y="${{iy+12}}">${{esc(x)}}</text><text class="value" data-rollup-flow="${{esc(x)}}" x="${{ix+7}}" y="${{iy+22}}">—</text></g>`;}});}});document.querySelector('#rollup-graph').innerHTML=svg+'</svg>';}}function refreshScenarios(){{let rows=ROLLUP_VALUES.filter(r=>r.source_system===rs.value);fill(rc,unique(rows.map(r=>r.scenario)),rc.value||unique(rows.map(r=>r.scenario))[0]);refreshYears();}}function refreshYears(){{let rows=ROLLUP_VALUES.filter(r=>r.source_system===rs.value&&r.scenario===rc.value);let years=unique(rows.map(r=>r.year)).sort((a,b)=>Number(a)-Number(b));fill(ry,years,years.at(-1));paint();}}function paint(){{let rows=ROLLUP_VALUES.filter(r=>r.source_system===rs.value&&r.scenario===rc.value&&String(r.year)===String(ry.value)),values=new Map();rows.forEach(r=>values.set(r.common_flow_label,(values.get(r.common_flow_label)||0)+Number(r.value)));document.querySelectorAll('[data-rollup-flow]').forEach(el=>{{let v=values.get(el.dataset.rollupFlow);el.textContent=v===undefined?'—':v.toLocaleString(undefined,{{maximumFractionDigits:2}});}});document.querySelectorAll('[data-rollup-target]').forEach(el=>{{let target=values.get(el.dataset.rollupTarget),inputs=el.dataset.rollupInputs.split('|').filter(Boolean),sum=inputs.reduce((s,x)=>s+(values.get(x)||0),0),ok=target!==undefined&&Math.abs(target-sum)<=0.01*Math.max(Math.abs(target),1);el.classList.toggle('value-pass',ok);el.classList.toggle('value-fail',target!==undefined&&!ok);}});}}drawGraph();if(ROLLUP_VALUES.length){{fill(rs,unique(ROLLUP_VALUES.map(r=>r.source_system)),unique(ROLLUP_VALUES.map(r=>r.source_system)).includes('ESTO')?'ESTO':unique(ROLLUP_VALUES.map(r=>r.source_system))[0]);refreshScenarios();rs.onchange=refreshScenarios;rc.onchange=refreshYears;ry.onchange=paint;}}else{{document.querySelector('.rollup-controls').innerHTML='<span class="empty-state">No comparison values were supplied for this dashboard render.</span>';}}</script></body></html>"""
     # The dashboard template predates the graph and emits one compact inline

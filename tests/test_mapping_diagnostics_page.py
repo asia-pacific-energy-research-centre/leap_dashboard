@@ -7,7 +7,7 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     _anchor_value_summary,
     _context_value_formatter,
     _direct_parent_mapping_reconciles,
-    _exclude_confirmed_paired_tree_exceptions,
+    _partition_paired_tree_exceptions,
     _mapping_cardinality_diagnostics,
     _mapped_target_structure_html,
     _paired_anchor_aggregate_summary,
@@ -22,14 +22,15 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
 )
 
 
-def test_paired_tree_excludes_only_final_confirmed_source_exceptions() -> None:
+def test_paired_tree_excludes_every_matched_exception() -> None:
     context_rows = []
     validation_rows = []
     cases = [
         ("source_issue", True, "confirmed", "source_non_additivity", False),
         ("detail_exclusion", True, "confirmed", "intentional_detail_exclusion", False),
-        ("provisional_review", True, "confirmed", "provisional_apec_anchor_review", True),
-        ("unreviewed_source_issue", True, "provisional", "source_non_additivity", True),
+        ("provisional_review", True, "confirmed", "provisional_apec_anchor_review", False),
+        ("unreviewed_source_issue", True, "provisional", "source_non_additivity", False),
+        ("unclassified", True, "confirmed", "", False),
         ("ordinary_failure", False, "", "", True),
     ]
     for parent_code, known_exception, review_status, issue_class, _ in cases:
@@ -57,13 +58,23 @@ def test_paired_tree_excludes_only_final_confirmed_source_exceptions() -> None:
             "exception_issue_class": issue_class,
         })
 
-    filtered = _exclude_confirmed_paired_tree_exceptions(
+    filtered, exception_groups = _partition_paired_tree_exceptions(
         pd.DataFrame(context_rows),
         pd.DataFrame(validation_rows),
     )
 
     assert set(filtered["parent_code"]) == {
         parent_code for parent_code, _, _, _, should_remain in cases if should_remain
+    }
+    assert set(exception_groups) == {
+        "intentional_detail_exclusion",
+        "provisional_apec_anchor_review",
+        "source_non_additivity",
+        "unclassified_exception",
+    }
+    assert set(exception_groups["source_non_additivity"]["parent_code"]) == {
+        "source_issue",
+        "unreviewed_source_issue",
     }
 
 
@@ -458,9 +469,9 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
         {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "parent_code": "09_total"},
     ]).to_csv(tree_root / "common_esto_validation.csv", index=False)
     pd.DataFrame([
-        {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "difference_exceeds_tolerance", "parent_code": "09_total", "parent_value": 10.0, "frontier_sum": 7.0, "difference": 3.0, "abs_error": 3.0, "known_data_quality_exception": True, "exception_review_status": "confirmed", "exception_id": "SRC-001", "exception_issue_class": "confirmed_source_non_additivity", "source_non_additivity_observed": True, "data_quality_exception_notes": "Reviewed source total."},
-        {"status": "failed", "source_system": "LEAP", "validation_axis": "flow", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "frontier_rows_absent", "parent_code": "Oil Refining", "parent_value": 4.0, "frontier_sum": 0.0, "difference": 4.0, "abs_error": 4.0, "known_data_quality_exception": False, "exception_review_status": "", "exception_id": "", "exception_issue_class": "", "source_non_additivity_observed": False, "data_quality_exception_notes": ""},
-        {"status": "failed", "source_system": "NINTH", "validation_axis": "flow", "economy": "20USA", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "difference_exceeds_tolerance", "parent_code": "other_economy_parent", "parent_value": 999.0, "frontier_sum": 0.0, "difference": 999.0, "abs_error": 999.0, "known_data_quality_exception": True, "exception_review_status": "confirmed", "exception_id": "SRC-OTHER", "exception_issue_class": "confirmed_source_non_additivity", "source_non_additivity_observed": True, "data_quality_exception_notes": "Must not leak."},
+        {"status": "failed", "comparison_scope": "esto_leap_ninth", "source_system": "NINTH", "validation_axis": "flow", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "difference_exceeds_tolerance", "parent_code": "09_total", "parent_value": 10.0, "frontier_sum": 7.0, "difference": 3.0, "abs_error": 3.0, "known_data_quality_exception": True, "exception_review_status": "confirmed", "exception_id": "SRC-001", "exception_issue_class": "confirmed_source_non_additivity", "source_non_additivity_observed": True, "data_quality_exception_notes": "Reviewed source total."},
+        {"status": "failed", "comparison_scope": "esto_leap_ninth", "source_system": "LEAP", "validation_axis": "flow", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "frontier_rows_absent", "parent_code": "Oil Refining", "parent_value": 4.0, "frontier_sum": 0.0, "difference": 4.0, "abs_error": 4.0, "known_data_quality_exception": False, "exception_review_status": "", "exception_id": "", "exception_issue_class": "", "source_non_additivity_observed": False, "data_quality_exception_notes": ""},
+        {"status": "failed", "comparison_scope": "esto_leap_ninth", "source_system": "NINTH", "validation_axis": "flow", "economy": "20USA", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "reason": "difference_exceeds_tolerance", "parent_code": "other_economy_parent", "parent_value": 999.0, "frontier_sum": 0.0, "difference": 999.0, "abs_error": 999.0, "known_data_quality_exception": True, "exception_review_status": "confirmed", "exception_id": "SRC-OTHER", "exception_issue_class": "confirmed_source_non_additivity", "source_non_additivity_observed": True, "data_quality_exception_notes": "Must not leak."},
     ]).to_csv(tree_root / "source_parent_anchor_validation.csv", index=False)
     pd.DataFrame([
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "parent_code": "09_total", "child_code": "09_child", "raw_child_total": 7.0},
@@ -517,6 +528,11 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "09 Child" in html
     assert ">7<" in html
     assert "NINTH flow tree: original vs mapped representation" in html
+    assert (
+        '<section class="panel"><h2>NINTH flow tree: original vs mapped representation</h2>'
+        in html
+    )
+    assert "No failed anchor contexts for this dashboard economy." in html
     assert "LEAP flow tree: original vs mapped representation" in html
     assert "Caution: treat this section as provisional." in html
     assert "until the relevant LEAP exports have been checked and confirmed" in html
@@ -546,6 +562,12 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Confirmed source issues among failed anchor rows" in html
     assert "Unconfirmed failed anchor rows" in html
     assert "SRC-001" in html
+    assert "Exception cases by classification" in html
+    assert 'id="paired-exception-classification"' in html
+    assert "All classifications" in html
+    assert 'data-exception-classification="confirmed_source_non_additivity"' in html
+    assert "Confirmed source non additivity (1)" in html
+    assert "Every context matched by the upstream exception set is omitted" in html
     assert "other_economy_parent" not in html
     assert "SRC-OTHER" not in html
     assert "skipped from actionable failures" not in html

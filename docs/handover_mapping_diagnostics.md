@@ -51,11 +51,11 @@ The page currently contains:
   cases.
 
 The paired-tree views are an unresolved-review queue, not a second copy of the
-full numerical failure table. Contexts confirmed in the upstream exception
-workbook as `source_non_additivity` or `intentional_detail_exclusion` stay
-failed in validation totals and reviewed-exception evidence, but are omitted
-from paired issue cards. `provisional_apec_anchor_review` rows remain visible
-until they receive a final classification.
+full numerical failure table. Every context matched by the upstream exception
+set stays failed in validation totals but is omitted from the default paired
+issue cards, regardless of review status or classification. A collapsed
+**Exception cases by classification** browser restores the same paired cards,
+economy evidence, and review details, grouped by `exception_issue_class`.
 
 The SVG and rollup-boundary cards share Dataset, Scenario, and Year controls.
 Values are green only when a rollup target equals the listed contributors within

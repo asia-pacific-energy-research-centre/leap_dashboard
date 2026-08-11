@@ -1083,6 +1083,32 @@ therefore show LEAP as unavailable until detailed source data are supplied.
   published source map, and Common ESTO comparison fact. The detailed mappings
   exist, but only the combined source placeholder has values for USA.
 
+## DASH-032: Exception-set matches leave the default paired-tree issue queue
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Diagnostic presentation
+**Affected areas:** Mapping diagnostics; paired original-versus-mapped flow trees
+
+### Current rule
+
+Treat `known_data_quality_exception = true` as the authoritative signal that an
+anchor context matched the active upstream exception set. Omit every such
+context from the default NINTH, LEAP, and ESTO paired-tree issue queues without
+requiring a particular review status or final classification.
+
+Keep the evidence inspectable in a collapsed **Exception cases by
+classification** panel. Its selector groups cases by `exception_issue_class`
+and renders the same original-versus-mapped card, related economy rows, review
+fields, and source-review candidates as the default issue queue. Missing class
+labels are grouped as `unclassified_exception`.
+
+### History
+
+- 2026-08-11: Replaced the two-class final-exception allowlist. Provisional and
+  unclassified exception-set matches now leave the default queue but remain
+  available in the classification browser.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
