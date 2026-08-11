@@ -1335,7 +1335,7 @@ def test_common_esto_dashboard_can_render_opt_in_scope_pages(tmp_path: Path) -> 
     assert "transport_leap_vs_ninth" in page_keys
 
 
-def test_common_esto_dashboard_renders_international_transport_as_secondary_supply_view(
+def test_common_esto_dashboard_keeps_international_transport_on_supply_without_secondary_page(
     tmp_path: Path,
 ) -> None:
     template = _load_template()
@@ -1407,13 +1407,13 @@ def test_common_esto_dashboard_renders_international_transport_as_secondary_supp
     manifest = render_dashboard(main_df, template, series_config, layout, scope_df=df)
 
     page_path = layout["dashboards"] / "international_transport.html"
-    assert page_path.exists()
-    assert "international_transport" in set(manifest["page_key"])
+    assert not page_path.exists()
+    assert "international_transport" not in set(manifest["page_key"])
 
     supply_html = (layout["dashboards"] / "supply.html").read_text(encoding="utf-8")
-    international_html = page_path.read_text(encoding="utf-8")
-    assert 'href="international_transport.html"' in supply_html
-    assert "International transport" in international_html
+    index_html = (layout["dashboards"] / "index.html").read_text(encoding="utf-8")
+    assert 'href="international_transport.html"' not in supply_html
+    assert 'href="international_transport.html"' not in index_html
 
     supply_flows = set(manifest.loc[manifest["page_key"].eq("supply"), "common_flow_label"])
     assert "04 International marine bunkers" in supply_flows

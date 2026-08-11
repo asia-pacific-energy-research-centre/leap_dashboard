@@ -54,6 +54,9 @@ These later commits supersede the corresponding snapshot rows below:
   marine remain unavailable because the current source provides only the
   combined `All demand aggregated/International transport` placeholder; the
   separate mappings are ready for Air and Shipping data when supplied.
+  A 2026-08-11 correction removes the duplicate secondary International
+  transport page and its navigation entry. Bunker rows remain owned by Supply
+  and the signed combined `04-05` row remains in the overview supply total.
 
 - **DASHQ-003 and DASHQ-004 are complete in the current documentation
   checkout.** `docs/handover_mapping_diagnostics.md` now retains the original

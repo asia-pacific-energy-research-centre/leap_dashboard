@@ -62,7 +62,6 @@ def test_routed_chart_pages_use_mapping_backed_contents_tables() -> None:
     config = json.loads(DEFAULT_GUIDE_CONFIG_PATH.read_text(encoding="utf-8"))
     routed_pages = {
         "supply",
-        "international_transport",
         "power",
         "refining",
         "other_transformation",
@@ -88,7 +87,6 @@ def test_routed_chart_pages_use_mapping_backed_contents_tables() -> None:
     [
         ("total_demand", "Energy balance overview", "What appears on the Energy balance overview"),
         ("supply", "Supply", "What appears on Supply"),
-        ("international_transport", "International transport", "What appears on International transport"),
         ("power", "Power", "What appears on Power"),
         ("refining", "Refining", "What appears on Refining"),
         ("other_transformation", "Other transformation", "What appears on Other transformation"),
@@ -147,7 +145,7 @@ def test_transport_purpose_excludes_international_transport_without_extra_card()
     chart_script = build_guide_fragments("chart", "transport", "Transport")["script"]
 
     assert "International aviation and marine bunkers are not included here" in chart_script
-    assert "Supply or on the separate International transport page" in chart_script
+    assert "review them on Supply" in chart_script
     assert "Separate domestic mode detail from total transport" not in chart_script
 
 

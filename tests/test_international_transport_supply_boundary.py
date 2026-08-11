@@ -7,7 +7,6 @@ from pathlib import Path
 import pandas as pd
 
 from codebase.common_esto_dashboard_renderer import (
-    _configured_scope_page_mask,
     assign_pages,
     code_expression_matches_prefix,
 )
@@ -40,10 +39,8 @@ def test_international_transport_routes_to_supply_and_supply_total() -> None:
         page["page_key"] for page in template["sector_pages"]
     }
 
-    secondary_page = template["secondary_pages"]["pages"][0]
-    secondary_mask = _configured_scope_page_mask(assigned, secondary_page)
-    assert secondary_page["page_key"] == "international_transport"
-    assert secondary_mask.tolist() == [True]
+    assert template["secondary_pages"]["enabled"] is False
+    assert template["secondary_pages"]["pages"] == []
     assert assigned.iloc[0]["_page_key"] == "supply"
 
 

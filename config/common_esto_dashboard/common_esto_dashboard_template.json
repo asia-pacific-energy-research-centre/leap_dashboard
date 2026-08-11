@@ -334,18 +334,9 @@
     ]
   },
   "secondary_pages": {
-    "enabled": true,
-    "_note": "Secondary pages are non-owning views of rows that remain assigned to their primary page. International transport remains part of Supply and TPES while also receiving a focused review page.",
-    "pages": [
-      {
-        "enabled": true,
-        "page_key": "international_transport",
-        "page_label": "International transport",
-        "source_page_keys": ["supply"],
-        "include_flow_code_prefixes": ["04", "05"],
-        "page_note": "International marine and aviation bunkers are shown as signed deductions from domestic supply. This focused page is an additional view of the same rows retained on Supply and in TPES."
-      }
-    ]
+    "enabled": false,
+    "_note": "No secondary pages are published. International marine and aviation bunkers remain on Supply and in TPES without a duplicate International transport page.",
+    "pages": []
   },
   "sankey_diagrams": {
     "enabled": false,

@@ -5,14 +5,13 @@
     "total_demand": "Start here for a whole-system view of final demand, transformation, supply and the principal energy-balance totals.",
     "buildings": "Use Buildings to review residential and commercial energy demand, including fuel totals and changes that need to be traced back to model assumptions.",
     "industry": "Use Industry to review industrial energy demand by subsector and fuel, with particular attention to large changes and differences between sources.",
-    "transport": "Use Transport to review road and non-road energy demand within the economy, including fuel switching and the effect of the detailed transport model on LEAP results. International aviation and marine bunkers are not included here; review them on Supply or on the separate International transport page.",
-    "international_transport": "Use International transport to review international aviation and marine bunker fuel as a signed deduction from domestic supply.",
+    "transport": "Use Transport to review road and non-road energy demand within the economy, including fuel switching and the effect of the detailed transport model on LEAP results. International aviation and marine bunkers are not included here; review them on Supply.",
     "others": "Use Other demand to review agriculture, fishing, non-specified demand and aggregate-only demand that has not yet been replaced by detailed LEAP branches.",
     "non_energy": "Use Non-energy use to review fuels consumed as feedstocks or materials rather than as an energy source.",
     "power": "Use Power to review electricity and heat generation, fuel inputs and outputs. LEAP's power transformation modules do not measure power-sector own use or losses within the transformation process. These are represented separately, so the charts on this page let you analyse power-sector own use and losses alongside the transformation results.",
     "refining": "Use Refining to review refinery inputs, petroleum-product outputs and refinery own use together. In LEAP, refinery own use is measured in the Auxiliary Fuel Use branch of the refining transformation module, so it can be shown separately from the transformation inputs. Review the inputs and own use together when assessing the full refinery process.",
     "other_transformation": "Use Other transformation to review four distinct parts of the energy balance: Other transformation (including own use), Transfers, Transmission and distribution losses, and Other energy-sector own use. These sections describe different kinds of flows and should not be added together without checking their signs and boundaries.",
-    "supply": "Use Supply to review how production, trade and transformation outputs meet the economy's fuel requirements, including international marine and aviation transport. Bunker fuels are shown here because they are supplied by the economy and deducted before domestic energy use is calculated. They also have a dedicated International transport page for focused review; it shows the same rows and is not an additional amount to add.",
+    "supply": "Use Supply to review how production, trade and transformation outputs meet the economy's fuel requirements, including international marine and aviation transport. Bunker fuels are shown here because they are supplied by the economy and deducted before domestic energy use is calculated.",
     "emissions": "Use Emissions to review the emissions implied by energy demand. Read the page note carefully where aggregate-only demand prevents a detailed sector split.",
     "transport_leap_vs_ninth": "This diagnostic page provides a focused LEAP-versus-9th view of transport detail. Use it alongside, not instead of, the main three-source Transport page.",
     "datacentres_leap_vs_ninth": "This diagnostic page provides a focused LEAP-versus-9th view of datacentre demand. Use it alongside the main Buildings page."
@@ -59,7 +58,7 @@
         "id": "supply-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Supply",
-        "copy": "Supply is organised by the balance flows that add energy to, or remove energy from, the economy. International marine and aviation transport is included because bunker fuel is supplied by the economy but then removed from domestic supply and domestic demand. The same rows also have a dedicated International transport page so they can be reviewed in detail without being confused with domestic Transport; that page is a second view, not an additional amount. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "copy": "Supply is organised by the balance flows that add energy to, or remove energy from, the economy. International marine and aviation transport is included because bunker fuel is supplied by the economy but then removed from domestic supply and domestic demand. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
         "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Supply page contents",
@@ -76,7 +75,7 @@
         "id": "supply-signs",
         "target": "[data-guide-id='chart-card']",
         "title": "Read supply and international-transport signs before comparing size",
-        "copy": "The dashboard applies explicit display sign rules. International transport is part of the supply balance because marine and aviation bunker fuels are supplied in the economy and then deducted before domestic use is calculated. Its dedicated page shows the same rows in a focused view; do not add them to Supply again. A surprising sign is a prompt to check the source or mapping convention and should not be silently reversed during review.",
+        "copy": "The dashboard applies explicit display sign rules. International transport is part of the supply balance because marine and aviation bunker fuels are supplied in the economy and then deducted before domestic use is calculated. A surprising sign is a prompt to check the source or mapping convention and should not be silently reversed during review.",
         "table": {
           "caption": "Supply sign guide",
           "headers": ["Flow", "Expected display sign", "Meaning"],
@@ -89,31 +88,6 @@
             ["Statistical discrepancy", "Either", "A balancing signal to investigate, not an ordinary supply source."]
           ]
         }
-      }
-    ],
-    "international_transport": [
-      {
-        "id": "international-transport-page-scope",
-        "target": "[data-guide-id='chart-card']",
-        "title": "What appears on International transport",
-        "copy": "International transport contains marine and aviation bunker fuel, kept outside domestic Transport and domestic demand totals. It is a focused view of rows that also remain on Supply and contribute to TPES. The table shows each Common flow and fuel beside the native categories mapped into it for the participating datasets.",
-        "dynamic_content": "page_mapping_table",
-        "table": {
-          "caption": "International transport page contents",
-          "headers": ["Area", "Generally included", "Important quirk"],
-          "rows": [
-            ["Flows", "International marine bunkers (04) and international aviation bunkers (05)", "These are international movements, not domestic navigation or aviation."],
-            ["Products", "Usually marine fuel oils, jet fuel and other reported bunker fuels", "The dashboard retains whatever shared product grain the selected datasets can support."],
-            ["Signs", "Fuel supplied to bunkers is normally negative", "The negative sign means removal from domestic supply, not negative physical activity."],
-            ["Supply relationship", "The same rows remain visible on Supply and are included in TPES", "This page is a secondary review view, not another amount to add to Supply."]
-          ]
-        }
-      },
-      {
-        "id": "international-transport-boundary",
-        "target": "[data-guide-id='chart-card']",
-        "title": "Keep international bunkers outside domestic transport",
-        "copy": "International aviation and marine bunkers are shown as negative because they are removed from domestic supply. Review them separately from domestic Transport and alongside Supply; a positive bunker value is a sign-convention warning."
       }
     ],
     "power": [
@@ -223,7 +197,7 @@
           "caption": "Transport page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
           "rows": [
-            ["Flows", "Total transport, road, rail, domestic aviation, domestic navigation, pipeline and non-specified transport where available", "International aviation and marine bunkers are kept on the separate International transport page and also remain on Supply."],
+            ["Flows", "Total transport, road, rail, domestic aviation, domestic navigation, pipeline and non-specified transport where available", "International aviation and marine bunkers are kept outside domestic Transport and remain on Supply."],
             ["Products", "Gasoline, diesel, jet fuel, fuel oil, biofuels, gas, electricity, hydrogen and other reported transport fuels", "Fuel detail follows the finest shared grain supported by the selected sources."],
             ["Comparison views", "Road, non-road and total-transport rollups", "These are context-specific alternatives; the same LEAP branch can contribute to several views, so do not add those views together."],
             ["How to diagnose", "Move from total transport to mode and then fuel", "A difference can reflect activity, modal structure, efficiency, fuel switching or source coverage."]

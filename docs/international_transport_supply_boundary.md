@@ -7,11 +7,11 @@ balance overview supply composition charts. The overview uses that common row
 rather than also summing its retained `04` and `05` source children, which
 would count bunkers twice. The detailed children remain visible on Supply.
 
-The dashboard also publishes an **International transport** page as a
-secondary, non-owning view of those same Supply rows. It shows the combined
-`04-05` comparison boundary alongside the available marine (`04`) and aviation
-(`05`) detail. This page is for focused review only: its values must not be
-added to Supply again.
+The dashboard does not publish a separate **International transport** page.
+Publishing the same rows as a secondary page duplicated the review surface and
+made it appear that bunkers were a separate dashboard area. Review the marine
+(`04`) and aviation (`05`) detail on Supply; the signed combined `04-05` row
+continues to contribute to the Energy balance overview supply boundary.
 
 LEAP's `All demand aggregated/International transport` placeholder is stored as
 a positive demand magnitude in the source export. The maintained mapping
