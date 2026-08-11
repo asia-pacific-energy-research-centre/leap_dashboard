@@ -140,10 +140,10 @@
           "caption": "Other transformation page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
           "rows": [
-            ["Other transformation (including own use)", "Gas processing, coal transformation, liquefaction/regasification and other conversion processes outside Power and Refining", "Inputs are normally negative and outputs positive. Where the label says including own use, the process boundary also contains the energy used to operate it."],
-            ["Transfers", "Flow 08 movements between fuel or product categories", "A transfer reclassifies energy within the balance; it does not create new supply or demand."],
-            ["Transmission and distribution losses", "Energy lost while electricity, heat, gas or another carrier is transmitted and distributed", "Losses are normally negative."],
-            ["Other energy-sector own use", "Energy consumed by mines, extraction, processing and other energy industries while they operate", "It is normally negative and is shown here only when it is not already included in a transformation boundary."],
+            ["Other transformation (including own use)", "Gas processing, coal transformation, liquefaction/regasification and other conversion processes outside Power and Refining", "Inputs are normally negative and outputs positive. For rows labelled including own use, the associated 10.01.xx own-use energy is included in the chart's transformation input."],
+            ["Transfers", "Flow 08 movements between fuel or product categories", "Review these as transformation processes with signed inputs, outputs and an implied process efficiency. LEAP splits them into three modules for modelling, but the dashboard aggregates them for comparison."],
+            ["Transmission and distribution losses", "Energy lost while electricity, heat, gas or another carrier is transmitted and distributed", "Electricity losses will eventually be measured through a transformation module. Other product losses are currently modelled under Demand\\Other loss and own use."],
+            ["Other energy-sector own use", "Auxiliary fuel use for other transformation modules where it was not possible or practical to track that use inside the module", "These normally negative values are modelled under Demand\\Other loss and own use."],
             ["Gas works quirk", "09.06.01 Gas works plants (including own use)", "LEAP does not expose 10.01.02 gas-works own use separately, so that standalone row is suppressed just like refinery own use."],
             ["Products", "The input and output fuels appropriate to each conversion process", "Read the flow label first: the same product can be an input in one process and an output in another."]
           ]
@@ -152,17 +152,16 @@
       {
         "id": "transformation-boundaries",
         "target": "[data-guide-id='chart-card']",
-        "title": "Understand conversion, transfers, losses and own use",
-        "copy": "These flows have different meanings. Read the flow label and sign before comparing totals. Some Common rows combine a transformation process with its associated own use so datasets with different reporting boundaries can still be compared.",
+        "title": "How to read the four Other transformation sections",
+        "copy": "This page groups four different parts of the energy balance. Review each section separately and use the row label, product and sign to understand what the chart represents.",
         "table": {
-          "caption": "How to interpret a row",
-          "headers": ["Row type", "Interpretation"],
+          "caption": "How to interpret each section",
+          "headers": ["Section", "How to interpret it"],
           "rows": [
-            ["Transformation or conversion", "Energy enters a process in one form and leaves in another. Inputs are normally negative and outputs positive, so review both sides of the process."],
-            ["Transfers", "Energy is moved or reclassified from one fuel or product category to another within the balance. Positive enters a category and negative leaves it; a transfer is not new supply or demand."],
-            ["Transmission and distribution losses", "Energy that is lost while a carrier is delivered through a network. It is normally negative."],
-            ["Energy-sector own use", "Energy consumed by an energy industry to run its own operations. It is normally negative."],
-            ["Including own use", "The transformation row already includes its associated own use so the source boundaries can be compared. Do not add a separate own-use row to it again."]
+            ["Other transformation (including own use)", "Inputs are normally negative and outputs positive. Where a comparison row says including own use, energy from the associated 10.01.xx own-use sector is included in the transformation input shown in these charts. This is necessary because Auxiliary Fuel Use for these LEAP transformation modules cannot be separated from their feedstock inputs."],
+            ["Other energy-sector own use", "These normally negative values represent auxiliary fuel use for other transformation modules where it was not possible or practical to track that use inside the module. In LEAP they are modelled under Demand\\Other loss and own use, rather than as transformation inputs or final demand."],
+            ["Transfers", "For dashboard review, treat these like transformation processes. Compare their signed inputs and outputs and the process efficiency implied by the balance. They have no associated own use. LEAP splits transfers into three modules for modelling practicality, but outside LEAP the results are normally aggregated so they can be compared with other datasets."],
+            ["Transmission and distribution losses", "These values are normally negative. Electricity transmission and distribution losses will eventually be measured through a transformation module. Losses for the other products shown here are currently modelled under Demand\\Other loss and own use."]
           ]
         }
       }

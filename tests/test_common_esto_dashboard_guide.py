@@ -82,6 +82,30 @@ def test_routed_chart_pages_use_mapping_backed_contents_tables() -> None:
     assert "dynamic_content" not in config["page_steps"]["emissions"][0]
 
 
+def test_other_transformation_guide_explains_leap_modelling_boundaries() -> None:
+    config = json.loads(DEFAULT_GUIDE_CONFIG_PATH.read_text(encoding="utf-8"))
+    step = config["page_steps"]["other_transformation"][1]
+    rows = {row[0]: row[1] for row in step["table"]["rows"]}
+
+    assert step["title"] == "How to read the four Other transformation sections"
+    assert list(rows) == [
+        "Other transformation (including own use)",
+        "Other energy-sector own use",
+        "Transfers",
+        "Transmission and distribution losses",
+    ]
+    assert "10.01.xx own-use sector" in rows["Other transformation (including own use)"]
+    assert "cannot be separated from their feedstock inputs" in rows[
+        "Other transformation (including own use)"
+    ]
+    assert "Demand\\Other loss and own use" in rows["Other energy-sector own use"]
+    assert "three modules" in rows["Transfers"]
+    assert "no associated own use" in rows["Transfers"]
+    assert "Electricity transmission and distribution losses" in rows[
+        "Transmission and distribution losses"
+    ]
+
+
 @pytest.mark.parametrize(
     ("page_key", "page_label", "scope_title"),
     [

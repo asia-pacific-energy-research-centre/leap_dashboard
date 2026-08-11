@@ -944,6 +944,10 @@ metadata and the non-expanding-rollup contributor QA emitted alongside it.
 The dashboard does not maintain a second list of mapping relationships.
 Power-related pump-storage own use is routed to Power.
 
+On 2026-08-11, the page guide was expanded to explain how inclusive own use,
+residual own use, transfers, and transmission and distribution losses are
+represented in LEAP and aggregated for cross-dataset review.
+
 ## DASH-026: Historical composition stacks reconcile to their total lines
 
 **Status:** Confirmed
