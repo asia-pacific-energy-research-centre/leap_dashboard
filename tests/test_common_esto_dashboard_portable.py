@@ -72,6 +72,7 @@ def test_required_inputs_are_declared_for_every_path_argument() -> None:
 def test_optional_inputs_are_declared() -> None:
     assert set(OPTIONAL_DASHBOARD_INPUTS) == {
         "code_colors_path",
+        "power_interim_audit_path",
         "source_to_common_map_path",
         "esto_to_common_map_path",
     }
@@ -142,3 +143,29 @@ def test_missing_leap_demand_branches_hide_sector_pages(tmp_path: Path) -> None:
     assert restricted["missing_leap_demand_branches"] == ["Transport"]
     # Hiding a sector page cannot increase the number of rendered charts.
     assert int(restricted["chart_count"]) <= int(baseline["chart_count"])
+
+
+def test_power_interim_audit_adds_placeholder_note(tmp_path: Path) -> None:
+    audit_path = tmp_path / "leap_source_branch_fallback_audit.csv"
+    pd.DataFrame(
+        [
+            {
+                "economy": "20_USA",
+                "year": 2025,
+                "status": "interim_only_retained",
+                "interim_branch": "Electricity interim",
+            },
+            {
+                "economy": "20_USA",
+                "year": 2025,
+                "status": "interim_zeroed",
+                "interim_branch": "CHP interim",
+            },
+        ]
+    ).to_csv(audit_path, index=False)
+
+    result = _render(tmp_path, power_interim_audit_path=audit_path)
+
+    assert result["power_interim_placeholder_branches"] == ["Electricity interim"]
+    power_html = Path(str(result["dashboard_index"])).with_name("power.html")
+    assert "LEAP placeholder in use" in power_html.read_text(encoding="utf-8")

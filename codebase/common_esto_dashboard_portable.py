@@ -52,6 +52,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     filter_common_esto_data,
     filter_ninth_pre_base_year_data,
     filter_template_for_leap_demand_coverage,
+    load_active_power_interim_branches,
     load_common_esto_data,
     load_source_category_map,
 )
@@ -79,6 +80,7 @@ REQUIRED_DASHBOARD_INPUTS = {
 #: Optional inputs. Absent ones fall back to a documented default.
 OPTIONAL_DASHBOARD_INPUTS = {
     "code_colors_path": "Per-axis ESTO code colour map (code_colors.json)",
+    "power_interim_audit_path": "Mapping-chain interim power fallback audit",
     "source_to_common_map_path": "LEAP/9th native-source to Common ESTO map",
     "esto_to_common_map_path": "ESTO component to Common ESTO map",
 }
@@ -105,6 +107,7 @@ def render_common_esto_dashboard(
     series_config_path: Path | str,
     output_root: Path | str,
     code_colors_path: Path | str | None = None,
+    power_interim_audit_path: Path | str | None = None,
     source_to_common_map_path: Path | str | None = None,
     esto_to_common_map_path: Path | str | None = None,
     comparison_scope: str = "esto_leap_ninth",
@@ -136,6 +139,16 @@ def render_common_esto_dashboard(
     template = filter_template_for_leap_demand_coverage(
         template,
         list(missing_leap_demand_branches),
+    )
+    template["_power_interim_placeholder_branches"] = (
+        load_active_power_interim_branches(
+            Path(power_interim_audit_path),
+            economy_key,
+            min_year=min_year,
+            max_year=max_year,
+        )
+        if power_interim_audit_path is not None
+        else []
     )
     template["_active_comparison_scope"] = comparison_scope
     series_config = json.loads(Path(series_config_path).read_text(encoding="utf-8"))
@@ -220,6 +233,9 @@ def render_common_esto_dashboard(
         "visible_row_count": int(len(visible_df)),
         "base_year": base_year,
         "missing_leap_demand_branches": list(missing_leap_demand_branches),
+        "power_interim_placeholder_branches": list(
+            template["_power_interim_placeholder_branches"]
+        ),
         "code_colors_path": str(code_colors_path) if code_colors_path else "",
     }
 

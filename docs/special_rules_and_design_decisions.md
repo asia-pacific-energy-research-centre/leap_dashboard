@@ -470,6 +470,9 @@ become visible once it contains LEAP data.
   retained. Merely having an interim mapping is not enough to trigger the
   warning; the audit must show that interim values are actually in use during
   the dashboard period.
+- 2026-08-11: Passed that run-specific fallback audit through the portable and
+  HF dashboard-from-export path so hosted renders apply the same warning rule
+  as maintainer renders.
 
 ## DASH-013: Gas-works own use is shown only in the shared transformation boundary
 
