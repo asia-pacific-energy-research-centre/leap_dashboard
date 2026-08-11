@@ -39,6 +39,9 @@
       "10.01": "10.01 Own use"
     },
     "synthetic_intermediate_flow_labels": {
+      "09.06": "09.06 Gas processing plants (including own use)",
+      "09.06.02": "09.06.02 Liquefaction/regasification plants (including own use)",
+      "09.08": "09.08 Coal transformation (including own use)",
       "14.03": "14.03 Manufacturing"
     }
   },
@@ -219,6 +222,7 @@
     {
       "page_key": "others",
       "page_label": "Other demand",
+      "page_scope_overview_label": "Other demand",
       "priority": 90,
       "flow_code_prefixes": [
         "16.03",

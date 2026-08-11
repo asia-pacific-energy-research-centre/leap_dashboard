@@ -386,6 +386,37 @@ def _code_expression_contains_expression(parent: object, child: object) -> bool:
     return True
 
 
+def _flow_subtree_is_page_complete(
+    assigned_df: pd.DataFrame,
+    page_key: str,
+    root_code: object,
+) -> bool:
+    """Return True when every routed descendant of a flow root stays on one page."""
+    required = {"common_flow_code", "_page_key"}
+    if assigned_df.empty or not required.issubset(assigned_df.columns):
+        return False
+    root_expression = code_candidate_text(root_code)
+    if not root_expression:
+        return False
+    routed_nodes = assigned_df[["common_flow_code", "_page_key"]].drop_duplicates()
+    descendants = routed_nodes[
+        routed_nodes["common_flow_code"].apply(
+            lambda value: _code_expression_contains_expression(
+                root_expression,
+                code_candidate_text(value),
+            )
+        )
+    ]
+    if descendants.empty:
+        return False
+    routed_pages = {
+        safe_slug(value)
+        for value in descendants["_page_key"].dropna().astype(str)
+        if str(value).strip()
+    }
+    return routed_pages == {safe_slug(page_key)}
+
+
 def _is_compound_code_expression(value: object) -> bool:
     """Return True for a comma list or inclusive range of ESTO codes."""
     records = parse_code_expression(value)
@@ -2158,6 +2189,8 @@ def _build_section_aggregate_charts(
                 "title": f"{title_prefix}: {section_label}",
                 "product_label": f"{title_prefix}: {section_label}",
                 "section_label": "Overview" if overview_summary else section_label,
+                "navigation_root_label": section_label if overview_summary else "",
+                "navigation_root_section_label": section_label if overview_summary else "",
                 "datasets": chart_dataset_tokens_from_figure(figure),
                 "stacked_area_note": stacked_area_note_from_figure(figure),
                 **metrics,
@@ -2236,7 +2269,7 @@ def _build_flow_group_aggregate_charts(
         descendant_count = flow_nodes[
             flow_nodes["canonical_code"].astype(str).str.startswith(prefix + ".")
         ]["common_flow_label"].nunique()
-        if descendant_count >= 2 and prefix not in parent_prefixes:
+        if descendant_count >= 1 and prefix not in parent_prefixes:
             parent_prefixes.append(prefix)
     parent_prefixes.sort(key=lambda value: (code_depth(value), value))
 
@@ -3570,9 +3603,11 @@ def line_section_tree(
     are relative to the visible tree: aggregate roots with visible children are
     level 1, their immediate visible children are level 2, and so on. Real
     parent flows represented only by overview charts are restored through
-    ``navigation_roots``. Compound code expressions remain intact so manual
-    rollups can contain their visible children. Unparented top-level codes stay
-    at level 1; deeper orphan leaves in a multi-node section start at level 2.
+    ``navigation_roots``. A page-defined overview aggregate can also parent a
+    renderer section even when it has no ESTO code. Compound code expressions
+    remain intact so manual rollups can contain their visible children.
+    Unparented top-level codes stay at level 1; deeper orphan leaves in a
+    multi-node section start at level 2.
     """
     tree: list[tuple[str, list[str]]] = []
     seen_sections: dict[str, list[str]] = {}
@@ -3585,12 +3620,26 @@ def line_section_tree(
         if group and group not in seen_sections[section_label]:
             seen_sections[section_label].append(group)
 
+    use_subsection_anchor = {
+        section_label: len(groups) > 1
+        for section_label, groups in tree
+    }
     root_targets: dict[str, str] = {}
+    section_root_labels: dict[str, str] = {}
     existing_groups = {group for groups in seen_sections.values() for group in groups}
     for root in navigation_roots or []:
         root_label = str(root.get("label") or "").strip()
         root_code = code_candidate_text(root_label)
-        if not root_label or not root_code or root_label in existing_groups:
+        section_hint = str(root.get("section_label") or "").strip()
+        if not root_label or root_label in existing_groups:
+            continue
+        if section_hint in seen_sections:
+            seen_sections[section_hint].insert(0, root_label)
+            existing_groups.add(root_label)
+            root_targets[root_label] = str(root.get("target") or "").strip()
+            section_root_labels[section_hint] = root_label
+            continue
+        if not root_code:
             continue
         scored_sections: list[tuple[int, int, str]] = []
         for order, (section_label, groups) in enumerate(tree):
@@ -3611,16 +3660,24 @@ def line_section_tree(
     hierarchy_tree: list[tuple[str, list[dict[str, object]]]] = []
     for section_label, groups in tree:
         coded_groups = [(group, code_candidate_text(group)) for group in groups]
-        coded_groups = [(group, code) for group, code in coded_groups if code]
+        coded_groups = [
+            (group, code)
+            for group, code in coded_groups
+            if code or group in root_targets
+        ]
         if not coded_groups:
             hierarchy_tree.append((section_label, []))
             continue
+        code_by_group = dict(coded_groups)
         parent_by_group: dict[str, str] = {}
         for child_group, child_code in coded_groups:
+            if not child_code:
+                continue
             candidates = [
                 (parent_group, parent_code)
                 for parent_group, parent_code in coded_groups
                 if parent_group != child_group
+                and parent_code
                 and parent_code != child_code
                 and _code_expression_contains_expression(parent_code, child_code)
             ]
@@ -3629,6 +3686,12 @@ def line_section_tree(
                     candidates,
                     key=lambda item: (code_depth(item[1]), len(item[1])),
                 )[0]
+
+        section_root = section_root_labels.get(section_label, "")
+        if section_root:
+            for group, _code in coded_groups:
+                if group != section_root and group not in parent_by_group:
+                    parent_by_group[group] = section_root
 
         groups_with_children = set(parent_by_group.values())
         depth_by_group: dict[str, int] = {}
@@ -3643,7 +3706,11 @@ def line_section_tree(
             parent = parent_by_group.get(group)
             if parent:
                 depth = visible_depth(parent, visiting) + 1
-            elif group in groups_with_children or len(coded_groups) == 1 or code_depth(code) == 1:
+            elif (
+                group in groups_with_children
+                or len(coded_groups) == 1
+                or code_depth(code_by_group.get(group, "")) == 1
+            ):
                 depth = 1
             else:
                 depth = 2
@@ -3656,7 +3723,7 @@ def line_section_tree(
                 "label": group,
                 "code": code,
                 "depth": visible_depth(group),
-                "use_subsection_anchor": len(groups) > 1,
+                "use_subsection_anchor": use_subsection_anchor.get(section_label, False),
                 "target": root_targets.get(group, ""),
             })
         hierarchy_tree.append((section_label, nodes))
@@ -4003,6 +4070,7 @@ def write_dashboard_page(
                 page_label,
                 str(row["navigation_root_label"]),
             ),
+            "section_label": str(row.get("navigation_root_section_label") or ""),
         }
         for row in area_rows
         if str(row.get("navigation_root_label") or "").strip()
@@ -5569,6 +5637,17 @@ def render_dashboard(
     for page_info in page_inventory:
         page_key = page_info["page_key"]
         page_label = page_info["page_label"]
+        page_rule = next(
+            (
+                rule
+                for rule in template.get("sector_pages", [])
+                if safe_slug(rule.get("page_key", "")) == page_key
+            ),
+            {},
+        )
+        page_scope_overview_label = str(
+            page_rule.get("page_scope_overview_label", "")
+        ).strip()
         # Bespoke pages own their complete bundle and manifest. They must not
         # first pass through the generic builder and then overwrite its files.
         if page_key == "total_demand":
@@ -5647,7 +5726,28 @@ def render_dashboard(
             if str(value).strip()
         }
         for area_spec in area_specs:
-            chart_key = f"chart__area__{safe_slug(area_spec['aggregate_flow_prefix'])}__{safe_slug(area_spec['aggregate_flow_label'])}"
+            source_aggregate_label = str(area_spec["aggregate_flow_label"])
+            source_root_code = str(area_spec.get("aggregate_flow_prefix") or "").strip()
+            if not source_root_code:
+                source_root_code = code_candidate_text(source_aggregate_label)
+            is_real_page_flow = source_aggregate_label in page_flow_labels
+            subtree_is_page_complete = _flow_subtree_is_page_complete(
+                assigned_df,
+                page_key,
+                source_root_code,
+            )
+            is_complete_page_root = is_real_page_flow and subtree_is_page_complete
+            if not subtree_is_page_complete and page_scope_overview_label:
+                display_aggregate_label = page_scope_overview_label
+            elif is_real_page_flow and not subtree_is_page_complete:
+                display_aggregate_label = page_label
+            else:
+                display_aggregate_label = source_aggregate_label
+            display_area_spec = {
+                **area_spec,
+                "aggregate_flow_label": display_aggregate_label,
+            }
+            chart_key = f"chart__area__{safe_slug(area_spec['aggregate_flow_prefix'])}__{safe_slug(source_aggregate_label)}"
             area_df = area_spec_rows(page_df, area_spec)
             if not area_chart_allowed_for_demand_coverage(
                 page_key,
@@ -5663,7 +5763,7 @@ def render_dashboard(
                 "section_label": "Overview",
                 "chart_type": "stacked_area",
                 "chart_key": chart_key,
-                "common_flow_label": area_spec["aggregate_flow_label"],
+                "common_flow_label": source_aggregate_label,
                 "common_product_label": "All products",
                 "row_count": int(len(area_df)),
                 "source_flow_labels": "; ".join(area_spec["source_flow_labels"]),
@@ -5673,21 +5773,20 @@ def render_dashboard(
             })
             if suppressed:
                 continue
-            figure = build_area_chart(page_df, area_spec, series_labels, template)
+            figure = build_area_chart(page_df, display_area_spec, series_labels, template)
             if not figure.data:
                 manifest_rows[-1]["suppressed"] = True
                 continue
             charts[chart_key] = figure
-            aggregate_flow_label = str(area_spec["aggregate_flow_label"])
             chart_rows.append({
                 "chart_key": chart_key,
                 "chart_type": "stacked_area",
-                "title": aggregate_flow_label,
-                "product_label": aggregate_flow_label,
+                "title": display_aggregate_label,
+                "product_label": display_aggregate_label,
                 "section_label": "Overview",
                 "navigation_root_label": (
-                    aggregate_flow_label
-                    if aggregate_flow_label in page_flow_labels
+                    source_aggregate_label
+                    if is_complete_page_root
                     else ""
                 ),
                 "datasets": chart_dataset_tokens_from_figure(figure),

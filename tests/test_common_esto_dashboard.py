@@ -54,6 +54,7 @@ from codebase.common_esto_dashboard_renderer import (
     _select_total_rows_by_source,
     _non_overlapping_common_row_frontier,
     _non_overlapping_flow_rows,
+    _flow_subtree_is_page_complete,
     _jump_nav_html,
 )
 
@@ -902,6 +903,57 @@ def test_jump_navigation_restores_real_industry_overview_parent() -> None:
     assert 'data-level="2" data-hierarchy-depth="2">14.03 Manufacturing</a>' in html
     assert 'data-level="3" data-hierarchy-depth="3">14.03.01 Iron and steel</a>' in html
     assert 'data-level="3" data-hierarchy-depth="3">14.03.11 Non-specified industry</a>' in html
+
+
+def test_flow_subtree_root_requires_all_descendants_to_share_page() -> None:
+    assigned = pd.DataFrame(
+        [
+            {"common_flow_code": "16", "_page_key": "others"},
+            {"common_flow_code": "16.01-16.02", "_page_key": "buildings"},
+            {"common_flow_code": "16.03", "_page_key": "others"},
+            {"common_flow_code": "14", "_page_key": "industry"},
+            {"common_flow_code": "14.03.01", "_page_key": "industry"},
+        ]
+    )
+
+    assert not _flow_subtree_is_page_complete(assigned, "others", "16")
+    assert _flow_subtree_is_page_complete(assigned, "industry", "14")
+
+
+def test_page_defined_overview_aggregates_parent_renderer_sections() -> None:
+    rows = [
+        {"section_label": "Other transformation (including own use)", "flow_group_label": label}
+        for label in [
+            "09.06 Gas processing plants (including own use)",
+            "09.06.01 Gas works plants (including own use)",
+            "09.12 Non-specified transformation (including own use)",
+        ]
+    ] + [
+        {"section_label": "Other energy-sector own use", "flow_group_label": "10.01.06 Coal mines"},
+    ]
+    roots = [
+        {
+            "label": "Other transformation (including own use)",
+            "section_label": "Other transformation (including own use)",
+            "target": "overview-other_transformation__other_transformation_including_own_use",
+        },
+        {
+            "label": "Other energy-sector own use",
+            "section_label": "Other energy-sector own use",
+            "target": "overview-other_transformation__other_energy_sector_own_use",
+        },
+    ]
+
+    html = _jump_nav_html("Other transformation", line_section_tree(rows, roots))
+
+    assert 'data-level="1" data-hierarchy-depth="1">Other transformation (including own use)</a>' in html
+    assert 'data-level="1" data-hierarchy-depth="1">Other energy-sector own use</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">09.06 Gas processing plants (including own use)</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">09.12 Non-specified transformation (including own use)</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2">10.01.06 Coal mines</a>' in html
+    assert 'data-level="3" data-hierarchy-depth="3">09.06.01 Gas works plants (including own use)</a>' in html
+    assert 'href="#sec-other_transformation__other_energy_sector_own_use"' in html
+    assert 'href="#sec-other_transformation__other_energy_sector_own_use__10_01_06_coal_mines"' not in html
 
 
 def test_jump_navigation_preserves_compound_rollup_containment() -> None:
