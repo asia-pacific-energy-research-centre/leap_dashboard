@@ -1622,6 +1622,89 @@ def _non_overlapping_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
     return result.drop(columns=["_flow_code", "_flow_name", "_is_boundary_adjusted"])
 
 
+def _leaf_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep the deepest available flow categories for each source/scenario.
+
+    This is the inverse of the parent-first aggregate frontier above. It is
+    intended for charts whose categories should expose the hierarchy leaves;
+    callers must still use an authoritative non-overlapping boundary for net
+    total lines.
+    """
+    required = {"common_flow_code", "common_flow_label", "source_system"}
+    if df.empty or not required.issubset(df.columns):
+        return df
+
+    work = df.copy()
+    work["_leaf_row_number"] = range(len(work))
+    context_columns = [
+        column
+        for column in ("comparison_scope", "source_system", "economy", "scenario")
+        if column in work.columns
+    ]
+    grouped_rows = [(None, work)]
+    if context_columns:
+        grouped_rows = list(work.groupby(context_columns, dropna=False, sort=False))
+
+    keep_row_numbers: set[int] = set()
+    for _, context_rows in grouped_rows:
+        categories = context_rows[
+            ["common_flow_code", "common_flow_label"]
+        ].drop_duplicates().copy()
+        categories["_flow_name"] = (
+            categories["common_flow_label"].map(flow_name_without_code)
+            .str.casefold()
+            .str.replace(" (including own use)", "", regex=False)
+            .str.strip()
+        )
+        categories["_is_boundary_adjusted"] = (
+            categories["common_flow_label"].astype(str).str.casefold()
+            .str.contains("including own use", regex=False)
+        )
+
+        preferred_labels: set[str] = set()
+        for _, same_name in categories.groupby("_flow_name", dropna=False):
+            boundary_rows = same_name[same_name["_is_boundary_adjusted"]]
+            candidates = boundary_rows if not boundary_rows.empty else same_name
+            preferred = max(
+                candidates.to_dict("records"),
+                key=lambda row: (
+                    code_depth(row["common_flow_code"]),
+                    str(row["common_flow_code"]),
+                    str(row["common_flow_label"]),
+                ),
+            )
+            preferred_labels.add(str(preferred["common_flow_label"]))
+
+        categories = categories[
+            categories["common_flow_label"].astype(str).isin(preferred_labels)
+        ]
+        leaf_labels: set[str] = set()
+        category_records = categories.to_dict("records")
+        for category in category_records:
+            parent_code = category["common_flow_code"]
+            has_observed_child = any(
+                str(other["common_flow_code"]) != str(parent_code)
+                and _code_expression_contains_expression(
+                    parent_code,
+                    other["common_flow_code"],
+                )
+                for other in category_records
+            )
+            if not has_observed_child:
+                leaf_labels.add(str(category["common_flow_label"]))
+
+        keep_row_numbers.update(
+            context_rows.loc[
+                context_rows["common_flow_label"].astype(str).isin(leaf_labels),
+                "_leaf_row_number",
+            ].astype(int)
+        )
+
+    return work[
+        work["_leaf_row_number"].isin(keep_row_numbers)
+    ].drop(columns=["_leaf_row_number"])
+
+
 def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, object]]:
     """Choose aggregate area charts from the flow hierarchy."""
     nodes = get_existing_flow_nodes(page_df)
@@ -4783,6 +4866,7 @@ def _build_supply_stack_chart(
     fuel_composition_note: str = "Areas show supply fuels",
     stack_prefix: str = "supply",
     preserve_gross_signs: bool = False,
+    total_detail_df: pd.DataFrame | None = None,
 ) -> go.Figure:
     """Build signed composition areas with same-boundary total lines.
 
@@ -4901,7 +4985,8 @@ def _build_supply_stack_chart(
     # Supply total lines, incl. primary LEAP scenarios (see note in
     # _build_td_sector_chart on why the stacked breakdown alone doesn't show
     # a single net total when components have mixed signs).
-    comp_totals = supply_detail_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
+    total_rows = supply_detail_df if total_detail_df is None else total_detail_df
+    comp_totals = total_rows.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     for (src, scen), grp in comp_totals.groupby(["source_system", "scenario"]):
         if not _has_nonzero_values(grp["value"]):
             continue
@@ -4984,6 +5069,7 @@ def select_transformation_overview_rows(
     df: pd.DataFrame,
     config: dict,
     presentation_config: dict,
+    prefer_leaf_flows: bool = False,
 ) -> pd.DataFrame:
     """Select one whole-system transformation/own-use/loss frontier.
 
@@ -5011,6 +5097,8 @@ def select_transformation_overview_rows(
         combined,
         presentation_config,
     )
+    if prefer_leaf_flows:
+        return _non_overlapping_common_row_frontier(_leaf_flow_rows(prepared))
     return _non_overlapping_flow_rows(
         _non_overlapping_common_row_frontier(prepared)
     )
@@ -5120,11 +5208,18 @@ def build_total_demand_page(
     supply_detail_df = assigned_df[supply_detail_mask].copy()
     transformation_config = config.get("transformation_composition", {})
     transformation_df = pd.DataFrame()
+    transformation_flow_df = pd.DataFrame()
     if transformation_config.get("enabled", False):
         transformation_df = select_transformation_overview_rows(
             assigned_df,
             transformation_config,
             template.get("other_transformation_page", {}),
+        )
+        transformation_flow_df = select_transformation_overview_rows(
+            assigned_df,
+            transformation_config,
+            template.get("other_transformation_page", {}),
+            prefer_leaf_flows=True,
         )
     charts: dict[str, go.Figure] = {}
     chart_rows: list[dict] = []
@@ -5189,7 +5284,7 @@ def build_total_demand_page(
             "title": f"{transformation_group} by flow",
             "overview_group": transformation_group,
             "build": lambda: _build_supply_stack_chart(
-                transformation_df,
+                transformation_flow_df,
                 series_labels,
                 primary_source,
                 primary_scenario,
@@ -5204,9 +5299,10 @@ def build_total_demand_page(
                 fuel_composition_note="Areas show fuels across the complete boundary",
                 stack_prefix="transformation",
                 preserve_gross_signs=True,
+                total_detail_df=transformation_df,
             ),
             "total_abs": transformation_total_abs,
-            "row_count": len(transformation_df),
+            "row_count": len(transformation_flow_df),
             "source_flow_labels": "; ".join(transformation_prefixes),
         })
         chart_specs.append({

@@ -137,8 +137,8 @@ def test_each_chart_page_has_unique_scope_guidance(
 def test_refining_scope_explains_the_inclusive_own_use_boundary() -> None:
     script = build_guide_fragments("chart", "refining", "Refining")["script"]
 
-    assert "LEAP does not publish refinery own use separately" in script
-    assert "Standalone 10.01.11 is therefore suppressed" in script
+    assert "LEAP records that own use in the Auxiliary Fuel Use branch" in script
+    assert "show own use separately from refinery inputs" in script
     assert "Other transformation &gt; Transfers" not in script
     assert "Other transformation > Transfers" in script
 
@@ -152,7 +152,8 @@ def test_energy_balance_scope_records_tfec_as_temporarily_disabled() -> None:
     assert "Not currently displayed" in script
     assert "temporarily disabled" in script
     assert "Transformation, transfers, losses and own use" in script
-    assert "shown by flow and by fuel" in script
+    assert "shown by leaf flow and by fuel" in script
+    assert "deepest available non-overlapping flow nodes" in script
 
 
 def test_chart_guide_explains_the_overview_first_review_strategy() -> None:

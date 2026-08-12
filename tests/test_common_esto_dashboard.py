@@ -58,6 +58,7 @@ from codebase.common_esto_dashboard_renderer import (
     _select_total_rows_by_source,
     _non_overlapping_common_row_frontier,
     _non_overlapping_flow_rows,
+    _leaf_flow_rows,
     _flow_subtree_is_page_complete,
     _jump_nav_html,
     _line_sections_html,
@@ -1488,6 +1489,35 @@ def test_transformation_overview_adds_transfers_own_use_and_losses() -> None:
     assert {"08", "10.01.17", "10.02"}.issubset(selected_codes)
 
 
+def test_transformation_overview_leaf_frontier_replaces_parent_flow() -> None:
+    rows = _build_common_esto_rows()
+    parent = rows[
+        rows["common_flow_code"].astype(str).eq("09")
+    ].iloc[0].to_dict()
+    child = {
+        **parent,
+        "common_flow_code": "09.07",
+        "common_flow_label": "09.07 Oil refineries",
+        "common_row_id": "transformation_leaf_09_07",
+    }
+    rows = pd.concat([rows, pd.DataFrame([child])], ignore_index=True, sort=False)
+
+    selected = select_transformation_overview_rows(
+        rows,
+        {"flow_code_prefixes": ["09", "08", "10.01", "10.02"]},
+        {"enabled": True, "append_inclusive_transformation_label": True},
+        prefer_leaf_flows=True,
+    )
+
+    matching_context = selected[
+        selected["source_system"].eq(parent["source_system"])
+        & selected["scenario"].eq(parent["scenario"])
+    ]
+    selected_codes = set(matching_context["common_flow_code"].astype(str))
+    assert "09.07" in selected_codes
+    assert "09" not in selected_codes
+
+
 def test_common_esto_dashboard_can_render_opt_in_scope_pages(tmp_path: Path) -> None:
     template = _load_template()
     template["scope_specific_pages"]["enabled"] = True
@@ -2225,6 +2255,34 @@ def test_transformation_stack_preserves_gross_inputs_and_outputs() -> None:
         if trace.stackgroup and trace.name == "09 Total transformation sector"
     ]
     assert sorted(float(trace.y[0]) for trace in area_traces) == [-8.0, 10.0]
+    net_trace = next(trace for trace in figure.data if trace.name == "LEAP|Target net total")
+    assert list(net_trace.y) == [3.0]
+
+
+def test_transformation_leaf_stack_uses_authoritative_boundary_total() -> None:
+    leaf_rows = pd.DataFrame([{
+        "source_system": "LEAP", "scenario": "Target", "year": 2030,
+        "common_flow_label": "09.07 Oil refineries", "value": -8.0,
+    }])
+    boundary_rows = pd.DataFrame([{
+        "source_system": "LEAP", "scenario": "Target", "year": 2030,
+        "common_flow_label": "09 Total transformation sector", "value": 3.0,
+    }])
+
+    figure = _build_supply_stack_chart(
+        leaf_rows,
+        series_labels={},
+        primary_source="LEAP",
+        primary_scenario="Target",
+        group_col="common_flow_label",
+        chart_title="Transformation by flow",
+        total_line_suffix="net total",
+        composition_subject="flow",
+        stack_prefix="transformation",
+        preserve_gross_signs=True,
+        total_detail_df=boundary_rows,
+    )
+
     net_trace = next(trace for trace in figure.data if trace.name == "LEAP|Target net total")
     assert list(net_trace.y) == [3.0]
 

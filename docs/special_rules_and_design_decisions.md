@@ -169,10 +169,12 @@ The former Total demand page is presented as the Energy balance overview. It
 shows paired composition charts by sector/flow and fuel for final demand,
 supply, and the whole transformation boundary. The transformation boundary
 contains all flow-09 sectors, transfers (08), energy-sector own use (10.01),
-and transmission/distribution losses (10.02). Shared hierarchy-frontier rules
-remove parent/child and inclusive-own-use overlap. Signed areas preserve gross
-positive outputs and negative inputs, transfers, own use and losses; the line
-shows their net. TFEC remains temporarily disabled under DASH-010 until
+and transmission/distribution losses (10.02). The by-flow chart selects the
+deepest available non-overlapping flow nodes for each source and scenario, so
+an available child replaces its uppermost parent in the area legend. The net
+lines and by-fuel chart retain the authoritative whole-boundary frontier.
+Signed areas preserve gross positive outputs and negative inputs, transfers,
+own use and losses; the line shows their net. TFEC remains temporarily disabled under DASH-010 until
 non-energy use can be separated from aggregated Other-sector LEAP demand.
 
 When a selected comparison basis has no detailed projection source, composition
@@ -184,8 +186,9 @@ that projected composition detail is unavailable.
 
 Confirm the overview manifest contains
 `chart__area__total_demand__transformation_flow` and
-`chart__area__total_demand__transformation_fuel`. The flow chart must retain
-flow 09 as well as 08, 10.01 and 10.02, and a category containing both positive
+`chart__area__total_demand__transformation_fuel`. The flow chart must replace
+an upper flow-09 parent with its available leaf descendants while retaining
+the leaf frontiers under 08, 10.01 and 10.02. A category containing both positive
 and negative facts must retain both signed area fragments. In aggregate-only
 LEAP demand scopes, Reference and Target views must still retain ESTO historical
 composition through the base year.
@@ -197,6 +200,8 @@ composition through the base year.
 - 2026-08-12: Replaced the single transformation net chart with paired signed
   composition charts covering transformation, transfers, losses and own use;
   retained ESTO historical composition when projection detail is unavailable.
+- 2026-08-12: Changed the by-flow areas to the deepest available flow frontier
+  while keeping net lines and the by-fuel chart on the whole boundary.
 
 ## DASH-006: Rollup modes appear inside the hierarchy tree
 
