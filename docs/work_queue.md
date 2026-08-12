@@ -18,6 +18,12 @@ was built from repository evidence on 2026-07-28: local `master` versus
 commit history, a relative-link check over all tracked Markdown, and direct
 inspection of the current upstream mapping artifacts.
 
+## Post-snapshot completion on 2026-08-12
+
+- Distinguish an app build that omitted native-source provenance files from a
+  genuinely stale or incomplete supplied map. The guide now avoids implying
+  that visible categories are unmapped when no provenance input was provided.
+
 ## Post-snapshot completions on 2026-07-28
 
 These later commits supersede the corresponding snapshot rows below:

@@ -1364,6 +1364,29 @@ def test_mapping_guide_table_flags_mismatched_provenance_generation() -> None:
     assert "Regenerate the comparison data and mapping files together" in table["note"]
 
 
+def test_mapping_guide_table_explains_when_provenance_files_were_not_supplied() -> None:
+    chart_rows = [
+        {
+            "chart_type": "line",
+            "flow_group_label": "08 Transfers",
+            "product_label": "07.01 Motor gasoline",
+            "common_row_id": "transfers_motor_gasoline",
+        }
+    ]
+
+    table = guide_page_mapping_table(
+        chart_rows,
+        None,
+        "esto_leap_ninth",
+        source_systems=["LEAP", "ESTO", "NINTH"],
+    )
+
+    assert table["rows"][0][2:] == ["Provenance unavailable*"] * 6
+    assert "were not included in this app build" in table["note"]
+    assert "does not mean these categories are unmapped" in table["note"]
+    assert "Regenerate the comparison data" not in table["note"]
+
+
 def test_source_category_map_combines_native_and_esto_mappings(tmp_path: Path) -> None:
     source_path = tmp_path / "source_to_common.csv"
     esto_path = tmp_path / "esto_to_common.csv"

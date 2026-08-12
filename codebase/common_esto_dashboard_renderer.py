@@ -3942,6 +3942,7 @@ def guide_page_mapping_table(
     source_systems: list[str] | None = None,
 ) -> dict[str, object]:
     """Build a native-source provenance table for visible detail charts."""
+    provenance_maps_supplied = source_category_map is not None
     mapping = (
         source_category_map.copy()
         if source_category_map is not None
@@ -4019,7 +4020,13 @@ def guide_page_mapping_table(
         )
 
     note = ""
-    if unavailable_row_count:
+    if unavailable_row_count and not provenance_maps_supplied:
+        note = (
+            "* Native-source provenance files were not included in this app build, "
+            "so source details cannot be shown. This does not mean these categories "
+            "are unmapped."
+        )
+    elif unavailable_row_count:
         category_word = "category was" if unavailable_row_count == 1 else "categories were"
         note = (
             f"* {unavailable_row_count} displayed {category_word} not found in the "

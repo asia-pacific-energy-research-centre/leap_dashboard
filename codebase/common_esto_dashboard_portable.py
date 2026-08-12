@@ -153,9 +153,13 @@ def render_common_esto_dashboard(
     )
     template["_active_comparison_scope"] = comparison_scope
     series_config = json.loads(Path(series_config_path).read_text(encoding="utf-8"))
-    source_category_map = load_source_category_map(
-        Path(source_to_common_map_path) if source_to_common_map_path is not None else None,
-        Path(esto_to_common_map_path) if esto_to_common_map_path is not None else None,
+    source_category_map = (
+        load_source_category_map(
+            Path(source_to_common_map_path) if source_to_common_map_path is not None else None,
+            Path(esto_to_common_map_path) if esto_to_common_map_path is not None else None,
+        )
+        if source_to_common_map_path is not None or esto_to_common_map_path is not None
+        else None
     )
 
     raw_df = load_common_esto_data(
