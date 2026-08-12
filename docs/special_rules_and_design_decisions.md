@@ -1056,9 +1056,15 @@ scope, exclude them from normal area and line generation, and show one grouped
 bar chart per flow using the configured base year. Fuels are on the x-axis and
 ESTO and LEAP are the comparison series. Label this two-source boundary on the
 chart. The 9th Outlook does not report these rows, so its absence is unavailable
-data rather than zero. Do not source or map the rows directly in the dashboard.
+data rather than zero. For Statistical discrepancy only, multiply the LEAP
+values by `-1` in the rendered bar chart so its displayed sign aligns with ESTO.
+This is a sign flip, not an absolute-value transform, and does not modify the
+upstream comparison fact. Do not source or map the rows directly in the dashboard.
 
 ### History
+
+- 2026-08-12: Flipped the displayed LEAP Statistical discrepancy sign without
+  changing ESTO, Stock changes, or upstream values.
 
 - 2026-08-12: Activated the upstream `esto_leap` balancing-flow boundary and
   labelled the base-year bars as ESTO and LEAP only.

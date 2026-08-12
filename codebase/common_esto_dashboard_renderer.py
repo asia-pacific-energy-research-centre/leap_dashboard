@@ -2629,6 +2629,7 @@ def build_base_year_product_bar(
     series_labels: dict[str, str],
     base_year: int,
     comparison_scope_label: str = "",
+    source_value_multipliers: dict[str, float] | None = None,
 ) -> go.Figure:
     """Build a grouped fuel bar chart for one base-year-only balance flow."""
     base_df = chart_df[chart_df["year"] == base_year].copy()
@@ -2639,11 +2640,14 @@ def build_base_year_product_bar(
     for (source_system, scenario), group in base_df.groupby(
         ["source_system", "scenario"], dropna=False
     ):
+        source_key = str(source_system).strip().upper()
+        multiplier = float((source_value_multipliers or {}).get(source_key, 1.0))
         grouped = (
             group.groupby("common_product_label", as_index=False, dropna=False)["value"]
             .sum()
             .sort_values("common_product_label")
         )
+        grouped["value"] = grouped["value"] * multiplier
         if grouped.empty or not _has_nonzero_values(grouped["value"]):
             continue
         label = series_label(group.iloc[0], series_labels)
@@ -2697,6 +2701,7 @@ def _build_supply_base_year_bar_charts(
     comparison_scope: str = "",
     comparison_scope_label: str = "",
     ordinary_page_df: pd.DataFrame | None = None,
+    source_value_multipliers_by_flow: dict[str, dict[str, float]] | None = None,
 ) -> tuple[dict[str, go.Figure], list[dict], list[dict], pd.DataFrame]:
     """Build base-year bars and return rows left for ordinary chart generation."""
     configured_codes = {canonical_code(value) for value in flow_codes if canonical_code(value)}
@@ -2757,6 +2762,14 @@ def _build_supply_base_year_bar_charts(
             series_labels,
             base_year,
             comparison_scope_label=comparison_scope_label,
+            source_value_multipliers={
+                str(source).strip().upper(): float(multiplier)
+                for source, multiplier in (
+                    (source_value_multipliers_by_flow or {}).get(
+                        canonical_code(flow_label), {}
+                    )
+                ).items()
+            },
         )
         if not figure.data:
             manifest_rows[-1]["suppressed"] = True
@@ -5806,6 +5819,9 @@ def render_dashboard(
                         supply_config.get("base_year_bar_scope_label", "")
                     ).strip(),
                     ordinary_page_df=page_df,
+                    source_value_multipliers_by_flow=dict(
+                        supply_config.get("base_year_bar_source_value_multipliers", {})
+                    ),
                 )
             )
             charts.update(bar_charts)

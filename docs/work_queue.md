@@ -198,8 +198,11 @@ These later commits supersede the corresponding snapshot rows below:
   the upstream `esto_leap` scope, and the default dashboard now reads that
   declared scope for these charts while retaining `esto_leap_ninth` for its
   ordinary Supply series. Charts state that they compare ESTO and LEAP only;
-  missing 9th Outlook rows are not treated as zero. Complete the production
-  mapping and dashboard rerun before marking this item verified.
+  missing 9th Outlook rows are not treated as zero. The Statistical discrepancy
+  chart multiplies LEAP values by `-1` at display time to align its sign with
+  ESTO, without changing upstream values or applying an absolute-value transform.
+  Complete the production mapping and dashboard rerun before marking this item
+  verified.
 
 - **DASHQ-049 is `complete_on_master`.** Every anchor context matched by the
   active upstream exception set is omitted from the default paired-tree issue

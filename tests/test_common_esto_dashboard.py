@@ -1,6 +1,8 @@
+import base64
 import json
 import re
 import copy
+import struct
 from pathlib import Path
 
 import pandas as pd
@@ -3093,7 +3095,8 @@ def test_supply_balancing_flows_use_base_year_bar_charts() -> None:
                 ("LEAP", "Target", 2022, "06", "06 Stock changes", "01", "01 Coal", 7.0),
                 ("LEAP", "Target", 2030, "06", "06 Stock changes", "01", "01 Coal", 99.0),
                 ("ESTO", "historical", 2022, "11", "11 Statistical discrepancy", "17", "17 Electricity", -3.0),
-                ("LEAP", "Target", 2022, "11", "11 Statistical discrepancy", "17", "17 Electricity", -4.0),
+                ("LEAP", "Target", 2022, "11", "11 Statistical discrepancy", "17", "17 Electricity", 4.0),
+                ("LEAP", "Reference", 2022, "11", "11 Statistical discrepancy", "17", "17 Electricity", -2.0),
                 ("LEAP", "Target", 2030, "01", "01 Production", "01", "01 Coal", 100.0),
             ]
         ]
@@ -3110,9 +3113,14 @@ def test_supply_balancing_flows_use_base_year_bar_charts() -> None:
         primary_scenario="Target",
         comparison_source="ESTO",
         ninth_source="NINTH",
-        series_labels={"ESTO|historical": "ESTO historical", "LEAP|Target": "LEAP Target"},
+        series_labels={
+            "ESTO|historical": "ESTO historical",
+            "LEAP|Reference": "LEAP Reference",
+            "LEAP|Target": "LEAP Target",
+        },
         comparison_scope="esto_leap",
         comparison_scope_label="ESTO and LEAP only",
+        source_value_multipliers_by_flow={"11": {"LEAP": -1}},
     )
 
     assert set(charts) == {
@@ -3124,6 +3132,22 @@ def test_supply_balancing_flows_use_base_year_bar_charts() -> None:
     assert set(remaining_rows["common_flow_code"]) == {"01"}
     stock_chart = charts["chart__bar__base_year__supply__06_stock_changes"]
     assert {value for trace in stock_chart.data for value in trace.y} == {5.0, 7.0}
+    discrepancy_chart = charts[
+        "chart__bar__base_year__supply__11_statistical_discrepancy"
+    ]
+    discrepancy_values = {
+        trace.name: list(trace.y)
+        for trace in discrepancy_chart.data
+    }
+    assert discrepancy_values == {
+        "ESTO historical": [-3.0],
+        "LEAP Reference": [2.0],
+        "LEAP Target": [-4.0],
+    }
+    assert rows.loc[
+        rows["source_system"].eq("LEAP") & rows["common_flow_code"].eq("11"),
+        "value",
+    ].tolist() == [4.0, -2.0]
     assert "ESTO and LEAP only" in stock_chart.layout.title.text
     assert {row["data_comparison_scope"] for row in manifest_rows} == {"esto_leap"}
 
@@ -3203,6 +3227,25 @@ def test_supply_balancing_bars_use_estoleap_scope_on_default_dashboard(
         figure = bundle[chart_key]
         assert "ESTO and LEAP only" in figure["layout"]["title"]["text"]
         assert all("9th" not in trace["name"] for trace in figure["data"])
+    discrepancy_figure = bundle[
+        "chart__bar__base_year__supply__11_statistical_discrepancy"
+    ]
+
+    def decoded_y_values(trace: dict) -> list[float]:
+        encoded = trace["y"]
+        if isinstance(encoded, list):
+            return encoded
+        raw_values = base64.b64decode(encoded["bdata"])
+        return list(struct.unpack(f"<{len(raw_values) // 8}d", raw_values))
+
+    discrepancy_values = {
+        trace["name"]: decoded_y_values(trace)
+        for trace in discrepancy_figure["data"]
+    }
+    assert discrepancy_values == {
+        "ESTO Historical": [4.0],
+        "LEAP Target": [-5.0],
+    }
 
 
 def test_chart_chrome_resolves_duplicate_configured_category_colours() -> None:
