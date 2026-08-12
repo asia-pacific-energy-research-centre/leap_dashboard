@@ -93,6 +93,39 @@ def safe_slug(value: object) -> str:
     return text.strip("_") or "item"
 
 
+_PUBLIC_PAGE_FILES = {
+    "total_demand": "energy_balance_overview.html",
+    "others": "other_demand.html",
+}
+
+
+def page_file_name(page_key: object) -> str:
+    """Return the public HTML filename for an internal dashboard page key."""
+    clean_key = safe_slug(page_key)
+    return _PUBLIC_PAGE_FILES.get(clean_key, f"{clean_key}.html")
+
+
+def write_legacy_page_redirect(
+    dashboards_directory: Path,
+    page_key: object,
+) -> None:
+    """Keep old generated links working after a public page-file rename."""
+    clean_key = safe_slug(page_key)
+    public_file = page_file_name(clean_key)
+    legacy_file = f"{clean_key}.html"
+    if legacy_file == public_file or not (dashboards_directory / public_file).is_file():
+        return
+    (dashboards_directory / legacy_file).write_text(
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+        f"<meta http-equiv=\"refresh\" content=\"0; url={escape(public_file)}\">"
+        f"<link rel=\"canonical\" href=\"{escape(public_file)}\">"
+        "<title>Opening dashboard</title></head><body>"
+        f"<a href=\"{escape(public_file)}\">Open the dashboard</a>"
+        "</body></html>",
+        encoding="utf-8",
+    )
+
+
 def load_json(path: Path) -> dict:
     """Read a JSON file."""
     return json.loads(path.read_text(encoding="utf-8"))
@@ -5427,7 +5460,7 @@ def build_total_demand_page(
         {"page_key": "total_demand", "page_label": page_label},
         chart_rows=chart_rows,
         bundle_js_name=bundle_name.replace(".json", ".js"),
-        output_path=layout["dashboards"] / "total_demand.html",
+        output_path=layout["dashboards"] / page_file_name("total_demand"),
         all_pages=all_pages,
         economy_label=economy_label,
         dashboard_switcher=dashboard_switcher,
@@ -5436,7 +5469,7 @@ def build_total_demand_page(
         **category_basis_ui_kwargs(template),
     )
     page_row = {
-        "file": "total_demand.html", "label": page_label,
+        "file": page_file_name("total_demand"), "label": page_label,
         "area_chart_count": sum(row["chart_type"] == "stacked_area" for row in chart_rows),
         "summary_chart_count": 0,
         "line_chart_count": sum(row["chart_type"] == "line" for row in chart_rows),
@@ -5648,7 +5681,7 @@ def build_scope_specific_pages(
 
         bundle_name = f"{page_key}__charts.json"
         write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
-        page_file = f"{page_key}.html"
+        page_file = page_file_name(page_key)
         write_dashboard_page(
             {"page_key": page_key, "page_label": page_label},
             chart_rows=chart_rows,
@@ -5852,7 +5885,7 @@ def render_dashboard(
         overview_label = str(
             template.get("total_demand_page", {}).get("page_label", "Energy balance overview")
         )
-        page_inventory.append({"page_key": "total_demand", "page_label": overview_label, "file": "total_demand.html"})
+        page_inventory.append({"page_key": "total_demand", "page_label": overview_label, "file": page_file_name("total_demand")})
     hidden_page_keys = {
         str(key) for key in template.get("leap_demand_sector_coverage", {}).get("_hidden_page_keys", [])
     }
@@ -5872,7 +5905,7 @@ def render_dashboard(
             continue
         page_label = str(meta["_page_label"])
         if not assigned_df[assigned_df["_page_key"] == meta["_page_key"]].empty:
-            page_inventory.append({"page_key": page_key, "page_label": page_label, "file": f"{page_key}.html"})
+            page_inventory.append({"page_key": page_key, "page_label": page_label, "file": page_file_name(page_key)})
 
     for secondary_key, secondary_page in secondary_pages_by_key.items():
         secondary_mask = _configured_scope_page_mask(assigned_df, secondary_page)
@@ -5896,7 +5929,7 @@ def render_dashboard(
                 page_inventory.append({
                     "page_key": scope_page_key,
                     "page_label": scope_page_label,
-                    "file": f"{scope_page_key}.html",
+                    "file": page_file_name(scope_page_key),
                 })
 
     # The Emissions page is derived from the demand pages above, so it must be
@@ -5907,7 +5940,7 @@ def render_dashboard(
         page_inventory.append({
             "page_key": emissions_page_key,
             "page_label": str(emissions_config.get("page_label", "Emissions")),
-            "file": f"{emissions_page_key}.html",
+            "file": page_file_name(emissions_page_key),
         })
 
     for page in additional_pages or []:
@@ -5916,7 +5949,7 @@ def render_dashboard(
             page_inventory.append({
                 "page_key": page_key,
                 "page_label": str(page.get("page_label", page_key)),
-                "file": str(page.get("file", f"{page_key}.html")),
+                "file": str(page.get("file", page_file_name(page_key))),
             })
 
     manifest_rows: list[dict[str, object]] = []
@@ -6225,7 +6258,7 @@ def render_dashboard(
             continue
         bundle_name = f"{page_key}__charts.json"
         write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
-        page_file = f"{page_key}.html"
+        page_file = page_file_name(page_key)
         write_dashboard_page(
             {"page_key": page_key, "page_label": page_label},
             chart_rows=chart_rows,
@@ -6267,6 +6300,9 @@ def render_dashboard(
     manifest_rows.extend(td_manifest_rows)
     if td_page_row:
         page_rows.append(td_page_row)
+
+    for legacy_page_key in _PUBLIC_PAGE_FILES:
+        write_legacy_page_redirect(layout["dashboards"], legacy_page_key)
 
     emissions_manifest_rows: list[dict] = []
     emissions_page_row: dict | None = None

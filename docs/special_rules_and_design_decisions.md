@@ -214,6 +214,9 @@ composition through the base year.
   retained ESTO historical composition when projection detail is unavailable.
 - 2026-08-12: Changed the by-flow areas to the deepest available flow frontier
   while keeping net lines and the by-fuel chart on the whole boundary.
+- 2026-08-12: Aligned public page URLs with their visible names:
+  `energy_balance_overview.html` and `other_demand.html`. The former
+  `total_demand.html` and `others.html` paths remain generated redirects.
 
 ## DASH-006: Rollup modes appear inside the hierarchy tree
 

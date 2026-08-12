@@ -37,6 +37,7 @@ from codebase.common_esto_dashboard_renderer import (
     chart_dataset_tokens_from_figure,
     code_expression_matches_prefix,
     page_keys_without_required_source,
+    page_file_name,
     color_for_code,
     color_for_plotting_name,
     drop_excluded_flow_rows,
@@ -456,6 +457,17 @@ def test_common_esto_dashboard_renders_core_pages_by_default(tmp_path: Path) -> 
     assert "chart__area__total_demand__transformation_fuel" in overview_chart_keys
     assert "chart__line__total_transformation_no_transfers" not in overview_chart_keys
     assert set(overview_rows["page_label"]) == {"Energy balance overview"}
+    assert page_file_name("total_demand") == "energy_balance_overview.html"
+    assert page_file_name("others") == "other_demand.html"
+    assert (layout["dashboards"] / "energy_balance_overview.html").exists()
+    overview_redirect = (layout["dashboards"] / "total_demand.html").read_text(
+        encoding="utf-8"
+    )
+    assert "url=energy_balance_overview.html" in overview_redirect
+    transport_html = (layout["dashboards"] / "transport.html").read_text(
+        encoding="utf-8"
+    )
+    assert 'href="energy_balance_overview.html"' in transport_html
     for bundle_path in layout["chart_bundles"].glob("*__charts.json"):
         page_key = bundle_path.name.removesuffix("__charts.json")
         bundle_keys = set(json.loads(bundle_path.read_text(encoding="utf-8"))["charts"])
