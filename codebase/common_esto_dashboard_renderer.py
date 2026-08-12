@@ -134,6 +134,12 @@ def stacked_area_dataset_note(sources: set[str], subject: str) -> str:
     """Describe the dataset(s) contributing the stacked traces."""
     if not sources:
         return "Stacked areas: no detailed dataset available."
+    normalized_sources = {str(source).strip().upper() for source in sources}
+    if normalized_sources == {"ESTO"}:
+        return (
+            f"Stacked areas: ESTO historical {subject} detail through the base year; "
+            "no detailed projection dataset is available."
+        )
     names = ", ".join(dataset_display_name(source) for source in sorted(sources))
     return f"Stacked areas: {names} {subject} detail for the selected scenario."
 
@@ -1242,13 +1248,18 @@ def _comparison_projection_area_rows(
         selected_source = source_name
         projected = source_rows
         break
-    if not selected_source:
-        return df.iloc[0:0].copy(), ""
-
     historical = df[
         source_column.eq(comparison_source.casefold())
         & df["year"].le(base_year)
     ].copy()
+    if not selected_source:
+        # A two-way LEAP+ESTO basis can legitimately have only an aggregate
+        # LEAP projection (for example All demand aggregated in China). Keep
+        # the real ESTO composition through the base year instead of blanking
+        # the entire area chart; the aggregate LEAP total line remains visible
+        # after the base year and the chart note explains the missing detail.
+        return historical, comparison_source if not historical.empty else ""
+
     projected_gross = pd.to_numeric(projected[value_col], errors="coerce").fillna(0.0).abs()
     historical_gross = pd.to_numeric(historical[value_col], errors="coerce").fillna(0.0).abs()
     projected_active = projected.assign(_gross_value=projected_gross).groupby(
@@ -4766,8 +4777,14 @@ def _build_supply_stack_chart(
     group_col: str,
     chart_title: str,
     base_year: int | None = None,
+    total_line_suffix: str = "supply total",
+    composition_subject: str = "supply",
+    flow_composition_note: str = "Areas show production, imports and exports",
+    fuel_composition_note: str = "Areas show supply fuels",
+    stack_prefix: str = "supply",
+    preserve_gross_signs: bool = False,
 ) -> go.Figure:
-    """Build available supply composition with same-side supply totals.
+    """Build signed composition areas with same-boundary total lines.
 
     `group_col` is "common_flow_label" for a by-component
     (Production/Imports/Exports, ...) breakdown or
@@ -4793,10 +4810,23 @@ def _build_supply_stack_chart(
         )
 
     default_rows, _ = stack_source(primary_scenario)
-    group_totals = (
-        default_rows.groupby(group_col)["value"].sum().abs()
-        .sort_values(ascending=False).index.tolist()
-    )
+    if preserve_gross_signs:
+        group_totals = (
+            default_rows.assign(
+                _gross_value=pd.to_numeric(
+                    default_rows["value"], errors="coerce"
+                ).fillna(0.0).abs()
+            )
+            .groupby(group_col)["_gross_value"]
+            .sum()
+            .sort_values(ascending=False)
+            .index.tolist()
+        )
+    else:
+        group_totals = (
+            default_rows.groupby(group_col)["value"].sum().abs()
+            .sort_values(ascending=False).index.tolist()
+        )
 
     for scenario_name in ("Reference", "Target"):
         scenario_df, stack_source_name = stack_source(scenario_name)
@@ -4806,29 +4836,63 @@ def _build_supply_stack_chart(
         if (scenario_df["source_system"].astype(str).str.casefold() == "esto").any():
             stacked_sources.add("ESTO")
         stacked_sources.add(stack_source_name)
-        group_by_year = scenario_df.groupby([group_col, "year"], as_index=False)["value"].sum()
+        if preserve_gross_signs:
+            signed_scenario_df = scenario_df.copy()
+            signed_values = pd.to_numeric(
+                signed_scenario_df["value"], errors="coerce"
+            ).fillna(0.0)
+            signed_scenario_df["_positive_value"] = signed_values.clip(lower=0.0)
+            signed_scenario_df["_negative_value"] = signed_values.clip(upper=0.0)
+            group_by_year = signed_scenario_df.groupby(
+                [group_col, "year"], as_index=False
+            )[["_positive_value", "_negative_value"]].sum()
+        else:
+            group_by_year = scenario_df.groupby(
+                [group_col, "year"], as_index=False
+            )["value"].sum()
         for group_value in group_totals:
             grp = group_by_year[group_by_year[group_col] == group_value].sort_values("year")
             if grp.empty:
                 continue
-            if not _has_nonzero_values(grp["value"]):
-                continue
             lbl = str(group_value)
-            trace_count = _add_signed_stack_traces(
-                fig=fig,
-                x_values=grp["year"],
-                y_values=grp["value"],
-                stackgroup_prefix=f"supply_{scenario_toggle_tag(stack_source_name, scenario_name)}",
-                trace_name=lbl,
-                visible=is_default,
-                hovertemplate=(
-                    "%{x}<br>%{y:,.2f}"
-                    + chart_unit
-                    + "<extra>"
-                    + escape(lbl)
-                    + "</extra>"
-                ),
+            hovertemplate = (
+                "%{x}<br>%{y:,.2f}"
+                + chart_unit
+                + "<extra>"
+                + escape(lbl)
+                + "</extra>"
             )
+            if preserve_gross_signs:
+                trace_count = _add_preseparated_signed_stack_traces(
+                    fig=fig,
+                    x_values=grp["year"],
+                    signed_parts=[
+                        ("pos", grp["_positive_value"]),
+                        ("neg", grp["_negative_value"]),
+                    ],
+                    stackgroup_prefix=(
+                        f"{stack_prefix}_"
+                        f"{scenario_toggle_tag(stack_source_name, scenario_name)}"
+                    ),
+                    trace_name=lbl,
+                    visible=is_default,
+                    hovertemplate=hovertemplate,
+                )
+            else:
+                if not _has_nonzero_values(grp["value"]):
+                    continue
+                trace_count = _add_signed_stack_traces(
+                    fig=fig,
+                    x_values=grp["year"],
+                    y_values=grp["value"],
+                    stackgroup_prefix=(
+                        f"{stack_prefix}_"
+                        f"{scenario_toggle_tag(stack_source_name, scenario_name)}"
+                    ),
+                    trace_name=lbl,
+                    visible=is_default,
+                    hovertemplate=hovertemplate,
+                )
             trace_meta.extend(
                 trace_meta_entry(stack_source_name, scenario_name, True)
                 for _ in range(trace_count)
@@ -4841,7 +4905,7 @@ def _build_supply_stack_chart(
     for (src, scen), grp in comp_totals.groupby(["source_system", "scenario"]):
         if not _has_nonzero_values(grp["value"]):
             continue
-        lbl = series_label_from_values(src, scen, series_labels) + " supply total"
+        lbl = series_label_from_values(src, scen, series_labels) + f" {total_line_suffix}"
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
             mode="lines+markers", name=lbl, line={"dash": "dash"},
@@ -4850,9 +4914,9 @@ def _build_supply_stack_chart(
         trace_meta.append(trace_meta_entry(src, scen, True))
 
     composition_note = (
-        "Areas show production, imports and exports"
+        flow_composition_note
         if group_col == "common_flow_label"
-        else "Areas show supply fuels"
+        else fuel_composition_note
     )
     fig.update_layout(
         title=chart_title,
@@ -4863,8 +4927,8 @@ def _build_supply_stack_chart(
         meta={
             "trace_meta": trace_meta,
             "stacked_area_note": (
-                f"{composition_note}; lines show available supply totals by dataset and scenario. "
-                + stacked_area_dataset_note(stacked_sources, "supply")
+                f"{composition_note}; lines show signed net totals by dataset and scenario. "
+                + stacked_area_dataset_note(stacked_sources, composition_subject)
             ),
         },
     )
@@ -4916,39 +4980,40 @@ def select_transformation_total_rows(df: pd.DataFrame, config: dict) -> pd.DataF
     return df[selection_mask].copy()
 
 
-def _build_transformation_total_chart(
-    transformation_df: pd.DataFrame,
-    series_labels: dict[str, str],
-    base_year: int | None = None,
-) -> go.Figure:
-    """Build the signed no-transfers transformation total comparison."""
-    chart_unit = _chart_unit(transformation_df)
-    fig = go.Figure()
-    trace_meta: list[dict] = []
-    totals = transformation_df.groupby(
-        ["source_system", "scenario", "year"], as_index=False
-    )["value"].sum()
-    for (source_system, scenario), group in totals.groupby(["source_system", "scenario"]):
-        label = series_label_from_values(source_system, scenario, series_labels)
-        ordered = group.sort_values("year")
-        fig.add_trace(go.Scatter(
-            x=ordered["year"],
-            y=ordered["value"],
-            mode="lines+markers",
-            name=label,
-            hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(label) + "</extra>",
-        ))
-        trace_meta.append(trace_meta_entry(source_system, scenario, True))
-    fig.update_layout(
-        title="Total transformation sector (excluding transfers)",
-        xaxis_title="Year",
-        yaxis_title=f"Signed energy balance ({chart_unit})",
-        margin={"l": 64, "r": 28, "t": 84, "b": 160},
-        legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
-        meta={"trace_meta": trace_meta},
+def select_transformation_overview_rows(
+    df: pd.DataFrame,
+    config: dict,
+    presentation_config: dict,
+) -> pd.DataFrame:
+    """Select one whole-system transformation/own-use/loss frontier.
+
+    Select every row under the declared flow-code roots, then apply the same
+    inclusive-own-use presentation policy used by Other transformation and the
+    shared non-overlapping hierarchy frontiers. This works even when optional
+    source-aggregate rollup metadata is unavailable in one comparison scope.
+    """
+    flow_code_prefixes = [
+        str(value).strip()
+        for value in config.get(
+            "flow_code_prefixes",
+            ["09", "08", "10.01", "10.02"],
+        )
+        if str(value).strip()
+    ]
+    overview_mask = df["common_flow_code"].apply(
+        lambda value: code_expression_matches_any_prefix(value, flow_code_prefixes)
     )
-    apply_chart_chrome(fig, base_year)
-    return fig
+    combined = df[overview_mask].copy()
+    if combined.empty:
+        return combined
+    prepared = prepare_other_transformation_page_rows(
+        combined,
+        combined,
+        presentation_config,
+    )
+    return _non_overlapping_flow_rows(
+        _non_overlapping_common_row_frontier(prepared)
+    )
 
 
 def _build_balance_flow_total_chart(
@@ -5007,7 +5072,7 @@ def build_total_demand_page(
     - Final energy demand by fuel, with authoritative TFC total lines
     - Energy supply by component, with available-supply total lines
     - Energy supply by fuel, with available-supply total lines
-    - Total transformation excluding transfers, when configured rollup metadata exists
+    - Transformation, transfers, losses and own use by flow and by fuel
 
     Available supply is the signed sum of configured supply codes 01, 02 and 03
     (Production + Imports - Exports). Bunkers, stock changes and TFC demand are
@@ -5053,6 +5118,14 @@ def build_total_demand_page(
         lambda c: code_expression_matches_any_prefix(c, supply_codes)
     )
     supply_detail_df = assigned_df[supply_detail_mask].copy()
+    transformation_config = config.get("transformation_composition", {})
+    transformation_df = pd.DataFrame()
+    if transformation_config.get("enabled", False):
+        transformation_df = select_transformation_overview_rows(
+            assigned_df,
+            transformation_config,
+            template.get("other_transformation_page", {}),
+        )
     charts: dict[str, go.Figure] = {}
     chart_rows: list[dict] = []
     manifest_rows: list[dict] = []
@@ -5105,6 +5178,62 @@ def build_total_demand_page(
             "source_flow_labels": "; ".join(supply_codes),
         })
 
+    if not transformation_df.empty:
+        transformation_total_abs = float(transformation_df["value"].abs().sum())
+        transformation_group = "Transformation, transfers, losses and own use"
+        transformation_prefixes = transformation_config.get(
+            "flow_code_prefixes", ["09", "08", "10.01", "10.02"]
+        )
+        chart_specs.append({
+            "chart_key": "chart__area__total_demand__transformation_flow",
+            "title": f"{transformation_group} by flow",
+            "overview_group": transformation_group,
+            "build": lambda: _build_supply_stack_chart(
+                transformation_df,
+                series_labels,
+                primary_source,
+                primary_scenario,
+                group_col="common_flow_label",
+                chart_title=f"{transformation_group} by flow",
+                base_year=base_year,
+                total_line_suffix="transformation/transfer/loss/own-use net total",
+                composition_subject="flow",
+                flow_composition_note=(
+                    "Areas show signed transformation, transfer, own-use and loss flows"
+                ),
+                fuel_composition_note="Areas show fuels across the complete boundary",
+                stack_prefix="transformation",
+                preserve_gross_signs=True,
+            ),
+            "total_abs": transformation_total_abs,
+            "row_count": len(transformation_df),
+            "source_flow_labels": "; ".join(transformation_prefixes),
+        })
+        chart_specs.append({
+            "chart_key": "chart__area__total_demand__transformation_fuel",
+            "title": f"{transformation_group} by fuel",
+            "overview_group": transformation_group,
+            "build": lambda: _build_supply_stack_chart(
+                transformation_df,
+                series_labels,
+                primary_source,
+                primary_scenario,
+                group_col="common_product_label",
+                chart_title=f"{transformation_group} by fuel",
+                base_year=base_year,
+                total_line_suffix="transformation/transfer/loss/own-use net total",
+                composition_subject="fuel",
+                flow_composition_note=(
+                    "Areas show signed transformation, transfer, own-use and loss flows"
+                ),
+                fuel_composition_note="Areas show fuels across the complete boundary",
+                stack_prefix="transformation",
+                preserve_gross_signs=True,
+            ),
+            "total_abs": transformation_total_abs,
+            "row_count": len(transformation_df),
+            "source_flow_labels": "; ".join(transformation_prefixes),
+        })
     for spec in chart_specs:
         chart_key = spec["chart_key"]
         fig = spec["build"]()
@@ -5129,47 +5258,6 @@ def build_total_demand_page(
             "total_abs_value": total_abs, "abs_diff": 0.0, "pct_diff": 0.0,
             "diff_hist_json": "", "diff_proj_json": "",
         })
-
-    transformation_config = config.get("transformation_total", {})
-    if transformation_config.get("enabled", False):
-        transformation_df = select_transformation_total_rows(assigned_df, transformation_config)
-        if not transformation_df.empty:
-            chart_key = "chart__line__total_transformation_no_transfers"
-            title = "Total transformation sector (excluding transfers)"
-            transformation_figure = _build_transformation_total_chart(
-                transformation_df, series_labels, base_year=base_year
-            )
-            charts[chart_key] = transformation_figure
-            total_abs = float(transformation_df["value"].abs().sum())
-            chart_rows.append({
-                "chart_key": chart_key,
-                "chart_type": "line",
-                "title": title,
-                "product_label": title,
-                "section_label": "Overview",
-                "total_abs_value": total_abs,
-                "abs_diff": 0.0,
-                "pct_diff": 0.0,
-                "datasets": chart_dataset_tokens_from_figure(transformation_figure),
-            })
-            manifest_rows.append({
-                "page_key": "total_demand",
-                "page_label": page_label,
-                "section_label": "Overview",
-                "chart_type": "line",
-                "chart_key": chart_key,
-                "common_flow_label": title,
-                "common_product_label": "All products",
-                "row_count": int(len(transformation_df)),
-                "source_flow_labels": str(transformation_config.get("source_aggregate_label", "")),
-                "sign_note": "Signed total: transformation inputs are negative and outputs are positive.",
-                "suppressed": False,
-                "total_abs_value": total_abs,
-                "abs_diff": 0.0,
-                "pct_diff": 0.0,
-                "diff_hist_json": "",
-                "diff_proj_json": "",
-            })
 
     for flow_code in overview_flow_codes:
         flow_df = overview_flow_df[overview_flow_df["common_flow_code"].astype(str) == flow_code]

@@ -161,34 +161,42 @@ test also checks the overview legend position and reserved bottom margin.
 **Status:** Confirmed
 **Owner:** leap_dashboard
 **Type:** Comparison
-**Affected areas:** Energy balance overview; Common ESTO metadata loading; total transformation chart
+**Affected areas:** Energy balance overview; demand, transformation and supply composition charts
 
 ### Current rule
 
 The former Total demand page is presented as the Energy balance overview. It
-continues to show the reviewed supply and TFC aggregates and also shows `Total
-transformation sector (excluding transfers)`. TFEC remains temporarily disabled
-under DASH-010 until non-energy use can be separated from aggregated
-Other-sector LEAP demand.
+shows paired composition charts by sector/flow and fuel for final demand,
+supply, and the whole transformation boundary. The transformation boundary
+contains all flow-09 sectors, transfers (08), energy-sector own use (10.01),
+and transmission/distribution losses (10.02). Shared hierarchy-frontier rules
+remove parent/child and inclusive-own-use overlap. Signed areas preserve gross
+positive outputs and negative inputs, transfers, own use and losses; the line
+shows their net. TFEC remains temporarily disabled under DASH-010 until
+non-energy use can be separated from aggregated Other-sector LEAP demand.
 
-Transformation selection is not inferred from display labels. Rows must carry
-source-aggregate membership for `Total transformation - no transfers`. LEAP
-uses generated rows with `requires_rollup = True`; ESTO and Ninth use exact
-parents with `is_exact_row = True`. Parent and generated representations are
-comparison alternatives and are never added together for one source series.
+When a selected comparison basis has no detailed projection source, composition
+areas retain real ESTO historical detail through the base year instead of
+disappearing. Projection total lines remain visible, and the chart note states
+that projected composition detail is unavailable.
 
 ### Validation
 
 Confirm the overview manifest contains
-`chart__line__total_transformation_no_transfers`, includes all available source
-systems, and contains no duplicate `(source, scenario, year, common_row_id)`
-rows after applying the source-role rule. Multiple exact component rows may
-share one displayed product rollup and are summed within the chart.
+`chart__area__total_demand__transformation_flow` and
+`chart__area__total_demand__transformation_fuel`. The flow chart must retain
+flow 09 as well as 08, 10.01 and 10.02, and a category containing both positive
+and negative facts must retain both signed area fragments. In aggregate-only
+LEAP demand scopes, Reference and Target views must still retain ESTO historical
+composition through the base year.
 
 ### History
 
 - 2026-06-29: Added the configured no-transfers transformation comparison to
   the aggregate overview and renamed its navigation label.
+- 2026-08-12: Replaced the single transformation net chart with paired signed
+  composition charts covering transformation, transfers, losses and own use;
+  retained ESTO historical composition when projection detail is unavailable.
 
 ## DASH-006: Rollup modes appear inside the hierarchy tree
 

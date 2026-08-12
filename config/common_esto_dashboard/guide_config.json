@@ -32,7 +32,7 @@
           "rows": [
             ["Supply", "Production (01), imports (02), signed exports (03), and signed international transport (04-05), with total primary energy supply (07) where available", "Stock changes remain outside the projection-comparable supply total."],
             ["Final demand", "Total final consumption (12), split into the major demand pages and broad fuel groups", "Demand sectors are selected on a non-overlapping frontier; do not add their parents and children again."],
-            ["Transformation", "The reviewed total transformation boundary excluding transfers", "Negative inputs and positive outputs can cancel, so inspect the transformation pages for process detail."],
+            ["Transformation, transfers, losses and own use", "The reviewed transformation boundary plus transfers (08), energy-sector own use (10.01), and transmission/distribution losses (10.02), shown by flow and by fuel", "Negative inputs, own use and losses can offset positive outputs, so read the signed areas as well as the net total line."],
             ["TFEC", "Not currently displayed", "Flow 13 is temporarily disabled because non-energy use cannot yet be separated from aggregate LEAP Other demand."]
           ]
         }
@@ -48,7 +48,7 @@
           "rows": [
             ["Supply", "Production + imports + signed exports + signed international transport", "Stock changes remain outside this projection-comparable total."],
             ["TFC", "Energy and non-energy final consumption", "Use it to test the overall demand boundary before opening sector pages."],
-            ["Transformation", "Total transformation excluding transfers", "Inputs are normally negative and outputs positive; compare the boundary, not a simple gross sum."]
+            ["Transformation, transfers, losses and own use", "The complete signed combination of transformation, transfers, energy-sector own use and transmission/distribution losses", "Inputs, own use and losses are normally negative while outputs are positive; the line is their net, while the areas preserve the gross signed composition."]
           ]
         }
       }

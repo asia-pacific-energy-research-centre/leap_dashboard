@@ -151,6 +151,8 @@ def test_energy_balance_scope_records_tfec_as_temporarily_disabled() -> None:
     assert "TFEC" in script
     assert "Not currently displayed" in script
     assert "temporarily disabled" in script
+    assert "Transformation, transfers, losses and own use" in script
+    assert "shown by flow and by fuel" in script
 
 
 def test_chart_guide_explains_the_overview_first_review_strategy() -> None:

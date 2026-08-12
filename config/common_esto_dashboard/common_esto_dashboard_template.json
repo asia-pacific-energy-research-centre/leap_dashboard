@@ -258,10 +258,9 @@
     "supply_codes": ["01", "02", "03", "04-05"],
     "tfec_enabled": false,
     "tfec_status": "Temporarily disabled because non-energy use cannot yet be separated from aggregated Other-sector LEAP demand.",
-    "transformation_total": {
+    "transformation_composition": {
       "enabled": true,
-      "source_aggregate_label": "Total transformation - no transfers",
-      "generated_source_systems": ["LEAP"]
+      "flow_code_prefixes": ["09", "08", "10.01", "10.02"]
     },
     "sector_colors": {
       "industry": "#3b82f6",
@@ -270,7 +269,7 @@
       "others": "#8b5cf6",
       "non_energy": "#94a3b8"
     },
-    "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports), and the common 04-05 International transport (bunkers) comparison row. The combined bunker row is used in overview totals so its retained 04/05 source children are not counted again; the detailed children remain available on the Supply page. Bunkers are supply deductions and are excluded from domestic demand. Stock changes (06) remain outside the projection-comparable total."
+    "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports), and the common 04-05 International transport (bunkers) comparison row. The combined bunker row is used in overview totals so its retained 04/05 source children are not counted again; the detailed children remain available on the Supply page. Bunkers are supply deductions and are excluded from domestic demand. Stock changes (06) remain outside the projection-comparable total. The transformation overview combines all flow-09 transformation sectors with flow 08 transfers, flow 10.01 energy-sector own use, and flow 10.02 transmission/distribution losses on one non-overlapping signed frontier."
   },
   "supply_page": {
     "page_key": "supply",

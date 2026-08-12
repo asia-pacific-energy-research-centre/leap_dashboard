@@ -46,6 +46,7 @@ from codebase.common_esto_dashboard_renderer import (
     pick_area_specs,
     prepare_other_transformation_page_rows,
     render_dashboard,
+    select_transformation_overview_rows,
     select_transformation_total_rows,
     _build_section_aggregate_charts,
     _build_flow_group_aggregate_charts,
@@ -295,6 +296,64 @@ def test_total_demand_fuel_area_uses_non_overlapping_parent_child_frontier() -> 
     assert values[2023] == 21.0
 
 
+def test_total_demand_fuel_area_keeps_esto_history_without_projection_detail() -> None:
+    demand_rows = pd.DataFrame([
+        {
+            "_page_key": "industry",
+            "_page_label": "Industry",
+            "common_flow_code": "14",
+            "common_flow_label": "14 Industry sector",
+            "common_product_code": product_code,
+            "common_product_label": product_label,
+            "source_system": "ESTO",
+            "scenario": "historical",
+            "year": 2022,
+            "value": value,
+        }
+        for product_code, product_label, value in [
+            ("01", "01 Coal", 20.0),
+            ("17", "17 Electricity", 30.0),
+        ]
+    ])
+    overview_rows = pd.DataFrame([
+        {
+            "source_system": "ESTO",
+            "scenario": "historical",
+            "year": 2022,
+            "common_flow_code": "12",
+            "value": 50.0,
+        },
+        {
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2030,
+            "common_flow_code": "12",
+            "value": 55.0,
+        },
+    ])
+
+    figure = _build_td_fuel_chart(
+        demand_rows,
+        overview_rows,
+        {},
+        "LEAP",
+        "Target",
+        base_year=2022,
+    )
+
+    visible_area_names = {
+        trace.name
+        for trace in figure.data
+        if trace.visible and getattr(trace, "stackgroup", None)
+    }
+    assert visible_area_names == {"01 Coal", "17 Electricity"}
+    assert any(trace.name == "LEAP|Target total (TFC)" for trace in figure.data)
+    assert (
+        "ESTO historical fuel detail through the base year"
+        in figure.layout.meta["stacked_area_note"]
+    )
+
+
 def _build_common_esto_rows() -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for scope in ["leap_vs_esto_vs_ninth", "leap_vs_ninth"]:
@@ -389,7 +448,10 @@ def test_common_esto_dashboard_renders_core_pages_by_default(tmp_path: Path) -> 
     assert "total_demand" in page_keys
     assert "transport_leap_vs_ninth" not in page_keys
     overview_rows = manifest[manifest["page_key"] == "total_demand"]
-    assert "chart__line__total_transformation_no_transfers" in set(overview_rows["chart_key"])
+    overview_chart_keys = set(overview_rows["chart_key"])
+    assert "chart__area__total_demand__transformation_flow" in overview_chart_keys
+    assert "chart__area__total_demand__transformation_fuel" in overview_chart_keys
+    assert "chart__line__total_transformation_no_transfers" not in overview_chart_keys
     assert set(overview_rows["page_label"]) == {"Energy balance overview"}
     for bundle_path in layout["chart_bundles"].glob("*__charts.json"):
         page_key = bundle_path.name.removesuffix("__charts.json")
@@ -1382,6 +1444,50 @@ def test_transformation_total_selection_uses_rollup_membership_and_source_role()
     assert reference_rows["is_exact_row"].all()
 
 
+def test_transformation_overview_adds_transfers_own_use_and_losses() -> None:
+    rows = _build_common_esto_rows()
+    supplements = pd.DataFrame([
+        {
+            **rows.iloc[0].to_dict(),
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2024,
+            "common_flow_code": flow_code,
+            "common_flow_label": flow_label,
+            "common_product_code": "17",
+            "common_product_label": "17 Electricity",
+            "common_row_id": f"supplement_{flow_code}",
+            "is_exact_row": True,
+            "requires_rollup": False,
+            "source_aggregate_labels": "",
+            "value": value,
+        }
+        for flow_code, flow_label, value in [
+            ("08", "08 Transfers", -2.0),
+            ("10.01.17", "10.01.17 Non-specified own uses", -3.0),
+            ("10.02", "10.02 Transmission and distribution losses", -4.0),
+        ]
+    ])
+    rows = pd.concat([rows, supplements], ignore_index=True, sort=False)
+    config = {
+        "flow_code_prefixes": ["09", "08", "10.01", "10.02"],
+    }
+    presentation_config = {
+        "enabled": True,
+        "append_inclusive_transformation_label": True,
+    }
+
+    selected = select_transformation_overview_rows(
+        rows,
+        config,
+        presentation_config,
+    )
+
+    selected_codes = set(selected["common_flow_code"].astype(str))
+    assert "09" in selected_codes
+    assert {"08", "10.01.17", "10.02"}.issubset(selected_codes)
+
+
 def test_common_esto_dashboard_can_render_opt_in_scope_pages(tmp_path: Path) -> None:
     template = _load_template()
     template["scope_specific_pages"]["enabled"] = True
@@ -2081,6 +2187,48 @@ def test_supply_stack_keeps_supply_totals_and_excludes_demand_comparison_lines()
     assert not any("demand" in name.casefold() for name in traces)
 
 
+def test_transformation_stack_preserves_gross_inputs_and_outputs() -> None:
+    rows = pd.DataFrame([
+        {
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2030,
+            "common_flow_label": "09 Total transformation sector",
+            "value": value,
+        }
+        for value in [10.0, -8.0]
+    ] + [{
+        "source_system": "LEAP",
+        "scenario": "Target",
+        "year": 2030,
+        "common_flow_label": "08 Transfers",
+        "value": 1.0,
+    }])
+
+    figure = _build_supply_stack_chart(
+        rows,
+        series_labels={},
+        primary_source="LEAP",
+        primary_scenario="Target",
+        group_col="common_flow_label",
+        chart_title="Transformation by flow",
+        base_year=2022,
+        total_line_suffix="net total",
+        composition_subject="flow",
+        stack_prefix="transformation",
+        preserve_gross_signs=True,
+    )
+
+    area_traces = [
+        trace
+        for trace in figure.data
+        if trace.stackgroup and trace.name == "09 Total transformation sector"
+    ]
+    assert sorted(float(trace.y[0]) for trace in area_traces) == [-8.0, 10.0]
+    net_trace = next(trace for trace in figure.data if trace.name == "LEAP|Target net total")
+    assert list(net_trace.y) == [3.0]
+
+
 def test_aggregate_only_leap_demand_warns_about_tfec_non_energy() -> None:
     note = aggregate_only_tfec_note({"NINTH"}, "LEAP")
 
@@ -2468,7 +2616,11 @@ def test_energy_balance_fuel_area_uses_esto_history_on_leap_category_frontier() 
     )
     area_names = {str(trace.name) for trace in figure.data if trace.stackgroup}
     assert area_names == {"07.01 Motor gasoline", "07.10 Refinery gas (not liquefied)"}
-    motor = next(trace for trace in figure.data if trace.name == "07.01 Motor gasoline")
+    motor = next(
+        trace
+        for trace in figure.data
+        if trace.name == "07.01 Motor gasoline" and trace.visible
+    )
     assert list(motor.x) == [2022, 2023]
     assert figure.layout.title.text == "Final energy demand by fuel (TFC)"
     assert not any("supply" in str(trace.name).casefold() for trace in figure.data)
