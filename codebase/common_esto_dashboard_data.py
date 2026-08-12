@@ -41,6 +41,30 @@ OUTPUT_CONTRACT_VERSION = "common_esto_output_contract_v1"
 DEFAULT_MEASURE = "energy"
 DEFAULT_UNIT = "PJ"
 
+# The 9th Outlook uses a 2021 base year for Russia only. Other sources in the
+# Russia dashboard retain their own normal boundaries.
+NINTH_BASE_YEAR_BY_ECONOMY = {"16RUS": 2021}
+
+
+def ninth_base_year_for_economy(economy: object, default_base_year: int) -> int:
+    """Return the 9th Outlook base year for one dashboard economy."""
+    economy_key = str(economy or "").replace("_", "").strip().upper()
+    return NINTH_BASE_YEAR_BY_ECONOMY.get(economy_key, int(default_base_year))
+
+
+def ninth_base_year_for_rows(df: pd.DataFrame, default_base_year: int) -> int:
+    """Resolve the 9th base year when rows belong to one known economy."""
+    if df.empty or "economy" not in df.columns:
+        return int(default_base_year)
+    economy_keys = {
+        str(value).replace("_", "").strip().upper()
+        for value in df["economy"].dropna().unique()
+        if str(value).strip()
+    }
+    if len(economy_keys) != 1:
+        return int(default_base_year)
+    return ninth_base_year_for_economy(next(iter(economy_keys)), default_base_year)
+
 LEGACY_TEXT_COLUMNS = {
     "comparison_scope",
     "source_system",

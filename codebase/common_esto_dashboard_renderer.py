@@ -28,6 +28,11 @@ except ModuleNotFoundError:  # pragma: no cover - import shim
         emissions_page_enabled,
     )
 
+try:  # pragma: no cover - import shim
+    from common_esto_dashboard_data import ninth_base_year_for_rows
+except ModuleNotFoundError:  # pragma: no cover - import shim
+    from codebase.common_esto_dashboard_data import ninth_base_year_for_rows
+
 
 def _chart_unit(df: pd.DataFrame, default: str = "PJ") -> str:
     """Return the unit carried by a chart's rows, falling back to PJ.
@@ -1237,11 +1242,17 @@ def _comparison_projection_area_rows(
     scenario_column = df["scenario"].astype(str).str.casefold()
     selected_source = ""
     projected = df.iloc[0:0].copy()
+    ninth_base_year = ninth_base_year_for_rows(df, base_year)
     for source_name in candidates:
+        projection_base_year = (
+            ninth_base_year
+            if source_name.casefold() == "ninth"
+            else base_year
+        )
         source_rows = df[
             source_column.eq(source_name.casefold())
             & scenario_column.eq(scenario_name.casefold())
-            & df["year"].gt(base_year)
+            & df["year"].gt(projection_base_year)
         ]
         if source_rows.empty or source_rows[detail_col].nunique(dropna=True) < detail_minimum:
             continue
@@ -2609,7 +2620,8 @@ def compute_diff_series(
         by_year["source_system"].astype(str).str.casefold() == ninth_source.casefold()
     ].groupby("year")["value"].mean()
     hist_years = model.index[model.index <= base_year].intersection(hist_comp.index)
-    proj_years = model.index[model.index > base_year].intersection(proj_comp.index)
+    ninth_base_year = ninth_base_year_for_rows(pair_df, base_year)
+    proj_years = model.index[model.index > ninth_base_year].intersection(proj_comp.index)
     hist_diff = (model.loc[hist_years] - hist_comp.loc[hist_years]).sort_index() if not hist_years.empty else pd.Series(dtype=float)
     proj_diff = (model.loc[proj_years] - proj_comp.loc[proj_years]).sort_index() if not proj_years.empty else pd.Series(dtype=float)
     return hist_diff, proj_diff
@@ -2662,7 +2674,12 @@ def build_product_chart(
         # historical range here; other sources start at the base year so their
         # calibration gap against ESTO remains visible.
         if base_year is not None and str(source_system).casefold() != comparison_source.casefold():
-            group = group[group["year"] >= base_year]
+            source_base_year = (
+                ninth_base_year_for_rows(chart_df, base_year)
+                if str(source_system).casefold() == "ninth"
+                else base_year
+            )
+            group = group[group["year"] >= source_base_year]
         if group.empty:
             continue
         label = series_label(group.iloc[0], series_labels)
@@ -3388,7 +3405,8 @@ def compute_ranking_metrics(
     ].groupby("year")["value"].mean()
 
     hist_years = model.index[model.index <= base_year].intersection(hist_comparison.index)
-    proj_years = model.index[model.index > base_year].intersection(proj_comparison.index)
+    ninth_base_year = ninth_base_year_for_rows(pair_df, base_year)
+    proj_years = model.index[model.index > ninth_base_year].intersection(proj_comparison.index)
 
     all_diff_years = hist_years.union(proj_years)
     if all_diff_years.empty:

@@ -4,6 +4,18 @@ This is the decision log for `leap_dashboard`. Record rules whose correct behavi
 
 Cross-repository decisions use a `CROSS-###` ID and have one authoritative entry in the repository that owns the implementation. Other affected repositories should link to that entry instead of copying it.
 
+## DASH-012: Russia uses a 2021 9th Outlook base year
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Source-specific comparison boundary
+**Affected areas:** portable dashboard preparation, 9th projection charts and difference rankings
+
+For economy `16_RUS` only, the 9th Outlook base year is 2021 and its projection
+comparison therefore starts in 2022. This exception applies only to `NINTH`
+rows; it does not change the ESTO or LEAP boundary, and all other economies
+continue to use the dashboard's ordinary 2022 9th base year.
+
 ## DASH-001: Use a flow frontier to prevent parent-child double charting
 
 **Status:** Confirmed

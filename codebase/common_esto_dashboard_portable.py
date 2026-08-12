@@ -55,6 +55,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     load_active_power_interim_branches,
     load_common_esto_data,
     load_source_category_map,
+    ninth_base_year_for_economy,
 )
 from common_esto_dashboard_output_layout import build_output_layout  # noqa: E402
 from common_esto_dashboard_renderer import render_dashboard, set_code_colors_path  # noqa: E402
@@ -167,10 +168,11 @@ def render_common_esto_dashboard(
     raw_df = enrich_with_component_metadata(raw_df, Path(common_rows_path))
 
     base_year = int(template.get("chart_generation", {}).get("base_year", 2022))
+    ninth_base_year = ninth_base_year_for_economy(economy_key, base_year)
     input_row_count = len(raw_df)
     raw_df = filter_ninth_pre_base_year_data(
         raw_df,
-        base_year=base_year,
+        base_year=ninth_base_year,
         include_pre_base_year_data=include_ninth_pre_base_year_data,
     )
     excluded_pre_base_year_rows = input_row_count - len(raw_df)
@@ -232,6 +234,7 @@ def render_common_esto_dashboard(
         "filtered_row_count": int(len(filtered_df)),
         "visible_row_count": int(len(visible_df)),
         "base_year": base_year,
+        "ninth_base_year": ninth_base_year,
         "missing_leap_demand_branches": list(missing_leap_demand_branches),
         "power_interim_placeholder_branches": list(
             template["_power_interim_placeholder_branches"]

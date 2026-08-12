@@ -20,6 +20,7 @@ from codebase.common_esto_dashboard_data import (
     load_active_power_interim_branches,
     load_source_category_map,
     load_common_esto_data,
+    ninth_base_year_for_economy,
 )
 from codebase.common_esto_dashboard_emissions import select_emissions_component_rows
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
@@ -32,6 +33,7 @@ from codebase.common_esto_dashboard_renderer import (
     assign_bespoke_overview_rows,
     build_area_chart,
     build_product_chart,
+    compute_diff_series,
     chart_dataset_tokens_from_figure,
     code_expression_matches_prefix,
     page_keys_without_required_source,
@@ -779,6 +781,38 @@ def test_ninth_pre_base_year_rows_can_be_retained() -> None:
     )
 
     assert len(filtered) == 1
+
+
+def test_russia_uses_2021_as_the_ninth_base_year_only() -> None:
+    assert ninth_base_year_for_economy("16_RUS", 2022) == 2021
+    assert ninth_base_year_for_economy("16RUS", 2022) == 2021
+    assert ninth_base_year_for_economy("20_USA", 2022) == 2022
+
+
+def test_russia_ninth_comparison_includes_2022_projection() -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "economy": "16_RUS",
+                "source_system": source,
+                "scenario": scenario,
+                "year": year,
+                "value": value,
+            }
+            for source, scenario, year, value in [
+                ("ESTO", "historical", 2022, 90.0),
+                ("LEAP", "Target", 2022, 100.0),
+                ("NINTH", "Target", 2021, 95.0),
+                ("NINTH", "Target", 2022, 98.0),
+            ]
+        ]
+    )
+
+    historical, projected = compute_diff_series(rows, base_year=2022)
+
+    assert list(historical.index) == [2022]
+    assert list(projected.index) == [2022]
+    assert projected.loc[2022] == 2.0
 
 
 def test_power_sector_rollup_is_not_assigned_to_other_transformation() -> None:
