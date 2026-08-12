@@ -1498,9 +1498,68 @@ def test_supply_placeholder_explains_missing_marine_and_aviation_leap_detail() -
     status = guide_placeholder_status("supply", template)
 
     assert "All demand aggregated/International transport" in note
-    assert "marine (04) and aviation (05) separately" in note
-    assert "separate Air and Shipping source branches" in status
-    assert "unavailable, not as zero" in status
+    assert "marine (04) and aviation (05) cannot be viewed separately" in note
+    assert "04-05 International transport (bunkers)" in status
+    assert "when their separate source branches replace the placeholder" in status
+
+
+def test_supply_uses_combined_bunker_boundary_while_placeholder_is_active(
+    tmp_path: Path,
+) -> None:
+    template = _load_template()
+    template["leap_demand_sector_coverage"]["_aggregate_only_page_branches"] = {
+        "supply": ["International transport"]
+    }
+    series_config = _load_series_config()
+    rows = _build_common_esto_rows()
+    bunker_rows: list[dict[str, object]] = []
+    for flow_code, flow_name, flow_label in [
+        (
+            "04-05",
+            "International transport (bunkers)",
+            "04-05 International transport (bunkers)",
+        ),
+        ("04", "International marine bunkers", "04 International marine bunkers"),
+        ("05", "International aviation bunkers", "05 International aviation bunkers"),
+    ]:
+        for source_system, scenario, value in [
+            ("ESTO", "historical", -4.0),
+            ("LEAP", "Target", -4.5),
+            ("NINTH", "Target", -4.2),
+        ]:
+            bunker_rows.append({
+                "comparison_scope": "leap_vs_esto_vs_ninth",
+                "source_system": source_system,
+                "economy": "20_USA",
+                "scenario": scenario,
+                "year": 2024,
+                "common_flow_code": flow_code,
+                "common_flow_name": flow_name,
+                "common_flow_label": flow_label,
+                "common_product_code": "07.05",
+                "common_product_name": "Kerosene type jet fuel",
+                "common_product_label": "07.05 Kerosene type jet fuel",
+                "value": value,
+            })
+    rows = pd.concat([rows, pd.DataFrame(bunker_rows)], ignore_index=True, sort=False)
+    df = apply_sign_semantics(rows, template["sign_semantics"])
+    main_df = df[df["comparison_scope"] == "leap_vs_esto_vs_ninth"].copy()
+
+    layout = build_output_layout(tmp_path / "outputs", "20USA", clear_existing=True)
+    manifest = render_dashboard(main_df, template, series_config, layout, scope_df=df)
+
+    supply_flows = set(
+        manifest.loc[manifest["page_key"].eq("supply"), "common_flow_label"]
+    )
+    assert "04-05 International transport (bunkers)" in supply_flows
+    assert "04 International marine bunkers" not in supply_flows
+    assert "05 International aviation bunkers" not in supply_flows
+
+    supply_html = (layout["dashboards"] / "supply.html").read_text(encoding="utf-8")
+    assert (
+        "cannot be viewed separately until the placeholder demand sector is replaced"
+        in supply_html
+    )
 
 
 def test_common_esto_dashboard_switcher_uses_current_dashboard_label(tmp_path: Path) -> None:

@@ -3922,6 +3922,18 @@ def guide_page_mapping_table(
     }
 
 
+def uses_combined_international_transport_placeholder(template: dict) -> bool:
+    """Return whether Supply must use the combined bunker comparison row."""
+    coverage = template.get("leap_demand_sector_coverage", {}) or {}
+    page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
+    sectors = {
+        str(value).strip().casefold()
+        for value in page_branches.get("supply", [])
+        if str(value).strip()
+    }
+    return "international transport" in sectors
+
+
 def guide_placeholder_status(page_key: str, template: dict) -> str:
     """Explain an active LEAP placeholder for one page."""
     power_interim_branches = [
@@ -3945,15 +3957,13 @@ def guide_placeholder_status(page_key: str, template: dict) -> str:
     ).strip()
     page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
     sectors = [str(value) for value in page_branches.get(page_key, []) if str(value).strip()]
-    if page_key == "supply" and "International transport" in sectors:
+    if page_key == "supply" and uses_combined_international_transport_placeholder(template):
         return (
             "The yellow warning means LEAP currently supplies international transport "
             "through the combined 'All demand aggregated/International transport' "
-            "placeholder. Supply shows marine bunkers (04) and aviation bunkers (05) "
-            "separately, so the combined LEAP value cannot be placed in either chart "
-            "without guessing a split. The detailed LEAP mappings are ready, but the "
-            "separate Air and Shipping source branches have not yet been supplied. Treat "
-            "the missing LEAP detail as unavailable, not as zero."
+            "placeholder. Supply therefore shows one combined 04-05 International "
+            "transport (bunkers) section. Marine (04) and aviation (05) will return as "
+            "separate sections when their separate source branches replace the placeholder."
         )
     if not sectors:
         return (
@@ -3987,12 +3997,12 @@ def page_placeholder_note(page_key: str, template: dict) -> str:
     coverage = template.get("leap_demand_sector_coverage", {}) or {}
     page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
     sectors = [str(value) for value in page_branches.get(page_key, []) if str(value).strip()]
-    if page_key == "supply" and "International transport" in sectors:
+    if page_key == "supply" and uses_combined_international_transport_placeholder(template):
         return (
             "LEAP placeholder in use: 'All demand aggregated/International transport' "
-            "provides only a combined international-transport value. Supply shows marine "
-            "(04) and aviation (05) separately, so LEAP is unavailable for those charts "
-            "until separate Air and Shipping data are supplied; missing values are not zero."
+            "provides only a combined international-transport value. This means marine "
+            "(04) and aviation (05) cannot be viewed separately until the placeholder "
+            "demand sector is replaced."
         )
     if not sectors:
         return ""
@@ -5769,6 +5779,12 @@ def render_dashboard(
                 for value in supply_config.get("exclude_flow_codes", [])
                 if str(value).strip()
             }
+            if uses_combined_international_transport_placeholder(template):
+                # The placeholder has one value at the 04-05 boundary. Keep that
+                # comparable parent and suppress its 04/05 children until LEAP
+                # supplies the separate Air and Shipping source branches.
+                excluded_flow_codes.discard("04-05")
+                excluded_flow_codes.update({"04", "05"})
             if excluded_flow_codes and "common_flow_code" in page_df.columns:
                 page_df = page_df[
                     ~page_df["common_flow_code"].astype(str).isin(excluded_flow_codes)
