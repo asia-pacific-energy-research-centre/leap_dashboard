@@ -483,10 +483,15 @@ def flow_name_without_code(flow_label: object) -> str:
     return parts[1] if len(parts) > 1 and code_candidate_text(text) else text
 
 
-def alphabetical_section_key(label: object) -> tuple[str, str]:
-    """Sort section labels by name while ignoring a leading ESTO code."""
+def section_order_key(label: object) -> tuple[object, ...]:
+    """Sort coded sections by their leading ESTO code, then uncoded labels by name."""
     text = str(label or "").strip()
-    return flow_name_without_code(text).casefold(), text.casefold()
+    records = parse_code_expression(text)
+    if records:
+        numeric_parts = _numeric_code_parts(records[0].get("start", ""))
+        if numeric_parts is not None:
+            return (0, numeric_parts, text.casefold())
+    return (1, (), flow_name_without_code(text).casefold(), text.casefold())
 
 
 def sign_note_for_chart(df: pd.DataFrame) -> str:
@@ -3683,7 +3688,7 @@ def _jump_nav_html(
     for depth in sorted({int(node["depth"]) for node in visible_nodes}):
         level_nodes = sorted(
             (node for node in visible_nodes if int(node["depth"]) == depth),
-            key=lambda node: alphabetical_section_key(node["label"]),
+            key=lambda node: section_order_key(node["label"]),
         )
         visual_level = min(max(depth, 1), 4)
         chips = "".join(
@@ -3941,12 +3946,12 @@ def line_section_tree(
                 "target": root_targets.get(group, ""),
             })
         hierarchy_tree.append((section_label, nodes))
-    hierarchy_tree.sort(key=lambda item: alphabetical_section_key(item[0]))
+    hierarchy_tree.sort(key=lambda item: section_order_key(item[0]))
     for _section_label, nodes in hierarchy_tree:
         nodes.sort(
             key=lambda node: (
                 int(node["depth"]),
-                alphabetical_section_key(node["label"]),
+                section_order_key(node["label"]),
             )
         )
     return hierarchy_tree
@@ -4224,7 +4229,7 @@ def _line_sections_html(line_rows: list[dict], page_label: str) -> str:
         if sl not in seen:
             seen.append(sl)
     chunks: list[str] = []
-    for section_label in sorted(seen, key=alphabetical_section_key):
+    for section_label in sorted(seen, key=section_order_key):
         section_rows = [r for r in line_rows if str(r.get("section_label") or "Other") == section_label]
         anchor = _section_anchor(page_label, section_label)
 
@@ -4233,7 +4238,7 @@ def _line_sections_html(line_rows: list[dict], page_label: str) -> str:
             group = str(row.get("flow_group_label") or "").strip()
             if group and group not in flow_groups:
                 flow_groups.append(group)
-        flow_groups.sort(key=alphabetical_section_key)
+        flow_groups.sort(key=section_order_key)
 
         if len(flow_groups) < 2:
             grid_class = _grid_class_for(len(section_rows))

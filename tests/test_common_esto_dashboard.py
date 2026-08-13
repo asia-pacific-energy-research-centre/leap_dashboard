@@ -1106,7 +1106,7 @@ def test_unparented_top_level_flows_remain_level_one() -> None:
     assert 'data-level="2"' not in html
 
 
-def test_supply_sections_are_alphabetical_by_name_without_esto_code() -> None:
+def test_supply_sections_follow_natural_esto_code_order() -> None:
     labels = [
         "06 Stock changes",
         "11 Statistical discrepancy",
@@ -1126,13 +1126,13 @@ def test_supply_sections_are_alphabetical_by_name_without_esto_code() -> None:
         for index, label in enumerate(labels)
     ]
     expected = [
-        "03 Exports",
-        "02 Imports",
-        "05 International aviation bunkers",
-        "04 International marine bunkers",
         "01 Production",
-        "11 Statistical discrepancy",
+        "02 Imports",
+        "03 Exports",
+        "04 International marine bunkers",
+        "05 International aviation bunkers",
         "06 Stock changes",
+        "11 Statistical discrepancy",
     ]
 
     navigation_html = _jump_nav_html("Supply", line_section_tree(rows))
@@ -1146,7 +1146,7 @@ def test_supply_sections_are_alphabetical_by_name_without_esto_code() -> None:
     )
 
 
-def test_section_sorting_is_alphabetical_within_each_hierarchy_level() -> None:
+def test_section_sorting_uses_code_order_within_each_hierarchy_level() -> None:
     rows = [
         {"section_label": "Industry", "flow_group_label": label}
         for label in [
@@ -1161,8 +1161,8 @@ def test_section_sorting_is_alphabetical_within_each_hierarchy_level() -> None:
 
     html = _jump_nav_html("Industry", line_section_tree(rows, roots))
 
+    assert html.index(">14.01 Mining and quarrying</a>") < html.index(">14.02 Construction</a>")
     assert html.index(">14.02 Construction</a>") < html.index(">14.03 Manufacturing</a>")
-    assert html.index(">14.03 Manufacturing</a>") < html.index(">14.01 Mining and quarrying</a>")
     assert html.index(">14.03.01 Iron and steel</a>") < html.index(">14.03.11 Non-specified industry</a>")
 
 

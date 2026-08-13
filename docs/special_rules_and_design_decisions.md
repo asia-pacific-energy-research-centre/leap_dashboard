@@ -4,6 +4,21 @@ This is the decision log for `leap_dashboard`. Record rules whose correct behavi
 
 Cross-repository decisions use a `CROSS-###` ID and have one authoritative entry in the repository that owns the implementation. Other affected repositories should link to that entry instead of copying it.
 
+## DASH-013: Section order follows the ESTO code hierarchy
+
+**Status:** Confirmed
+**Owner:** leap_dashboard
+**Type:** Presentation
+**Affected areas:** section navigation pills and matching chart-body sections
+
+At every visible hierarchy level, sections with leading ESTO codes use natural
+numeric code order. For example, Supply appears as `01`, `02`, `03`, `04-05`,
+`06`, then `11`, regardless of the alphabetical order of the labels following
+those codes. Compound labels use the first code represented by their expression.
+Labels without a leading code fall back to alphabetical ordering. The same key
+must order both navigation and body sections so links and page reading order
+remain aligned after every regeneration.
+
 ## DASH-012: Russia uses a 2021 9th Outlook base year
 
 **Status:** Confirmed

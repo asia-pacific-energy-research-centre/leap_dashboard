@@ -20,6 +20,9 @@ inspection of the current upstream mapping artifacts.
 
 ## Post-snapshot completion on 2026-08-12
 
+- Section navigation and matching body sections now sort automatically by the
+  natural numeric ESTO code at each hierarchy level. Labels without a leading
+  code use alphabetical fallback ordering.
 - Distinguish an app build that omitted native-source provenance files from a
   genuinely stale or incomplete supplied map. The guide now avoids implying
   that visible categories are unmapped when no provenance input was provided.
