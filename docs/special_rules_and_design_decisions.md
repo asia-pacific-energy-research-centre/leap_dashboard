@@ -4,7 +4,7 @@ This is the decision log for `leap_dashboard`. Record rules whose correct behavi
 
 Cross-repository decisions use a `CROSS-###` ID and have one authoritative entry in the repository that owns the implementation. Other affected repositories should link to that entry instead of copying it.
 
-## DASH-013: Section order follows the ESTO code hierarchy
+## DASH-034: Section order follows the ESTO code hierarchy
 
 **Status:** Confirmed
 **Owner:** leap_dashboard
