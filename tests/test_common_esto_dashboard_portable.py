@@ -6,11 +6,14 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from codebase import common_esto_dashboard_portable as portable
 from codebase.common_esto_dashboard_portable import (
     OPTIONAL_DASHBOARD_INPUTS,
     REQUIRED_DASHBOARD_INPUTS,
+    configured_comparison_scopes,
     normalize_dashboard_economy_key,
     render_common_esto_dashboard,
+    render_common_esto_dashboard_variants,
 )
 from codebase.common_esto_dashboard_renderer import (
     load_code_colors,
@@ -76,6 +79,89 @@ def test_optional_inputs_are_declared() -> None:
         "source_to_common_map_path",
         "esto_to_common_map_path",
     }
+
+
+def test_configured_comparison_scopes_use_maintained_selector() -> None:
+    template = json.loads(TEMPLATE_PATH.read_text(encoding="utf-8"))
+
+    definitions = configured_comparison_scopes(template)
+
+    assert [item["comparison_scope"] for item in definitions] == [
+        "esto_leap_ninth",
+        "esto_leap",
+    ]
+    assert [item["output_suffix"] for item in definitions] == ["", "__esto_leap"]
+    assert [item["is_default"] for item in definitions] == [True, False]
+
+
+def test_variant_render_forwards_basis_options_and_writes_diagnostics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_render(**kwargs: object) -> dict[str, object]:
+        calls.append(kwargs)
+        key = str(kwargs["dashboard_key"])
+        root = Path(str(kwargs["output_root"])) / key
+        dashboard = root / "dashboards" / "index.html"
+        dashboard.parent.mkdir(parents=True, exist_ok=True)
+        dashboard.write_text("<html></html>", encoding="utf-8")
+        return {
+            "economy": "20USA",
+            "output_root": str(root),
+            "dashboard_index": str(dashboard),
+            "chart_manifest": str(root / "supporting_files" / "chart_manifest.csv"),
+            "sign_semantics_summary": str(root / "supporting_files" / "sign.csv"),
+            "chart_count": 2,
+        }
+
+    monkeypatch.setattr(portable, "render_common_esto_dashboard", fake_render)
+    monkeypatch.setattr(
+        portable,
+        "load_source_category_map",
+        lambda *_args, **_kwargs: pd.DataFrame([
+            {
+                "comparison_scope": "esto_leap_ninth",
+                "source_system": "LEAP",
+                "source_flow": "Supply",
+                "source_product": "Coal",
+                "common_flow_label": "Supply",
+                "common_product_label": "Coal",
+            }
+        ]),
+    )
+
+    result = render_common_esto_dashboard_variants(
+        economy="20_USA",
+        comparison_data_path=COMPARISON_FIXTURE,
+        common_rows_path=ROWS_FIXTURE,
+        template_path=TEMPLATE_PATH,
+        series_config_path=SERIES_CONFIG_PATH,
+        source_to_common_map_path=tmp_path / "source.csv",
+        esto_to_common_map_path=tmp_path / "esto.csv",
+        output_root=tmp_path / "outputs",
+        dashboard_updated_label="test",
+    )
+
+    assert [call["comparison_scope"] for call in calls] == [
+        "esto_leap_ninth",
+        "esto_leap",
+    ]
+    assert calls[0]["category_basis_options"] == [
+        {
+            "comparison_scope": "esto_leap_ninth",
+            "label": "LEAP + ESTO + Ninth",
+            "dashboard_key": "20USA",
+        },
+        {
+            "comparison_scope": "esto_leap",
+            "label": "LEAP + ESTO",
+            "dashboard_key": "20USA__esto_leap",
+        },
+    ]
+    assert result["chart_count"] == 4
+    assert Path(str(result["mapping_diagnostics"]["page"])).is_file()
 
 
 def test_code_colors_path_can_be_redirected_and_restored(tmp_path: Path) -> None:
