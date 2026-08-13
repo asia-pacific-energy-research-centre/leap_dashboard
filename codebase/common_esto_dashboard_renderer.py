@@ -3417,23 +3417,46 @@ def compute_ranking_metrics(
     *,
     base_year: int = 2023,
     ninth_source: str = "NINTH",
-) -> dict[str, float]:
+    small_comparison_denominator: float = 1.0,
+) -> dict[str, object]:
     """Compute sort ranking metrics for one flow/product chart.
 
     Uses ESTO as the comparison for years <= base_year and NINTH for years > base_year.
     Years where LEAP has no data are excluded from diff calculations rather than
     being treated as zero.
     """
+    empty_metrics: dict[str, object] = {
+        "total_abs_value": 0.0,
+        "abs_diff": 0.0,
+        "pct_diff": 0.0,
+        "model_abs_value": 0.0,
+        "comparison_abs_value": 0.0,
+        "max_annual_absolute_difference": 0.0,
+        "max_annual_percentage_difference": 0.0,
+        "non_zero_year_count": 0,
+        "unexpected_sign_count": 0,
+        "ranking_warning": "missing_model;missing_comparison;sparse_model_series",
+    }
     if pair_df.empty:
-        return {"total_abs_value": 0.0, "abs_diff": 0.0, "pct_diff": 0.0}
+        return empty_metrics
     total_abs = float(pair_df["value"].abs().sum())
     by_year = pair_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
     model = by_year[
         (by_year["source_system"].astype(str).str.casefold() == primary_source.casefold())
         & (by_year["scenario"].astype(str).str.casefold() == primary_scenario.casefold())
     ].set_index("year")["value"]
+    model_abs = float(model.abs().sum())
+    non_zero_year_count = int((model.abs() > 1e-9).sum())
+    warnings: list[str] = []
     if model.empty:
-        return {"total_abs_value": total_abs, "abs_diff": 0.0, "pct_diff": 0.0}
+        warnings.extend(["missing_model", "missing_comparison", "sparse_model_series"])
+        return {
+            **empty_metrics,
+            "total_abs_value": total_abs,
+            "ranking_warning": ";".join(warnings),
+        }
+    if non_zero_year_count < 2:
+        warnings.append("sparse_model_series")
 
     hist_comparison = by_year[
         by_year["source_system"].astype(str).str.casefold() == comparison_source.casefold()
@@ -3448,21 +3471,127 @@ def compute_ranking_metrics(
 
     all_diff_years = hist_years.union(proj_years)
     if all_diff_years.empty:
-        return {"total_abs_value": total_abs, "abs_diff": 0.0, "pct_diff": 0.0}
+        warnings.append("missing_comparison")
+        return {
+            **empty_metrics,
+            "total_abs_value": total_abs,
+            "model_abs_value": model_abs,
+            "non_zero_year_count": non_zero_year_count,
+            "ranking_warning": ";".join(warnings),
+        }
 
     diffs: list[pd.Series] = []
-    comp_totals: list[float] = []
+    comparisons: list[pd.Series] = []
     if not hist_years.empty:
         diffs.append((model.loc[hist_years] - hist_comparison.loc[hist_years]).abs())
-        comp_totals.append(float(hist_comparison.loc[hist_years].abs().sum()))
+        comparisons.append(hist_comparison.loc[hist_years])
     if not proj_years.empty:
         diffs.append((model.loc[proj_years] - proj_comparison.loc[proj_years]).abs())
-        comp_totals.append(float(proj_comparison.loc[proj_years].abs().sum()))
+        comparisons.append(proj_comparison.loc[proj_years])
 
-    abs_diff = float(pd.concat(diffs).sum()) if diffs else 0.0
-    comp_total = sum(comp_totals)
-    pct_diff = abs_diff / comp_total if comp_total > 1e-9 else 0.0
-    return {"total_abs_value": total_abs, "abs_diff": abs_diff, "pct_diff": pct_diff}
+    annual_diffs = pd.concat(diffs).sort_index() if diffs else pd.Series(dtype=float)
+    paired_comparison = (
+        pd.concat(comparisons).sort_index() if comparisons else pd.Series(dtype=float)
+    )
+    paired_model = model.loc[paired_comparison.index]
+    comparison_abs = float(paired_comparison.abs().sum())
+    abs_diff = float(annual_diffs.sum())
+
+    usable_denominator = paired_comparison.abs() >= small_comparison_denominator
+    small_denominator = ~usable_denominator
+    if small_denominator.any():
+        warnings.append("small_comparison_denominator")
+    usable_comp_total = float(paired_comparison.loc[usable_denominator].abs().sum())
+    usable_abs_diff = float(annual_diffs.loc[usable_denominator].sum())
+    pct_diff = usable_abs_diff / usable_comp_total if usable_comp_total > 0 else 0.0
+    annual_pct = (
+        annual_diffs.loc[usable_denominator]
+        / paired_comparison.loc[usable_denominator].abs()
+    )
+    unexpected_sign_count = int(
+        (
+            (paired_model.abs() > 1e-9)
+            & (paired_comparison.abs() > 1e-9)
+            & ((paired_model * paired_comparison) < 0)
+        ).sum()
+    )
+    if unexpected_sign_count:
+        warnings.append("unexpected_sign")
+
+    return {
+        "total_abs_value": total_abs,
+        "abs_diff": abs_diff,
+        "pct_diff": pct_diff,
+        "model_abs_value": model_abs,
+        "comparison_abs_value": comparison_abs,
+        "max_annual_absolute_difference": (
+            float(annual_diffs.max()) if not annual_diffs.empty else 0.0
+        ),
+        "max_annual_percentage_difference": (
+            float(annual_pct.max()) if not annual_pct.empty else 0.0
+        ),
+        "non_zero_year_count": non_zero_year_count,
+        "unexpected_sign_count": unexpected_sign_count,
+        "ranking_warning": ";".join(warnings),
+    }
+
+
+RANKING_METRIC_DEFAULTS: dict[str, object] = {
+    "model_abs_value": 0.0,
+    "comparison_abs_value": 0.0,
+    "max_annual_absolute_difference": 0.0,
+    "max_annual_percentage_difference": 0.0,
+    "non_zero_year_count": 0,
+    "unexpected_sign_count": 0,
+    "ranking_warning": "",
+}
+
+
+def finalize_chart_manifest(manifest_df: pd.DataFrame) -> pd.DataFrame:
+    """Add complete, stable audit fields to the chart manifest."""
+    finalized = manifest_df.copy()
+    if "default_order" not in finalized.columns:
+        if "page_key" in finalized.columns:
+            finalized["default_order"] = finalized.groupby(
+                "page_key", dropna=False, sort=False
+            ).cumcount()
+        else:
+            finalized["default_order"] = range(len(finalized))
+
+    missing_metric_rows = pd.Series(False, index=finalized.index)
+    for column, default in RANKING_METRIC_DEFAULTS.items():
+        if column not in finalized.columns:
+            finalized[column] = default
+            if column != "ranking_warning":
+                missing_metric_rows[:] = True
+            continue
+        if column != "ranking_warning":
+            missing_metric_rows = missing_metric_rows | finalized[column].isna()
+        finalized[column] = finalized[column].fillna(default)
+
+    warnings = finalized["ranking_warning"].fillna("").astype(str)
+    warnings = warnings.mask(
+        missing_metric_rows,
+        warnings.map(lambda value: _append_warning(value, "ranking_metrics_unavailable")),
+    )
+    if "suppressed" in finalized.columns:
+        suppressed = finalized["suppressed"].astype(str).str.casefold().isin(
+            {"true", "1", "yes"}
+        )
+        warnings = warnings.mask(
+            suppressed,
+            warnings.map(lambda value: _append_warning(value, "suppressed")),
+        )
+    finalized["ranking_warning"] = warnings
+    return finalized
+
+
+def _append_warning(existing: str, warning: str) -> str:
+    """Append one warning token without duplicates."""
+    tokens = [token for token in str(existing).split(";") if token]
+    if warning not in tokens:
+        tokens.append(warning)
+    return ";".join(tokens)
 
 
 def _section_anchor(page_label: str, section_label: str, subsection_label: str | None = None) -> str:
@@ -6366,7 +6495,7 @@ def render_dashboard(
         dashboard_updated_label=dashboard_updated_label,
         **category_basis_ui_kwargs(template),
     )
-    manifest_df = pd.DataFrame(manifest_rows)
+    manifest_df = finalize_chart_manifest(pd.DataFrame(manifest_rows))
     active_scope = str(template.get("_active_comparison_scope", "")).strip()
     if active_scope and "comparison_scope" not in manifest_df.columns:
         manifest_df.insert(0, "comparison_scope", active_scope)

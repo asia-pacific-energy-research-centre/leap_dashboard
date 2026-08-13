@@ -33,6 +33,7 @@ from codebase.common_esto_dashboard_renderer import (
     assign_bespoke_overview_rows,
     build_area_chart,
     build_product_chart,
+    compute_ranking_metrics,
     compute_diff_series,
     chart_dataset_tokens_from_figure,
     code_expression_matches_prefix,
@@ -49,6 +50,7 @@ from codebase.common_esto_dashboard_renderer import (
     pick_area_specs,
     prepare_other_transformation_page_rows,
     render_dashboard,
+    finalize_chart_manifest,
     select_transformation_overview_rows,
     select_transformation_total_rows,
     _build_section_aggregate_charts,
@@ -71,6 +73,76 @@ from codebase.common_esto_dashboard_renderer import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORE_PAGES = ["index", "total_demand", "transport"]
 DEFAULT_DIAGNOSTIC_PAGES = ["transport_leap_vs_ninth", "datacentres_leap_vs_ninth"]
+
+
+def test_ranking_metrics_record_normal_paired_series() -> None:
+    rows = pd.DataFrame(
+        [
+            {"source_system": "ESTO", "scenario": "historical", "year": 2022, "value": 90.0},
+            {"source_system": "LEAP", "scenario": "Target", "year": 2022, "value": 100.0},
+            {"source_system": "NINTH", "scenario": "Reference", "year": 2023, "value": 105.0},
+            {"source_system": "LEAP", "scenario": "Target", "year": 2023, "value": 110.0},
+        ]
+    )
+
+    metrics = compute_ranking_metrics(rows, base_year=2022)
+
+    assert metrics["model_abs_value"] == pytest.approx(210.0)
+    assert metrics["comparison_abs_value"] == pytest.approx(195.0)
+    assert metrics["abs_diff"] == pytest.approx(15.0)
+    assert metrics["pct_diff"] == pytest.approx(15.0 / 195.0)
+    assert metrics["max_annual_absolute_difference"] == pytest.approx(10.0)
+    assert metrics["max_annual_percentage_difference"] == pytest.approx(10.0 / 90.0)
+    assert metrics["non_zero_year_count"] == 2
+    assert metrics["unexpected_sign_count"] == 0
+    assert metrics["ranking_warning"] == ""
+
+
+def test_ranking_metrics_flag_small_comparison_denominator() -> None:
+    rows = pd.DataFrame(
+        [
+            {"source_system": "LEAP", "scenario": "Target", "year": 2023, "value": 10.0},
+            {"source_system": "NINTH", "scenario": "Reference", "year": 2023, "value": 0.01},
+        ]
+    )
+
+    metrics = compute_ranking_metrics(rows, base_year=2022)
+
+    assert metrics["abs_diff"] == pytest.approx(9.99)
+    assert metrics["pct_diff"] == 0.0
+    assert metrics["max_annual_percentage_difference"] == 0.0
+    assert "small_comparison_denominator" in str(metrics["ranking_warning"])
+    assert "sparse_model_series" in str(metrics["ranking_warning"])
+
+
+def test_ranking_metrics_flag_missing_model() -> None:
+    rows = pd.DataFrame(
+        [
+            {"source_system": "ESTO", "scenario": "historical", "year": 2022, "value": 5.0},
+        ]
+    )
+
+    metrics = compute_ranking_metrics(rows, base_year=2022)
+
+    assert metrics["model_abs_value"] == 0.0
+    assert "missing_model" in str(metrics["ranking_warning"])
+
+
+def test_finalize_chart_manifest_records_order_suppression_and_missing_metrics() -> None:
+    manifest = pd.DataFrame(
+        [
+            {"page_key": "supply", "chart_key": "a", "suppressed": False, "model_abs_value": 2.0},
+            {"page_key": "supply", "chart_key": "b", "suppressed": True},
+            {"page_key": "power", "chart_key": "c", "suppressed": False, "model_abs_value": 3.0},
+        ]
+    )
+
+    finalized = finalize_chart_manifest(manifest)
+
+    assert finalized["default_order"].tolist() == [0, 1, 0]
+    assert "suppressed" in finalized.loc[1, "ranking_warning"]
+    assert "ranking_metrics_unavailable" in finalized.loc[1, "ranking_warning"]
+    assert finalized.loc[0, "model_abs_value"] == pytest.approx(2.0)
 
 
 def test_page_navigation_stays_on_one_scrollable_row() -> None:
