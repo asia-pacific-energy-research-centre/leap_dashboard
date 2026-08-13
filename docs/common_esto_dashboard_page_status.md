@@ -1,12 +1,7 @@
 # Common ESTO Dashboard Page Status
 
-Last evidence review: 2026-06-28 using the upstream `20_USA` output and the
-existing 21-economy page-noise report.
-
-> **Dated evidence:** renderer, diagnostics, and input-contract work continued
-> after this review. The counts below describe that 2026-06-28 generation, not
-> a permanent or current baseline. DASHQ-012 requires a reproducible refresh
-> before these counts are replaced.
+Last evidence review: 2026-08-13 using the current four-source Common ESTO
+output and a fresh 21-economy, two-comparison-basis render.
 
 ## Summary
 
@@ -18,39 +13,32 @@ hidden by default until their rows are reviewed with more complete economy data.
 
 These pages are enabled by default and are suitable for normal dashboard review:
 
-| Page key | Status | 2026-06-28 chart count | Notes |
+| Page key | Status | 20USA chart count | Notes |
 |---|---:|---:|---|
-| `total_demand` | Production-facing | 2 | High-level demand/supply aggregate checks. |
-| `supply` | Production-facing | 211 | Broad supply review; requires aggregate-first navigation because of its density. |
-| `bunkers` | Production-facing | 27 | Bunker rows use the configured negative-value sign semantics. |
-| `power` | Production-facing | 138 | Power output and related power-sector rows. |
-| `other_transformation` | Production-facing | 88 | Includes the Transfers section; useful for transformation QA. |
-| `refining` | Production-facing | 52 | Oil refining rows and related own-use rows. |
-| `industry` | Production-facing | 219 | Largest default page; requires aggregate-first navigation and stronger sections. |
-| `transport` | Production-facing | 42 | Domestic transport final energy demand. |
-| `buildings` | Production-facing | 24 | Residential, commercial/public, and visible datacentre rows. |
-| `others` | Production-facing | 30 | Other final demand outside buildings/industry/transport. |
-| `non_energy` | Production-facing | 17 | Non-energy use rows. |
+| `total_demand` | Production-facing | 8 | Energy-balance overview and summary aggregate checks. |
+| `supply` | Production-facing | 85 | Broad supply review with aggregate-first navigation. |
+| `power` | Production-facing | 54 | Power output and related power-sector rows. |
+| `other_transformation` | Production-facing | 66 | Other transformation processes and transfers. |
+| `refining` | Production-facing | 20 | Oil refining rows and the inclusive own-use boundary. |
+| `industry` | Production-facing | 150 | Largest current USA page; detailed charts remain available below its overview. |
+| `transport` | Production-facing | 46 | Domestic transport final energy demand. |
+| `buildings` | Production-facing | 32 | Residential, commercial/public, and visible datacentre rows. |
+| `others` | Production-facing | 43 | Other demand, including the separately routed non-energy section. |
+| `emissions` | Production-facing | 2 | Configured combustion-emissions summary charts. |
 
-The current upstream render writes 850 chart manifest rows for `20_USA` from
-19,103 visible input rows. The older tracked fixture wrote 860 rows; that count
-is historical and must not be used as the current page baseline.
+The current `20USA` render writes 1,035 charts across both maintained bases:
+529 for `esto_leap` and 506 for `esto_leap_ninth`. Its default three-way chart
+manifest contains 506 rows (the 10 page counts above). Across all 21 economies,
+the batch wrote 15,166 charts. `render_summary.csv`, each economy's
+`chart_manifest.csv`, and `page_assignment_summary.csv` are the count sources.
 
 ## Page-noise Review
 
-The existing 21-economy analysis flags 23 economy/page pairs. Eight have a high
-chart count, 15 have a high suppressed share, and three have many sparse
-one-row charts; some pages have more than one reason.
-
-The eight high-count flags are Industry for Australia, China, Korea, Russia,
-Chinese Taipei, and the USA, plus Supply for Canada and the USA. This is a real
-navigation problem, not a suppression-threshold problem. Industry and Supply
-should gain aggregate-first navigation and stronger configuration-driven
-sections while retaining every detailed chart and manifest row.
-
-High suppressed-share flags remain QA prompts. They do not justify increasing
-the confirmed 1 PJ threshold. Sparse one-row flags on USA Industry, Supply, and
-Transport require content review during the grouping work.
+The 2026-08-13 page-noise analysis inspected 418 economy/page rows and reported
+zero flags. Large trees, suppressed candidates, and sparse one-row charts remain
+recorded in `page_noise_summary.csv`; the current policy treats them as review
+metrics rather than automatic warnings. Publication readiness passed for all
+42 rendered roots (21 economies times two maintained comparison bases).
 
 ## Diagnostic Pages
 
@@ -72,8 +60,8 @@ large, medium, and small economies.
 Before publishing a Common ESTO dashboard:
 
 1. Run `scripts/check_common_esto_dashboard_publish_ready.py`.
-2. Confirm `outputs/common_esto_dashboard/20USA/supporting_files/chart_manifest.csv`
-   has no unexpected diagnostic pages.
+2. Confirm each maintained basis has no unexpected diagnostic page in its
+   `supporting_files/chart_manifest.csv`.
 3. Open `outputs/common_esto_dashboard/20USA/dashboards/index.html` and inspect
    the largest pages for noisy or redundant sections.
 4. Keep `PUBLISH_TO_DOCS = False` unless deliberately copying serving assets to
