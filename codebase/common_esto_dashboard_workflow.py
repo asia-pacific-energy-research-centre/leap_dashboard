@@ -336,6 +336,9 @@ def maybe_regen_common_esto_fast_path() -> None:
         NINTH_PROJECTION_START_YEAR,
         run_common_esto_comparison_fast_path,
     )
+    from mapping_tools.value_adapter_registry import (  # noqa: E402
+        get_component_relevance_reference_paths,
+    )
 
     relationship_dir = _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships"
     run_timestamp = datetime.now(timezone.utc)
@@ -357,6 +360,9 @@ def maybe_regen_common_esto_fast_path() -> None:
         ninth_projection_start_year=NINTH_PROJECTION_START_YEAR,
         run_id=run_timestamp.strftime("common_esto_fast_path_%Y%m%dT%H%M%S%fZ"),
         run_timestamp_utc=run_timestamp.isoformat(),
+        relevance_reference_paths=get_component_relevance_reference_paths(
+            _LEAP_MAPPINGS_REPO
+        ),
     )
 
 

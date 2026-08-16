@@ -229,17 +229,19 @@ These later commits supersede the corresponding snapshot rows below:
   queue. A collapsed classification selector retains the same paired cards,
   related economy evidence, review fields, and source-review candidates for
   audit without mixing known exceptions back into unresolved issues.
-- **DASHQ-050 is `upstream_decision_required`.** The four current ESTO
-  flow-tree cards reduce to one mapped 2022 China component,
+- **DASHQ-050 is `complete_on_master`.** The four former ESTO flow-tree cards
+  reduced to one mapped 2022 China component,
   `10.01.01 Electricity, CHP and heat plants / 02.07 Coal tar` (-0.060290 PJ),
-  which the active Common ESTO build prunes because ESTO component relevance
-  uses the latest available year (2023, where the component is zero). The raw
+  which the previous Common ESTO build pruned because it applied one global
+  latest year (2023, where the component is zero). The raw
   ESTO hierarchy reconciles and the published structural map includes the
   component, so this is neither source non-additivity nor a general 10.x-to-09.x
-  boundary-adjustment failure. Decide upstream whether to retain this component
-  narrowly or classify its historical omission as `intentional_detail_exclusion`;
-  do not change ESTO relevance globally because that would restore 284 pruned
-  2022 pairs totaling about 19 million PJ, mostly 18.x generation categories.
+  boundary-adjustment failure. The approved upstream policy now retains a
+  mapped pair when it is non-zero in the endpoint year of any maintained ESTO
+  vintage, without treating all historical years as relevant or adding another
+  displayed ESTO source. Mapping run `common_esto_20260816T062433503628Z`
+  retained the component; the regenerated page has zero ESTO flow issue cards,
+  and no exception was added.
 
 - **DASHQ-051 is `complete_on_master`.** The Energy balance overview now shows
   paired signed composition charts for the complete transformation boundary:
@@ -379,7 +381,7 @@ decisions can be made without review.
 |---|---|---|---|---|---|---|
 | DASHQ-038 | P1 | 2026-08-10 | `complete_on_master` | none | Remove the production mapping-tree explorer page and make failed NINTH/LEAP anchor cards show the tested child frontier | The production workflow no longer renders or links `mapping_tree_explorer.html`; the standalone script remains available for manual investigation. Paired diagnostic cards now constrain component evidence by source system and show only child-frontier rows, explicitly identifying excluded parent mappings and unmapped children. Focused diagnostics tests pass, and the shared APEC diagnostics plus 16RUS dashboard were regenerated. |
 | DASHQ-049 | P1 | 2026-08-11 | `complete_on_master` | DASHQ-038 | Separate exception-set matches from the default paired-tree issue queue | Every `known_data_quality_exception` context is hidden from the default NINTH/LEAP/ESTO issue trees and retained in a collapsed `exception_issue_class` selector using the same paired cards and evidence drill-down. Focused diagnostics tests and the regenerated shared diagnostics page verify the split. |
-| DASHQ-050 | P1 | 2026-08-11 | `upstream_decision_required` | `leap_mappings` relevance policy | Resolve four duplicate ESTO flow-tree failures caused by one pruned historical coal-tar component | The structural map includes `10.01.01 / 02.07`, and raw 2022 ESTO reconciles, but latest-year relevance removes its -0.060290 PJ China value because 2023 is zero. Prefer a narrow upstream retention rule if historical anchor completeness is intended; otherwise record `intentional_detail_exclusion`. A global all-period ESTO policy is unsafe: it restores 284 pruned 2022 pairs totaling about 19 million PJ. |
+| DASHQ-050 | P1 | 2026-08-16 | `complete_on_master` | `leap_mappings` MAPQ-048 | Resolve four duplicate ESTO flow-tree failures caused by one pruned historical coal-tar component | Run `common_esto_20260816T062433503628Z` retained the component using per-dataset/per-vintage endpoint relevance. All ten mapped scope/source totals remained 100% conserved; 141 dashboard tests passed; the regenerated diagnostics page has zero ESTO flow issue cards and no new exception. USA/Brunei smoke renders wrote 1,361 charts, publication readiness passed all 42 roots, and page-noise reported zero flags. |
 | DASHQ-051 | P0 | 2026-08-12 | `complete_on_master` | DASHQ-040, DASHQ-042 | Add the complete transformation boundary to Energy balance overview and retain historical detail in aggregate-only two-way demand views | Implemented paired flow/fuel charts for 09, 08, 10.01 and 10.02 using non-overlapping frontiers and gross signed stacks. LEAP+ESTO demand views now keep ESTO historical areas when no detailed projection source is available. Verification: 112 dashboard tests pass; regenerated China three-way/two-way bundles contain both transformation charts, flow 09 has positive and negative fragments, all four required roots are present, and Reference demand areas are non-empty. |
 | DASHQ-052 | P0 | 2026-08-12 | `complete_on_master` | DASHQ-051 | Show transformation leaf flows in the Energy balance overview | The by-flow areas now select the deepest available non-overlapping flow nodes per source/scenario instead of retaining the uppermost parent. Net lines and the by-fuel chart continue to use the authoritative whole-boundary frontier. Verification: 114 dashboard tests pass; China production-render evidence is recorded with the implementation commit. |
 | DASHQ-053 | P1 | 2026-08-12 | `complete_on_master` | none | Align public dashboard filenames with page names | Energy balance overview now uses `energy_balance_overview.html` and Other demand uses `other_demand.html`; internal data keys and bundle names remain stable. Generated redirects preserve old `total_demand.html` and `others.html` links. Verification: 117 dashboard tests pass. |
