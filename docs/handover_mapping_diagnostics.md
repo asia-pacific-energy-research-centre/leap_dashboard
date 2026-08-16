@@ -390,8 +390,8 @@ The current anchor sections are evidence-rich but still hard to navigate. The
 next agent should:
 
 1. Start from `source_parent_anchor_validation.csv`,
-   `source_parent_anchor_child_context_values.csv`, and
-   `source_parent_anchor_mapped_component_context_values.csv` in
+   `source_parent_anchor_child_context_values.parquet`, and
+   `source_parent_anchor_mapped_component_context_values.parquet` in
    `leap_mappings/results/tree_structure/`.
 2. Keep one parent boundary as one check/failure; fuels and years should be
    evidence nested beneath it rather than headline failure counts.

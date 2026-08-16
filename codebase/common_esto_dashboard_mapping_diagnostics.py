@@ -7,6 +7,7 @@ not infer mappings, modify workbooks, or change validation status semantics.
 
 from __future__ import annotations
 
+import hashlib
 from html import escape
 import json
 from math import floor, log10
@@ -42,6 +43,48 @@ def _read_csv(path: Path) -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
     return pd.read_csv(path, low_memory=False).fillna("")
+
+
+def prefer_parquet_path(path: Path) -> Path:
+    """Prefer Parquet detail output and accept a legacy CSV during rollout."""
+    candidate = Path(path)
+    if candidate.suffix.lower() != ".parquet":
+        return candidate
+    if candidate.exists():
+        return candidate
+    legacy_path = candidate.with_suffix(".csv")
+    if legacy_path.exists():
+        return legacy_path
+    return candidate
+
+
+def _read_diagnostic_table(path: Path) -> pd.DataFrame:
+    """Read an optional CSV or integrity-manifested Parquet diagnostic table."""
+    selected_path = prefer_parquet_path(path)
+    if not selected_path.exists():
+        return pd.DataFrame()
+    if selected_path.suffix.lower() == ".parquet":
+        manifest_path = selected_path.with_name(f"{selected_path.name}.manifest.json")
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"Unreadable mapping diagnostic manifest: {manifest_path}") from exc
+        artifact = manifest.get("artifact", {})
+        if manifest.get("storage_format") != "leap_mappings_manifested_tabular_artifact":
+            raise ValueError(f"Unsupported mapping diagnostic manifest: {manifest_path}")
+        if manifest.get("format_version") != 1:
+            raise ValueError(f"Unsupported mapping diagnostic version: {manifest_path}")
+        digest = hashlib.sha256()
+        with selected_path.open("rb") as handle:
+            for block in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(block)
+        if digest.hexdigest() != artifact.get("sha256"):
+            raise ValueError(f"Mapping diagnostic hash mismatch: {selected_path}")
+        frame = pd.read_parquet(selected_path)
+        if len(frame) != int(artifact.get("row_count", -1)):
+            raise ValueError(f"Mapping diagnostic row-count mismatch: {selected_path}")
+        return frame.fillna("")
+    return _read_csv(selected_path)
 
 
 def prefer_compressed_csv_path(path: Path) -> Path:
@@ -1550,11 +1593,19 @@ def write_mapping_diagnostics_page(
     tree_root = results_root / "tree_structure"
     anchor_path = tree_root / "source_parent_anchor_validation.csv"
     anchor_child_values_path = tree_root / "source_parent_anchor_child_values.csv"
-    anchor_child_context_values_path = tree_root / "source_parent_anchor_child_context_values.csv"
-    anchor_mapped_component_context_values_path = tree_root / "source_parent_anchor_mapped_component_context_values.csv"
+    anchor_child_context_values_path = prefer_parquet_path(
+        tree_root / "source_parent_anchor_child_context_values.parquet"
+    )
+    anchor_mapped_component_context_values_path = prefer_parquet_path(
+        tree_root / "source_parent_anchor_mapped_component_context_values.parquet"
+    )
     anchor_economy_examples_path = tree_root / "source_parent_anchor_economy_examples.csv"
-    anchor_economy_child_context_values_path = tree_root / "source_parent_anchor_economy_child_context_values.csv"
-    anchor_economy_mapped_component_context_values_path = tree_root / "source_parent_anchor_economy_mapped_component_context_values.csv"
+    anchor_economy_child_context_values_path = prefer_parquet_path(
+        tree_root / "source_parent_anchor_economy_child_context_values.parquet"
+    )
+    anchor_economy_mapped_component_context_values_path = prefer_parquet_path(
+        tree_root / "source_parent_anchor_economy_mapped_component_context_values.parquet"
+    )
     leaf_reconciliation_candidates_path = tree_root / "source_parent_anchor_leaf_reconciliation_candidates.csv"
     stage_path = tree_root / "common_esto_validation.csv"
     partial_path = results_root / "common_esto" / "qa_common_esto_unresolved_partial_coverage.csv"
@@ -1569,14 +1620,14 @@ def write_mapping_diagnostics_page(
 
     anchor = _read_csv(anchor_path)
     anchor_child_values = _read_csv(anchor_child_values_path)
-    anchor_child_context_values = _read_csv(anchor_child_context_values_path)
-    anchor_mapped_component_context_values = _read_csv(anchor_mapped_component_context_values_path)
+    anchor_child_context_values = _read_diagnostic_table(anchor_child_context_values_path)
+    anchor_mapped_component_context_values = _read_diagnostic_table(anchor_mapped_component_context_values_path)
     anchor_economy_examples = _read_csv(anchor_economy_examples_path)
     case_economy_examples = (
         anchor_economy_examples if not anchor_economy_examples.empty else anchor
     )
-    anchor_economy_child_context_values = _read_csv(anchor_economy_child_context_values_path)
-    anchor_economy_mapped_component_context_values = _read_csv(
+    anchor_economy_child_context_values = _read_diagnostic_table(anchor_economy_child_context_values_path)
+    anchor_economy_mapped_component_context_values = _read_diagnostic_table(
         anchor_economy_mapped_component_context_values_path
     )
     leaf_reconciliation_candidates = _read_csv(leaf_reconciliation_candidates_path)

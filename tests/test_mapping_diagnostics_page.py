@@ -1,6 +1,9 @@
+import hashlib
+import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from codebase.common_esto_dashboard_mapping_diagnostics import (
     _aggregate_stage_validation_to_apec,
@@ -17,10 +20,27 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     _rollup_boundary_details_html,
     _rollup_graph_data,
     _transformation_rollup_diagram_html,
+    _read_diagnostic_table,
     load_esto_exact_values_for_economy,
     prefer_compressed_csv_path,
+    prefer_parquet_path,
     write_mapping_diagnostics_page,
 )
+
+
+def _write_manifested_test_parquet(frame: pd.DataFrame, path: Path) -> None:
+    frame.to_parquet(path, index=False)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    path.with_name(f"{path.name}.manifest.json").write_text(
+        json.dumps(
+            {
+                "storage_format": "leap_mappings_manifested_tabular_artifact",
+                "format_version": 1,
+                "artifact": {"sha256": digest, "row_count": len(frame)},
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_exception_classification_descriptions_cover_current_upstream_classes() -> None:
@@ -38,6 +58,26 @@ def test_exception_classification_descriptions_cover_current_upstream_classes() 
     assert "deliberately omits" in descriptions["intentional_detail_exclusion"]
     assert "temporary APEC-wide review" in descriptions["provisional_apec_anchor_review"]
     assert "did not supply an issue class" in descriptions["unclassified_exception"]
+
+
+def test_prefer_parquet_path_accepts_legacy_csv_during_rollout(tmp_path: Path) -> None:
+    requested = tmp_path / "anchor_context.parquet"
+    legacy = tmp_path / "anchor_context.csv"
+    legacy.write_text("value\n1\n", encoding="utf-8")
+
+    assert prefer_parquet_path(requested) == legacy
+
+    _write_manifested_test_parquet(pd.DataFrame({"value": [2]}), requested)
+    assert prefer_parquet_path(requested) == requested
+
+
+def test_parquet_diagnostic_reader_rejects_hash_mismatch(tmp_path: Path) -> None:
+    path = tmp_path / "anchor_context.parquet"
+    _write_manifested_test_parquet(pd.DataFrame({"value": [1]}), path)
+    path.write_bytes(path.read_bytes() + b"corrupt")
+
+    with pytest.raises(ValueError, match="hash mismatch"):
+        _read_diagnostic_table(path)
 
 
 def test_paired_tree_excludes_every_matched_exception() -> None:
@@ -494,17 +534,17 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     pd.DataFrame([
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "parent_code": "09_total", "child_code": "09_child", "raw_child_total": 7.0},
     ]).to_csv(tree_root / "source_parent_anchor_child_values.csv", index=False)
-    pd.DataFrame([
+    _write_manifested_test_parquet(pd.DataFrame([
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "child_code": "09_child", "parent_value": 10.0, "frontier_sum": 7.0, "raw_child_value": 7.0},
-    ]).to_csv(tree_root / "source_parent_anchor_child_context_values.csv", index=False)
-    pd.DataFrame([
+    ]), tree_root / "source_parent_anchor_child_context_values.parquet")
+    _write_manifested_test_parquet(pd.DataFrame([
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "parent", "raw_child_code": "09_total", "component_esto_flow": "09 Total", "component_esto_product": "08.01 Gas", "common_row_id": "parent", "mapped_value": 10.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "parent", "raw_child_code": "09_total", "component_esto_flow": "09 Total", "component_esto_product": "08.01 Gas", "common_row_id": "parent", "mapped_value": 10.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "parent", "raw_child_code": "09_total", "component_esto_flow": "09 Extra", "component_esto_product": "08.01 Gas", "common_row_id": "extra", "mapped_value": 1.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "child", "raw_child_code": "09_child", "component_esto_flow": "09.00 Total", "component_esto_product": "08.01 Gas", "common_row_id": "common", "mapped_value": 7.0, "mapping_status": "mapped"},
         {"source_system": "NINTH", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "child", "raw_child_code": "missing_child", "component_esto_flow": "", "component_esto_product": "", "common_row_id": "", "mapped_value": 0.0, "mapping_status": "missing_source_mapping:missing_child"},
         {"source_system": "LEAP", "validation_axis": "flow", "comparison_scope": "esto_leap_ninth", "economy": "01AUS", "scenario": "reference", "year": 2023, "other_axis_value": "Gas", "parent_code": "09_total", "raw_node_role": "child", "raw_child_code": "foreign_child", "component_esto_flow": "09 Foreign source row", "component_esto_product": "08.01 Gas", "common_row_id": "foreign", "mapped_value": 999.0, "mapping_status": "mapped"},
-    ]).to_csv(tree_root / "source_parent_anchor_mapped_component_context_values.csv", index=False)
+    ]), tree_root / "source_parent_anchor_mapped_component_context_values.parquet")
     pd.DataFrame([{
         "enabled": False, "source_system": "NINTH", "validation_axis": "flow",
         "parent_code": "09_total", "other_axis_value": "Gas", "economy": "01AUS",
