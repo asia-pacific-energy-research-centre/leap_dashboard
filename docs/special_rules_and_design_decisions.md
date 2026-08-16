@@ -1198,6 +1198,39 @@ root-cause classification.
 - 2026-08-11: Added short classification descriptions beside the retained
   upstream class codes.
 
+## DASH-034: Coke ovens and blast furnaces use their inclusive comparison leaves
+
+**Status:** Confirmed and implemented
+**Owner:** leap_dashboard
+**Type:** Presentation / comparison-boundary filtering
+**Affected areas:** Other transformation overview and detail charts
+
+### Current rule
+
+Publish `09.08.01 Coke ovens (including own use)` and `09.08.02 Blast
+furnaces (including own use)` as the ordinary dashboard comparison leaves when
+the upstream mapping supplies them. Suppress the parallel plain transformation
+rows and the absorbed standalone own-use rows `10.01.05 Coke ovens` and
+`10.01.07 Blast furnaces` from those charts.
+
+The upstream mapping and diagnostics retain the component identities for
+lineage and drill-down evidence. The dashboard consumes the upstream
+`NON_EXPANDING` contributor metadata to choose the presentation frontier; it
+does not hard-code a second copy of rollup membership. This is the same rule
+already used for Gas works plants and Oil refineries.
+
+### Validation
+
+Regression coverage presents plain, own-use, and inclusive rows together for
+Gas works plants, Coke ovens, and Blast furnaces. In every case the prepared
+Other transformation page retains only the inclusive comparison leaf while an
+unabsorbed own-use row remains available.
+
+### History
+
+- 2026-08-16: P3-01 approved detailed coexistence in mapping outputs and one
+  inclusive frontier in ordinary dashboard comparisons.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:

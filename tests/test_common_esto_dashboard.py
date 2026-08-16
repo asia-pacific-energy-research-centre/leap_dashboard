@@ -2498,6 +2498,48 @@ def test_other_transformation_page_uses_inclusive_boundaries_and_residual_sectio
             "_section_label": "Other transformation",
         },
         {
+            "common_flow_code": "09.08.01",
+            "common_flow_label": "09.08.01 Coke ovens",
+            "component_flow_code": "09.08.01",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "09.08.01",
+            "common_flow_label": "09.08.01 Coke ovens (including own use)",
+            "component_flow_code": "09.08.01",
+            "non_expanding_contributor_inputs": (
+                "ESTO: 09.08.01 Coke ovens|ESTO: 10.01.05 Coke ovens"
+            ),
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "10.01.05",
+            "common_flow_label": "10.01.05 Coke ovens",
+            "component_flow_code": "10.01.05",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "09.08.02",
+            "common_flow_label": "09.08.02 Blast furnaces",
+            "component_flow_code": "09.08.02",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "09.08.02",
+            "common_flow_label": "09.08.02 Blast furnaces (including own use)",
+            "component_flow_code": "09.08.02",
+            "non_expanding_contributor_inputs": (
+                "ESTO: 09.08.02 Blast furnaces|ESTO: 10.01.07 Blast furnaces"
+            ),
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "10.01.07",
+            "common_flow_label": "10.01.07 Blast furnaces",
+            "component_flow_code": "10.01.07",
+            "_section_label": "Other transformation",
+        },
+        {
             "common_flow_code": "09.13.03",
             "common_flow_label": "09.13.03 SMR w CCS",
             "component_flow_code": "09.13.03",
@@ -2528,6 +2570,8 @@ def test_other_transformation_page_uses_inclusive_boundaries_and_residual_sectio
 
     assert set(prepared["common_flow_label"]) == {
         "09.06.01 Gas works plants (including own use)",
+        "09.08.01 Coke ovens (including own use)",
+        "09.08.02 Blast furnaces (including own use)",
         "09.13.03 SMR w CCS (including own use)",
         "10.01.06 Coal mines",
         "10.02 Transmission and distribution losses",
