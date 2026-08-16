@@ -188,7 +188,7 @@ def manifest_artifact_paths(manifest: dict, mappings_root: Path) -> list[Path]:
     if manifest.get("_manifest_kind") == "output_contract":
         return [Path(value) for value in manifest.get("_artifact_paths", [])]
     return [
-        mappings_root / "results" / "common_esto" / "common_esto_comparison_data.csv"
+        mappings_root / "results" / "common_esto" / "common_esto_comparison_data.parquet"
     ]
 
 

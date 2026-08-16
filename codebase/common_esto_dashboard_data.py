@@ -222,6 +222,9 @@ def load_source_category_map(
     frames: list[pd.DataFrame] = []
     if source_to_common_map_path is not None:
         source_map = pd.read_csv(Path(source_to_common_map_path), dtype=str).fillna("")
+        source_map = source_map.rename(
+            columns={"scope": "comparison_scope", "system": "source_system"}
+        )
         missing = [
             column for column in SOURCE_CATEGORY_MAP_COLUMNS
             if column not in source_map.columns
@@ -492,11 +495,15 @@ def load_wide_common_esto_data(
 
 def load_long_common_esto_data(path: Path) -> pd.DataFrame:
     """Load already-long common ESTO comparison data."""
-    df = pd.read_csv(
-        path,
-        dtype=_legacy_csv_text_dtypes(path),
-        low_memory=False,
-    ).fillna("")
+    path = Path(path)
+    if path.suffix.casefold() == ".parquet":
+        df = pd.read_parquet(path).fillna("")
+    else:
+        df = pd.read_csv(
+            path,
+            dtype=_legacy_csv_text_dtypes(path),
+            low_memory=False,
+        ).fillna("")
     missing_columns = [column for column in REQUIRED_COLUMNS if column not in df.columns]
     if missing_columns:
         raise ValueError(f"Common ESTO data is missing required columns: {missing_columns}")
@@ -863,6 +870,8 @@ def load_common_esto_data(
     """
     if output_contract_path is not None:
         loaded = load_common_esto_output_contract(output_contract_path)
+    elif Path(path).suffix.casefold() == ".parquet":
+        loaded = load_long_common_esto_data(path)
     else:
         sample_df = pd.read_csv(path, nrows=0, low_memory=False)
         if all(column in sample_df.columns for column in REQUIRED_COLUMNS):

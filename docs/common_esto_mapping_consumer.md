@@ -109,8 +109,8 @@ onto the contract is tracked in
 
 Worth being exact, because the target shape is not yet what the code does.
 
-**Today.** This dashboard reads the pre-converted
-`leap_mappings/results/common_esto/common_esto_comparison_data.csv` via
+**Today.** This dashboard reads the pre-converted, manifested
+`leap_mappings/results/common_esto/common_esto_comparison_data.parquet` via
 `codebase/common_esto_dashboard_data.load_common_esto_data`. The conversion has
 already happened upstream, so the guarantee above is inherited rather than
 exercised here.

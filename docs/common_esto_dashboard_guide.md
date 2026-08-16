@@ -159,7 +159,7 @@ C:\Users\Work\miniconda3\python.exe scripts\update_common_esto_dashboard_fixture
 The script copies:
 
 ```text
-C:\Users\Work\github\leap_mappings\results\common_esto\common_esto_comparison_data.csv
+C:\Users\Work\github\leap_mappings\results\common_esto\common_esto_comparison_data.parquet
 C:\Users\Work\github\leap_mappings\results\common_esto\common_esto_rows.csv
 ```
 
@@ -218,7 +218,7 @@ For production or ad hoc runs, override the input paths with environment
 variables:
 
 ```powershell
-$env:COMMON_ESTO_INPUT_DATA_PATH = "C:\path\to\common_esto_comparison_data.csv"
+$env:COMMON_ESTO_INPUT_DATA_PATH = "C:\path\to\common_esto_comparison_data.parquet"
 $env:COMMON_ESTO_ROWS_PATH = "C:\path\to\common_esto_rows.csv"
 $env:COMMON_ESTO_ECONOMIES = "20_USA"
 $env:COMMON_ESTO_DASHBOARD_OUTPUT_ROOT = "outputs\common_esto_dashboard"

@@ -43,6 +43,10 @@ from codebase.mapping_pipeline_provenance import (  # noqa: E402 - needs sys.pat
     resolve_mappings_root,
     selected_run_manifest,
 )
+from codebase.common_esto_dashboard_mapping_diagnostics import (  # noqa: E402
+    _read_diagnostic_table,
+    prefer_parquet_path,
+)
 
 MAPPINGS_ROOT = resolve_mappings_root(REPO_ROOT.parent / "leap_mappings")
 RESULTS_ROOT = MAPPINGS_ROOT / "results"
@@ -70,8 +74,8 @@ class Artifact:
 
 
 def _read_artifact(key: str, relative: str, label: str) -> Artifact:
-    """Read one small CSV artifact without raising on missing or bad files."""
-    path = RESULTS_ROOT / relative
+    """Read one small CSV or manifested-Parquet artifact without raising."""
+    path = prefer_parquet_path(RESULTS_ROOT / relative)
     artifact = Artifact(key=key, path=path, label=label)
     if not path.exists():
         return artifact
@@ -79,7 +83,10 @@ def _read_artifact(key: str, relative: str, label: str) -> Artifact:
     # Local time, so artifact timestamps compare correctly with local git commit dates.
     artifact.mtime = _artifact_mtime(path)
     try:
-        artifact.frame = pd.read_csv(path, dtype=str, keep_default_na=False)
+        if path.suffix.lower() == ".parquet":
+            artifact.frame = _read_diagnostic_table(path).astype(str)
+        else:
+            artifact.frame = pd.read_csv(path, dtype=str, keep_default_na=False)
     except Exception as error:  # noqa: BLE001 - report, never fail the page
         artifact.error = f"{type(error).__name__}: {error}"
     return artifact
@@ -88,7 +95,7 @@ def _read_artifact(key: str, relative: str, label: str) -> Artifact:
 ARTIFACT_SPECS: list[tuple[str, str, str]] = [
     ("common_esto_validation", "tree_structure/common_esto_validation_summary.csv",
      "Common ESTO hierarchy validation summary"),
-    ("anchor_validation", "tree_structure/source_parent_anchor_validation_summary.csv",
+    ("anchor_validation", "tree_structure/source_parent_anchor_validation_summary.parquet",
      "Source-parent anchor validation summary"),
     ("rollup_validation", "tree_structure/common_esto_rollup_validation_summary.csv",
      "Rollup boundary reconciliation summary"),

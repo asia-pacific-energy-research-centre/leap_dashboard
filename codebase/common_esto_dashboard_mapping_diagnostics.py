@@ -1591,38 +1591,46 @@ def write_mapping_diagnostics_page(
     """Write one self-contained mapping diagnostics page and summary CSV."""
     results_root = mappings_root / "results"
     tree_root = results_root / "tree_structure"
-    anchor_path = tree_root / "source_parent_anchor_validation.csv"
-    anchor_child_values_path = tree_root / "source_parent_anchor_child_values.csv"
+    anchor_path = prefer_parquet_path(
+        tree_root / "source_parent_anchor_validation.parquet"
+    )
+    anchor_child_values_path = prefer_parquet_path(
+        tree_root / "source_parent_anchor_child_values.parquet"
+    )
     anchor_child_context_values_path = prefer_parquet_path(
         tree_root / "source_parent_anchor_child_context_values.parquet"
     )
     anchor_mapped_component_context_values_path = prefer_parquet_path(
         tree_root / "source_parent_anchor_mapped_component_context_values.parquet"
     )
-    anchor_economy_examples_path = tree_root / "source_parent_anchor_economy_examples.csv"
+    anchor_economy_examples_path = prefer_parquet_path(
+        tree_root / "source_parent_anchor_economy_examples.parquet"
+    )
     anchor_economy_child_context_values_path = prefer_parquet_path(
         tree_root / "source_parent_anchor_economy_child_context_values.parquet"
     )
     anchor_economy_mapped_component_context_values_path = prefer_parquet_path(
         tree_root / "source_parent_anchor_economy_mapped_component_context_values.parquet"
     )
-    leaf_reconciliation_candidates_path = tree_root / "source_parent_anchor_leaf_reconciliation_candidates.csv"
+    leaf_reconciliation_candidates_path = prefer_parquet_path(
+        tree_root / "source_parent_anchor_leaf_reconciliation_candidates.parquet"
+    )
     stage_path = tree_root / "common_esto_validation.csv"
     partial_path = results_root / "common_esto" / "qa_common_esto_unresolved_partial_coverage.csv"
     unmapped_path = results_root / "common_esto" / "qa_nonzero_unmapped_leap_branches.csv"
     conflicts_path = results_root / "maintenance" / "leap_source_presence_conflicts.csv"
     coverage_path = results_root / "source_coverage" / "all_demand_aggregated_coverage_gaps.csv"
-    source_to_common_path = results_root / "common_esto" / "structural_artifacts" / "source_pair_to_common_row.csv"
+    source_to_common_path = results_root / "common_esto" / "structural_artifacts" / "source_pair_to_common_row.parquet"
     many_to_many_path = results_root / "maintenance" / "many_to_many_conflicts.csv"
     rollup_catalogue_path = results_root / "mapping_relationships" / "rollup_edges.csv"
     if not rollup_catalogue_path.exists():
         rollup_catalogue_path = results_root / "mapping_relationships" / "non_expanding_rollups.csv"
 
-    anchor = _read_csv(anchor_path)
-    anchor_child_values = _read_csv(anchor_child_values_path)
+    anchor = _read_diagnostic_table(anchor_path)
+    anchor_child_values = _read_diagnostic_table(anchor_child_values_path)
     anchor_child_context_values = _read_diagnostic_table(anchor_child_context_values_path)
     anchor_mapped_component_context_values = _read_diagnostic_table(anchor_mapped_component_context_values_path)
-    anchor_economy_examples = _read_csv(anchor_economy_examples_path)
+    anchor_economy_examples = _read_diagnostic_table(anchor_economy_examples_path)
     case_economy_examples = (
         anchor_economy_examples if not anchor_economy_examples.empty else anchor
     )
@@ -1630,7 +1638,7 @@ def write_mapping_diagnostics_page(
     anchor_economy_mapped_component_context_values = _read_diagnostic_table(
         anchor_economy_mapped_component_context_values_path
     )
-    leaf_reconciliation_candidates = _read_csv(leaf_reconciliation_candidates_path)
+    leaf_reconciliation_candidates = _read_diagnostic_table(leaf_reconciliation_candidates_path)
     stage = _read_csv(stage_path)
     ninth_tree = _read_csv(tree_root / "ninth_tree.csv")
     leap_tree = _read_csv(tree_root / "leap_tree.csv")
@@ -1650,7 +1658,7 @@ def write_mapping_diagnostics_page(
     unmapped = _read_csv(unmapped_path)
     conflicts = _read_csv(conflicts_path)
     coverage = _read_csv(coverage_path)
-    source_to_common = _read_csv(source_to_common_path)
+    source_to_common = _read_diagnostic_table(source_to_common_path)
     many_to_many = _read_csv(many_to_many_path)
     rollup_catalogue = _read_csv(rollup_catalogue_path)
     # The hierarchy contract owns ordinary parent/child structure and value

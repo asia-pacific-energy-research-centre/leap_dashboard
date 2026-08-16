@@ -11,7 +11,7 @@ def test_dashboard_workflow_uses_common_esto_and_only_derived_convergence_input(
     source = (REPO_ROOT / "codebase" / "common_esto_dashboard_workflow.py").read_text(
         encoding="utf-8"
     )
-    assert "common_esto_comparison_data.csv" in source
+    assert "common_esto_comparison_data.parquet" in source
     assert '"leap_initialisation"' in source
     assert '"outputs"' in source
     assert '"leap_exports"' in source

@@ -159,7 +159,7 @@ ESTO_EXTENDED_EXACT_ROWS_PATH = prefer_compressed_csv_path(
 # The long-form file only contains rows a source system actually reported, so
 # years a source has no data for are simply absent instead of zero-filled
 # (unlike the wide CSV, which pads every year column with 0).
-DEFAULT_INPUT_PATH = _LEAP_MAPPINGS_RESULTS / "common_esto_comparison_data.csv"
+DEFAULT_INPUT_PATH = _LEAP_MAPPINGS_RESULTS / "common_esto_comparison_data.parquet"
 INPUT_DATA_PATH = _resolve(os.getenv("COMMON_ESTO_INPUT_DATA_PATH", str(DEFAULT_INPUT_PATH)))
 DEFAULT_OUTPUT_CONTRACT_PATH = _LEAP_MAPPINGS_RESULTS / "common_esto_output_contract.json"
 OUTPUT_CONTRACT_PATH = _resolve(
@@ -231,7 +231,7 @@ PUBLISH_TO_DOCS = _env_bool("COMMON_ESTO_PUBLISH_TO_DOCS", default=False)
 # What this does when True:
 # - recomputes fast-path Common ESTO outputs in leap_mappings/results/common_esto
 #   from latest mapping relationship files (Stage 3 fast-path equivalent);
-# - updates dashboard inputs such as common_esto_comparison_data.csv used below.
+# - updates dashboard inputs such as common_esto_comparison_data.parquet used below.
 #
 # Data refresh is opt-in so ordinary renders cannot mutate the sibling repo.
 UPDATE_DATA = False
@@ -322,7 +322,7 @@ def maybe_regen_common_esto_fast_path() -> None:
     """Refresh upstream Common ESTO outputs before dashboard rendering when enabled.
 
     This updates the fast-path input data under leap_mappings/results/common_esto
-    that the dashboard reads from (notably common_esto_comparison_data.csv).
+    that the dashboard reads from (notably common_esto_comparison_data.parquet).
     """
     if not UPDATE_DATA:
         print(

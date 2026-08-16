@@ -1477,8 +1477,8 @@ def test_source_category_map_combines_native_and_esto_mappings(tmp_path: Path) -
     pd.DataFrame(
         [
             {
-                "comparison_scope": "esto_leap_ninth",
-                "source_system": "LEAP",
+                "scope": "esto_leap_ninth",
+                "system": "LEAP",
                 "source_flow": "Buildings",
                 "source_product": "Electricity",
                 "common_flow_label": "16.01-16.02 Buildings",

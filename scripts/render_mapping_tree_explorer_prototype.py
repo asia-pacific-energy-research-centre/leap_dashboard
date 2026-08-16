@@ -17,6 +17,13 @@ import pandas as pd
 
 #%%
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from codebase.common_esto_dashboard_mapping_diagnostics import (  # noqa: E402
+    _read_diagnostic_table,
+)
+
 MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
 OUTPUT_PATH = REPO_ROOT / "outputs" / "prototypes" / "mapping_tree_explorer_prototype.html"
 
@@ -181,7 +188,9 @@ def _case_html(case: dict[str, object]) -> str:
 
 def render_prototype() -> Path:
     tree_root = MAPPINGS_ROOT / "results" / "tree_structure"
-    anchors = _read_csv(tree_root / "source_parent_anchor_validation.csv")
+    anchors = _read_diagnostic_table(
+        tree_root / "source_parent_anchor_validation.parquet"
+    )
     children = _read_csv(tree_root / "source_parent_anchor_child_context_values.csv")
     components = _read_csv(tree_root / "source_parent_anchor_mapped_component_context_values.csv")
     esto_tree = _read_csv(tree_root / "esto_tree.csv")
