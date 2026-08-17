@@ -1,0 +1,297 @@
+{
+  "meta": {
+    "title": "APEC EBT Dashboard — Data Visualization Colors",
+    "description": "Colors currently used across the APEC EBT dashboard, grouped by what they represent: fuels, sectors (consumption end-use), regions, and economies. Within each category, a 'standard'/base list is the single source of truth for hex values; where the dashboard merges multiple raw codes into one display label, that entry carries an 'inherits_from' (or 'members') pointer back to the base list instead of repeating the hex.",
+    "sources": [
+      "apec-ebt-dashboard/src/data_io/egeda_ebt_utils.py (ebt_colors, fuel_color_assign_set1, sector_color_assign_set1, region_color_assign_set1)",
+      "apec-ebt-dashboard/src/data_io/aggregation_rules.py (fuel_groupings, fuel_group_types*, regex_groups_flows_type_tfc/tfec, regions_analysis)",
+      "apec-ebt-dashboard/src/plots/apec_palette.py (economy hue-family + lightness addressing)"
+    ],
+    "notes": [
+      "When Oil is disaggregated into individual products, the remaining products grouped under 'Other Oil' keep Oil's original color; Diesel takes the separate oil-products color.",
+      "When Solar and Wind merge into 'Solar & Wind', the combined label takes Solar's color.",
+      "LPG and Wind use closely the same color. Since the chance of these two appearing on the same chart is small, reusing the color is acceptable.",
+      "AvGas and FuelOil use closely the same colors as Hydro and Geothermal respectively. Since the chance of these appearing on the same chart is small, reusing the colors is acceptable."
+    ]
+  },
+
+  "fuels": {
+    "description": "Fuel colors. 'standard' is the ungrouped, per-code palette and the source of truth for every hex value. 'aggregate' holds the named fuel-grouping schemes offered in the dashboard's 'Fuel grouping' dropdown — each merges raw codes into a display label that inherits its color from one representative standard code.",
+    "used_in": ["TPES", "TFC", "TFEC", "Power", "Fuel Consumption", "Sectoral Consumption"],
+    "standard": [
+      { "code": "01",    "label": "Coal",                   "hex": "#000000" },
+      { "code": "06",    "label": "Oil",                     "hex": "#842482" },
+      { "code": "07.01", "label": "Gasoline",                "hex": "#E46C0A" },
+      { "code": "07.02", "label": "AvGas",                   "hex": "#ABD3EF" },
+      { "code": "07.03", "label": "Naphtha",                 "hex": "#F72F28" },
+      { "code": "07.05", "label": "KeroJet",                 "hex": "#D5EDF2" },
+      { "code": "07.06", "label": "OthKer",                  "hex": "#4695BF" },
+      { "code": "07.07", "label": "Diesel",                  "hex": "#E981E7" },
+      { "code": "07.08", "label": "FuelOil",                 "hex": "#906030" },
+      { "code": "07.09", "label": "LPG",                     "hex": "#000099" },
+      { "code": "07.11", "label": "Ethane",                  "hex": "#BFDAA6" },
+      { "code": "07.14", "label": "Bitumen",                 "hex": "#914747" },
+      { "code": "07.17", "label": "OthProd",                 "hex": "#D1D1D1" },
+      { "code": "07.97", "label": "Other Oil",                "hex": "#842482" },
+      { "code": "08",    "label": "Gas",                     "hex": "#0070C0" },
+      { "code": "09",    "label": "Nuclear",                 "hex": "#FD1983" },
+      { "code": "10",    "label": "Hydro",                   "hex": "#B0D6F0" },
+      { "code": "11",    "label": "Geothermal",               "hex": "#9C5E31" },
+      { "code": "12",    "label": "Solar",                   "hex": "#FFD700" },
+      { "code": "14",    "label": "Wind",                    "hex": "#000099" },
+      { "code": "15",    "label": "Biomass",                 "hex": "#2E8B57" },
+      { "code": "16.01", "label": "Other RE",                 "hex": "#A7DFBF" },
+      { "code": "16.02", "label": "Others",                  "hex": "#808080" },
+      { "code": "17",    "label": "Electricity",              "hex": "#FDE975" },
+      { "code": "17.20", "label": "Electricity (Imported)",   "hex": "#C8FF00" },
+      { "code": "18",    "label": "Heat",                    "hex": "#CD5C5C" }
+    ],
+
+    "aggregate": {
+      "Major Fuels": {
+        "grouping_key": "major_fuels",
+        "used_in": ["TPES", "Power", "Sectoral Consumption"],
+        "fuels": [
+          { "label": "Coal",       "regex": "^(01|02)",                                        "inherits_from": "01" },
+          { "label": "Oil",        "regex": "^(06|07)",                                          "inherits_from": "06" },
+          { "label": "Gas",        "regex": "^08",                                                "inherits_from": "08" },
+          { "label": "Nuclear",    "regex": "^09",                                                "inherits_from": "09" },
+          { "label": "Hydro",      "regex": "^10",                                                "inherits_from": "10" },
+          { "label": "Geothermal", "regex": "^11",                                                "inherits_from": "11" },
+          { "label": "Solar",      "regex": "^12",                                                "inherits_from": "12" },
+          { "label": "Wind",       "regex": "^14",                                                "inherits_from": "14" },
+          { "label": "Biomass",    "regex": "^15",                                                "inherits_from": "15" },
+          { "label": "Other RE",   "regex": "^(13|16.01|16.03|16.05|16.06|16.07|16.08)",          "inherits_from": "16.01" },
+          { "label": "Others",     "regex": "^(03|04|05|16.02|16.04|16.09|17|18)",                "inherits_from": "16.02" }
+        ]
+      },
+      "Supply (Overview)": {
+        "grouping_key": "tpes_overview",
+        "used_in": ["TPES"],
+        "fuels": [
+          { "label": "Coal",       "regex": "^(01|02)",                                              "inherits_from": "01" },
+          { "label": "Oil",        "regex": "^(06|07)",                                               "inherits_from": "06" },
+          { "label": "Gas",        "regex": "^08",                                                     "inherits_from": "08" },
+          { "label": "Nuclear",    "regex": "^09",                                                     "inherits_from": "09" },
+          { "label": "Renewables", "regex": "^(10|11|12|13|14|15|16.01|16.03|16.05|16.06|16.07|16.08)", "inherits_from": "15" },
+          { "label": "Others",     "regex": "^(03|04|05|16.02|16.04|16.09|17|18)",                     "inherits_from": "16.02" }
+        ]
+      },
+      "Supply (Simple)": {
+        "grouping_key": "tpes_t1",
+        "used_in": ["TPES"],
+        "fuels": [
+          { "label": "Coal",           "regex": "^(01|02)",                                       "inherits_from": "01" },
+          { "label": "Oil",            "regex": "^(06|07)",                                        "inherits_from": "06" },
+          { "label": "Gas",            "regex": "^08",                                              "inherits_from": "08" },
+          { "label": "Nuclear",        "regex": "^09",                                              "inherits_from": "09" },
+          { "label": "Hydro",          "regex": "^10",                                              "inherits_from": "10" },
+          { "label": "Geo & Biomass",  "regex": "^(11|15)",                                         "inherits_from": "15" },
+          { "label": "Solar & Wind",   "regex": "^(12|14)",                                         "inherits_from": "12" },
+          { "label": "Other RE",       "regex": "^(13|16.01|16.03|16.05|16.06|16.07|16.08)",        "inherits_from": "16.01" },
+          { "label": "Others",         "regex": "^(03|04|05|16.02|16.04|16.09|17|18)",              "inherits_from": "16.02" }
+        ]
+      },
+      "Supply": {
+        "grouping_key": "tpes_t2",
+        "used_in": ["TPES", "Sectoral Consumption"],
+        "fuels": [
+          { "label": "Coal",         "regex": "^(01|02)",                                          "inherits_from": "01" },
+          { "label": "Oil",          "regex": "^(06|07)",                                           "inherits_from": "06" },
+          { "label": "Gas",          "regex": "^08",                                                 "inherits_from": "08" },
+          { "label": "Nuclear",      "regex": "^09",                                                 "inherits_from": "09" },
+          { "label": "Hydro",        "regex": "^10",                                                 "inherits_from": "10" },
+          { "label": "Geothermal",   "regex": "^11",                                                 "inherits_from": "11" },
+          { "label": "Biomass",      "regex": "^15",                                                 "inherits_from": "15" },
+          { "label": "Solar & Wind", "regex": "^(12|14)",                                            "inherits_from": "12" },
+          { "label": "Other RE",     "regex": "^(13|16.01|16.03|16.05|16.06|16.07|16.08)",           "inherits_from": "16.01" },
+          { "label": "Others",       "regex": "^(03|04|05|16.02|16.04|16.09|17|18)",                 "inherits_from": "16.02" }
+        ]
+      },
+      "Supply w/ Electricity": {
+        "grouping_key": "tpes_with_import_elect",
+        "used_in": ["TPES", "Sectoral Consumption"],
+        "fuels": [
+          { "label": "Coal",         "regex": "^(01|02)",                                           "inherits_from": "01" },
+          { "label": "Oil",          "regex": "^(06|07)",                                            "inherits_from": "06" },
+          { "label": "Gas",          "regex": "^08",                                                  "inherits_from": "08" },
+          { "label": "Nuclear",      "regex": "^09",                                                  "inherits_from": "09" },
+          { "label": "Hydro",        "regex": "^10",                                                  "inherits_from": "10" },
+          { "label": "Geothermal",   "regex": "^11",                                                  "inherits_from": "11" },
+          { "label": "Solar & Wind", "regex": "^(12|14)",                                             "inherits_from": "12" },
+          { "label": "Biomass",      "regex": "^15",                                                  "inherits_from": "15" },
+          { "label": "Electricity",  "regex": "^17",                                                  "inherits_from": "17" },
+          { "label": "Other RE",     "regex": "^(13|16.01|16.03|16.05|16.06|16.07|16.08)",            "inherits_from": "16.01" },
+          { "label": "Others",       "regex": "^(03|04|05|16.02|16.04|16.09|18)",                     "inherits_from": "16.02" }
+        ]
+      },
+
+      "Power (Overview)": {
+        "grouping_key": "power_overview",
+        "used_in": ["Power", "Sectoral Consumption"],
+        "fuels": [
+          { "label": "Coal",       "regex": "^(01|02)",                                              "inherits_from": "01" },
+          { "label": "Oil",        "regex": "^(06|07)",                                               "inherits_from": "06" },
+          { "label": "Gas",        "regex": "^08",                                                     "inherits_from": "08" },
+          { "label": "Nuclear",    "regex": "^09",                                                     "inherits_from": "09" },
+          { "label": "Hydro",      "regex": "^10",                                                     "inherits_from": "10" },
+          { "label": "Geothermal", "regex": "^11",                                                     "inherits_from": "11" },
+          { "label": "Solar",      "regex": "^12",                                                     "inherits_from": "12" },
+          { "label": "Wind",       "regex": "^14",                                                     "inherits_from": "14" },
+          { "label": "Other RE",   "regex": "^(13|15|16.01|16.03|16.05|16.06|16.07|16.08)",            "inherits_from": "16.01" },
+          { "label": "Others",     "regex": "^(03|04|05|16.02|16.04|16.09|17|18)",                     "inherits_from": "16.02" }
+        ]
+      },
+      "Power (Renewable Share)": {
+        "grouping_key": "power_re",
+        "used_in": ["Power", "Sectoral Consumption"],
+        "fuels": [
+          { "label": "Non-RE",     "regex": "^(01|02|03|04|05|06|07|08|16.02|16.04|16.09|17|18)",      "inherits_from": "08" },
+          { "label": "Low-Carbon", "regex": "^09",                                                     "inherits_from": "09" },
+          { "label": "RE",         "regex": "^(10|11|12|13|14|15|16.01|16.03|16.05|16.06|16.07|16.08)","inherits_from": "15" }
+        ]
+      },
+      "Power (Simple)": {
+        "grouping_key": "power_t2",
+        "used_in": ["Power"],
+        "fuels": [
+          { "label": "Coal",   "regex": "^(01|02)",                             "inherits_from": "01" },
+          { "label": "Oil",    "regex": "^(06|07)",                              "inherits_from": "06" },
+          { "label": "Gas",    "regex": "^08",                                    "inherits_from": "08" },
+          { "label": "Nuclear","regex": "^09",                                    "inherits_from": "09" },
+          { "label": "Hydro",  "regex": "^10",                                    "inherits_from": "10" },
+          { "label": "Solar",  "regex": "^12",                                    "inherits_from": "12" },
+          { "label": "Wind",   "regex": "^14",                                    "inherits_from": "14" },
+          { "label": "Others", "regex": "^(03|04|05|11|13|15|16|17|18)",          "inherits_from": "16.02" }
+        ]
+      },
+      "Consumption (Overview)": {
+        "grouping_key": "tfc_overview",
+        "used_in": ["TFC", "TFEC", "Sectoral Consumption"],
+        "fuels": [
+          { "label": "Coal",         "regex": "^(01|02)",                                                      "inherits_from": "01" },
+          { "label": "Oil",          "regex": "^(06|07)",                                                       "inherits_from": "06" },
+          { "label": "Gas",          "regex": "^08",                                                             "inherits_from": "08" },
+          { "label": "Renewables",   "regex": "^(10|11|12|13|14|15|16.01|16.03|16.05|16.06|16.07|16.08)",       "inherits_from": "15" },
+          { "label": "Electricity",  "regex": "^17",                                                             "inherits_from": "17" },
+          { "label": "Others",       "regex": "^(03|04|05|09|16.02|16.04|16.09|18)",                            "inherits_from": "16.02" }
+        ]
+      },
+      "Consumption": {
+        "grouping_key": "tfc",
+        "used_in": ["TFC", "TFEC", "Sectoral Consumption"],
+        "fuels": [
+          { "label": "Coal",        "regex": "^(01|02)",                                                    "inherits_from": "01" },
+          { "label": "Oil",         "regex": "^(06|07)",                                                     "inherits_from": "06" },
+          { "label": "Gas",         "regex": "^08",                                                           "inherits_from": "08" },
+          { "label": "Biomass",     "regex": "^15",                                                           "inherits_from": "15" },
+          { "label": "Electricity","regex": "^17",                                                            "inherits_from": "17" },
+          { "label": "Heat",        "regex": "^18",                                                           "inherits_from": "18" },
+          { "label": "Other RE",    "regex": "^(10|11|12|13|14|16.01|16.03|16.05|16.06|16.07|16.08)",         "inherits_from": "16.01" },
+          { "label": "Others",      "regex": "^(03|04|05|09|16.02|16.04|16.09)",                              "inherits_from": "16.02" }
+        ]
+      },
+      "Consumption + Major Oil": {
+        "grouping_key": "tfec_oil",
+        "used_in": ["TFC", "TFEC", "Sectoral Consumption"],
+        "fuels": [
+          { "label": "Coal",       "regex": "^(01|02)",                                                       "inherits_from": "01" },
+          { "label": "Gasoline",   "regex": "^07.01",                                                          "inherits_from": "07.01" },
+          { "label": "Diesel",     "regex": "^07.07",                                                          "inherits_from": "07.07" },
+          { "label": "LPG",        "regex": "^07.09",                                                          "inherits_from": "07.09" },
+          { "label": "Other Oil",  "regex": "^(06|07.02|07.03|07.04|07.05|07.06|07.08|07.1\\d|07.9\\d)",       "inherits_from": "06" },
+          { "label": "Gas",        "regex": "^08",                                                              "inherits_from": "08" },
+          { "label": "Biomass",    "regex": "^15",                                                              "inherits_from": "15" },
+          { "label": "Electricity","regex": "^17",                                                              "inherits_from": "17" },
+          { "label": "Heat",       "regex": "^18",                                                              "inherits_from": "18" },
+          { "label": "Other RE",   "regex": "^(09|10|11|12|13|14|16.01|16.03|16.05|16.06|16.07|16.08)",         "inherits_from": "16.01" },
+          { "label": "Others",     "regex": "^(03|04|05|16.02|16.04|16.09|16.99)",                              "inherits_from": "16.02" }
+        ]
+      },
+      "Consumption + Major Oil (More)": {
+        "grouping_key": "tfec_oil_more",
+        "used_in": ["TFC", "TFEC", "Sectoral Consumption"],
+        "fuels": [
+          { "label": "Coal",       "regex": "^(01|02)",                                                        "inherits_from": "01" },
+          { "label": "Gasoline",   "regex": "^07.01",                                                           "inherits_from": "07.01" },
+          { "label": "Diesel",     "regex": "^07.07",                                                           "inherits_from": "07.07" },
+          { "label": "LPG",        "regex": "^07.09",                                                           "inherits_from": "07.09" },
+          { "label": "Naphtha",    "regex": "^07.03",                                                           "inherits_from": "07.03" },
+          { "label": "KeroJet",    "regex": "^07.05",                                                           "inherits_from": "07.05" },
+          { "label": "FuelOil",    "regex": "^07.08",                                                           "inherits_from": "07.08" },
+          { "label": "Other Oil",  "regex": "^(06|07.02|07.04|07.06|07.1[012345-9]|07.9\\d)",                    "inherits_from": "06" },
+          { "label": "Gas",        "regex": "^08",                                                               "inherits_from": "08" },
+          { "label": "Biomass",    "regex": "^15",                                                               "inherits_from": "15" },
+          { "label": "Electricity","regex": "^17",                                                               "inherits_from": "17" },
+          { "label": "Heat",       "regex": "^18",                                                               "inherits_from": "18" },
+          { "label": "Other RE",   "regex": "^(09|10|11|12|13|14|16.01|16.03|16.05|16.06|16.07|16.08)",          "inherits_from": "16.01" },
+          { "label": "Others",     "regex": "^(03|04|05|16.02|16.04|16.09|16.99)",                               "inherits_from": "16.02" }
+        ]
+      }
+    }
+  },
+
+  "sectors": {
+    "description": "Colors for the six end-use sectors shown in TFC and TFEC charts: Industry, Transport, Commercial, Residential, Agriculture & Others, and Non-energy. 'Non-energy' only applies to TFC — TFEC excludes non-energy use entirely.",
+    "used_in": ["TFC (by Sector)", "TFEC (by Sector)", "Fuel Consumption (by Sector)", "Sectoral Consumption"],
+    "list": [
+      { "label": "Industry",              "code": "14",    "regex": "^14",                 "hex": "#E11936", "in_tfec": true },
+      { "label": "Transport",             "code": "15",    "regex": "^15",                 "hex": "#0E71C2", "in_tfec": true },
+      { "label": "Commercial",            "code": "16.01", "regex": "^16.01",              "hex": "#FF8C00", "in_tfec": true },
+      { "label": "Residential",           "code": "16.02", "regex": "^16.02",              "hex": "#FFC000", "in_tfec": true },
+      { "label": "Agriculture & Others",  "code": "16.03", "regex": "^(16.03|16.04|16.05)","hex": "#00A249", "in_tfec": true },
+      { "label": "Non-energy",            "code": "17",    "regex": "^17",                 "hex": "#7030A0", "in_tfec": false }
+    ]
+  },
+
+  "regions": {
+    "description": "Regional rollup used for regional totals and the 'By Region' view. USA, China, and Russia are individually significant enough to stand alone, so they just inherit their own economy's color. The other four are genuine clusters of multiple economies, given a fresh representative color not tied to any one member.",
+    "used_in": ["Fuel Consumption — By Region", "regional total rollups"],
+    "list": [
+      { "label": "USA",    "inherits_from": "20USA", "members": ["20USA"] },
+      { "label": "China",  "inherits_from": "05PRC", "members": ["05PRC"] },
+      { "label": "Russia", "inherits_from": "16RUS", "members": ["16RUS"] },
+      { "label": "SEA",    "hex": "#FF8C00", "members": ["02BD", "07INA", "10MAS", "15PHL", "17SGP", "19THA", "21VN"] },
+      { "label": "NEA",    "hex": "#F8C226", "members": ["06HKC", "08JPN", "09ROK", "18CT"] },
+      { "label": "OAM",    "hex": "#4DC2B5", "members": ["03CDA", "04CHL", "11MEX", "14PE"] },
+      { "label": "OCE",    "hex": "#23893B", "members": ["01AUS", "12NZ", "13PNG"] }
+    ]
+  },
+
+  "economies": {
+    "used_in": ["Fuel Consumption — By Economy", "economy-level breakdowns everywhere"],
+    "hue_families": {
+      "red":    { "hue": 358, "saturation": 0.80 },
+      "orange": { "hue": 30,  "saturation": 0.88 },
+      "yellow": { "hue": 50,  "saturation": 0.90 },
+      "green":  { "hue": 140, "saturation": 0.72 },
+      "cyan":   { "hue": 186, "saturation": 0.85 },
+      "blue":   { "hue": 223, "saturation": 0.82 },
+      "purple": { "hue": 289, "saturation": 0.62 },
+      "black":  { "hue": 0,   "saturation": 0.0 }
+    },
+    "list": [
+      { "code": "01AUS", "name": "Australia",         "hex": "#8B4513", "family": "yellow", "lightness": "dark",     "fixed": true,  "display": "brown" },
+      { "code": "02BD",  "name": "Brunei",             "hex": "#000000", "family": "black",  "lightness": null,       "fixed": true,  "display": "black" },
+      { "code": "03CDA", "name": "Canada",             "hex": "#ED5A5F", "family": "red",    "lightness": "light",    "fixed": false },
+      { "code": "04CHL", "name": "Chile",              "hex": "#6189EF", "family": "blue",   "lightness": "light",    "fixed": false },
+      { "code": "05PRC", "name": "China",              "hex": "#FF0000", "family": "red",    "lightness": "normal",   "fixed": true,  "display": "red" },
+      { "code": "06HKC", "name": "Hong Kong, China",   "hex": "#F8E277", "family": "yellow", "lightness": "lightest", "fixed": false },
+      { "code": "07INA", "name": "Indonesia",          "hex": "#E67A0F", "family": "orange", "lightness": "dark",     "fixed": false },
+      { "code": "08JPN", "name": "Japan",               "hex": "#632DA9", "family": "purple", "lightness": "normal",   "fixed": true,  "display": "blue · purple" },
+      { "code": "09ROK", "name": "Korea",              "hex": "#0B818E", "family": "cyan",   "lightness": "dark",     "fixed": false },
+      { "code": "10MAS", "name": "Malaysia",           "hex": "#10B8CB", "family": "cyan",   "lightness": "normal",   "fixed": false },
+      { "code": "11MEX", "name": "Mexico",             "hex": "#20C557", "family": "green",  "lightness": "normal",   "fixed": false },
+      { "code": "12NZ",  "name": "New Zealand",        "hex": "#58E487", "family": "green",  "lightness": "light",    "fixed": false },
+      { "code": "13PNG", "name": "Papua New Guinea",   "hex": "#F5A85C", "family": "orange", "lightness": "light",    "fixed": false },
+      { "code": "14PE",  "name": "Peru",               "hex": "#C76ADC", "family": "purple", "lightness": "light",    "fixed": false },
+      { "code": "15PHL", "name": "Philippines",        "hex": "#F4D125", "family": "yellow", "lightness": "light",    "fixed": false },
+      { "code": "16RUS", "name": "Russia",             "hex": "#832499", "family": "purple", "lightness": "dark",     "fixed": false },
+      { "code": "17SGP", "name": "Singapore",          "hex": "#137634", "family": "green",  "lightness": "dark",     "fixed": false },
+      { "code": "18CT",  "name": "Chinese Taipei",     "hex": "#00A86B", "family": "green",  "lightness": "jade",     "fixed": true,  "display": "green · medium" },
+      { "code": "19THA", "name": "Thailand",           "hex": "#1345C3", "family": "blue",   "lightness": "normal",   "fixed": false },
+      { "code": "20USA", "name": "USA",                "hex": "#12065F", "family": "blue",   "lightness": "darkest",  "fixed": true,  "display": "blue · darkest" },
+      { "code": "21VN",  "name": "Vietnam",            "hex": "#B5141A", "family": "red",    "lightness": "dark",     "fixed": false }
+    ]
+  }
+}

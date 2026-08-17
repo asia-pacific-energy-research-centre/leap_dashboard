@@ -67,6 +67,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     load_source_category_map,
     load_unmet_requirements_data,
 )
+from scripts.manage_dashboard_colors import synchronize_dashboard_colors  # noqa: E402
 from common_esto_dashboard_emissions import set_leap_mappings_root  # noqa: E402
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
 from common_esto_dashboard_output_layout import build_output_layout, publish_to_docs  # noqa: E402
@@ -726,6 +727,7 @@ def run_shared_mapping_diagnostics() -> dict[str, str]:
 
 def run_dashboard_workflow() -> dict[str, object]:
     """Run dashboard render once for all configured economies."""
+    synchronize_dashboard_colors()
     maybe_regen_common_esto_fast_path()
 
     configured_economies = _normalize_economies(ECONOMIES)

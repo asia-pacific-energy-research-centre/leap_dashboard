@@ -1999,7 +1999,17 @@ def _apply_total_series_chrome(fig: go.Figure) -> None:
         source = next((key for key in _TOTAL_SERIES_COLORS if key.casefold() in trace_name.casefold()), None)
         if source is None:
             continue
-        color = _TOTAL_SERIES_COLORS[source]
+        configured_series = load_code_colors().get("plotting", {}).get("series", {})
+        color = next(
+            (
+                configured_color
+                for label, configured_color in sorted(
+                    configured_series.items(), key=lambda item: len(str(item[0])), reverse=True
+                )
+                if trace_name.casefold().startswith(str(label).casefold())
+            ),
+            _TOTAL_SERIES_COLORS[source],
+        )
         style = _TOTAL_SERIES_STYLES[source]
         trace_line = getattr(trace, "line", None)
         if trace_line is not None:

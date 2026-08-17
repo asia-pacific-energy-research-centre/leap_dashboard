@@ -47,6 +47,7 @@ from codebase.common_esto_dashboard_renderer import (
     guide_placeholder_status,
     line_section_tree,
     load_code_colors,
+    set_code_colors_path,
     page_placeholder_note,
     pick_area_specs,
     prepare_other_transformation_page_rows,
@@ -2159,6 +2160,32 @@ def test_stacked_traces_take_their_code_colour_and_totals_keep_theirs() -> None:
     assert fig.data[0].fillcolor == color_for_code("17 Electricity", "product")
     # The total line must keep its stable source colour, not a code colour.
     assert fig.data[1].line.color == "#0072B2"
+
+
+def test_comparison_reference_and_target_lines_use_editable_series_colours(tmp_path: Path) -> None:
+    config_path = tmp_path / "code_colors.json"
+    config_path.write_text(
+        json.dumps({
+            "plotting": {
+                "series": {
+                    "LEAP Reference": "#112233",
+                    "LEAP Target": "#445566",
+                }
+            }
+        }),
+        encoding="utf-8",
+    )
+    set_code_colors_path(config_path)
+    try:
+        fig = go.Figure([
+            go.Scatter(x=[2030], y=[1.0], mode="lines", name="LEAP Reference total"),
+            go.Scatter(x=[2030], y=[2.0], mode="lines", name="LEAP Target total"),
+        ])
+        apply_chart_chrome(fig, base_year=None)
+        assert fig.data[0].line.color == "#112233"
+        assert fig.data[1].line.color == "#445566"
+    finally:
+        set_code_colors_path(None)
 
 
 def test_shared_chart_chrome_keeps_legend_for_one_trace() -> None:

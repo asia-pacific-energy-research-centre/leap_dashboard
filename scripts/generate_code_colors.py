@@ -44,6 +44,14 @@ try:
 except ValueError:
     COMMON_ROWS_SOURCE_LABEL = str(COMMON_ROWS)
 
+COMPARISON_SERIES_COLORS = {
+    "ESTO Historical": "#0072B2",
+    "LEAP Reference": "#D55E00",
+    "LEAP Target": "#D55E00",
+    "9th Reference": "#009E73",
+    "9th Target": "#009E73",
+}
+
 
 def _hls(base: str) -> tuple[float, float, float]:
     r, g, b = (int(base[i:i + 2], 16) / 255 for i in (1, 3, 5))
@@ -312,6 +320,8 @@ flow["19.04"] = flow["09.02.03"]    # AP heat          ~ AP heat plants
 # catalogue. Existing code choices remain authoritative.
 source_colors, ambiguous_source_colors = _read_color_source()
 plotting_colors, plotting_colors_missing = _plotting_color_catalogue(source_colors)
+plotting_colors["series"] = dict(COMPARISON_SERIES_COLORS)
+plotting_colors_missing["series"] = []
 _add_mapping_source_codes(product, "fuels_plotting", "fuels_plotting", source_colors)
 _add_mapping_source_codes(flow, "sectors_plotting", "sectors_plotting", source_colors)
 _add_mapping_source_codes(flow, "transformation_sector_mappings", "sectors_plotting", source_colors)
@@ -338,6 +348,7 @@ payload = {
     "_common_color_source": COMMON_ROWS_SOURCE_LABEL,
     "_common_color_method": "equal-weight OKLab average of mapping-owned ESTO components",
     "_common_color_overrides": dict(custom_colors.get("common_overrides", {})),
+    "_component_color_bases": dict(custom_colors.get("_component_color_bases", {})),
     "_ambiguous_source_colors": ambiguous_source_colors,
     "_source_plotting_colors": dict(sorted(source_colors.items())),
     "_plotting_color_coverage": {
