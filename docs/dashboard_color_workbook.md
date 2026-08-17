@@ -14,12 +14,15 @@ editing surface, not a second runtime format.
    `outputs/dashboard_color_mapping/dashboard_color_mapping.xlsx`.
 4. Send that workbook to the reviewer.
 
-The reviewer starts on **START HERE**. Product and flow codes are joined to
-their names in one visible **Category** column, such as `01 Coal`. In the other
-tabs, the reviewer edits only the **Proposed colour — EDIT** column. They can
-either type a six-digit hex colour such as `#1F77B4` or use Excel's
-paint-bucket fill. The Category column must not be changed. The special label
-tabs are optional.
+The workbook has only three visible sheets: **START HERE**, **Products**, and
+**Flows**. Product and flow codes are joined to their names in one visible
+**Category** column, such as `01 Coal`. The reviewer edits only the
+**Colour — EDIT** column. They can type a six-digit hex colour such as
+`#1F77B4` or use Excel's paint-bucket fill.
+
+Blue **Common rollup** rows are automatic equal-weight OKLab averages of the
+listed ESTO components. Leave them unchanged to keep automatic calculation.
+Edit one only when that particular rollup needs a deliberate override.
 
 ## Apply the returned workbook
 
@@ -48,12 +51,17 @@ the upstream process merges each native flow/product pair onto its declared
 allocate values. The dashboard reads the resulting
 `common_esto_comparison_data` output.
 
-Colours are applied after that conversion. The renderer reads the first ESTO
-code in each Common ESTO label and looks it up in the product or flow colour
-map. For example, the rolled product `01.02-01.04 Coal` uses the configured
-colour for `01.02`. If an exact code has no colour, the renderer walks up the
-code hierarchy, so an unseen `14.03.99` flow can inherit the colour for
-`14.03 Manufacturing`.
+Colours are applied after that conversion. Exact Common ESTO categories use
+their configured ESTO product or flow colour. Multi-component categories use
+an equal-weight average in OKLab colour space. For example,
+`01.02-01.04 Coal` averages the colours of `01.02`, `01.03`, and `01.04`.
+Using equal component weights keeps the colour stable across economies,
+scenarios, years, and data values. If an exact component has no colour, it
+inherits the nearest configured parent colour before the average is taken.
+
+Component membership comes from the mapping-owned `common_esto_rows.csv`; the
+dashboard does not infer membership from the category label. An optional
+rollup override from the workbook is applied after the automatic average.
 
 This separation is deliberate: mapping logic determines which values belong
 to a Common ESTO category, while this workbook determines only how the
@@ -61,10 +69,6 @@ resulting category is displayed.
 
 ## Usability recommendations
 
-- Ask the reviewer to add a short note for major changes. This makes later
-  palette discussions much easier.
-- Start with Products and Flows; expose the special label tabs only when they
-  need them.
 - Prefer medium-dark, saturated colours that remain visible on a white chart.
 - Check colour-blind distinguishability and contrast after import. Excel is the
   editing interface, but rendered dashboard charts remain the final review.

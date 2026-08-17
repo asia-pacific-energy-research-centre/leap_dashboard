@@ -2,6 +2,9 @@
   "_generated_by": "scripts/generate_code_colors.py - edit that script, not this file",
   "_color_source": "config/archive/master_config 9th visualisation.xlsx, colors sheet",
   "_custom_color_source": "",
+  "_common_color_source": "leap_mappings/results/common_esto/common_esto_rows.csv",
+  "_common_color_method": "equal-weight OKLab average of mapping-owned ESTO components",
+  "_common_color_overrides": {},
   "_ambiguous_source_colors": [
     "Aviation fuels",
     "Hydrogen-based fuels",
@@ -400,11 +403,10 @@
   },
   "_notes": [
     "Maps ESTO code -> hex, per axis. Keyed by code, never by display name:",
-    "common ESTO labels take their name from the first component of a",
-    "partition, so the name shifts when a rollup changes while the code",
-    "span does not. Lookup takes the first code of a label's code",
-    "expression (07.12-07.17 -> 07.12) and walks up the dots until a key",
-    "matches, so a new sub-code inherits its family colour for free.",
+    "Exact Common ESTO categories use their configured ESTO code colour.",
+    "Multi-component Common ESTO categories use an equal-weight OKLab",
+    "average of their mapping-owned component colours. Missing exact",
+    "component colours inherit from the nearest configured code parent.",
     "Product and flow codes are separate namespaces and must not be merged:",
     "product 16 is Others, flow 16.01 is Commercial and public services.",
     "Anchors marked (legend) in the generator match the previous dashboard's",
@@ -809,5 +811,19 @@
     "21": "#F37021",
     "23": "#B8D0ED",
     "24": "#B9B9B9"
+  },
+  "common": {
+    "product": {
+      "01.02-01.04": "#A2A2A2",
+      "02.01-02.08": "#A48A5E",
+      "06.03-06.04": "#4E948E",
+      "07.04-07.05": "#72278F",
+      "07.12-07.17": "#DE86BD"
+    },
+    "flow": {
+      "18.01-18.03": "#463B75",
+      "19.01,19.03": "#5B4CC5",
+      "19.02,19.04": "#C7AAE4"
+    }
   }
 }

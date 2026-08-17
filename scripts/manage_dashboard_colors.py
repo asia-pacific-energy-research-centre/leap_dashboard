@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 from colorsys import hls_to_rgb, rgb_to_hls
 from pathlib import Path
 from xml.etree import ElementTree
@@ -20,10 +21,19 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.styles.colors import COLOR_INDEX
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from codebase.dashboard_color_config import (
+    build_common_rollup_colors,
+    load_common_rollup_memberships,
+    normalize_hex,
+)
+
 
 # --- Stable paths and workbook contract -----------------------------------
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_DIR = REPO_ROOT / "config" / "common_esto_dashboard"
 CODE_COLORS_PATH = CONFIG_DIR / "code_colors.json"
 CUSTOM_COLORS_PATH = CONFIG_DIR / "code_colors_custom.json"
@@ -37,34 +47,25 @@ UPSTREAM_AXIS_NODES_PATH = (
     / "axis_nodes.csv"
 )
 FALLBACK_COMMON_ROWS_PATH = REPO_ROOT / "tests" / "fixtures" / "common_esto_dashboard" / "common_esto_rows.csv"
+UPSTREAM_COMMON_ROWS_PATH = REPO_ROOT.parent / "leap_mappings" / "results" / "common_esto" / "common_esto_rows.csv"
+DEFAULT_COMMON_ROWS_PATH = UPSTREAM_COMMON_ROWS_PATH if UPSTREAM_COMMON_ROWS_PATH.exists() else FALLBACK_COMMON_ROWS_PATH
 
-WORKBOOK_SCHEMA_VERSION = "1"
-HEX_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
-EDIT_FILL = PatternFill("solid", fgColor="FFF2CC")
+WORKBOOK_SCHEMA_VERSION = "2"
+COMMON_KEY_PREFIX = "common::"
 HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
 SUBHEADER_FILL = PatternFill("solid", fgColor="D9EAF7")
 LOCKED_FILL = PatternFill("solid", fgColor="F2F2F2")
+ROLLUP_FILL = PatternFill("solid", fgColor="D9EAF7")
 WHITE_FONT = Font(color="FFFFFF")
 BLACK_FONT = Font(color="000000")
 
 SHEET_SPECS = (
-    ("Products", "product", "code"),
-    ("Flows", "flow", "code"),
-    ("Product labels", "product", "plotting"),
-    ("Flow labels", "flow", "plotting"),
-    ("Capacity labels", "capacity", "plotting"),
+    ("Products", "product"),
+    ("Flows", "flow"),
 )
 
 
 # --- Colour and label helpers ---------------------------------------------
-
-def normalize_hex(value: object) -> str:
-    """Return an uppercase #RRGGBB colour or raise a useful error."""
-    text = str(value or "").strip()
-    if not HEX_PATTERN.fullmatch(text):
-        raise ValueError(f"Expected a colour like #1F77B4, received {value!r}")
-    return text.upper()
-
 
 def _cell_fill_hex(cell: object) -> str:
     """Read an ordinary solid Excel fill as #RRGGBB, or return blank."""
@@ -167,13 +168,12 @@ def _write_instructions(workbook: Workbook) -> None:
     sheet.row_dimensions[1].height = 30
 
     instructions = [
-        ("What to do", "Open the Products and Flows tabs. The yellow-column heading marks the cells you may edit."),
-        ("Option 1 — easiest", "Select a Proposed colour cell and use Excel's paint bucket (Fill Color) to choose a colour."),
-        ("Option 2 — exact", "Type a six-digit hex colour such as #1F77B4 into a Proposed colour cell."),
+        ("What to do", "Open Products or Flows and edit only cells under Colour — EDIT."),
+        ("Easiest method", "Select a colour cell and use Excel's paint bucket (Fill Color)."),
+        ("Exact method", "Type a six-digit hex colour such as #1F77B4 into the colour cell."),
+        ("Common rollups", "Blue Common rollup rows are automatic OKLab averages. Leave them unchanged unless you want an override."),
         ("Important", "If you change both the text and the fill in one cell, make them the same colour."),
         ("When finished", "Save the workbook and send this same .xlsx file back. Do not delete rows or rename tabs."),
-        ("Helpful notes", "Use the Notes column to explain choices. Do not edit the Category column or delete rows."),
-        ("Special labels", "The three label tabs are optional and cover special chart labels outside the main Common ESTO code hierarchy."),
     ]
     sheet.append([])
     for heading, explanation in instructions:
@@ -193,47 +193,50 @@ def _write_instructions(workbook: Workbook) -> None:
 def _write_colour_sheet(
     workbook: Workbook,
     sheet_name: str,
-    rows: list[tuple[str, str, str]],
+    rows: list[tuple[str, str, str, str, str]],
 ) -> None:
     sheet = workbook.create_sheet(sheet_name)
     sheet.sheet_view.showGridLines = False
     # Column A is the stable machine identifier used during import. It stays
     # hidden so the reviewer sees one uncomplicated combined Category column.
-    sheet.append(["_internal_key", "Category", "Current colour", "Proposed colour — EDIT", "Notes (optional)"])
-    for identifier, label, color in rows:
+    sheet.append(["_internal_key", "Category", "Colour — EDIT", "Note"])
+    for identifier, label, color, note, automatic_color in rows:
         row_number = sheet.max_row + 1
-        sheet.append([identifier, label, color, color, ""])
-        for column in (3, 4):
-            cell = sheet.cell(row=row_number, column=column)
-            cell.fill = PatternFill("solid", fgColor=color.lstrip("#"))
-            cell.font = _font_for_fill(color)
-            cell.alignment = Alignment(horizontal="center")
+        sheet.append([identifier, label, color, note])
+        color_cell = sheet.cell(row=row_number, column=3)
+        color_cell.fill = PatternFill("solid", fgColor=color.lstrip("#"))
+        color_cell.font = _font_for_fill(color)
+        color_cell.alignment = Alignment(horizontal="center")
         sheet.cell(row=row_number, column=1).fill = LOCKED_FILL
         sheet.cell(row=row_number, column=2).fill = LOCKED_FILL
         sheet.cell(row=row_number, column=1).number_format = "@"
+        if identifier.startswith(COMMON_KEY_PREFIX):
+            sheet.cell(row=row_number, column=2).fill = ROLLUP_FILL
+            sheet.cell(row=row_number, column=2).font = Font(bold=True, color="1F4E78")
+            sheet.cell(row=row_number, column=4).fill = ROLLUP_FILL
+            sheet.cell(row=row_number, column=4).alignment = Alignment(wrap_text=True)
 
     header = sheet[1]
     for cell in header:
         cell.fill = HEADER_FILL
         cell.font = Font(color="FFFFFF", bold=True)
         cell.alignment = Alignment(wrap_text=True, vertical="center")
-    header[3].fill = PatternFill("solid", fgColor="BF9000")
+    header[2].fill = PatternFill("solid", fgColor="BF9000")
     sheet.row_dimensions[1].height = 34
     sheet.freeze_panes = "C2"
     sheet.auto_filter.ref = f"A1:E{sheet.max_row}"
     sheet.column_dimensions["A"].hidden = True
     sheet.column_dimensions["A"].width = 2
     sheet.column_dimensions["B"].width = 55
-    sheet.column_dimensions["C"].width = 18
-    sheet.column_dimensions["D"].width = 24
-    sheet.column_dimensions["E"].width = 44
+    sheet.column_dimensions["C"].width = 22
+    sheet.column_dimensions["D"].width = 60
     if sheet.max_row > 1:
         sheet.conditional_formatting.add(
-            f"D2:D{sheet.max_row}",
-            FormulaRule(formula=["NOT(AND(LEFT(D2,1)=\"#\",LEN(D2)=7))"], fill=PatternFill("solid", fgColor="F4CCCC")),
+            f"C2:C{sheet.max_row}",
+            FormulaRule(formula=["NOT(AND(LEFT(C2,1)=\"#\",LEN(C2)=7))"], fill=PatternFill("solid", fgColor="F4CCCC")),
         )
         table_name = re.sub(r"[^A-Za-z0-9]", "", sheet_name) + "Colours"
-        table = Table(displayName=table_name, ref=f"A1:E{sheet.max_row}")
+        table = Table(displayName=table_name, ref=f"A1:D{sheet.max_row}")
         table.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True, showColumnStripes=False)
         sheet.add_table(table)
 
@@ -241,38 +244,59 @@ def _write_colour_sheet(
 def export_color_workbook(
     output_path: Path = DEFAULT_WORKBOOK_PATH,
     code_colors_path: Path = CODE_COLORS_PATH,
+    common_rows_path: Path = DEFAULT_COMMON_ROWS_PATH,
 ) -> Path:
     """Create the workbook that can be sent directly to a colleague."""
     payload = json.loads(code_colors_path.read_text(encoding="utf-8"))
     labels = _load_axis_labels()
+    memberships = load_common_rollup_memberships(common_rows_path)
+    automatic_common = build_common_rollup_colors(
+        {axis: dict(payload.get(axis, {})) for axis in ("product", "flow")},
+        memberships,
+    )
+    configured_common = dict(payload.get("common", {}))
     workbook = Workbook()
     _write_instructions(workbook)
+    workbook_metadata_rows: list[tuple[str, str, str, str]] = []
 
-    for sheet_name, axis, mapping_kind in SHEET_SPECS:
-        if mapping_kind == "code":
-            mapping = dict(payload.get(axis, {}))
-            rows = [
-                (
-                    code,
-                    f"{code} {labels.get(axis, {}).get(code, 'Category not in the current common hierarchy')}",
-                    normalize_hex(color),
-                )
-                for code, color in sorted(mapping.items())
-            ]
-            _write_colour_sheet(workbook, sheet_name, rows)
-        else:
-            mapping = dict(payload.get("plotting", {}).get(axis, {}))
-            rows = [
-                (name, name.replace("_", " "), normalize_hex(color))
-                for name, color in sorted(mapping.items(), key=lambda item: item[0].casefold())
-            ]
-            _write_colour_sheet(workbook, sheet_name, rows)
+    for sheet_name, axis in SHEET_SPECS:
+        mapping = dict(payload.get(axis, {}))
+        rows = [
+            (
+                code,
+                f"{code} {labels.get(axis, {}).get(code, 'Category not in the current common hierarchy')}",
+                normalize_hex(color),
+                "",
+                normalize_hex(color),
+            )
+            for code, color in sorted(mapping.items())
+        ]
+        for expression, details in sorted(memberships[axis].items()):
+            automatic_color = automatic_common[axis][expression]
+            current_color = normalize_hex(dict(configured_common.get(axis, {})).get(expression, automatic_color))
+            components = ", ".join(str(code) for code in details["components"])
+            rows.append((
+                f"{COMMON_KEY_PREFIX}{expression}",
+                f"Common rollup: {details['label']}",
+                current_color,
+                f"Automatic OKLab average of {components}: {automatic_color}. Edit to override.",
+                automatic_color,
+            ))
+        _write_colour_sheet(workbook, sheet_name, rows)
+        workbook_metadata_rows.extend(
+            (sheet_name, identifier, color, automatic_color)
+            for identifier, _label, color, _note, automatic_color in rows
+        )
 
     metadata = workbook.create_sheet("_metadata")
     metadata.sheet_state = "hidden"
     metadata.append(["schema_version", WORKBOOK_SCHEMA_VERSION])
     metadata.append(["source_config_sha256", _config_hash(payload)])
     metadata.append(["source_config", str(code_colors_path)])
+    metadata.append([])
+    metadata.append(["sheet", "key", "current_color", "automatic_color"])
+    for metadata_row in workbook_metadata_rows:
+        metadata.append(list(metadata_row))
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     workbook.save(output_path)
@@ -282,8 +306,8 @@ def export_color_workbook(
 
 # --- Workbook import ------------------------------------------------------
 
-def _chosen_colour(current_cell: object, proposed_cell: object, location: str) -> str:
-    current = normalize_hex(getattr(current_cell, "value", None))
+def _chosen_colour(current_value: object, proposed_cell: object, location: str) -> str:
+    current = normalize_hex(current_value)
     proposed_text = normalize_hex(getattr(proposed_cell, "value", None))
     proposed_fill = _cell_fill_hex(proposed_cell) or current
     text_changed = proposed_text != current
@@ -296,33 +320,64 @@ def _chosen_colour(current_cell: object, proposed_cell: object, location: str) -
     return proposed_text if text_changed else proposed_fill
 
 
-def _read_colour_sheet(workbook: object, sheet_name: str) -> dict[str, str]:
+def _read_colour_sheet(
+    workbook: object,
+    sheet_name: str,
+    workbook_metadata: dict[tuple[str, str], tuple[str, str]],
+) -> dict[str, dict[str, object]]:
     if sheet_name not in workbook.sheetnames:
         raise ValueError(f"Required sheet {sheet_name!r} is missing or was renamed")
     sheet = workbook[sheet_name]
-    expected_headers = ["Category", "Current colour", "Proposed colour — EDIT"]
+    expected_headers = ["Category", "Colour — EDIT", "Note"]
     actual_headers = [sheet.cell(row=1, column=column).value for column in (2, 3, 4)]
     if actual_headers != expected_headers:
         raise ValueError(f"{sheet_name}: headings were changed; expected {expected_headers!r}")
-    colors: dict[str, str] = {}
+    colors: dict[str, dict[str, object]] = {}
     for row_number in range(2, sheet.max_row + 1):
         identifier = str(sheet.cell(row=row_number, column=1).value or "").strip()
         if not identifier:
             continue
         if identifier in colors:
             raise ValueError(f"{sheet_name}: duplicate identifier {identifier!r}")
-        colors[identifier] = _chosen_colour(
+        metadata_key = (sheet_name, identifier)
+        if metadata_key not in workbook_metadata:
+            raise ValueError(f"{sheet_name}: internal metadata is missing for {identifier!r}")
+        current, automatic = workbook_metadata[metadata_key]
+        current = normalize_hex(current)
+        chosen = _chosen_colour(
+            current,
             sheet.cell(row=row_number, column=3),
-            sheet.cell(row=row_number, column=4),
-            f"{sheet_name}!D{row_number}",
+            f"{sheet_name}!C{row_number}",
         )
+        colors[identifier] = {
+            "color": chosen,
+            "changed": chosen != current,
+            "current": current,
+            "automatic": normalize_hex(automatic),
+        }
     return colors
+
+
+def _read_workbook_metadata(workbook: object) -> dict[tuple[str, str], tuple[str, str]]:
+    """Read stable keys and comparison colours from the hidden metadata sheet."""
+    sheet = workbook["_metadata"]
+    metadata: dict[tuple[str, str], tuple[str, str]] = {}
+    for row_number in range(6, sheet.max_row + 1):
+        sheet_name = str(sheet.cell(row=row_number, column=1).value or "").strip()
+        identifier = str(sheet.cell(row=row_number, column=2).value or "").strip()
+        if sheet_name and identifier:
+            metadata[(sheet_name, identifier)] = (
+                normalize_hex(sheet.cell(row=row_number, column=3).value),
+                normalize_hex(sheet.cell(row=row_number, column=4).value),
+            )
+    return metadata
 
 
 def import_color_workbook(
     workbook_path: Path,
     code_colors_path: Path = CODE_COLORS_PATH,
     custom_colors_path: Path = CUSTOM_COLORS_PATH,
+    common_rows_path: Path = DEFAULT_COMMON_ROWS_PATH,
 ) -> Path:
     """Validate a returned workbook, save its scheme, and apply it to config."""
     workbook = load_workbook(workbook_path, data_only=False)
@@ -331,33 +386,60 @@ def import_color_workbook(
     schema_version = str(workbook["_metadata"]["B1"].value or "")
     if schema_version != WORKBOOK_SCHEMA_VERSION:
         raise ValueError(f"Unsupported workbook schema {schema_version!r}; expected {WORKBOOK_SCHEMA_VERSION!r}")
+    workbook_metadata = _read_workbook_metadata(workbook)
 
     custom_payload: dict[str, object] = {
         "_generated_by": "scripts/manage_dashboard_colors.py from a colleague-edited workbook",
         "_workbook": workbook_path.name,
         "product": {},
         "flow": {},
-        "plotting": {},
+        "common_overrides": {"product": {}, "flow": {}},
     }
-    for sheet_name, axis, mapping_kind in SHEET_SPECS:
-        colors = _read_colour_sheet(workbook, sheet_name)
-        if mapping_kind == "code":
-            custom_payload[axis] = colors
-        else:
-            custom_payload["plotting"][axis] = colors
-
     production_payload = json.loads(code_colors_path.read_text(encoding="utf-8"))
-    for axis in ("product", "flow"):
+    memberships = load_common_rollup_memberships(common_rows_path)
+    entries_by_axis: dict[str, dict[str, dict[str, object]]] = {}
+    for sheet_name, axis in SHEET_SPECS:
+        entries = _read_colour_sheet(workbook, sheet_name, workbook_metadata)
+        entries_by_axis[axis] = entries
+        base_colors = {
+            key: str(details["color"])
+            for key, details in entries.items()
+            if not key.startswith(COMMON_KEY_PREFIX)
+        }
         expected = set(dict(production_payload.get(axis, {})))
-        received = set(dict(custom_payload[axis]))
+        received = set(base_colors)
         if expected != received:
             raise ValueError(f"{axis.title()} rows changed: missing={sorted(expected - received)}, extra={sorted(received - expected)}")
-        production_payload[axis] = dict(custom_payload[axis])
-    for axis, colors in dict(custom_payload["plotting"]).items():
-        expected = set(dict(production_payload.get("plotting", {}).get(axis, {})))
-        if expected != set(colors):
-            raise ValueError(f"{axis.title()} plotting-label rows were added or removed")
-        production_payload.setdefault("plotting", {})[axis] = colors
+        rollup_expressions = {
+            key.removeprefix(COMMON_KEY_PREFIX)
+            for key in entries
+            if key.startswith(COMMON_KEY_PREFIX)
+        }
+        if rollup_expressions != set(memberships[axis]):
+            raise ValueError(f"{axis.title()} Common rollup rows were added or removed")
+        custom_payload[axis] = base_colors
+
+    base_by_axis = {axis: dict(custom_payload[axis]) for axis in ("product", "flow")}
+    automatic_common = build_common_rollup_colors(base_by_axis, memberships)
+    for axis in ("product", "flow"):
+        for expression in memberships[axis]:
+            details = entries_by_axis[axis][f"{COMMON_KEY_PREFIX}{expression}"]
+            chosen = normalize_hex(details["color"])
+            was_override = normalize_hex(details["current"]) != normalize_hex(details["automatic"])
+            if bool(details["changed"]) or was_override:
+                if chosen != automatic_common[axis][expression]:
+                    custom_payload["common_overrides"][axis][expression] = chosen
+
+    resolved_common = build_common_rollup_colors(
+        base_by_axis,
+        memberships,
+        overrides=dict(custom_payload["common_overrides"]),
+    )
+    production_payload["product"] = dict(custom_payload["product"])
+    production_payload["flow"] = dict(custom_payload["flow"])
+    production_payload["common"] = resolved_common
+    production_payload["_common_color_method"] = "equal-weight OKLab average of mapping-owned ESTO components"
+    production_payload["_common_color_overrides"] = dict(custom_payload["common_overrides"])
     production_payload["_custom_color_source"] = custom_colors_path.name
 
     custom_colors_path.write_text(json.dumps(custom_payload, indent=2) + "\n", encoding="utf-8")

@@ -18,14 +18,31 @@ from __future__ import annotations
 
 import colorsys
 import json
+import os
 import re
+import sys
 from pathlib import Path
 
 import openpyxl
 
-OUT = Path(__file__).resolve().parents[1] / "config" / "common_esto_dashboard" / "code_colors.json"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from codebase.dashboard_color_config import build_common_rollup_colors, load_common_rollup_memberships
+
+OUT = REPO_ROOT / "config" / "common_esto_dashboard" / "code_colors.json"
 CUSTOM_COLORS = OUT.with_name("code_colors_custom.json")
 COLOR_SOURCE_XLSX = OUT.parents[1] / "archive" / "master_config 9th visualisation.xlsx"
+DEFAULT_COMMON_ROWS = REPO_ROOT.parent / "leap_mappings" / "results" / "common_esto" / "common_esto_rows.csv"
+FALLBACK_COMMON_ROWS = REPO_ROOT / "tests" / "fixtures" / "common_esto_dashboard" / "common_esto_rows.csv"
+COMMON_ROWS = Path(os.getenv("COMMON_ESTO_ROWS_PATH", str(DEFAULT_COMMON_ROWS)))
+if not COMMON_ROWS.exists():
+    COMMON_ROWS = FALLBACK_COMMON_ROWS
+try:
+    COMMON_ROWS_SOURCE_LABEL = COMMON_ROWS.relative_to(REPO_ROOT.parent).as_posix()
+except ValueError:
+    COMMON_ROWS_SOURCE_LABEL = str(COMMON_ROWS)
 
 
 def _hls(base: str) -> tuple[float, float, float]:
@@ -307,11 +324,20 @@ product.update(dict(custom_colors.get("product", {})))
 flow.update(dict(custom_colors.get("flow", {})))
 for axis, colors in dict(custom_colors.get("plotting", {})).items():
     plotting_colors.setdefault(axis, {}).update(dict(colors))
+common_memberships = load_common_rollup_memberships(COMMON_ROWS)
+common_colors = build_common_rollup_colors(
+    {"product": product, "flow": flow},
+    common_memberships,
+    overrides=dict(custom_colors.get("common_overrides", {})),
+)
 
 payload = {
     "_generated_by": "scripts/generate_code_colors.py - edit that script, not this file",
     "_color_source": "config/archive/master_config 9th visualisation.xlsx, colors sheet",
     "_custom_color_source": CUSTOM_COLORS.name if CUSTOM_COLORS.exists() else "",
+    "_common_color_source": COMMON_ROWS_SOURCE_LABEL,
+    "_common_color_method": "equal-weight OKLab average of mapping-owned ESTO components",
+    "_common_color_overrides": dict(custom_colors.get("common_overrides", {})),
     "_ambiguous_source_colors": ambiguous_source_colors,
     "_source_plotting_colors": dict(sorted(source_colors.items())),
     "_plotting_color_coverage": {
@@ -323,11 +349,10 @@ payload = {
     },
     "_notes": [
         "Maps ESTO code -> hex, per axis. Keyed by code, never by display name:",
-        "common ESTO labels take their name from the first component of a",
-        "partition, so the name shifts when a rollup changes while the code",
-        "span does not. Lookup takes the first code of a label's code",
-        "expression (07.12-07.17 -> 07.12) and walks up the dots until a key",
-        "matches, so a new sub-code inherits its family colour for free.",
+        "Exact Common ESTO categories use their configured ESTO code colour.",
+        "Multi-component Common ESTO categories use an equal-weight OKLab",
+        "average of their mapping-owned component colours. Missing exact",
+        "component colours inherit from the nearest configured code parent.",
         "Product and flow codes are separate namespaces and must not be merged:",
         "product 16 is Others, flow 16.01 is Commercial and public services.",
         "Anchors marked (legend) in the generator match the previous dashboard's",
@@ -339,6 +364,10 @@ payload = {
     "plotting": plotting_colors,
     "product": dict(sorted(product.items())),
     "flow": dict(sorted(flow.items())),
+    "common": {
+        axis: dict(sorted(colors.items()))
+        for axis, colors in common_colors.items()
+    },
 }
 OUT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 print(f"wrote {OUT} - {len(product)} product codes, {len(flow)} flow codes")

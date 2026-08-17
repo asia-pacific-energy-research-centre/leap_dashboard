@@ -1876,11 +1876,16 @@ def set_code_colors_path(path: Path | str | None) -> Path:
 def load_code_colors() -> dict[str, dict[str, str]]:
     """Load the per-axis ESTO code colour map, tolerating an absent config."""
     if not CODE_COLORS_PATH.exists():
-        return {"product": {}, "flow": {}, "plotting": {}}
+        return {"product": {}, "flow": {}, "common": {}, "plotting": {}}
     payload = load_json(CODE_COLORS_PATH)
     return {
         "product": dict(payload.get("product", {})),
         "flow": dict(payload.get("flow", {})),
+        "common": {
+            axis: dict(values)
+            for axis, values in dict(payload.get("common", {})).items()
+            if isinstance(values, dict)
+        },
         "plotting": {
             axis: dict(values)
             for axis, values in dict(payload.get("plotting", {})).items()
@@ -1912,12 +1917,16 @@ def color_for_plotting_name(name: object, axis: str) -> str:
 def color_for_code(code_or_label: object, axis: str) -> str:
     """Resolve a common ESTO label or code to its axis colour, or "" if unmapped.
 
-    Colours are keyed by code rather than display name because a common label
-    takes its name from the first component of its partition: a rollup change
-    or a label override rewrites the name while the code span stays put. The
-    lookup uses the first code of the expression (07.12-07.17 -> 07.12) and
-    walks up the hierarchy, so an unseen sub-code inherits its family colour.
+    Multi-component Common ESTO expressions use their configured perceptual
+    average. Exact categories use their ESTO code colour, walking up the
+    hierarchy when an unseen sub-code needs to inherit its family colour.
     """
+    text = str(code_or_label or "").strip()
+    expression_match = re.match(r"^([0-9.]+(?:[-,][0-9.]+)+)", text)
+    if expression_match:
+        common_color = load_code_colors().get("common", {}).get(axis, {}).get(expression_match.group(1), "")
+        if common_color:
+            return common_color
     colors = load_code_colors().get(axis, {})
     code = canonical_code(code_or_label)
     while code:
@@ -1926,7 +1935,6 @@ def color_for_code(code_or_label: object, axis: str) -> str:
         if "." not in code:
             break
         code = code.rsplit(".", 1)[0]
-    text = str(code_or_label or "").strip()
     label = text.split(maxsplit=1)[1] if " " in text else ""
     return color_for_plotting_name(label, axis)
 

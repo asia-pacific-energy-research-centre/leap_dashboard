@@ -46,6 +46,7 @@ from codebase.common_esto_dashboard_renderer import (
     guide_page_mapping_table,
     guide_placeholder_status,
     line_section_tree,
+    load_code_colors,
     page_placeholder_note,
     pick_area_specs,
     prepare_other_transformation_page_rows,
@@ -2093,9 +2094,12 @@ def test_publishing_copies_browser_bundles_but_not_qa_json(tmp_path: Path) -> No
 
 
 def test_code_colors_resolve_by_code_not_display_name() -> None:
-    # A rolled-up row keeps the first component's name but spans several codes;
-    # the colour must follow the code span, not the name it happens to carry.
-    assert color_for_code("01.02-01.04 Other bituminous coal", "product") == color_for_code("01.02", "product")
+    # A rolled-up row uses its mapping-owned components' OKLab average rather
+    # than borrowing the first component's colour or display name.
+    colors = load_code_colors()
+    assert color_for_code("01.02-01.04 Other bituminous coal", "product") == colors["common"]["product"]["01.02-01.04"]
+    assert color_for_code("01.02-01.04 Other bituminous coal", "product") != color_for_code("01.02", "product")
+    assert color_for_code("19.01,19.03 Heat output in PJ", "flow") == colors["common"]["flow"]["19.01,19.03"]
     # A renamed label with the same code keeps its colour.
     assert color_for_code("07.99 Anything At All", "product") == color_for_code("07.99 PetProd nonspecified", "product")
 
@@ -2130,6 +2134,8 @@ def test_archived_plotting_catalogue_records_mapping_coverage() -> None:
     assert colors["_plotting_color_coverage"]["product"]["mapped"] > 0
     assert colors["_plotting_color_coverage"]["flow"]["mapped"] > 0
     assert colors["_plotting_color_coverage"]["capacity"]["mapped"] > 0
+    assert colors["_common_color_method"].startswith("equal-weight OKLab")
+    assert not Path(colors["_common_color_source"]).is_absolute()
 
 
 def test_every_common_esto_label_in_the_sample_resolves_to_a_colour() -> None:
