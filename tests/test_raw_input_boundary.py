@@ -7,11 +7,13 @@ import sys
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_dashboard_workflow_uses_common_esto_and_only_derived_convergence_input() -> None:
+def test_dashboard_workflow_uses_common_esto_and_only_derived_diagnostic_inputs() -> None:
     source = (REPO_ROOT / "codebase" / "common_esto_dashboard_workflow.py").read_text(
         encoding="utf-8"
     )
     assert "common_esto_comparison_data.parquet" in source
+    assert "raw_leap_results.csv" in source
+    assert "source_to_common_esto_map.csv" in source
     assert '"leap_initialisation"' in source
     assert '"outputs"' in source
     assert '"leap_exports"' in source

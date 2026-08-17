@@ -5340,6 +5340,103 @@ def _build_balance_flow_total_chart(
     return fig
 
 
+def build_unmet_requirements_chart(
+    unmet_df: pd.DataFrame,
+    series_labels: dict[str, str],
+    primary_scenario: str = "Target",
+    base_year: int | None = None,
+) -> go.Figure:
+    """Build signed LEAP unmet requirements by Common ESTO fuel category."""
+    chart_unit = _chart_unit(unmet_df)
+    fig = go.Figure()
+    trace_meta: list[dict] = []
+    fuel_order = (
+        unmet_df.assign(
+            _gross_value=pd.to_numeric(unmet_df["value"], errors="coerce")
+            .fillna(0.0)
+            .abs()
+        )
+        .groupby("common_product_label")["_gross_value"]
+        .sum()
+        .sort_values(ascending=False)
+        .index.tolist()
+    )
+    scenarios = [str(value) for value in unmet_df["scenario"].dropna().unique()]
+    default_scenario = next(
+        (
+            value
+            for value in scenarios
+            if value.casefold() == primary_scenario.casefold()
+        ),
+        scenarios[0] if scenarios else primary_scenario,
+    )
+    scenarios.sort(key=lambda value: (value.casefold() != default_scenario.casefold(), value))
+    for scenario in scenarios:
+        scenario_df = unmet_df[
+            unmet_df["scenario"].astype(str).str.casefold().eq(scenario.casefold())
+        ]
+        visible = scenario.casefold() == default_scenario.casefold()
+        for fuel_label in fuel_order:
+            fuel_df = (
+                scenario_df[scenario_df["common_product_label"].eq(fuel_label)]
+                .groupby("year", as_index=False)["value"]
+                .sum()
+                .sort_values("year")
+            )
+            if fuel_df.empty or not _has_nonzero_values(fuel_df["value"]):
+                continue
+            trace_count = _add_signed_stack_traces(
+                fig=fig,
+                x_values=fuel_df["year"],
+                y_values=fuel_df["value"],
+                stackgroup_prefix=f"unmet_{scenario_toggle_tag('LEAP', scenario)}",
+                trace_name=str(fuel_label),
+                visible=visible,
+                hovertemplate=(
+                    "%{x}<br>%{y:,.2f}"
+                    + chart_unit
+                    + "<extra>"
+                    + escape(str(fuel_label))
+                    + "</extra>"
+                ),
+            )
+            trace_meta.extend(trace_meta_entry("LEAP", scenario, True) for _ in range(trace_count))
+
+        totals = scenario_df.groupby("year", as_index=False)["value"].sum().sort_values("year")
+        if _has_nonzero_values(totals["value"]):
+            label = series_label_from_values("LEAP", scenario, series_labels) + " net unmet requirements"
+            fig.add_trace(go.Scatter(
+                x=totals["year"],
+                y=totals["value"],
+                mode="lines+markers",
+                name=label,
+                visible=True if visible else "legendonly",
+                line={"dash": "dash"},
+                hovertemplate=(
+                    "%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(label) + "</extra>"
+                ),
+            ))
+            trace_meta.append(trace_meta_entry("LEAP", scenario, True))
+
+    fig.update_layout(
+        title="Unmet requirements by fuel",
+        xaxis_title="Year",
+        yaxis_title=f"Signed unmet requirement ({chart_unit})",
+        margin={"l": 64, "r": 28, "t": 84, "b": 160},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
+        meta={
+            "trace_meta": trace_meta,
+            "stacked_area_note": (
+                "Positive values show an energy shortage; negative values show surplus energy. "
+                "Areas show LEAP Unmet Requirements by mapped Common ESTO fuel category; "
+                "the dashed line is the signed net across fuels."
+            ),
+        },
+    )
+    apply_chart_chrome(fig, base_year, code_axis="product")
+    return fig
+
+
 def build_total_demand_page(
     assigned_df: pd.DataFrame,
     template: dict,
@@ -5352,6 +5449,7 @@ def build_total_demand_page(
     dashboard_switcher: list[dict[str, str]] | None = None,
     current_dashboard: str = "",
     dashboard_updated_label: str = "",
+    unmet_requirements_df: pd.DataFrame | None = None,
 ) -> tuple[list[dict], dict | None]:
     """Build the total demand summary page (config-driven bespoke page).
 
@@ -5446,6 +5544,25 @@ def build_total_demand_page(
             "source_flow_labels": "; ".join(demand_page_keys),
         },
     ]
+    unmet_requirements_df = (
+        pd.DataFrame() if unmet_requirements_df is None else unmet_requirements_df.copy()
+    )
+    if not unmet_requirements_df.empty and _has_nonzero_values(unmet_requirements_df["value"]):
+        unmet_total_abs = float(unmet_requirements_df["value"].abs().sum())
+        chart_specs.append({
+            "chart_key": "chart__area__total_demand__unmet_requirements",
+            "title": "Unmet requirements by fuel",
+            "overview_group": "Unmet requirements",
+            "build": lambda: build_unmet_requirements_chart(
+                unmet_requirements_df,
+                series_labels,
+                primary_scenario=primary_scenario,
+                base_year=base_year,
+            ),
+            "total_abs": unmet_total_abs,
+            "row_count": len(unmet_requirements_df),
+            "source_flow_labels": "Unmet Requirements",
+        })
     if not supply_detail_df.empty:
         supply_total_abs = float(supply_detail_df["value"].abs().sum())
         chart_specs.append({
@@ -5975,6 +6092,7 @@ def render_dashboard(
     dashboard_updated_label: str = "",
     additional_pages: list[dict[str, str]] | None = None,
     source_category_map: pd.DataFrame | None = None,
+    unmet_requirements_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Render page bundles, dashboard pages, and a chart manifest."""
     series_labels = series_config.get("series_labels", {})
@@ -6438,6 +6556,7 @@ def render_dashboard(
         dashboard_switcher=dashboard_switcher,
         current_dashboard=current_dashboard,
         dashboard_updated_label=dashboard_updated_label,
+        unmet_requirements_df=unmet_requirements_df,
     )
     manifest_rows.extend(td_manifest_rows)
     if td_page_row:

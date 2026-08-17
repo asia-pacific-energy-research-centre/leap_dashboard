@@ -181,6 +181,97 @@ SOURCE_CATEGORY_MAP_COLUMNS = [
     "common_row_id",
 ]
 
+UNMET_REQUIREMENTS_COLUMNS = [
+    "comparison_scope",
+    "source_system",
+    "economy",
+    "scenario",
+    "year",
+    "leap_product",
+    "common_product_label",
+    "fuel_mapping_status",
+    "value",
+]
+
+
+def load_unmet_requirements_data(
+    raw_leap_results_path: Path,
+    source_to_common_map_path: Path,
+    *,
+    comparison_scope: str,
+    economy: str,
+    min_year: int | None = None,
+    max_year: int | None = None,
+) -> pd.DataFrame:
+    """Load unmapped LEAP Unmet Requirements and resolve only their fuel axis.
+
+    Unmet Requirements is intentionally not a Common ESTO balance flow. Its
+    LEAP fuels are resolved through the published, scope-specific source map so
+    the diagnostic chart uses the same product categories as the dashboard
+    without reproducing mapping logic or allocating source aggregates.
+    """
+    empty = pd.DataFrame(columns=UNMET_REQUIREMENTS_COLUMNS)
+    raw_path = Path(raw_leap_results_path)
+    map_path = Path(source_to_common_map_path)
+    if not raw_path.exists() or not map_path.exists():
+        return empty
+
+    required_raw = ["economy", "scenario", "year", "leap_flow", "leap_product", "value"]
+    raw = pd.read_csv(raw_path, usecols=required_raw, low_memory=False)
+    raw["economy"] = (
+        raw["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
+    )
+    selected = raw[
+        raw["economy"].eq(str(economy).replace("_", "").strip())
+        & raw["leap_flow"].astype(str).str.strip().str.casefold().eq("unmet requirements")
+        & ~raw["leap_product"].astype(str).str.strip().str.casefold().eq("total")
+    ].copy()
+    selected["year"] = pd.to_numeric(selected["year"], errors="coerce")
+    selected["value"] = pd.to_numeric(selected["value"], errors="coerce").fillna(0.0)
+    if min_year is not None:
+        selected = selected[selected["year"] >= min_year]
+    if max_year is not None:
+        selected = selected[selected["year"] <= max_year]
+    selected = selected[selected["value"].abs() > 1e-12]
+    if selected.empty:
+        return empty
+
+    source_map = pd.read_csv(
+        map_path,
+        usecols=["scope", "system", "source_product", "common_product_label"],
+        low_memory=False,
+    )
+    fuel_map = source_map[
+        source_map["scope"].astype(str).eq(str(comparison_scope))
+        & source_map["system"].astype(str).str.strip().str.casefold().eq("leap")
+    ][["source_product", "common_product_label"]].drop_duplicates()
+    ambiguous = fuel_map.groupby("source_product")["common_product_label"].nunique()
+    ambiguous = ambiguous[ambiguous > 1]
+    if not ambiguous.empty:
+        raise ValueError(
+            "Published LEAP fuel map is ambiguous for Unmet Requirements: "
+            + ", ".join(map(str, ambiguous.index.tolist()))
+        )
+
+    selected = selected.merge(
+        fuel_map,
+        how="left",
+        left_on="leap_product",
+        right_on="source_product",
+        validate="many_to_one",
+    )
+    mapped = selected["common_product_label"].notna()
+    selected["fuel_mapping_status"] = np.where(mapped, "mapped", "unmapped")
+    selected.loc[~mapped, "common_product_label"] = (
+        "Unmapped LEAP fuel: " + selected.loc[~mapped, "leap_product"].astype(str)
+    )
+    selected["comparison_scope"] = str(comparison_scope)
+    selected["source_system"] = "LEAP"
+    selected = selected[UNMET_REQUIREMENTS_COLUMNS]
+    return selected.sort_values(
+        ["scenario", "common_product_label", "year"], ignore_index=True
+    )
+
 
 def load_active_power_interim_branches(
     audit_path: Path,

@@ -32,7 +32,8 @@
           "rows": [
             ["Supply", "Production (01), imports (02), signed exports (03), and signed international transport (04-05), with total primary energy supply (07) where available", "Stock changes remain outside the projection-comparable supply total."],
             ["Final demand", "Total final consumption (12), split into the major demand pages and broad fuel groups", "Demand sectors are selected on a non-overlapping frontier; do not add their parents and children again."],
-            ["Transformation, transfers, losses and own use", "The reviewed transformation boundary plus transfers (08), energy-sector own use (10.01), and transmission/distribution losses (10.02), shown by leaf flow and by fuel", "The by-flow areas use the deepest available non-overlapping flow nodes. Negative inputs, own use and losses can offset positive outputs, so read the signed areas as well as the authoritative net total line."],
+            ["Transformation, transfers, losses and own use", "The reviewed transformation boundary plus transfers (08), energy-sector own use (10.01), and transmission/distribution losses (10.02), shown by mapping-owned flow frontier and by fuel", "The by-flow areas use the mapping-owned non-overlapping frontier, including terminal NON_EXPANDING comparison rollups. Negative inputs, own use and losses can offset positive outputs, so read the signed areas as well as the authoritative net total line."],
+            ["Unmet requirements", "LEAP Unmet Requirements rows, grouped by their mapped Common ESTO fuel category", "Positive values show a shortage of energy; negative values show surplus energy. This is a separate LEAP diagnostic, not a mapped balance flow."],
             ["TFEC", "Not currently displayed", "Flow 13 is temporarily disabled because non-energy use cannot yet be separated from aggregate LEAP Other demand."]
           ]
         }

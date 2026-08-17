@@ -26,6 +26,9 @@
 #   Boolean toggle for copying serving assets into tracked docs/. Default False.
 # COMMON_ESTO_CAPACITY_UNMET_CONVERGENCE_PATH
 #   Optional path to a capacity-unmet convergence CSV.
+# COMMON_ESTO_RAW_LEAP_RESULTS_PATH
+#   Optional override for the upstream raw LEAP results extract used only by
+#   the Energy balance overview's Unmet Requirements diagnostic.
 # COMMON_ESTO_INCLUDE_NINTH_PRE_BASE_YEAR_DATA
 #   Boolean toggle for retaining 9th-edition rows before the dashboard base
 #   year. Default is False because ESTO is the preferred historical source.
@@ -62,6 +65,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     load_active_power_interim_branches,
     load_common_esto_data,
     load_source_category_map,
+    load_unmet_requirements_data,
 )
 from common_esto_dashboard_emissions import set_leap_mappings_root  # noqa: E402
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
@@ -170,6 +174,12 @@ SOURCE_TO_COMMON_MAP_PATH = _resolve(
     os.getenv(
         "COMMON_ESTO_SOURCE_TO_COMMON_MAP_PATH",
         str(_LEAP_MAPPINGS_RESULTS / "source_to_common_esto_map.csv"),
+    )
+)
+RAW_LEAP_RESULTS_PATH = _resolve(
+    os.getenv(
+        "COMMON_ESTO_RAW_LEAP_RESULTS_PATH",
+        str(_LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "raw_leap_results.csv"),
     )
 )
 POWER_INTERIM_AUDIT_PATH = _resolve(
@@ -545,6 +555,14 @@ def run_dashboard_for_economy(
         visible_df = apply_sign_semantics(
             visible_df, scope_template.get("sign_semantics")
         )
+        unmet_requirements_df = load_unmet_requirements_data(
+            RAW_LEAP_RESULTS_PATH,
+            SOURCE_TO_COMMON_MAP_PATH,
+            comparison_scope=comparison_scope,
+            economy=economy,
+            min_year=MIN_YEAR,
+            max_year=MAX_YEAR,
+        )
         layout = build_output_layout(
             OUTPUT_ROOT, dashboard_key, clear_existing=CLEAR_EXISTING_OUTPUTS
         )
@@ -567,6 +585,9 @@ def run_dashboard_for_economy(
         sign_summary_df.to_csv(
             layout["supporting"] / "sign_semantics_summary.csv", index=False
         )
+        unmet_requirements_df.to_csv(
+            layout["supporting"] / "unmet_requirements_fuel_mapping.csv", index=False
+        )
         manifest_df = render_dashboard(
             visible_df,
             scope_template,
@@ -582,6 +603,7 @@ def run_dashboard_for_economy(
                 },
             ],
             source_category_map=source_category_map,
+            unmet_requirements_df=unmet_requirements_df,
         )
         scope_result: dict[str, object] = {
             "comparison_scope": comparison_scope,
