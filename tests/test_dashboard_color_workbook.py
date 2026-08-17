@@ -65,6 +65,10 @@ def test_export_and_import_accept_typed_and_fill_changes(tmp_path: Path) -> None
     assert workbook["Products"]["B2"].value == "01 Coal"
     assert workbook["Products"]["C2"].value == "#0D0D0D"
     assert workbook["Products"]["C2"].fill.fgColor.rgb.endswith("0D0D0D")
+    assert workbook["Products"].auto_filter.ref is None
+    assert list(workbook["Products"].tables) == ["ProductsColours"]
+    assert workbook["Flows"].auto_filter.ref is None
+    assert list(workbook["Flows"].tables) == ["FlowsColours"]
     product_row = _row_for_key(workbook["Products"], "01.02")
     flow_row = _row_for_key(workbook["Flows"], "01")
     workbook["Products"].cell(product_row, 3).value = "#123456"

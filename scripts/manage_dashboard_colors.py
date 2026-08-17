@@ -224,7 +224,9 @@ def _write_colour_sheet(
     header[2].fill = PatternFill("solid", fgColor="BF9000")
     sheet.row_dimensions[1].height = 34
     sheet.freeze_panes = "C2"
-    sheet.auto_filter.ref = f"A1:E{sheet.max_row}"
+    # The Excel table below owns the filter. Adding a second worksheet-level
+    # AutoFilter over the same cells creates conflicting OOXML that desktop
+    # Excel repairs by removing the table.
     sheet.column_dimensions["A"].hidden = True
     sheet.column_dimensions["A"].width = 2
     sheet.column_dimensions["B"].width = 55
