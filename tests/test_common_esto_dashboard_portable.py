@@ -89,9 +89,16 @@ def test_configured_comparison_scopes_use_maintained_selector() -> None:
     assert [item["comparison_scope"] for item in definitions] == [
         "esto_leap_ninth",
         "esto_leap",
+        "esto_extended_leap_ninth",
+        "esto_extended_leap",
     ]
-    assert [item["output_suffix"] for item in definitions] == ["", "__esto_leap"]
-    assert [item["is_default"] for item in definitions] == [True, False]
+    assert [item["output_suffix"] for item in definitions] == [
+        "",
+        "__esto_leap",
+        "__esto_extended_leap_ninth",
+        "__esto_extended_leap",
+    ]
+    assert [item["is_default"] for item in definitions] == [True, False, False, False]
 
 
 def test_variant_render_forwards_basis_options_without_substitute_diagnostics(
@@ -147,6 +154,8 @@ def test_variant_render_forwards_basis_options_without_substitute_diagnostics(
     assert [call["comparison_scope"] for call in calls] == [
         "esto_leap_ninth",
         "esto_leap",
+        "esto_extended_leap_ninth",
+        "esto_extended_leap",
     ]
     assert calls[0]["category_basis_options"] == [
         {
@@ -159,9 +168,19 @@ def test_variant_render_forwards_basis_options_without_substitute_diagnostics(
             "label": "LEAP + ESTO",
             "dashboard_key": "20USA__esto_leap",
         },
+        {
+            "comparison_scope": "esto_extended_leap_ninth",
+            "label": "LEAP + ESTO Extended + Ninth",
+            "dashboard_key": "20USA__esto_extended_leap_ninth",
+        },
+        {
+            "comparison_scope": "esto_extended_leap",
+            "label": "LEAP + ESTO Extended",
+            "dashboard_key": "20USA__esto_extended_leap",
+        },
     ]
     assert calls[0]["additional_pages"] == []
-    assert result["chart_count"] == 4
+    assert result["chart_count"] == 8
     assert "mapping_diagnostics" not in result
     assert not (tmp_path / "outputs" / "diagnostics").exists()
 
