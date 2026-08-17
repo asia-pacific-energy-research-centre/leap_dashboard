@@ -90,6 +90,15 @@ def _row_for_key(sheet: object, key: str) -> int:
     return next(row for row in range(2, sheet.max_row + 1) if sheet.cell(row=row, column=1).value == key)
 
 
+def _metadata_row_for_key(sheet: object, sheet_name: str, key: str) -> int:
+    return next(
+        row
+        for row in range(8, sheet.max_row + 1)
+        if sheet.cell(row=row, column=1).value == sheet_name
+        and sheet.cell(row=row, column=2).value == key
+    )
+
+
 def test_export_and_import_accept_typed_and_fill_changes(tmp_path: Path) -> None:
     config_path = tmp_path / "code_colors.json"
     custom_path = tmp_path / "code_colors_custom.json"
@@ -101,6 +110,17 @@ def test_export_and_import_accept_typed_and_fill_changes(tmp_path: Path) -> None
     export_color_workbook(output_path=workbook_path, code_colors_path=config_path, common_rows_path=common_rows_path, external_colors_path=None)
     workbook = load_workbook(workbook_path)
     assert workbook["_metadata"].sheet_state == "veryHidden"
+    assert workbook["_metadata"]["B1"].value == "7"
+    assert [workbook["_metadata"].cell(row=7, column=column).value for column in range(1, 9)] == [
+        "sheet",
+        "key",
+        "category",
+        "current_color",
+        "sync_with_json",
+        "exists_in_json",
+        "color_components",
+        "missing_color_components",
+    ]
     assert workbook["Products"].column_dimensions["A"].hidden is True
     assert workbook["Products"]["B2"].value == "01 Coal"
     assert workbook["Products"]["C2"].value == "#0D0D0D"
@@ -277,6 +297,9 @@ def test_export_syncs_from_detailed_external_json(tmp_path: Path) -> None:
     assert workbook["Products"].cell(coal_row, 3).fill.fgColor.rgb.endswith("101010")
     assert workbook["Products"].cell(coal_row, 4).value == "TRUE"
     assert workbook["Products"].cell(coal_row, 5).value == "TRUE"
+    coal_metadata_row = _metadata_row_for_key(workbook["_metadata"], "Products", "01")
+    assert workbook["_metadata"].cell(coal_metadata_row, 7).value is None
+    assert workbook["_metadata"].cell(coal_metadata_row, 8).value is None
     unmapped_product_row = _row_for_key(workbook["Products"], "01.02")
     assert workbook["Products"].cell(unmapped_product_row, 4).value == "TRUE"
     assert workbook["Products"].cell(unmapped_product_row, 5).value == "FALSE"
@@ -401,6 +424,39 @@ def test_synchronize_true_without_exact_json_uses_components_or_keeps_colour(tmp
     assert refreshed["Products"].cell(unmapped_row, 5).value == "FALSE"
     assert refreshed["Flows"].cell(flow_row, 5).value == "FALSE"
     assert refreshed["Flows"].cell(flow_row, 3).value not in {None, "", "NA", "#N/A"}
+
+
+def test_metadata_records_used_and_missing_average_components(tmp_path: Path) -> None:
+    config_path = tmp_path / "code_colors.json"
+    workbook_path = tmp_path / "colors.xlsx"
+    common_rows_path = tmp_path / "common_rows.csv"
+    _sample_config(config_path)
+    _sample_common_rows(common_rows_path)
+    axis_components = {
+        "product": {},
+        "flow": {
+            "01": ("18.01", "18.02", "99.99"),
+            "14": ("18.01", "18.02"),
+        },
+    }
+
+    export_color_workbook(
+        workbook_path,
+        config_path,
+        common_rows_path,
+        external_colors_path=None,
+        sync_flags={"product": {}, "flow": {"01": True, "14": False}},
+        axis_components=axis_components,
+    )
+
+    workbook = load_workbook(workbook_path)
+    metadata = workbook["_metadata"]
+    averaged_row = _metadata_row_for_key(metadata, "Flows", "01")
+    manual_row = _metadata_row_for_key(metadata, "Flows", "14")
+    assert metadata.cell(averaged_row, 7).value == "18.01=#362B4F; 18.02=#8A5DA7"
+    assert metadata.cell(averaged_row, 8).value == "99.99"
+    assert metadata.cell(manual_row, 7).value is None
+    assert metadata.cell(manual_row, 8).value is None
 
 
 def test_synchronize_is_no_op_when_sources_are_unchanged(tmp_path: Path) -> None:

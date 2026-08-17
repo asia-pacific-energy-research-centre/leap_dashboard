@@ -51,6 +51,12 @@ Historical, LEAP Reference, LEAP Target, 9th Reference, and 9th Target.
 Common rollups are intentionally not shown. They are always regenerated as
 equal-weight OKLab averages of their mapping-owned ESTO components.
 
+For audit purposes, the very-hidden `_metadata` sheet records how each synced
+average was produced. `color_components` lists every direct input as
+`code=#HEX`; `missing_color_components` lists any declared direct component
+that could not supply a colour. Both fields are blank for exact JSON matches,
+manual rows, and categories that were not calculated as component averages.
+
 ## Apply the returned workbook
 
 1. Save the returned file at the path set by `WORKBOOK_PATH`.

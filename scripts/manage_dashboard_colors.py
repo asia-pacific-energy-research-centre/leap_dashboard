@@ -58,7 +58,7 @@ FALLBACK_COMMON_ROWS_PATH = REPO_ROOT / "tests" / "fixtures" / "common_esto_dash
 UPSTREAM_COMMON_ROWS_PATH = REPO_ROOT.parent / "leap_mappings" / "results" / "common_esto" / "common_esto_rows.csv"
 DEFAULT_COMMON_ROWS_PATH = UPSTREAM_COMMON_ROWS_PATH if UPSTREAM_COMMON_ROWS_PATH.exists() else FALLBACK_COMMON_ROWS_PATH
 
-WORKBOOK_SCHEMA_VERSION = "6"
+WORKBOOK_SCHEMA_VERSION = "7"
 PLACEHOLDER_LABEL = "Category not in the current common hierarchy"
 HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
 LOCKED_FILL = PatternFill("solid", fgColor="F2F2F2")
@@ -373,6 +373,7 @@ def resolve_json_synced_colors(
     exact_json_by_axis: dict[str, dict[str, str]],
     components_by_axis: dict[str, dict[str, tuple[str, ...]]],
     component_base_by_axis: dict[str, dict[str, str]] | None = None,
+    component_audit_by_axis: dict[str, dict[str, dict[str, tuple[object, ...]]]] | None = None,
 ) -> dict[str, dict[str, str]]:
     """Resolve exact JSON colours, then OKLab component averages, then current colour.
 
@@ -395,6 +396,8 @@ def resolve_json_synced_colors(
                 color = base.get(code, "")
             else:
                 member_colors: list[str] = []
+                used_components: list[tuple[str, str]] = []
+                missing_components: list[str] = []
                 for member_code in components.get(code, ()):
                     if member_code == code:
                         member_color = component_bases.get(code, base.get(code))
@@ -404,6 +407,14 @@ def resolve_json_synced_colors(
                         member_color = None
                     if member_color:
                         member_colors.append(member_color)
+                        used_components.append((member_code, member_color))
+                    else:
+                        missing_components.append(member_code)
+                if components.get(code) and component_audit_by_axis is not None:
+                    component_audit_by_axis.setdefault(axis, {})[code] = {
+                        "used": tuple(used_components),
+                        "missing": tuple(missing_components),
+                    }
                 color = average_oklab(member_colors) if member_colors else base.get(code, "")
             if color:
                 resolved[axis][code] = color
@@ -562,16 +573,21 @@ def export_color_workbook(
     }
     components = axis_components if axis_components is not None else load_axis_color_components()
     component_bases = _component_color_bases(payload, components)
+    component_audit: dict[str, dict[str, dict[str, tuple[object, ...]]]] = {
+        "product": {},
+        "flow": {},
+    }
     resolved_sync_colors = resolve_json_synced_colors(
         base_by_axis,
         sync_colors,
         components,
         component_base_by_axis=component_bases,
+        component_audit_by_axis=component_audit,
     )
     labels = _load_axis_labels()
     workbook = Workbook()
     _write_instructions(workbook)
-    workbook_metadata_rows: list[tuple[str, str, str, str, str, str]] = []
+    workbook_metadata_rows: list[tuple[str, str, str, str, str, str, str, str]] = []
 
     for sheet_name, axis in SHEET_SPECS:
         mapping = dict(payload.get(axis, {}))
@@ -601,6 +617,26 @@ def export_color_workbook(
                 color,
                 str(axis_flags[identifier]).upper(),
                 str(exact_exists[identifier]).upper(),
+                (
+                    "; ".join(
+                        f"{component_code}={component_color}"
+                        for component_code, component_color in component_audit[axis]
+                        .get(identifier, {})
+                        .get("used", ())
+                    )
+                    if axis_flags[identifier] and not exact_exists[identifier]
+                    else ""
+                ),
+                (
+                    "; ".join(
+                        str(component_code)
+                        for component_code in component_audit[axis]
+                        .get(identifier, {})
+                        .get("missing", ())
+                    )
+                    if axis_flags[identifier] and not exact_exists[identifier]
+                    else ""
+                ),
             )
             for identifier, label, color in rows
         )
@@ -612,7 +648,7 @@ def export_color_workbook(
     ]
     _write_colour_sheet(workbook, OTHER_SHEET_NAME, other_rows)
     workbook_metadata_rows.extend(
-        (OTHER_SHEET_NAME, identifier, label, color, "", "")
+        (OTHER_SHEET_NAME, identifier, label, color, "", "", "", "")
         for identifier, label, color in other_rows
     )
 
@@ -624,7 +660,16 @@ def export_color_workbook(
     metadata.append(["external_colors_sha256", external_source_hash])
     metadata.append(["external_colors_path", str(external_colors_path or "")])
     metadata.append([])
-    metadata.append(["sheet", "key", "category", "current_color", "sync_with_json", "exists_in_json"])
+    metadata.append([
+        "sheet",
+        "key",
+        "category",
+        "current_color",
+        "sync_with_json",
+        "exists_in_json",
+        "color_components",
+        "missing_color_components",
+    ])
     for metadata_row in workbook_metadata_rows:
         metadata.append(list(metadata_row))
 
@@ -754,6 +799,8 @@ def _read_workbook_metadata(workbook: object) -> dict[tuple[str, str], dict[str,
                 "current_color": normalize_hex(sheet.cell(row=row_number, column=4).value),
                 "sync_with_json": str(sheet.cell(row=row_number, column=5).value or "").strip(),
                 "exists_in_json": str(sheet.cell(row=row_number, column=6).value or "").strip(),
+                "color_components": str(sheet.cell(row=row_number, column=7).value or "").strip(),
+                "missing_color_components": str(sheet.cell(row=row_number, column=8).value or "").strip(),
             }
     return metadata
 
