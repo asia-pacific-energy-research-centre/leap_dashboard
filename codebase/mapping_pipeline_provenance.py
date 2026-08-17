@@ -62,8 +62,8 @@ def stage3_manifest(mappings_root: Path) -> dict:
 
 
 def output_contract_is_selected() -> bool:
-    """Return whether dashboard inputs explicitly select the v1 output contract."""
-    return os.environ.get(USE_OUTPUT_CONTRACT_ENV_VAR, "0").strip().casefold() in {
+    """Return whether dashboard inputs select the stable v1 output contract."""
+    return os.environ.get(USE_OUTPUT_CONTRACT_ENV_VAR, "1").strip().casefold() in {
         "1",
         "true",
         "yes",

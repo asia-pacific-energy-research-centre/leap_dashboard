@@ -58,7 +58,7 @@ def test_workflow_defaults_are_non_mutating() -> None:
         text=True,
         check=True,
     )
-    assert "False False False False" in result.stdout
+    assert "False False False True" in result.stdout
 
 
 def test_mappings_preflight_loads_when_dashboard_codebase_package_is_loaded(
