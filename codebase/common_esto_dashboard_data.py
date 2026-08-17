@@ -588,7 +588,11 @@ def load_long_common_esto_data(path: Path) -> pd.DataFrame:
     """Load already-long common ESTO comparison data."""
     path = Path(path)
     if path.suffix.casefold() == ".parquet":
-        df = pd.read_parquet(path).fillna("")
+        df = pd.read_parquet(path)
+        categorical_columns = list(df.select_dtypes(include=["category"]).columns)
+        if categorical_columns:
+            df[categorical_columns] = df[categorical_columns].astype(object)
+        df = df.fillna("")
     else:
         df = pd.read_csv(
             path,

@@ -2082,6 +2082,40 @@ def test_long_loader_preserves_identifier_code_and_label_strings(tmp_path: Path)
     assert not bool(row["requires_rollup"])
 
 
+def test_long_parquet_loader_handles_categorical_nulls(tmp_path: Path) -> None:
+    long_path = tmp_path / "long_categorical.parquet"
+    frame = pd.DataFrame([
+        {
+            "comparison_scope": "esto_extended_leap",
+            "source_system": "LEAP",
+            "economy": "01_AUS",
+            "scenario": "Target",
+            "year": 2022,
+            "common_flow_code": "15.02.01",
+            "common_flow_name": "Freight road",
+            "common_flow_label": "15.02.01 Freight road",
+            "common_product_code": "17",
+            "common_product_name": "Electricity",
+            "common_product_label": "17 Electricity",
+            "common_row_id": "road-freight-electricity",
+            "is_exact_row": True,
+            "requires_rollup": False,
+            "value": 1.0,
+        }
+    ])
+    frame["scenario"] = pd.Categorical(frame["scenario"], categories=["Target", "Reference"])
+    frame["common_flow_name"] = pd.Categorical(
+        [None], categories=["Freight road"]
+    )
+    frame.to_parquet(long_path, index=False)
+
+    loaded = load_common_esto_data(long_path)
+
+    assert loaded.iloc[0]["scenario"] == "Target"
+    assert loaded.iloc[0]["common_flow_name"] == ""
+    assert loaded.iloc[0]["value"] == 1.0
+
+
 def test_common_esto_scope_filter_rejects_unavailable_scope() -> None:
     df = pd.DataFrame(
         [
