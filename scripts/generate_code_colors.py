@@ -24,6 +24,7 @@ from pathlib import Path
 import openpyxl
 
 OUT = Path(__file__).resolve().parents[1] / "config" / "common_esto_dashboard" / "code_colors.json"
+CUSTOM_COLORS = OUT.with_name("code_colors_custom.json")
 COLOR_SOURCE_XLSX = OUT.parents[1] / "archive" / "master_config 9th visualisation.xlsx"
 
 
@@ -298,9 +299,19 @@ _add_mapping_source_codes(product, "fuels_plotting", "fuels_plotting", source_co
 _add_mapping_source_codes(flow, "sectors_plotting", "sectors_plotting", source_colors)
 _add_mapping_source_codes(flow, "transformation_sector_mappings", "sectors_plotting", source_colors)
 
+# A colleague-edited Excel workbook can supply a complete custom layer through
+# scripts/manage_dashboard_colors.py. Apply it last so regenerating the base
+# catalogue never discards reviewed choices.
+custom_colors = json.loads(CUSTOM_COLORS.read_text(encoding="utf-8")) if CUSTOM_COLORS.exists() else {}
+product.update(dict(custom_colors.get("product", {})))
+flow.update(dict(custom_colors.get("flow", {})))
+for axis, colors in dict(custom_colors.get("plotting", {})).items():
+    plotting_colors.setdefault(axis, {}).update(dict(colors))
+
 payload = {
     "_generated_by": "scripts/generate_code_colors.py - edit that script, not this file",
     "_color_source": "config/archive/master_config 9th visualisation.xlsx, colors sheet",
+    "_custom_color_source": CUSTOM_COLORS.name if CUSTOM_COLORS.exists() else "",
     "_ambiguous_source_colors": ambiguous_source_colors,
     "_source_plotting_colors": dict(sorted(source_colors.items())),
     "_plotting_color_coverage": {

@@ -424,6 +424,8 @@ decisions can be made without review.
 | DASHQ-025 | P1 | 2026-08-03 to 2026-08-10 | ✅ `complete_unpushed` | DASHQ-007 | Resolve the publication blocker on empty transfers charts | **Done in `b125425`.** Empty area figures are suppressed. The recorded `20USA`/`02BD` legacy-versus-contract equivalence run passed readiness and page-noise checks; DASHQ-007 must repeat the gates for a newly published all-economy generation. |
 | DASHQ-017 | P0 | 2026-08-18 to 2026-08-24 | `not_started` | all above | Run the clean-checkout handover rehearsal | A colleague or clean agent session follows the runbook from a fresh checkout of all three repositories, records every missing assumption, and renders one economy end to end. Complete when the rehearsal succeeds without undocumented local knowledge and the queue is frozen with owner, risk, next action, and last-verified date on every remaining item. |
 
+| DASHQ-037 | P2 | 2026-08-17 | `complete_on_master` | — | Add a colleague-facing dashboard colour workbook round trip | Added a macro-free Excel editor with visibly filled colour cells, typed-hex or paint-bucket editing (including Excel theme colours), strict import validation, a persistent custom-config layer, focused tests, and an operator guide. Verification: 121 dashboard/workbook tests passed; all six user-facing sheets passed visual QA; a 20USA fixture render wrote 941 charts across both comparison bases; publication readiness passed and page-noise analysis reported zero flags. |
+
 ## Deferred by decision — not queue items
 
 These are deliberately out of scope. They are recorded here so they are not

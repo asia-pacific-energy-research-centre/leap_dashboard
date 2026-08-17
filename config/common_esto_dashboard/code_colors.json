@@ -1,6 +1,7 @@
 {
   "_generated_by": "scripts/generate_code_colors.py - edit that script, not this file",
   "_color_source": "config/archive/master_config 9th visualisation.xlsx, colors sheet",
+  "_custom_color_source": "",
   "_ambiguous_source_colors": [
     "Aviation fuels",
     "Hydrogen-based fuels",
