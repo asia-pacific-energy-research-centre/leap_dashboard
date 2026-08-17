@@ -430,6 +430,33 @@ def _code_expression_contains_expression(parent: object, child: object) -> bool:
     return True
 
 
+LNG_HISTORICAL_COVERAGE_NOTE = (
+    "Note: ESTO historical data do not contain all LNG activity, so a large "
+    "change between the base year and projections can be expected and does not "
+    "indicate a dashboard or mapping error;"
+)
+
+
+def chart_note_with_lng_coverage(note: str, chart_df: pd.DataFrame) -> str:
+    """Append the LNG coverage warning when a chart contains flow 09.06.02."""
+    if chart_df.empty:
+        return str(note or "")
+    flow_columns = [
+        column
+        for column in ("common_flow_code", "component_flow_code", "common_flow_label")
+        if column in chart_df.columns
+    ]
+    contains_lng_activity = any(
+        code_expression_matches_prefix(value, "09.06.02")
+        for column in flow_columns
+        for value in chart_df[column].dropna().unique()
+    )
+    clean_note = str(note or "").strip()
+    if not contains_lng_activity or LNG_HISTORICAL_COVERAGE_NOTE in clean_note:
+        return clean_note
+    return f"{clean_note} {LNG_HISTORICAL_COVERAGE_NOTE}".strip()
+
+
 def _flow_subtree_is_page_complete(
     assigned_df: pd.DataFrame,
     page_key: str,
@@ -861,11 +888,6 @@ def prepare_other_transformation_page_rows(
     )
     inclusive_context = context[inclusive_mask]
 
-    inclusive_codes = {
-        canonical_code(value)
-        for value in inclusive_context.get("common_flow_code", pd.Series(dtype=object))
-        if canonical_code(value)
-    }
     absorbed_own_use_codes: set[str] = set()
     if "component_flow_code" in inclusive_context.columns:
         for value in inclusive_context["component_flow_code"]:
@@ -888,9 +910,33 @@ def prepare_other_transformation_page_rows(
         "(including own use)", case=False, regex=False
     )
 
-    # Prefer the real inclusive Common ESTO row when both forms exist.
+    # Prefer the real inclusive Common ESTO row only when the same source
+    # series and product actually publish that replacement. An inclusive row
+    # in ESTO must not suppress a plain LEAP leaf that carries the projection.
+    replacement_context_columns = [
+        column
+        for column in ("comparison_scope", "source_system", "economy", "scenario")
+        if column in out.columns and column in inclusive_context.columns
+    ]
+    for product_column in ("common_product_code", "common_product_label"):
+        if product_column in out.columns and product_column in inclusive_context.columns:
+            replacement_context_columns.append(product_column)
+            break
+
+    def boundary_keys(frame: pd.DataFrame) -> pd.MultiIndex:
+        key_frame = pd.DataFrame(index=frame.index)
+        for column in replacement_context_columns:
+            key_frame[column] = (
+                frame[column].fillna("").astype(str).str.strip().str.casefold()
+            )
+        key_frame["_boundary_flow_code"] = frame["common_flow_code"].map(canonical_code)
+        return pd.MultiIndex.from_frame(key_frame)
+
+    has_inclusive_replacement = boundary_keys(out).isin(
+        boundary_keys(inclusive_context).drop_duplicates()
+    )
     duplicate_plain_boundary = (
-        codes.isin(inclusive_codes)
+        has_inclusive_replacement
         & codes.str.startswith("09")
         & ~already_inclusive
     )
@@ -1672,12 +1718,16 @@ def _non_overlapping_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _leaf_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
-    """Keep the deepest available flow categories for each source/scenario.
+    """Keep mapping-terminal or deepest flow categories per source/scenario.
 
     This is the inverse of the parent-first aggregate frontier above. It is
-    intended for charts whose categories should expose the hierarchy leaves;
-    callers must still use an authoritative non-overlapping boundary for net
-    total lines.
+    intended for charts whose categories should expose the hierarchy leaves.
+    Mapping-owned NON_EXPANDING rollups are terminal comparison leaves even
+    when their display code has deeper nodes in the raw ESTO hierarchy. The
+    terminal codes apply across sources in the same comparison surface, so an
+    ESTO boundary such as 09.06.02 (including own use) also keeps the equivalent
+    LEAP projection on 09.06.02 instead of relabelling it as .01 detail. Callers
+    must still use an authoritative non-overlapping boundary for net lines.
     """
     required = {"common_flow_code", "common_flow_label", "source_system"}
     if df.empty or not required.issubset(df.columns):
@@ -1685,6 +1735,42 @@ def _leaf_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
 
     work = df.copy()
     work["_leaf_row_number"] = range(len(work))
+    terminal_context_columns = [
+        column
+        for column in ("comparison_scope", "economy")
+        if column in work.columns
+    ]
+
+    def terminal_rollup_codes_for(context_rows: pd.DataFrame) -> set[str]:
+        """Return the most specific declared rollups on this comparison surface."""
+        if "is_non_expanding_rollup" not in work.columns:
+            return set()
+        surface_rows = work
+        for column in terminal_context_columns:
+            context_value = context_rows.iloc[0][column]
+            if pd.isna(context_value):
+                surface_rows = surface_rows[surface_rows[column].isna()]
+            else:
+                surface_rows = surface_rows[surface_rows[column].eq(context_value)]
+        declared_codes = {
+            str(code).strip()
+            for code in surface_rows.loc[
+                _metadata_bool(surface_rows["is_non_expanding_rollup"]),
+                "common_flow_code",
+            ]
+            if str(code).strip()
+        }
+        # A broad presentation subtotal must not replace a more specific
+        # declared comparison boundary nested beneath it.
+        return {
+            code
+            for code in declared_codes
+            if not any(
+                other != code
+                and _code_expression_contains_expression(code, other)
+                for other in declared_codes
+            )
+        }
     context_columns = [
         column
         for column in ("comparison_scope", "source_system", "economy", "scenario")
@@ -1696,6 +1782,7 @@ def _leaf_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
 
     keep_row_numbers: set[int] = set()
     for _, context_rows in grouped_rows:
+        terminal_rollup_codes = terminal_rollup_codes_for(context_rows)
         categories = context_rows[
             ["common_flow_code", "common_flow_label"]
         ].drop_duplicates().copy()
@@ -1727,10 +1814,27 @@ def _leaf_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
         categories = categories[
             categories["common_flow_label"].astype(str).isin(preferred_labels)
         ]
+        categories["_is_terminal_rollup"] = categories[
+            "common_flow_code"
+        ].astype(str).str.strip().isin(terminal_rollup_codes)
+        terminal_records = categories[
+            categories["_is_terminal_rollup"]
+        ].to_dict("records")
         leaf_labels: set[str] = set()
         category_records = categories.to_dict("records")
         for category in category_records:
             parent_code = category["common_flow_code"]
+            if bool(category["_is_terminal_rollup"]):
+                leaf_labels.add(str(category["common_flow_label"]))
+                continue
+            is_inside_terminal_rollup = any(
+                str(terminal["common_flow_code"]) != str(parent_code)
+                and _code_expression_contains_expression(
+                    terminal["common_flow_code"],
+                    parent_code,
+                )
+                for terminal in terminal_records
+            )
             has_observed_child = any(
                 str(other["common_flow_code"]) != str(parent_code)
                 and _code_expression_contains_expression(
@@ -1739,7 +1843,7 @@ def _leaf_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
                 )
                 for other in category_records
             )
-            if not has_observed_child:
+            if not has_observed_child and not is_inside_terminal_rollup:
                 leaf_labels.add(str(category["common_flow_label"]))
 
         keep_row_numbers.update(
@@ -2227,9 +2331,12 @@ def build_area_chart(
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={
             "trace_meta": trace_meta,
-            "stacked_area_note": (
-                f"Stacked areas: {dataset_display_name(comparison_source)} historical through "
-                f"{base_year}; {dataset_display_name(primary_source)} projection after {base_year}."
+            "stacked_area_note": chart_note_with_lng_coverage(
+                (
+                    f"Stacked areas: {dataset_display_name(comparison_source)} historical through "
+                    f"{base_year}; {dataset_display_name(primary_source)} projection after {base_year}."
+                ),
+                chart_df,
             ),
         },
     )
@@ -2784,7 +2891,10 @@ def build_product_chart(
         # with the title otherwise (see build_area_chart).
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
-        meta={"trace_meta": trace_meta},
+        meta={
+            "trace_meta": trace_meta,
+            "stacked_area_note": chart_note_with_lng_coverage("", chart_df),
+        },
     )
     apply_chart_chrome(fig, base_year)
     return fig
@@ -5077,6 +5187,7 @@ def _build_supply_stack_chart(
     stack_prefix: str = "supply",
     preserve_gross_signs: bool = False,
     total_detail_df: pd.DataFrame | None = None,
+    note_context_df: pd.DataFrame | None = None,
 ) -> go.Figure:
     """Build signed composition areas with same-boundary total lines.
 
@@ -5221,9 +5332,12 @@ def _build_supply_stack_chart(
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={
             "trace_meta": trace_meta,
-            "stacked_area_note": (
-                f"{composition_note}; lines show signed net totals by dataset and scenario. "
-                + stacked_area_dataset_note(stacked_sources, composition_subject)
+            "stacked_area_note": chart_note_with_lng_coverage(
+                (
+                    f"{composition_note}; lines show signed net totals by dataset and scenario. "
+                    + stacked_area_dataset_note(stacked_sources, composition_subject)
+                ),
+                supply_detail_df if note_context_df is None else note_context_df,
             ),
         },
     )
@@ -5616,6 +5730,7 @@ def build_total_demand_page(
                 fuel_composition_note="Areas show fuels across the complete boundary",
                 stack_prefix="transformation",
                 preserve_gross_signs=True,
+                note_context_df=transformation_flow_df,
             ),
             "total_abs": transformation_total_abs,
             "row_count": len(transformation_df),
@@ -6518,6 +6633,7 @@ def render_dashboard(
                     else ""
                 ),
                 "datasets": chart_dataset_tokens_from_figure(chart_figure),
+                "stacked_area_note": stacked_area_note_from_figure(chart_figure),
                 **metrics,
             })
 

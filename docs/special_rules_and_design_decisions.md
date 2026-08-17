@@ -196,10 +196,19 @@ The former Total demand page is presented as the Energy balance overview. It
 shows paired composition charts by sector/flow and fuel for final demand,
 supply, and the whole transformation boundary. The transformation boundary
 contains all flow-09 sectors, transfers (08), energy-sector own use (10.01),
-and transmission/distribution losses (10.02). The by-flow chart selects the
-deepest available non-overlapping flow nodes for each source and scenario, so
-an available child replaces its uppermost parent in the area legend. The net
-lines and by-fuel chart retain the authoritative whole-boundary frontier.
+and transmission/distribution losses (10.02). The by-flow chart uses the
+deepest uncovered flow nodes, but treats mapping-owned NON_EXPANDING comparison
+rollups as terminal leaves. For example, `09.06.02 (including own use)` remains
+the comparison category instead of being replaced by `.01` or `.02` detail.
+When mapping rollups are nested, only the most specific declared rollups are
+terminal; a broad transformation subtotal cannot replace its more specific
+declared descendants.
+The net lines and by-fuel chart retain the authoritative whole-boundary frontier.
+Every chart whose underlying rows contain `09.06.02` or one of its descendants
+warns that ESTO historical data do not contain all LNG activity, so a large
+change at the base-year transition into projections can be expected and is not
+evidence of a dashboard or mapping error. The rule follows the data and applies
+to flow, product and individual fuel views rather than one hard-coded chart.
 Signed areas preserve gross positive outputs and negative inputs, transfers,
 own use and losses; the line shows their net. TFEC remains temporarily disabled under DASH-010 until
 non-energy use can be separated from aggregated Other-sector LEAP demand.
@@ -213,9 +222,9 @@ that projected composition detail is unavailable.
 
 Confirm the overview manifest contains
 `chart__area__total_demand__transformation_flow` and
-`chart__area__total_demand__transformation_fuel`. The flow chart must replace
-an upper flow-09 parent with its available leaf descendants while retaining
-the leaf frontiers under 08, 10.01 and 10.02. A category containing both positive
+`chart__area__total_demand__transformation_fuel`. The flow chart must retain
+mapping-owned terminal rollups and the deepest uncovered nodes while removing
+overlapping parent/detail alternatives under 09, 08, 10.01 and 10.02. A category containing both positive
 and negative facts must retain both signed area fragments. In aggregate-only
 LEAP demand scopes, Reference and Target views must still retain ESTO historical
 composition through the base year.
@@ -229,6 +238,12 @@ composition through the base year.
   retained ESTO historical composition when projection detail is unavailable.
 - 2026-08-12: Changed the by-flow areas to the deepest available flow frontier
   while keeping net lines and the by-fuel chart on the whole boundary.
+- 2026-08-17: Scoped plain-versus-inclusive transformation suppression to the
+  same comparison scope, source, economy, scenario and product. An inclusive
+  historical row in one dataset therefore cannot erase the equivalent
+  projected comparison row supplied by another dataset. Restored the by-flow
+  chart to the mapping-owned frontier so terminal NON_EXPANDING rollups remain
+  continuous across the base year.
 - 2026-08-12: Aligned public page URLs with their visible names:
   `energy_balance_overview.html` and `other_demand.html`. The former
   `total_demand.html` and `others.html` paths remain generated redirects.

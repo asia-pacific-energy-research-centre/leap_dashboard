@@ -1661,6 +1661,52 @@ def test_transformation_overview_leaf_frontier_replaces_parent_flow() -> None:
     assert "09" not in selected_codes
 
 
+def test_transformation_leaf_frontier_does_not_treat_broad_rollup_as_terminal() -> None:
+    common = {
+        "comparison_scope": "esto_leap_ninth",
+        "economy": "01_AUS",
+        "year": 2022,
+        "common_product_code": "08.01",
+        "common_product_label": "08.01 Natural gas",
+        "value": -10.0,
+    }
+    categories = [
+        ("09", "09 Transformation (including own use)", True),
+        (
+            "09.06.02",
+            "09.06.02 Liquefaction/regasification plants (including own use)",
+            True,
+        ),
+        ("09.06.02.01", "09.06.02.01 Liquefaction", False),
+        ("09.07", "09.07 Oil refineries", False),
+    ]
+    rows = pd.DataFrame([
+        {
+            **common,
+            "source_system": source_system,
+            "scenario": scenario,
+            "common_flow_code": flow_code,
+            "common_flow_label": flow_label,
+            # The ESTO rows carry the mapping declaration; it must determine
+            # the equivalent LEAP comparison frontier on the same surface.
+            "is_non_expanding_rollup": is_rollup if source_system == "ESTO" else False,
+        }
+        for source_system, scenario in [("ESTO", "historical"), ("LEAP", "Reference")]
+        for flow_code, flow_label, is_rollup in categories
+    ])
+
+    selected = _leaf_flow_rows(rows)
+
+    for source_system in ("ESTO", "LEAP"):
+        selected_codes = set(
+            selected.loc[
+                selected["source_system"].eq(source_system),
+                "common_flow_code",
+            ].astype(str)
+        )
+        assert selected_codes == {"09.06.02", "09.07"}
+
+
 def test_common_esto_dashboard_can_render_opt_in_scope_pages(tmp_path: Path) -> None:
     template = _load_template()
     template["scope_specific_pages"]["enabled"] = True
@@ -2461,6 +2507,113 @@ def test_transformation_leaf_stack_uses_authoritative_boundary_total() -> None:
     assert list(net_trace.y) == [3.0]
 
 
+def test_lng_coverage_note_follows_090602_data_across_chart_shapes() -> None:
+    rows = pd.DataFrame([
+        {
+            "source_system": source_system,
+            "scenario": scenario,
+            "year": year,
+            "common_flow_code": "09.06.02.01",
+            "common_flow_label": "09.06.02.01 Liquefaction",
+            "common_product_code": "08.01",
+            "common_product_label": "08.01 Natural gas",
+            "value": value,
+        }
+        for source_system, scenario, year, value in [
+            ("ESTO", "historical", 2022, -10.0),
+            ("LEAP", "Target", 2023, -500.0),
+        ]
+    ])
+
+    figures = [
+        _build_supply_stack_chart(
+            rows,
+            series_labels={},
+            primary_source="LEAP",
+            primary_scenario="Target",
+            group_col="common_flow_label",
+            chart_title="Transformation by flow",
+            base_year=2022,
+        ),
+        _build_supply_stack_chart(
+            rows,
+            series_labels={},
+            primary_source="LEAP",
+            primary_scenario="Target",
+            group_col="common_product_label",
+            chart_title="Transformation by product",
+            base_year=2022,
+        ),
+        build_product_chart(
+            rows,
+            "09.06.02.01 Liquefaction",
+            "08.01 Natural gas",
+            {},
+            primary_source="LEAP",
+            primary_scenario="Target",
+            base_year=2022,
+        ),
+    ]
+
+    for figure in figures:
+        note = figure.layout.meta["stacked_area_note"]
+        assert "ESTO historical data do not contain all LNG activity" in note
+        assert "does not indicate a dashboard or mapping error;" in note
+
+
+def test_lng_coverage_note_is_absent_without_090602_data() -> None:
+    rows = pd.DataFrame([{
+        "source_system": "LEAP",
+        "scenario": "Target",
+        "year": 2030,
+        "common_flow_code": "09.07",
+        "common_flow_label": "09.07 Oil refineries",
+        "common_product_label": "08.01 Natural gas",
+        "value": -10.0,
+    }])
+
+    figure = _build_supply_stack_chart(
+        rows,
+        series_labels={},
+        primary_source="LEAP",
+        primary_scenario="Target",
+        group_col="common_flow_label",
+        chart_title="Transformation by flow",
+    )
+
+    assert "LNG activity" not in figure.layout.meta["stacked_area_note"]
+
+
+def test_lng_coverage_note_can_follow_detailed_context_behind_broad_frontier() -> None:
+    broad_rows = pd.DataFrame([{
+        "source_system": "LEAP",
+        "scenario": "Target",
+        "year": 2030,
+        "common_flow_code": "09",
+        "common_flow_label": "09 Total transformation sector",
+        "common_product_label": "08.01 Natural gas",
+        "value": -500.0,
+    }])
+    detailed_context = broad_rows.assign(
+        common_flow_code="09.06.02.01",
+        common_flow_label="09.06.02.01 Liquefaction",
+    )
+
+    figure = _build_supply_stack_chart(
+        broad_rows,
+        series_labels={},
+        primary_source="LEAP",
+        primary_scenario="Target",
+        group_col="common_product_label",
+        chart_title="Transformation by product",
+        note_context_df=detailed_context,
+    )
+
+    assert "ESTO historical data do not contain all LNG activity" in (
+        figure.layout.meta["stacked_area_note"]
+    )
+
+
 def test_aggregate_only_leap_demand_warns_about_tfec_non_energy() -> None:
     note = aggregate_only_tfec_note({"NINTH"}, "LEAP")
 
@@ -2615,6 +2768,69 @@ def test_other_transformation_page_uses_inclusive_boundaries_and_residual_sectio
     assert sections["10.01.06"] == "Other energy-sector own use"
     assert sections["10.02"] == "Transmission and distribution losses"
     assert sections["08"] == "Transfers"
+
+
+def test_transformation_comparison_frontier_survives_other_source_inclusive_row() -> None:
+    rows = pd.DataFrame([
+        {
+            "comparison_scope": "esto_leap_ninth",
+            "source_system": "ESTO",
+            "economy": "01AUS",
+            "scenario": "historical",
+            "year": 2022,
+            "common_flow_code": "09.06.02",
+            "common_flow_label": (
+                "09.06.02 Liquefaction/regasification plants (including own use)"
+            ),
+            "common_product_code": "08.01",
+            "common_product_label": "08.01 Natural gas",
+            "is_non_expanding_rollup": True,
+            "value": -10.0,
+        },
+        {
+            "comparison_scope": "esto_leap_ninth",
+            "source_system": "LEAP",
+            "economy": "01AUS",
+            "scenario": "Reference",
+            "year": 2023,
+            "common_flow_code": "09.06.02",
+            "common_flow_label": "09.06.02 Liquefaction/regasification plants",
+            "common_product_code": "08.01",
+            "common_product_label": "08.01 Natural gas",
+            "is_non_expanding_rollup": True,
+            "value": -500.0,
+        },
+        {
+            "comparison_scope": "esto_leap_ninth",
+            "source_system": "LEAP",
+            "economy": "01AUS",
+            "scenario": "Reference",
+            "year": 2023,
+            "common_flow_code": "09.06.02.01",
+            "common_flow_label": "09.06.02.01 Liquefaction",
+            "common_product_code": "08.01",
+            "common_product_label": "08.01 Natural gas",
+            "is_non_expanding_rollup": False,
+            "value": -500.0,
+        },
+    ])
+
+    selected = select_transformation_overview_rows(
+        rows,
+        {"flow_code_prefixes": ["09", "08", "10.01", "10.02"]},
+        {"enabled": True, "append_inclusive_transformation_label": True},
+        prefer_leaf_flows=True,
+    )
+
+    leap_rows = selected[
+        selected["source_system"].eq("LEAP")
+        & selected["scenario"].eq("Reference")
+    ]
+    assert set(leap_rows["common_flow_code"]) == {"09.06.02"}
+    assert leap_rows.iloc[0]["common_flow_label"] == (
+        "09.06.02 Liquefaction/regasification plants (including own use)"
+    )
+    assert leap_rows["value"].sum() == -500.0
 
 
 def test_component_metadata_includes_upstream_rollup_contributors(tmp_path: Path) -> None:
