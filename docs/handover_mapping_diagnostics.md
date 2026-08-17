@@ -294,7 +294,7 @@ doubled.
 | Prompt | Repo | Scope |
 | --- | --- | --- |
 | `rebuild_esto_rollup_source_identity_prompt.md` (completed prompt; no longer present on mappings `master`) | `leap_mappings` | **DONE 2026-07-27.** Run `common_esto_20260727T113042584213Z` removed the doubling (ratio 1.0 in all 21 economies) and added a guard that fails the run rather than writing a doubled artifact. |
-| `docs/prompts/anchor_validation_section_rebuild_prompt.md` | `leap_dashboard` | Rebuild the anchor section: one parent boundary is one check, fuels/years nested as evidence, full filters, defensive skipped-run handling. |
+| `docs/archive/anchor_validation_section_rebuild_prompt.md` | `leap_dashboard` | Completed/superseded anchor-section brief retained as implementation history; current behavior is owned by the renderer, tests, and this handover. |
 
 ### Deferred: ESTO Extended coverage findings
 

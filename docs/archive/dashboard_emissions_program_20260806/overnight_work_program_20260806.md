@@ -4,7 +4,7 @@ Single operational runbook for tonight's unattended session. Work items, gates,
 verification, and the report template are all here.
 
 **Design detail lives in
-`docs/prompts/measure_aware_dashboard_and_mapping_inversion_plan.md`.** This file
+`measure_aware_dashboard_and_mapping_inversion_plan.md`.** This file
 says *what to do tonight and in what order*; that file says *why, and what the
 target shape is*. Read the relevant plan section before starting each item.
 

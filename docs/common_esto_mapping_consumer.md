@@ -103,7 +103,8 @@ See `codebase/common_esto_dashboard_emissions.select_non_overlapping_rows` and
 `DASH-021` in `docs/special_rules_and_design_decisions.md`. That code currently
 derives *all* of the above from code expressions; migrating its parenthood half
 onto the contract is tracked in
-`docs/prompts/measure_aware_dashboard_and_mapping_inversion_plan.md`.
+the archived implementation plan at
+`docs/archive/dashboard_emissions_program_20260806/measure_aware_dashboard_and_mapping_inversion_plan.md`.
 
 ## Current state versus target state
 
@@ -136,5 +137,8 @@ The point of the target is not performance. It is that anyone holding their own
 version of a dataset gets identical common rows from identical mappings, with
 only the values differing.
 
-See `docs/prompts/measure_aware_dashboard_and_mapping_inversion_plan.md`
-(Phase C). Update this section when it lands.
+See the archived
+`docs/archive/dashboard_emissions_program_20260806/measure_aware_dashboard_and_mapping_inversion_plan.md`
+(Phase C). The plan is retained as design history; any remaining inversion work
+must be re-scoped in `docs/work_queue.md` from the current parquet consumer
+rather than re-running that completed programme.

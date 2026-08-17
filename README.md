@@ -23,11 +23,16 @@ The dated
 [`documentation audit`](docs/documentation_audit_20260728.md) records the
 disposition of every tracked Markdown document; it is evidence, not the
 operating queue.
+The current post-baseline re-review is
+[`docs/documentation_audit_20260817.md`](docs/documentation_audit_20260817.md).
 
 The production entry point is
 `codebase/common_esto_dashboard_workflow.py`. Supporting modules are flattened
 directly under `codebase/`; configuration is under
 `config/common_esto_dashboard/`; tests and sample fixtures are under `tests/`.
+The normal production input is the manifested Common ESTO parquet generation
+published by `leap_mappings`; CSV fixtures are an explicit regression/testing
+path rather than the production default.
 
 The previous ESTO-axis dashboard is frozen separately for historical and visual
 comparison at:

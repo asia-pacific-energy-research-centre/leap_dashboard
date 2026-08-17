@@ -1,9 +1,9 @@
 # Relay baton — emissions-overnight
 
 Protocol: `C:\Users\Work\.claude\relay\RELAY_PROTOCOL.md`. This is the
-**state** file. The plan is `docs/prompts/overnight_work_program_20260806.md`
+**state** file. The plan is `overnight_work_program_20260806.md`
 in this repo (never edited by the run); design detail is in
-`docs/prompts/measure_aware_dashboard_and_mapping_inversion_plan.md` beside it.
+`measure_aware_dashboard_and_mapping_inversion_plan.md` beside it.
 
 ```text
 Status:       COMPLETE

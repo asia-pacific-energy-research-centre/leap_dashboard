@@ -28,7 +28,7 @@ confusing. **Phase C is the inversion.**
 ## Where everything is written down
 
 **For the 2026-08-06 overnight session, the operational runbook is
-`docs/prompts/overnight_work_program_20260806.md`** — work items, order, gates
+`overnight_work_program_20260806.md`** — work items, order, gates
 and the report template. This file is the design reference it points back to.
 
 This file is the plan for all phases. Two companion documents are **reference
