@@ -70,3 +70,4 @@ def test_unmet_requirements_chart_explains_shortage_and_surplus() -> None:
     assert any(float(value) > 0 for trace in fig.data for value in trace.y)
     assert any(float(value) < 0 for trace in fig.data for value in trace.y)
     assert all(trace.visible is None or trace.visible is True for trace in fig.data)
+    assert not any("net unmet requirements" in str(trace.name).casefold() for trace in fig.data)

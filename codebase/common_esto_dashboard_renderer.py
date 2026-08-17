@@ -5402,22 +5402,6 @@ def build_unmet_requirements_chart(
             )
             trace_meta.extend(trace_meta_entry("LEAP", scenario, True) for _ in range(trace_count))
 
-        totals = scenario_df.groupby("year", as_index=False)["value"].sum().sort_values("year")
-        if _has_nonzero_values(totals["value"]):
-            label = series_label_from_values("LEAP", scenario, series_labels) + " net unmet requirements"
-            fig.add_trace(go.Scatter(
-                x=totals["year"],
-                y=totals["value"],
-                mode="lines+markers",
-                name=label,
-                visible=True if visible else "legendonly",
-                line={"dash": "dash"},
-                hovertemplate=(
-                    "%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(label) + "</extra>"
-                ),
-            ))
-            trace_meta.append(trace_meta_entry("LEAP", scenario, True))
-
     fig.update_layout(
         title="Unmet requirements by fuel",
         xaxis_title="Year",
@@ -5428,8 +5412,7 @@ def build_unmet_requirements_chart(
             "trace_meta": trace_meta,
             "stacked_area_note": (
                 "Positive values show an energy shortage; negative values show surplus energy. "
-                "Areas show LEAP Unmet Requirements by mapped Common ESTO fuel category; "
-                "the dashed line is the signed net across fuels."
+                "Areas show LEAP Unmet Requirements by mapped Common ESTO fuel category."
             ),
         },
     )
@@ -5544,25 +5527,6 @@ def build_total_demand_page(
             "source_flow_labels": "; ".join(demand_page_keys),
         },
     ]
-    unmet_requirements_df = (
-        pd.DataFrame() if unmet_requirements_df is None else unmet_requirements_df.copy()
-    )
-    if not unmet_requirements_df.empty and _has_nonzero_values(unmet_requirements_df["value"]):
-        unmet_total_abs = float(unmet_requirements_df["value"].abs().sum())
-        chart_specs.append({
-            "chart_key": "chart__area__total_demand__unmet_requirements",
-            "title": "Unmet requirements by fuel",
-            "overview_group": "Unmet requirements",
-            "build": lambda: build_unmet_requirements_chart(
-                unmet_requirements_df,
-                series_labels,
-                primary_scenario=primary_scenario,
-                base_year=base_year,
-            ),
-            "total_abs": unmet_total_abs,
-            "row_count": len(unmet_requirements_df),
-            "source_flow_labels": "Unmet Requirements",
-        })
     if not supply_detail_df.empty:
         supply_total_abs = float(supply_detail_df["value"].abs().sum())
         chart_specs.append({
@@ -5647,6 +5611,27 @@ def build_total_demand_page(
             "row_count": len(transformation_df),
             "source_flow_labels": "; ".join(transformation_prefixes),
         })
+    # Keep this separate LEAP diagnostic at the bottom of the overview page,
+    # after the mapped balance and transformation sections.
+    unmet_requirements_df = (
+        pd.DataFrame() if unmet_requirements_df is None else unmet_requirements_df.copy()
+    )
+    if not unmet_requirements_df.empty and _has_nonzero_values(unmet_requirements_df["value"]):
+        unmet_total_abs = float(unmet_requirements_df["value"].abs().sum())
+        chart_specs.append({
+            "chart_key": "chart__area__total_demand__unmet_requirements",
+            "title": "Unmet requirements by fuel",
+            "overview_group": "Unmet requirements",
+            "build": lambda: build_unmet_requirements_chart(
+                unmet_requirements_df,
+                series_labels,
+                primary_scenario=primary_scenario,
+                base_year=base_year,
+            ),
+            "total_abs": unmet_total_abs,
+            "row_count": len(unmet_requirements_df),
+            "source_flow_labels": "Unmet Requirements",
+        })
     for spec in chart_specs:
         chart_key = spec["chart_key"]
         fig = spec["build"]()
@@ -5712,6 +5697,18 @@ def build_total_demand_page(
             "diff_hist_json": "",
             "diff_proj_json": "",
         })
+
+    # The LEAP-only Unmet Requirements diagnostic belongs after every mapped
+    # overview and balance-total chart, not just after the composition charts.
+    unmet_chart_key = "chart__area__total_demand__unmet_requirements"
+    chart_rows[:] = (
+        [row for row in chart_rows if row["chart_key"] != unmet_chart_key]
+        + [row for row in chart_rows if row["chart_key"] == unmet_chart_key]
+    )
+    manifest_rows[:] = (
+        [row for row in manifest_rows if row["chart_key"] != unmet_chart_key]
+        + [row for row in manifest_rows if row["chart_key"] == unmet_chart_key]
+    )
 
     bundle_name = "total_demand__charts.json"
     write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
