@@ -14,10 +14,12 @@ editing surface, not a second runtime format.
    `outputs/dashboard_color_mapping/dashboard_color_mapping.xlsx`.
 4. Send that workbook to the reviewer.
 
-The reviewer starts on **START HERE**. In the other tabs, they edit only the
-**Proposed colour — EDIT** column. They can either type a six-digit hex colour
-such as `#1F77B4` or use Excel's paint-bucket fill. Product and flow codes must
-not be changed. The special label tabs are optional.
+The reviewer starts on **START HERE**. Product and flow codes are joined to
+their names in one visible **Category** column, such as `01 Coal`. In the other
+tabs, the reviewer edits only the **Proposed colour — EDIT** column. They can
+either type a six-digit hex colour such as `#1F77B4` or use Excel's
+paint-bucket fill. The Category column must not be changed. The special label
+tabs are optional.
 
 ## Apply the returned workbook
 
@@ -36,6 +38,26 @@ After importing, render the tracked USA fixture and run the usual publication
 readiness and page-noise checks. Review charts with many stacked categories in
 particular: two individually attractive colours can still be too similar when
 they appear next to each other.
+
+## How these colours reach Common ESTO dashboard categories
+
+This workbook does not convert source data into the Common ESTO structure.
+That conversion is owned by `leap_mappings`. For each participating dataset,
+the upstream process merges each native flow/product pair onto its declared
+`common_row_id`, then aggregates by that identifier. It does not split or
+allocate values. The dashboard reads the resulting
+`common_esto_comparison_data` output.
+
+Colours are applied after that conversion. The renderer reads the first ESTO
+code in each Common ESTO label and looks it up in the product or flow colour
+map. For example, the rolled product `01.02-01.04 Coal` uses the configured
+colour for `01.02`. If an exact code has no colour, the renderer walks up the
+code hierarchy, so an unseen `14.03.99` flow can inherit the colour for
+`14.03 Manufacturing`.
+
+This separation is deliberate: mapping logic determines which values belong
+to a Common ESTO category, while this workbook determines only how the
+resulting category is displayed.
 
 ## Usability recommendations
 

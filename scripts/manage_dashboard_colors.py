@@ -172,7 +172,7 @@ def _write_instructions(workbook: Workbook) -> None:
         ("Option 2 — exact", "Type a six-digit hex colour such as #1F77B4 into a Proposed colour cell."),
         ("Important", "If you change both the text and the fill in one cell, make them the same colour."),
         ("When finished", "Save the workbook and send this same .xlsx file back. Do not delete rows or rename tabs."),
-        ("Helpful notes", "Use the Notes column to explain choices. Product/flow codes are identifiers and should not be edited."),
+        ("Helpful notes", "Use the Notes column to explain choices. Do not edit the Category column or delete rows."),
         ("Special labels", "The three label tabs are optional and cover special chart labels outside the main Common ESTO code hierarchy."),
     ]
     sheet.append([])
@@ -193,12 +193,13 @@ def _write_instructions(workbook: Workbook) -> None:
 def _write_colour_sheet(
     workbook: Workbook,
     sheet_name: str,
-    identifier_heading: str,
     rows: list[tuple[str, str, str]],
 ) -> None:
     sheet = workbook.create_sheet(sheet_name)
     sheet.sheet_view.showGridLines = False
-    sheet.append([identifier_heading, "Category name", "Current colour", "Proposed colour — EDIT", "Notes (optional)"])
+    # Column A is the stable machine identifier used during import. It stays
+    # hidden so the reviewer sees one uncomplicated combined Category column.
+    sheet.append(["_internal_key", "Category", "Current colour", "Proposed colour — EDIT", "Notes (optional)"])
     for identifier, label, color in rows:
         row_number = sheet.max_row + 1
         sheet.append([identifier, label, color, color, ""])
@@ -220,8 +221,9 @@ def _write_colour_sheet(
     sheet.row_dimensions[1].height = 34
     sheet.freeze_panes = "C2"
     sheet.auto_filter.ref = f"A1:E{sheet.max_row}"
-    sheet.column_dimensions["A"].width = 25
-    sheet.column_dimensions["B"].width = 48
+    sheet.column_dimensions["A"].hidden = True
+    sheet.column_dimensions["A"].width = 2
+    sheet.column_dimensions["B"].width = 55
     sheet.column_dimensions["C"].width = 18
     sheet.column_dimensions["D"].width = 24
     sheet.column_dimensions["E"].width = 44
@@ -250,17 +252,21 @@ def export_color_workbook(
         if mapping_kind == "code":
             mapping = dict(payload.get(axis, {}))
             rows = [
-                (code, labels.get(axis, {}).get(code, "Not in the current common hierarchy"), normalize_hex(color))
+                (
+                    code,
+                    f"{code} {labels.get(axis, {}).get(code, 'Category not in the current common hierarchy')}",
+                    normalize_hex(color),
+                )
                 for code, color in sorted(mapping.items())
             ]
-            _write_colour_sheet(workbook, sheet_name, "Category code — DO NOT EDIT", rows)
+            _write_colour_sheet(workbook, sheet_name, rows)
         else:
             mapping = dict(payload.get("plotting", {}).get(axis, {}))
             rows = [
                 (name, name.replace("_", " "), normalize_hex(color))
                 for name, color in sorted(mapping.items(), key=lambda item: item[0].casefold())
             ]
-            _write_colour_sheet(workbook, sheet_name, "Chart label — DO NOT EDIT", rows)
+            _write_colour_sheet(workbook, sheet_name, rows)
 
     metadata = workbook.create_sheet("_metadata")
     metadata.sheet_state = "hidden"
@@ -294,7 +300,7 @@ def _read_colour_sheet(workbook: object, sheet_name: str) -> dict[str, str]:
     if sheet_name not in workbook.sheetnames:
         raise ValueError(f"Required sheet {sheet_name!r} is missing or was renamed")
     sheet = workbook[sheet_name]
-    expected_headers = ["Category name", "Current colour", "Proposed colour — EDIT"]
+    expected_headers = ["Category", "Current colour", "Proposed colour — EDIT"]
     actual_headers = [sheet.cell(row=1, column=column).value for column in (2, 3, 4)]
     if actual_headers != expected_headers:
         raise ValueError(f"{sheet_name}: headings were changed; expected {expected_headers!r}")

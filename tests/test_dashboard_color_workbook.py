@@ -33,6 +33,8 @@ def test_export_and_import_accept_typed_and_fill_changes(tmp_path: Path) -> None
     export_color_workbook(output_path=workbook_path, code_colors_path=config_path)
     workbook = load_workbook(workbook_path)
     assert workbook["_metadata"].sheet_state == "hidden"
+    assert workbook["Products"].column_dimensions["A"].hidden is True
+    assert workbook["Products"]["B2"].value == "01 Coal"
     assert workbook["Products"]["D2"].value == "#0D0D0D"
     assert workbook["Products"]["D2"].fill.fgColor.rgb.endswith("0D0D0D")
     workbook["Products"]["D2"] = "#123456"
