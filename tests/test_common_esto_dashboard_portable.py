@@ -94,7 +94,7 @@ def test_configured_comparison_scopes_use_maintained_selector() -> None:
     assert [item["is_default"] for item in definitions] == [True, False]
 
 
-def test_variant_render_forwards_basis_options_and_writes_diagnostics(
+def test_variant_render_forwards_basis_options_without_substitute_diagnostics(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -160,8 +160,10 @@ def test_variant_render_forwards_basis_options_and_writes_diagnostics(
             "dashboard_key": "20USA__esto_leap",
         },
     ]
+    assert calls[0]["additional_pages"] == []
     assert result["chart_count"] == 4
-    assert Path(str(result["mapping_diagnostics"]["page"])).is_file()
+    assert "mapping_diagnostics" not in result
+    assert not (tmp_path / "outputs" / "diagnostics").exists()
 
 
 def test_code_colors_path_can_be_redirected_and_restored(tmp_path: Path) -> None:

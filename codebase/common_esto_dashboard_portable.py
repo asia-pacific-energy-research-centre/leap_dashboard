@@ -13,12 +13,10 @@ executed at import, and the only in-repo dependencies are the three production
 dashboard modules. It is what the developer launcher and the portable release
 both call, so both run identical rendering code.
 
-The portable release carries the published source-to-Common and ESTO-to-Common
-maps, so this module also writes a compact, read-only mapping diagnostics page.
-It reports the published relationships and scope coverage; it never infers or
-modifies mapping semantics. The maintainer workflow retains the deeper
-hierarchy/rollup diagnostics page that uses the full ``leap_mappings`` results
-tree.
+The maintainer workflow separately renders the hierarchy/rollup diagnostics
+page from the full ``leap_mappings`` results tree. The portable release does
+not carry that complete diagnostics contract, so it does not publish a reduced
+or substitute diagnostics page.
 
 Deliberately **not** included here:
 
@@ -39,7 +37,6 @@ import json
 import sys
 from copy import deepcopy
 from collections.abc import Sequence
-from html import escape
 from pathlib import Path
 
 import pandas as pd
@@ -160,84 +157,6 @@ def configured_comparison_scopes(template: dict) -> list[dict[str, object]]:
             "The default comparison scope must use an empty output_suffix to preserve existing URLs."
         )
     return definitions
-
-
-def _write_portable_mapping_diagnostics(
-    *,
-    output_root: Path,
-    economy_key: str,
-    source_category_map: pd.DataFrame | None,
-    dashboard_updated_label: str,
-) -> dict[str, str]:
-    """Write a compact audit of the published mapping relationships."""
-    dashboard_dir = output_root / "diagnostics" / "dashboards"
-    supporting_dir = output_root / "diagnostics" / "supporting_files"
-    dashboard_dir.mkdir(parents=True, exist_ok=True)
-    supporting_dir.mkdir(parents=True, exist_ok=True)
-    mapping = source_category_map.copy() if source_category_map is not None else pd.DataFrame()
-    group_columns = [
-        column
-        for column in ("comparison_scope", "source_system")
-        if column in mapping.columns
-    ]
-    if not mapping.empty and group_columns:
-        summary = (
-            mapping.groupby(group_columns, dropna=False)
-            .size()
-            .reset_index(name="published_relationship_rows")
-            .sort_values(group_columns, kind="stable")
-        )
-    else:
-        summary = pd.DataFrame(
-            columns=["comparison_scope", "source_system", "published_relationship_rows"]
-        )
-    summary_path = supporting_dir / "mapping_diagnostics_summary.csv"
-    summary.to_csv(summary_path, index=False)
-    display_columns = [
-        column
-        for column in (
-            "comparison_scope",
-            "source_system",
-            "source_flow",
-            "source_product",
-            "common_flow_label",
-            "common_product_label",
-        )
-        if column in mapping.columns
-    ]
-    summary_rows = "".join(
-        "<tr>" + "".join(f"<td>{escape(str(value))}</td>" for value in row) + "</tr>"
-        for row in summary.itertuples(index=False, name=None)
-    ) or '<tr><td colspan="3">No published mapping rows were supplied.</td></tr>'
-    detail = mapping.loc[:, display_columns].head(250) if display_columns else pd.DataFrame()
-    detail_rows = "".join(
-        "<tr>" + "".join(f"<td>{escape(str(value))}</td>" for value in row) + "</tr>"
-        for row in detail.itertuples(index=False, name=None)
-    ) or '<tr><td>No mapping detail is available.</td></tr>'
-    page_path = dashboard_dir / "mapping_diagnostics.html"
-    page_path.write_text(
-        "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' "
-        "content='width=device-width,initial-scale=1'><title>Mapping diagnostics</title>"
-        "<style>body{font-family:Inter,Segoe UI,Arial,sans-serif;background:#f4f6f8;color:#172033;margin:0}"
-        ".shell{max-width:1500px;margin:auto;padding:24px}.panel{background:white;border:1px solid #d9e1ea;"
-        "border-radius:10px;padding:16px;margin:16px 0}.scroll{overflow:auto;max-height:620px}"
-        "table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #d9e1ea;"
-        "padding:6px 8px;text-align:left}th{background:#e8f0fa;position:sticky;top:0}</style></head>"
-        f"<body><div class='shell'><a href='../../{escape(economy_key)}/dashboards/index.html'>"
-        "← Back to dashboard</a><section class='panel'><h1>Mapping diagnostics</h1>"
-        "<p>This portable view audits the published source-to-Common relationships used by the dashboard. "
-        "It does not create, change, or infer mappings.</p>"
-        f"<p>Updated: {escape(dashboard_updated_label)}</p></section>"
-        "<section class='panel'><h2>Published relationship coverage</h2><table><thead><tr>"
-        + "".join(f"<th>{escape(column)}</th>" for column in summary.columns)
-        + f"</tr></thead><tbody>{summary_rows}</tbody></table></section>"
-        "<section class='panel'><h2>Published mapping rows</h2><p>Showing the first 250 rows. "
-        "Download the complete archive for the full CSV artifacts.</p><div class='scroll'><table><thead><tr>"
-        + "".join(f"<th>{escape(column)}</th>" for column in display_columns)
-        + f"</tr></thead><tbody>{detail_rows}</tbody></table></div></section></div></body></html>",
-        encoding="utf-8",
-    )
-    return {"page": str(page_path), "summary": str(summary_path)}
 
 
 def render_common_esto_dashboard(
@@ -416,21 +335,6 @@ def render_common_esto_dashboard_variants(
         }
         for item in definitions
     ]
-    source_category_map = load_source_category_map(
-        Path(str(kwargs["source_to_common_map_path"])),
-        Path(str(kwargs["esto_to_common_map_path"])),
-    )
-    diagnostics = _write_portable_mapping_diagnostics(
-        output_root=output_root,
-        economy_key=economy_key,
-        source_category_map=source_category_map,
-        dashboard_updated_label=str(kwargs.get("dashboard_updated_label", "")),
-    )
-    additional_pages = [{
-        "page_key": "mapping_diagnostics",
-        "page_label": "Mapping diagnostics",
-        "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
-    }]
     scope_results: dict[str, dict[str, object]] = {}
     default_result: dict[str, object] | None = None
     for definition in definitions:
@@ -441,7 +345,7 @@ def render_common_esto_dashboard_variants(
             "category_basis_options": options,
             "active_dataset_filter_options": list(definition["source_systems"]),
             "dashboard_key_suffix": str(definition["output_suffix"]),
-            "additional_pages": additional_pages,
+            "additional_pages": [],
             "clear_existing": True,
         })
         result = render_common_esto_dashboard(**call_kwargs)
@@ -453,7 +357,6 @@ def render_common_esto_dashboard_variants(
     combined = dict(default_result)
     combined["output_root"] = str(output_root)
     combined["scope_results"] = scope_results
-    combined["mapping_diagnostics"] = diagnostics
     combined["chart_count"] = sum(
         int(result.get("chart_count", 0)) for result in scope_results.values()
     )

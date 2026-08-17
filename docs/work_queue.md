@@ -20,14 +20,15 @@ inspection of the current upstream mapping artifacts.
 
 ## Post-snapshot completion on 2026-08-13
 
-- **Portable/web comparison bases and mapping diagnostics are complete.**
+- **Portable/web comparison bases are complete.**
   `render_common_esto_dashboard_variants()` publishes both maintained
   comparison scopes (`ESTO / LEAP / NINTH` and `ESTO / LEAP`) with explicit
-  category-basis choices. Each bundle also contains a compact read-only
-  mapping-diagnostics page derived from the published source-to-Common maps;
-  it does not create or override mapping relationships. Focused unit tests and
-  a real portable fixture render pass. The web-app source preserves the whole
-  variant bundle when snapshotting, publishing, and downloading results.
+  category-basis choices. Focused unit tests and a real portable fixture render
+  pass. The web-app source preserves the whole variant bundle when snapshotting,
+  publishing, and downloading results. On 2026-08-17 the misleading reduced
+  mapping page was removed: portable bundles do not carry the full mapping QA
+  contract needed by the production diagnostics renderer and no longer publish
+  relationship-count or raw-row substitutes.
 
 ## Post-snapshot completion on 2026-08-12
 
