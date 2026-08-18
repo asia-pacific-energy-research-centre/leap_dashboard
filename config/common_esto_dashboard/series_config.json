@@ -28,6 +28,7 @@
   },
   "visible_series": [
     {"source_system": "ESTO", "scenario": "historical"},
+    {"source_system": "ESTO_EXTENDED", "scenario": "historical"},
     {"source_system": "LEAP", "scenario": "Reference"},
     {"source_system": "LEAP", "scenario": "Target"},
     {"source_system": "NINTH", "scenario": "Reference"},
@@ -35,6 +36,7 @@
   ],
   "series_labels": {
     "ESTO|historical": "ESTO Historical",
+    "ESTO_EXTENDED|historical": "ESTO Historical",
     "LEAP|Reference": "LEAP Reference",
     "LEAP|Target": "LEAP Target",
     "NINTH|Reference": "9th Reference",

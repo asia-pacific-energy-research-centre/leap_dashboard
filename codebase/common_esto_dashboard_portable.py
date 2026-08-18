@@ -220,6 +220,10 @@ def render_common_esto_dashboard(
     template["_current_dashboard_key"] = economy_key
     template["_category_basis_options"] = list(category_basis_options)
     template["_active_dataset_filter_options"] = list(active_dataset_filter_options)
+    if "ESTO_EXTENDED" in {
+        str(source).upper() for source in active_dataset_filter_options
+    }:
+        template["chart_generation"]["comparison_source_system"] = "ESTO_EXTENDED"
     template["_dashboard_key_suffix"] = dashboard_key_suffix
     series_config = json.loads(Path(series_config_path).read_text(encoding="utf-8"))
     source_category_map = (

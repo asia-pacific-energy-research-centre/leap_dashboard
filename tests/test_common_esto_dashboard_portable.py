@@ -87,16 +87,16 @@ def test_configured_comparison_scopes_use_maintained_selector() -> None:
     definitions = configured_comparison_scopes(template)
 
     assert [item["comparison_scope"] for item in definitions] == [
-        "esto_leap_ninth",
-        "esto_leap",
         "esto_extended_leap_ninth",
         "esto_extended_leap",
+        "esto_leap_ninth",
+        "esto_leap",
     ]
     assert [item["output_suffix"] for item in definitions] == [
         "",
-        "__esto_leap",
-        "__esto_extended_leap_ninth",
         "__esto_extended_leap",
+        "__esto_leap_ninth",
+        "__esto_leap",
     ]
     assert [item["is_default"] for item in definitions] == [True, False, False, False]
 
@@ -152,37 +152,78 @@ def test_variant_render_forwards_basis_options_without_substitute_diagnostics(
     )
 
     assert [call["comparison_scope"] for call in calls] == [
-        "esto_leap_ninth",
-        "esto_leap",
         "esto_extended_leap_ninth",
         "esto_extended_leap",
+        "esto_leap_ninth",
+        "esto_leap",
     ]
     assert calls[0]["category_basis_options"] == [
         {
-            "comparison_scope": "esto_leap_ninth",
-            "label": "LEAP + ESTO + Ninth",
-            "dashboard_key": "20USA",
-        },
-        {
-            "comparison_scope": "esto_leap",
-            "label": "LEAP + ESTO",
-            "dashboard_key": "20USA__esto_leap",
-        },
-        {
             "comparison_scope": "esto_extended_leap_ninth",
             "label": "LEAP + ESTO Extended + Ninth",
-            "dashboard_key": "20USA__esto_extended_leap_ninth",
+            "dashboard_key": "20USA",
         },
         {
             "comparison_scope": "esto_extended_leap",
             "label": "LEAP + ESTO Extended",
             "dashboard_key": "20USA__esto_extended_leap",
         },
+        {
+            "comparison_scope": "esto_leap_ninth",
+            "label": "LEAP + ESTO + Ninth (ordinary verification)",
+            "dashboard_key": "20USA__esto_leap_ninth",
+        },
+        {
+            "comparison_scope": "esto_leap",
+            "label": "LEAP + ESTO (ordinary verification)",
+            "dashboard_key": "20USA__esto_leap",
+        },
     ]
     assert calls[0]["additional_pages"] == []
     assert result["chart_count"] == 8
     assert "mapping_diagnostics" not in result
     assert not (tmp_path / "outputs" / "diagnostics").exists()
+
+
+def test_extended_scope_renders_ordinary_history_under_extended_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    comparison = pd.read_csv(COMPARISON_FIXTURE)
+    comparison = comparison[
+        comparison["comparison_scope"].eq("esto_leap_ninth")
+    ].copy()
+    comparison["comparison_scope"] = "esto_extended_leap_ninth"
+    comparison.loc[
+        comparison["source_system"].eq("ESTO"), "source_system"
+    ] = "ESTO_EXTENDED"
+    comparison_path = tmp_path / "extended_comparison.csv"
+    comparison.to_csv(comparison_path, index=False)
+    captured: dict[str, object] = {}
+
+    def fake_render_dashboard(df: pd.DataFrame, template: dict, *args: object, **kwargs: object) -> pd.DataFrame:
+        captured["sources"] = set(df["source_system"].astype(str))
+        captured["comparison_source"] = template["chart_generation"][
+            "comparison_source_system"
+        ]
+        return pd.DataFrame()
+
+    monkeypatch.setattr(portable, "render_dashboard", fake_render_dashboard)
+    render_common_esto_dashboard(
+        economy="20_USA",
+        comparison_data_path=comparison_path,
+        common_rows_path=ROWS_FIXTURE,
+        template_path=TEMPLATE_PATH,
+        series_config_path=SERIES_CONFIG_PATH,
+        output_root=tmp_path / "outputs",
+        comparison_scope="esto_extended_leap_ninth",
+        active_dataset_filter_options=["LEAP", "ESTO_EXTENDED", "NINTH"],
+        min_year=2020,
+        max_year=2022,
+    )
+
+    assert "ESTO_EXTENDED" in captured["sources"]
+    assert captured["comparison_source"] == "ESTO_EXTENDED"
 
 
 def test_code_colors_path_can_be_redirected_and_restored(tmp_path: Path) -> None:

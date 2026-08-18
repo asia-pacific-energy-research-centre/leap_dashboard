@@ -158,9 +158,6 @@ _LEAP_MAPPINGS_RESULTS = _LEAP_MAPPINGS_REPO / "results" / "common_esto"
 ESTO_EXACT_ROWS_PATH = prefer_compressed_csv_path(
     _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_results_exact_rows.csv.gz"
 )
-ESTO_EXTENDED_EXACT_ROWS_PATH = prefer_compressed_csv_path(
-    _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_extended_results_exact_rows.csv.gz"
-)
 # The long-form file only contains rows a source system actually reported, so
 # years a source has no data for are simply absent instead of zero-filled
 # (unlike the wide CSV, which pads every year column with 0).
@@ -218,14 +215,14 @@ set_leap_mappings_root(_LEAP_MAPPINGS_REPO)
 
 #%%
 # User-tuned constants.
-COMPARISON_SCOPE = os.getenv("COMMON_ESTO_COMPARISON_SCOPE", "esto_leap_ninth")
+COMPARISON_SCOPE = os.getenv("COMMON_ESTO_COMPARISON_SCOPE", "esto_extended_leap_ninth")
 RENDER_COMPARISON_SCOPE_VARIANTS = _env_bool(
     "COMMON_ESTO_RENDER_COMPARISON_SCOPE_VARIANTS", default=True
 )
 # Which source scope to read from the wide comparison file (see
 # ``common_esto_dashboard_data.DEFAULT_WIDE_FILE_SCOPE``). Use "esto_leap" to
 # read the 2-way LEAP/ESTO comparison instead.
-WIDE_FILE_SCOPE = os.getenv("COMMON_ESTO_WIDE_FILE_SCOPE", "esto_leap_ninth")
+WIDE_FILE_SCOPE = os.getenv("COMMON_ESTO_WIDE_FILE_SCOPE", "esto_extended_leap_ninth")
 USE_OUTPUT_CONTRACT = _env_bool("COMMON_ESTO_USE_OUTPUT_CONTRACT", default=False)
 ECONOMIES: str | list[str] = os.getenv("COMMON_ESTO_ECONOMIES", ["20_USA", "02_BD"])
 MIN_YEAR = 2010
@@ -363,6 +360,9 @@ def maybe_regen_common_esto_fast_path() -> None:
             "ESTO": prefer_compressed_csv_path(
                 relationship_dir / "esto_results_exact_rows.csv.gz"
             ),
+            "ESTO_EXTENDED": prefer_compressed_csv_path(
+                relationship_dir / "esto_results_exact_rows.csv.gz"
+            ),
         },
         common_rows_path=_LEAP_MAPPINGS_RESULTS / "common_esto_rows.csv",
         output_dir=_LEAP_MAPPINGS_RESULTS,
@@ -374,6 +374,7 @@ def maybe_regen_common_esto_fast_path() -> None:
         relevance_reference_paths=get_component_relevance_reference_paths(
             _LEAP_MAPPINGS_REPO
         ),
+        source_system_overrides={"ESTO_EXTENDED": "ESTO_EXTENDED"},
     )
 
 
@@ -551,6 +552,8 @@ def run_dashboard_for_economy(
         scope_template["_current_dashboard_key"] = economy
         scope_template["_active_comparison_scope"] = comparison_scope
         scope_template["_active_dataset_filter_options"] = list(definition["source_systems"])
+        if "ESTO_EXTENDED" in definition["source_systems"]:
+            scope_template["chart_generation"]["comparison_source_system"] = "ESTO_EXTENDED"
         scope_template["_dashboard_key_suffix"] = output_suffix
         scope_template["_category_basis_options"] = selector_options
         visible_df = apply_sign_semantics(
@@ -704,7 +707,7 @@ def run_shared_mapping_diagnostics() -> dict[str, str]:
         max_year=MAX_YEAR,
     )
     esto_extended_exact_values = load_esto_exact_values_for_economy(
-        ESTO_EXTENDED_EXACT_ROWS_PATH,
+        ESTO_EXACT_ROWS_PATH,
         "",
         min_year=MIN_YEAR,
         max_year=MAX_YEAR,

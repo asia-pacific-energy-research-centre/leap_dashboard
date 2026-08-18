@@ -53,6 +53,10 @@ strayed into mapping logic and belongs upstream.
   scope. The 9th maps cleanly in `esto_leap_ninth` and *not* in `esto_leap`,
   where it is not a participant — 151 of its pairs fan out there. That is the
   rule working, not a defect.
+- **Treat ESTO Extended as structure, not a second history.** Extended scopes
+  reuse the ordinary ESTO exact rows under the `ESTO_EXTENDED` source identity.
+  The additional children let reported LEAP detail remain visible, but the
+  dashboard must not allocate ordinary ESTO totals among those children.
 - **Do not re-derive mapping semantics.** `leap_dashboard/AGENTS.md` forbids
   reproducing mapping logic here. Note that it forbids a second *implementation*
   — it does not forbid this repository from performing the conversion by calling
