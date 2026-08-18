@@ -163,7 +163,12 @@ def series_label_from_values(source_system: object, scenario: object, series_lab
 
 def dataset_display_name(source_system: object) -> str:
     """Return the short dataset name used in chart notes."""
-    names = {"ESTO": "ESTO", "LEAP": "LEAP", "NINTH": "9th edition"}
+    names = {
+        "ESTO": "ESTO",
+        "ESTO_EXTENDED": "ESTO Extended",
+        "LEAP": "LEAP",
+        "NINTH": "9th edition",
+    }
     source = str(source_system).strip().upper()
     return names.get(source, source or "unknown dataset")
 
@@ -1351,6 +1356,17 @@ def _comparison_projection_area_rows(
     candidates = [primary_source, "NINTH", "LEAP", "ESTO"]
     source_column = df["source_system"].astype(str).str.casefold()
     scenario_column = df["scenario"].astype(str).str.casefold()
+    # Extended comparison scopes use the same historical ESTO observations
+    # under the ESTO_EXTENDED source label. The area-chart callers retain the
+    # legacy ESTO default for ordinary scopes, so resolve that label here when
+    # the filtered frame contains only the Extended comparison source.
+    available_sources = set(source_column.unique())
+    if (
+        comparison_source.casefold() == "esto"
+        and "esto" not in available_sources
+        and "esto_extended" in available_sources
+    ):
+        comparison_source = "ESTO_EXTENDED"
     selected_source = ""
     projected = df.iloc[0:0].copy()
     ninth_base_year = ninth_base_year_for_rows(df, base_year)
@@ -3462,7 +3478,7 @@ _LAZY_LOAD_JS = """
     }
   };
 
-  var renderPlot = function(plot) {
+  var renderPlot = async function(plot) {
     if (plot.dataset.rendered === 'true' || plot.dataset.rendering === 'true') return;
     plot.dataset.rendering = 'true';
     setState(plot, 'Loading chart…', false);
@@ -3470,7 +3486,7 @@ _LAZY_LOAD_JS = """
       var bundle = bundleData;
       var chart = bundle && bundle.charts && bundle.charts[plot.dataset.chartKey];
       if (!chart) throw new Error('Missing chart: ' + plot.dataset.chartKey);
-      window.Plotly.newPlot(plot, chart.data || [], chart.layout || {}, {responsive: true});
+      await window.Plotly.newPlot(plot, chart.data || [], chart.layout || {}, {responsive: true});
       plot.dataset.rendered = 'true';
       plot.classList.remove('is-unloaded');
       setState(plot, '', true);

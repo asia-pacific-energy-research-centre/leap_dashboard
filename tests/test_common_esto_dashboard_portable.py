@@ -89,16 +89,12 @@ def test_configured_comparison_scopes_use_maintained_selector() -> None:
     assert [item["comparison_scope"] for item in definitions] == [
         "esto_extended_leap_ninth",
         "esto_extended_leap",
-        "esto_leap_ninth",
-        "esto_leap",
     ]
     assert [item["output_suffix"] for item in definitions] == [
         "",
         "__esto_extended_leap",
-        "__esto_leap_ninth",
-        "__esto_leap",
     ]
-    assert [item["is_default"] for item in definitions] == [True, False, False, False]
+    assert [item["is_default"] for item in definitions] == [True, False]
 
 
 def test_variant_render_forwards_basis_options_without_substitute_diagnostics(

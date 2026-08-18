@@ -16,18 +16,6 @@
         "label": "LEAP + ESTO Extended",
         "source_systems": ["LEAP", "ESTO_EXTENDED"],
         "output_suffix": "__esto_extended_leap"
-      },
-      {
-        "comparison_scope": "esto_leap_ninth",
-        "label": "LEAP + ESTO + Ninth (ordinary verification)",
-        "source_systems": ["LEAP", "ESTO", "NINTH"],
-        "output_suffix": "__esto_leap_ninth"
-      },
-      {
-        "comparison_scope": "esto_leap",
-        "label": "LEAP + ESTO (ordinary verification)",
-        "source_systems": ["LEAP", "ESTO"],
-        "output_suffix": "__esto_leap"
       }
     ]
   },

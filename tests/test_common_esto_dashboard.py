@@ -27,6 +27,7 @@ from codebase.common_esto_dashboard_output_layout import build_output_layout, pu
 from codebase.common_esto_dashboard_renderer import (
     _PAGE_CSS,
     _build_td_fuel_chart,
+    _comparison_projection_area_rows,
     apply_chart_chrome,
     assert_unique_line_trace_x,
     assign_pages,
@@ -71,6 +72,29 @@ from codebase.common_esto_dashboard_renderer import (
     _jump_nav_html,
     _line_sections_html,
 )
+
+
+def test_extended_comparison_keeps_pre_base_year_historical_rows() -> None:
+    rows = pd.DataFrame(
+        [
+            {"source_system": "ESTO_EXTENDED", "scenario": "historical", "year": 2021, "_page_key": "industry", "value": 10.0},
+            {"source_system": "LEAP", "scenario": "Target", "year": 2023, "_page_key": "industry", "value": 12.0},
+        ]
+    )
+
+    selected, source = _comparison_projection_area_rows(
+        rows,
+        scenario_name="Target",
+        primary_source="LEAP",
+        comparison_source="ESTO",
+        base_year=2022,
+        group_col="_page_key",
+        detail_col="_page_key",
+        detail_minimum=1,
+    )
+
+    assert source == "LEAP"
+    assert selected["year"].tolist() == [2021, 2023]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
