@@ -4994,7 +4994,7 @@ def _build_td_sector_chart(
         # historical ESTO rows such as Buildings plus its Commercial and
         # Residential children are summed together, while the projected LEAP
         # side may contain only the parent row.
-        return _non_overlapping_common_row_frontier(rows)
+        return _non_overlapping_flow_rows(_non_overlapping_common_row_frontier(rows))
 
     # Use the detailed source available for each scenario. LEAP is preferred,
     # but some economies only have aggregate LEAP demand and therefore need
@@ -5019,7 +5019,9 @@ def _build_td_sector_chart(
             group_col="_page_key",
             detail_col="_page_key",
         )
-        projected_source_rows = _non_overlapping_common_row_frontier(projected_source_rows)
+        projected_source_rows = _non_overlapping_flow_rows(
+            _non_overlapping_common_row_frontier(projected_source_rows)
+        )
         scenario_df = projected_source_rows
         if not stack_source_name:
             continue
@@ -5127,7 +5129,7 @@ def _build_td_fuel_chart(
             group_col="common_product_label",
             detail_col="common_product_label",
         )
-        return _non_overlapping_common_row_frontier(rows)
+        return _non_overlapping_flow_rows(_non_overlapping_common_row_frontier(rows))
 
     # Product stacking order is computed from the default scenario and reused
     # for both scenarios so switching REF/TGT does not reshuffle the layers.
@@ -5151,7 +5153,9 @@ def _build_td_fuel_chart(
             group_col="common_product_label",
             detail_col="common_product_label",
         )
-        scenario_df = _non_overlapping_common_row_frontier(scenario_df)
+        scenario_df = _non_overlapping_flow_rows(
+            _non_overlapping_common_row_frontier(scenario_df)
+        )
         if not stack_source_name:
             continue
         if (scenario_df["source_system"].astype(str).str.casefold() == "esto").any():

@@ -97,6 +97,20 @@ def test_extended_comparison_keeps_pre_base_year_historical_rows() -> None:
     assert selected["year"].tolist() == [2021, 2023]
 
 
+def test_demand_area_frontier_does_not_stack_flow_parents_and_children() -> None:
+    rows = pd.DataFrame(
+        [
+            {"source_system": "LEAP", "scenario": "Target", "year": 2023, "common_flow_code": "15", "common_flow_label": "15 Transport sector", "value": 10.0},
+            {"source_system": "LEAP", "scenario": "Target", "year": 2023, "common_flow_code": "15.02", "common_flow_label": "15.02 Road", "value": 10.0},
+            {"source_system": "LEAP", "scenario": "Target", "year": 2023, "common_flow_code": "15.02.01", "common_flow_label": "15.02.01 Freight road", "value": 4.0},
+        ]
+    )
+
+    selected = _non_overlapping_flow_rows(rows)
+
+    assert selected["common_flow_code"].tolist() == ["15"]
+
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORE_PAGES = ["index", "total_demand", "transport"]
 DEFAULT_DIAGNOSTIC_PAGES = ["transport_leap_vs_ninth", "datacentres_leap_vs_ninth"]
