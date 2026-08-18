@@ -318,6 +318,9 @@ def synthesize_model_topology(template_meta, balance_meta, min_flow_pj=1.0):
 
     # Sort active modules in LEAP hierarchy order (from upstream processing at bottom to downstream at top)
     active_modules.sort(key=lambda m: m['order'], reverse=True)
+    # Assign side: highest module (downstream, top of diagram) is always 'left', alternating downwards
+    for i, mod in enumerate(active_modules):
+        mod['side'] = 'left' if (len(active_modules) - 1 - i) % 2 == 0 else 'right'
 
     # 3. Demand Sectors
     demand_sector_names = ['Buildings', 'Industry', 'Road', 'Transport non road', 'International transport', 'Other sector']
