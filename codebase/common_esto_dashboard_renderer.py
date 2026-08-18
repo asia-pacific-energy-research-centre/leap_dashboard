@@ -1727,7 +1727,12 @@ def _non_overlapping_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
     )
     keep = pd.Series(True, index=work.index)
 
-    category_rows = work[["common_flow_label", "_flow_code", "_flow_name", "_is_boundary_adjusted"]].drop_duplicates()
+    context_columns = [
+        column
+        for column in ("comparison_scope", "economy", "source_system", "scenario")
+        if column in work.columns
+    ]
+    category_rows = work[context_columns + ["common_flow_label", "_flow_code", "_flow_name", "_is_boundary_adjusted"]].drop_duplicates()
     replacements: dict[str, str] = {}
     for flow_name, same_name in category_rows.groupby("_flow_name", dropna=False):
         same_name = same_name.copy()
@@ -1746,14 +1751,28 @@ def _non_overlapping_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
     # If a parent flow and its child are both present, retain the parent in an
     # aggregate-by-flow chart. Detail charts remain responsible for showing the
     # child categories individually.
+    # Parent/child overlap is meaningful only within one source/scenario
+    # surface.  Comparing all rows together can let a LEAP parent suppress
+    # the detailed ESTO historical rows that are needed before the base year.
     kept_categories = category_rows[category_rows["common_flow_label"].isin(replacements)]
-    for _, category in kept_categories.iterrows():
-        code = str(category["_flow_code"])
-        if code and any(
-            other != code and code_matches_prefix(code, other)
-            for other in kept_categories["_flow_code"].astype(str)
-        ):
-            keep.loc[keep & (work["_flow_code"] == code)] = False
+    if context_columns:
+        context_groups = kept_categories.groupby(context_columns, dropna=False, sort=False)
+    else:
+        context_groups = [(None, kept_categories)]
+    for context_key, context_categories in context_groups:
+        context_codes = context_categories["_flow_code"].astype(str).tolist()
+        context_mask = pd.Series(True, index=work.index)
+        if context_columns:
+            context_values = context_key if isinstance(context_key, tuple) else (context_key,)
+            for column, value in zip(context_columns, context_values):
+                context_mask &= work[column].eq(value)
+        for _, category in context_categories.iterrows():
+            code = str(category["_flow_code"])
+            if code and any(
+                other != code and code_matches_prefix(code, other)
+                for other in context_codes
+            ):
+                keep.loc[context_mask & (work["_flow_code"] == code)] = False
 
     result = work.loc[keep].copy()
     result["common_flow_label"] = result["common_flow_label"].map(replacements).fillna(result["common_flow_label"])

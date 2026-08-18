@@ -111,6 +111,21 @@ def test_demand_area_frontier_does_not_stack_flow_parents_and_children() -> None
     assert selected["common_flow_code"].tolist() == ["15"]
 
 
+def test_demand_frontier_does_not_cross_filter_historical_and_projection_sources() -> None:
+    rows = pd.DataFrame(
+        [
+            {"source_system": "ESTO_EXTENDED", "scenario": "historical", "common_flow_code": "15.02", "common_flow_label": "15.02 Road", "value": 10.0},
+            {"source_system": "LEAP", "scenario": "Target", "common_flow_code": "15", "common_flow_label": "15 Transport sector", "value": 10.0},
+            {"source_system": "LEAP", "scenario": "Target", "common_flow_code": "15.02", "common_flow_label": "15.02 Road", "value": 10.0},
+        ]
+    )
+
+    selected = _non_overlapping_flow_rows(rows)
+
+    assert selected.loc[selected["source_system"] == "ESTO_EXTENDED", "common_flow_code"].tolist() == ["15.02"]
+    assert selected.loc[selected["source_system"] == "LEAP", "common_flow_code"].tolist() == ["15"]
+
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORE_PAGES = ["index", "total_demand", "transport"]
 DEFAULT_DIAGNOSTIC_PAGES = ["transport_leap_vs_ninth", "datacentres_leap_vs_ninth"]
