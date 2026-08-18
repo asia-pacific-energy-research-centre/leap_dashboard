@@ -115,6 +115,18 @@ emissions allocation model.
 
 ## Mapping diagnostics: ESTO Extended
 
+For chart pages, the selected comparison basis determines the finest safe
+Common categories. The dashboard does not disaggregate a reported total using
+assumed shares. In particular, when the 9th Outlook publishes a broad
+projection category, LEAP and ESTO are aggregated to that level because the
+9th allocation among children is unknown. A LEAP + ESTO Extended basis can
+therefore show finer LEAP detail than a basis that also includes the 9th.
+
+ESTO Extended is a structural mapping basis, not an invented historical
+disaggregation. It adds children beneath selected ordinary ESTO leaf flows so
+detailed LEAP branches can appear in valid Common categories. Where ESTO has no
+measured child value, its value remains zero or unavailable.
+
 The Mapping diagnostics page uses ordinary ESTO by default. If the supplied
 comparison data contains `ESTO_EXTENDED`, select **Include ESTO Extended**
 above the sector SVG to make that source available in the Dataset selector.

@@ -168,6 +168,16 @@ def test_chart_guide_explains_the_overview_first_review_strategy() -> None:
     )
 
 
+def test_chart_guide_explains_comparison_basis_and_esto_extended() -> None:
+    script = build_guide_fragments("chart", "transport", "Transport")["script"]
+
+    assert "never divides a published aggregate using assumed shares" in script
+    assert "its allocation among children is unknown" in script
+    assert "ESTO Extended is a structural mapping basis" in script
+    assert "does not invent historical ESTO detail" in script
+    assert "LEAP + ESTO Extended can therefore show more detail" in script
+
+
 def test_transport_purpose_excludes_international_transport_without_extra_card() -> None:
     chart_script = build_guide_fragments("chart", "transport", "Transport")["script"]
 
