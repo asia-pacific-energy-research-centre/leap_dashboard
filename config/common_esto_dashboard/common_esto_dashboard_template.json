@@ -90,6 +90,18 @@
       "reason": "Transfers are routing operations shown as their own section under Other transformation."
     },
     {
+      "case_id": "non_energy_to_industry_section",
+      "enabled": true,
+      "match": {"common_flow_code_exact": "17"},
+      "action": "route",
+      "page_key": "industry",
+      "page_label": "Industry",
+      "section_key": "non_energy",
+      "section_label": "Non-energy use",
+      "temporary": false,
+      "reason": "Exact flow 17 is presented as a Non-energy use section on the Industry page."
+    },
+    {
       "case_id": "combined_other_and_non_energy_placeholder",
       "enabled": true,
       "match": {"common_flow_code_exact": "16.03-16.05,17"},
@@ -97,7 +109,7 @@
       "page_key": "others",
       "page_label": "Other demand",
       "temporary": true,
-      "reason": "LEAP currently reports Other sector and non-energy as one inseparable aggregate; exact standalone code 17 remains owned by Non-energy."
+      "reason": "LEAP currently reports Other sector and non-energy as one inseparable aggregate; exact standalone code 17 is shown in the Industry page's Non-energy use section."
     }
   ],
   "sector_pages": [
@@ -248,25 +260,13 @@
         "Other sector"
       ],
       "rule_note": "Other final demand rows outside buildings/industry/transport."
-    },
-    {
-      "page_key": "non_energy",
-      "page_label": "Non-energy use",
-      "priority": 55,
-      "flow_code_prefixes": [
-        "17"
-      ],
-      "flow_keywords": [
-        "Non-energy"
-      ],
-      "rule_note": "Non-energy use rows."
     }
   ],
   "total_demand_page": {
     "enabled": true,
     "page_label": "Energy balance overview",
     "overview_flow_codes": ["07", "12"],
-    "demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"],
+    "demand_page_keys": ["industry", "transport", "buildings", "others"],
     "supply_codes": ["01", "02", "03", "04-05"],
     "tfec_enabled": false,
     "tfec_status": "Temporarily disabled because non-energy use cannot yet be separated from aggregated Other-sector LEAP demand.",
@@ -278,8 +278,7 @@
       "industry": "#3b82f6",
       "transport": "#f97316",
       "buildings": "#10b981",
-      "others": "#8b5cf6",
-      "non_energy": "#94a3b8"
+      "others": "#8b5cf6"
     },
     "_note": "supply_total = sum of signed values for codes 01 (Production), 02 (Imports), 03 (Exports), and the common 04-05 International transport (bunkers) comparison row. The combined bunker row is used in overview totals so its retained 04/05 source children are not counted again; the detailed children remain available on the Supply page. Bunkers are supply deductions and are excluded from domestic demand. Stock changes (06) remain outside the projection-comparable total. The transformation overview combines all flow-09 transformation sectors with flow 08 transfers, flow 10.01 energy-sector own use, and flow 10.02 transmission/distribution losses. Its by-flow areas use the deepest available non-overlapping flow nodes, while its net lines and by-fuel chart retain the authoritative whole-boundary frontier. Unmet Requirements remains a separate LEAP-only diagnostic: only its fuels are resolved to the selected Common ESTO category scope; positive values mean shortage and negative values mean surplus."
   },
@@ -298,7 +297,7 @@
     "page_label": "Emissions",
     "factor_sets_config_path": "config/common_esto_dashboard/emissions_factor_sets.json",
     "factor_set_key": "",
-    "demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"],
+    "demand_page_keys": ["industry", "transport", "buildings", "others"],
     "suppression_threshold": 0.1,
     "frontier_coverage_tolerance_pj": 10.0,
     "sector_colors": {},
@@ -317,8 +316,8 @@
       "others": ["Other sector"]
     },
     "always_skip_page_keys": [],
-    "require_primary_source_page_keys": ["non_energy"],
-    "_note": "page_leap_branches maps each domestic demand page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. International transport is a signed supply deduction and is routed to Supply, not domestic demand. Non-energy remains hidden until exact standalone rows include the configured primary source; the combined Other sector including non-energy placeholder is routed to Other demand by its explicit routing special case."
+    "require_primary_source_page_keys": [],
+    "_note": "page_leap_branches maps each domestic demand page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. International transport is a signed supply deduction and is routed to Supply, not domestic demand. Exact flow 17 is presented in the Industry page's Non-energy use section; the combined Other sector including non-energy placeholder remains routed to Other demand by its explicit routing special case."
   },
   "scope_specific_pages": {
     "enabled": false,

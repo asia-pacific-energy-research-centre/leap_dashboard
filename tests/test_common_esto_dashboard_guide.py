@@ -69,7 +69,6 @@ def test_routed_chart_pages_use_mapping_backed_contents_tables() -> None:
         "transport",
         "buildings",
         "others",
-        "non_energy",
         "transport_leap_vs_ninth",
         "datacentres_leap_vs_ninth",
     }
@@ -118,7 +117,6 @@ def test_other_transformation_guide_explains_leap_modelling_boundaries() -> None
         ("transport", "Transport", "What appears on Transport"),
         ("buildings", "Buildings", "What appears on Buildings"),
         ("others", "Other demand", "What appears on Other demand"),
-        ("non_energy", "Non-energy use", "What appears on Non-energy use"),
         ("emissions", "Emissions", "What appears on Emissions"),
         ("transport_leap_vs_ninth", "Diagnostic transport", "What appears on diagnostic Transport"),
         ("datacentres_leap_vs_ninth", "Diagnostic datacentres", "What appears on diagnostic Datacentres"),

@@ -7,7 +7,6 @@
     "industry": "Use Industry to review industrial energy demand by subsector and fuel, with particular attention to large changes and differences between sources.",
     "transport": "Use Transport to review road and non-road energy demand within the economy, including fuel switching and the effect of the detailed transport model on LEAP results. International aviation and marine bunkers are not included here; review them on Supply.",
     "others": "Use Other demand to review agriculture, fishing, non-specified demand and aggregate-only demand that has not yet been replaced by detailed LEAP branches.",
-    "non_energy": "Use Non-energy use to review fuels consumed as feedstocks or materials rather than as an energy source.",
     "power": "Use Power to review electricity and heat generation, fuel inputs and outputs. LEAP's power transformation modules do not measure power-sector own use or losses within the transformation process. These are represented separately, so the charts on this page let you analyse power-sector own use and losses alongside the transformation results.",
     "refining": "Use Refining to review refinery inputs, petroleum-product outputs and refinery own use together. In LEAP, refinery own use is measured in the Auxiliary Fuel Use branch of the refining transformation module, so it can be shown separately from the transformation inputs. Review the inputs and own use together when assessing the full refinery process.",
     "other_transformation": "Use Other transformation to review four distinct parts of the energy balance: Other transformation (including own use), Transfers, Transmission and distribution losses, and Other energy-sector own use. These sections describe different kinds of flows and should not be added together without checking their signs and boundaries.",
@@ -172,7 +171,7 @@
         "id": "industry-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Industry",
-        "copy": "Industry owns the Common ESTO tree below 14, from the sector total through mining, construction, manufacturing and available subsectors. The table shows each Common sector and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "copy": "Industry owns the Common ESTO tree below 14, from the sector total through mining, construction, manufacturing and available subsectors. Exact flow 17 Non-energy use is shown here as a separate section because these fuels are used as feedstocks or materials rather than for combustion. The table shows each Common sector and fuel on this page beside the native categories mapped into it for the participating datasets.",
         "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Industry page contents",
@@ -181,6 +180,7 @@
             ["Flows", "14 Industry, 14.01 Mining, 14.02 Construction, 14.03 Manufacturing and descendants such as iron and steel or chemicals", "The available depth changes with the selected Common-category scope."],
             ["Products", "Coal, oil products, gas, electricity, heat, renewables, hydrogen and other reported industrial carriers", "Every supported subsector-product pair can create a detail chart, making this one of the densest pages."],
             ["Hierarchy", "Sector parents, subsector parents and detailed children can all be available as alternative views", "Do not sum parent and child charts together."],
+            ["Non-energy use", "17 Non-energy use and its supported products", "Included in TFC but excluded from TFEC and combustion emissions; do not combine it with the temporary 16.03-16.05,17 Other-demand placeholder."],
             ["Aggregate-only LEAP", "Some economies currently expose only the broad LEAP Industry placeholder", "The broad chart can contain LEAP while detailed charts contain only ESTO or Ninth; the dataset filter makes that coverage difference visible."]
           ]
         }
@@ -228,7 +228,7 @@
             ["Flows", "Agriculture (16.03), fishing (16.04) and non-specified other demand (16.05)", "These are domestic final-demand flows, not a catch-all for every unassigned row."],
             ["Products", "Electricity, oil products, gas, coal, renewables and other reported fuels", "Available products depend strongly on economy and source detail."],
             ["Combined placeholder", "16.03-16.05,17 Other sector including non-energy", "LEAP currently reports this boundary inseparably for some economies. It is routed here temporarily and must not be interpreted as a detailed sector split."],
-            ["Relationship to Non-energy", "Exact standalone 17 remains owned by the Non-energy page", "Do not add exact 17 to the combined placeholder; they overlap."]
+            ["Relationship to Non-energy", "Exact standalone 17 appears in Industry's Non-energy use section", "Do not add exact 17 to the combined placeholder; they overlap."]
           ]
         }
       },
@@ -237,31 +237,6 @@
         "target": "[data-guide-id='chart-card']",
         "title": "Treat aggregate-only demand as a boundary, not detail",
         "copy": "Other demand covers agriculture, fishing and non-specified demand. For economies still using the All demand aggregated LEAP placeholder, a combined Other-sector/non-energy row may appear here until detailed branches replace it. Do not infer a sector or non-energy split that the model does not provide."
-      }
-    ],
-    "non_energy": [
-      {
-        "id": "non-energy-page-scope",
-        "target": "[data-guide-id='chart-card']",
-        "title": "What appears on Non-energy use",
-        "copy": "Non-energy use owns exact flow 17: fuels used as chemical feedstocks, materials or other non-combustion inputs rather than for their energy content. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
-        "dynamic_content": "page_mapping_table",
-        "table": {
-          "caption": "Non-energy page contents",
-          "headers": ["Area", "Generally included", "Important quirk"],
-          "rows": [
-            ["Flows", "17 Non-energy use and any supported descendants", "This page is separate from energy consumed by Industry or Other demand."],
-            ["Products", "Oil products, natural gas, coal and other fuels used as feedstocks or materials", "A positive value is material use; it should not be read as combustion demand."],
-            ["Totals and emissions", "Included in TFC but excluded from TFEC and the dashboard's combustion-emissions calculation", "Current TFEC presentation is disabled while aggregate LEAP Other/non-energy demand remains inseparable."],
-            ["Visibility", "The page requires usable standalone LEAP flow-17 coverage", "If LEAP only supplies the combined 16.03-16.05,17 placeholder, that row stays on Other demand and this page remains hidden."]
-          ]
-        }
-      },
-      {
-        "id": "non-energy-boundary",
-        "target": "[data-guide-id='chart-card']",
-        "title": "Keep feedstock use separate from combustion",
-        "copy": "Non-energy use records fuels used as materials or feedstocks rather than for their energy content. It is included in total final consumption but excluded from total final energy consumption and from the dashboard's combustion-emissions calculation."
       }
     ],
     "emissions": [

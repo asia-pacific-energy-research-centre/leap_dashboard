@@ -476,7 +476,7 @@ flags.
 **Status:** Confirmed and implemented
 **Owner:** leap_dashboard
 **Type:** Demand-page routing / transitional presentation
-**Affected areas:** Industry, Transport, Buildings, Other demand, and Non-energy page routing
+**Affected areas:** Industry, Transport, Buildings, Other demand, and Industry Non-energy section routing
 
 ### Current rule
 
@@ -497,18 +497,15 @@ aggregate-only.
 
 Route the combined `Other sector including non-energy (all demand aggregate)`
 row to Other demand through its exact, temporary routing special case.
-Continue routing an exact code-17 row to Non-energy. Hide the standalone page
-only while it has no usable standalone LEAP mapping; it must appear
-automatically when source-specific code-17 data becomes available. This is
-presentation routing only; the dashboard does not split or recalculate the
-upstream aggregate.
+Route an exact code-17 row to the Industry page's `Non-energy use` section.
+The combined placeholder remains on Other demand. This is presentation routing
+only; the dashboard does not split or recalculate the upstream aggregate.
 
 ### Validation
 
 Regression tests require aggregate-only demand pages to remain visible, the
-unmapped Non-energy page to remain hidden, the combined placeholder to route to
-Other demand, and an exact code-17 row to retain its Non-energy assignment and
-become visible once it contains LEAP data.
+combined placeholder to route to Other demand, and an exact code-17 row to
+route to Industry with the `Non-energy use` section key.
 
 ### History
 
@@ -523,6 +520,9 @@ become visible once it contains LEAP data.
   permanent skip list.
 - 2026-08-10: Added visible page-top placeholder notices and mapping-backed
   page-content provenance tables to the routed chart-page guides.
+- 2026-08-18: Moved exact flow 17 into Industry's `Non-energy use` section and
+  removed the standalone Non-energy page. The combined Other/non-energy
+  placeholder remains unchanged until upstream source detail is separated.
 - 2026-08-11: Extended the same placeholder presentation to Power when the
   upstream source-branch fallback audit records an interim power branch as
   retained. Merely having an interim mapping is not enough to trigger the

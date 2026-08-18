@@ -126,10 +126,9 @@ Illustrative shape:
 ```
 
 The combined placeholder must not consume an independently available exact
-`17 Non-energy use` row. Exact `17` remains owned by the Non-energy page and
-that page should become available when the selected scope/economy has usable
-standalone data. The temporary combined placeholder remains on Other demand
-until upstream detail can replace it.
+`17 Non-energy use` row. Exact `17` is routed to the Industry page's
+`Non-energy use` section. The temporary combined placeholder remains on Other
+demand until upstream detail can replace it.
 
 The routing audit must distinguish ordinary, special-case, ambiguous,
 unassigned, and deliberately excluded categories. No retained category may

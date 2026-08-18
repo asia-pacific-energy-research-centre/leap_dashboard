@@ -3771,7 +3771,7 @@ def _section_anchor(page_label: str, section_label: str, subsection_label: str |
 def _nav_chips_html(all_pages: list[dict], current_file: str) -> str:
     """Build page-navigation chip HTML."""
     overview = ["total_demand"]
-    demand = ["buildings", "industry", "transport", "others", "non_energy"]
+    demand = ["buildings", "industry", "transport", "others"]
     transform = ["power", "refining", "other_transformation"]
     supply = ["supply", "international_transport"]
     derived = ["emissions"]
@@ -4485,7 +4485,6 @@ def guide_page_context(
         "transport",
         "buildings",
         "others",
-        "non_energy",
         "transport_leap_vs_ninth",
         "datacentres_leap_vs_ninth",
     }
@@ -5623,7 +5622,7 @@ def build_total_demand_page(
 
     base_year = int(template.get("chart_generation", {}).get("base_year", 2023))
     demand_page_keys = [str(k) for k in config.get(
-        "demand_page_keys", ["industry", "transport", "buildings", "others", "non_energy"]
+        "demand_page_keys", ["industry", "transport", "buildings", "others"]
     )]
     supply_codes = [str(c) for c in config.get("supply_codes", ["01", "02", "03"])]
     sector_colors: dict[str, str] = config.get("sector_colors", {
@@ -5631,7 +5630,6 @@ def build_total_demand_page(
         "transport": "#f97316",
         "buildings": "#10b981",
         "others": "#8b5cf6",
-        "non_energy": "#94a3b8",
     })
     page_label = str(config.get("page_label", "Energy balance overview"))
 

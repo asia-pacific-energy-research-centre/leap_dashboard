@@ -230,7 +230,8 @@ def test_emissions_components_keep_demand_sectors_and_combine_signed_transformat
             "scenario": "Target", "year": 2030, "value": 20.0,
         },
         {
-            "_page_key": "non_energy", "_page_label": "Non-energy use",
+            "_page_key": "industry", "_page_label": "Industry",
+            "_section_key": "non_energy", "_section_label": "Non-energy use",
             "common_flow_code": "17", "common_flow_label": "17 Non-energy use",
             "common_product_label": "06 Crude oil", "source_system": "LEAP",
             "scenario": "Target", "year": 2030, "value": 8.0,
@@ -288,7 +289,7 @@ def test_emissions_components_keep_demand_sectors_and_combine_signed_transformat
 
     selected, coverage, selection = select_emissions_component_rows(
         rows,
-        {"demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"]},
+        {"demand_page_keys": ["industry", "transport", "buildings", "others"]},
     )
 
     assert coverage.empty
@@ -946,7 +947,7 @@ def test_most_specific_page_root_owns_nested_transformation_categories() -> None
     assert assigned["_page_rule_priority"].tolist() == ["root:09.01", "root:09.07", "root:09"]
 
 
-def test_combined_placeholder_is_special_but_exact_17_keeps_its_page_root() -> None:
+def test_combined_placeholder_is_special_but_exact_17_routes_to_industry_section() -> None:
     template = _load_template()
     rows = pd.DataFrame([
         {
@@ -957,15 +958,16 @@ def test_combined_placeholder_is_special_but_exact_17_keeps_its_page_root() -> N
     ])
 
     without_special_case = assign_pages(rows.iloc[[0]], template["sector_pages"])
-    assert without_special_case.iloc[0]["_routing_status"] == "ambiguous"
+    assert without_special_case.iloc[0]["_page_key"] == "others"
 
     assigned = assign_pages(
         rows,
         template["sector_pages"],
         template["routing_special_cases"],
     )
-    assert assigned["_page_key"].tolist() == ["others", "non_energy"]
-    assert assigned["_routing_status"].tolist() == ["special_case", "page_root"]
+    assert assigned["_page_key"].tolist() == ["others", "industry"]
+    assert assigned["_routing_status"].tolist() == ["special_case", "special_case"]
+    assert assigned.loc[1, "_section_key"] == "non_energy"
     assert assigned.iloc[0]["_routing_special_case"] == "combined_other_and_non_energy_placeholder"
 
 
@@ -986,7 +988,7 @@ def test_energy_balance_totals_receive_bespoke_routing_status() -> None:
     assert set(routed["_routing_status"]) == {"bespoke_page"}
 
 
-def test_non_energy_page_appears_when_exact_17_has_leap_data() -> None:
+def test_non_energy_industry_section_is_available_when_exact_17_has_leap_data() -> None:
     template = _load_template()
     rows = pd.DataFrame([
         {
@@ -1005,14 +1007,9 @@ def test_non_energy_page_appears_when_exact_17_has_leap_data() -> None:
         template["sector_pages"],
         template["routing_special_cases"],
     )
-    required_pages = template["leap_demand_sector_coverage"][
-        "require_primary_source_page_keys"
-    ]
-
-    assert page_keys_without_required_source(assigned.iloc[[0]], required_pages, "LEAP") == {
-        "non_energy"
-    }
-    assert page_keys_without_required_source(assigned, required_pages, "LEAP") == set()
+    assert set(assigned["_page_key"]) == {"industry"}
+    assert set(assigned["_section_key"]) == {"non_energy"}
+    assert template["leap_demand_sector_coverage"]["require_primary_source_page_keys"] == []
 
 
 def test_chart_dataset_tokens_come_from_final_traces() -> None:
@@ -1550,7 +1547,7 @@ def test_aggregate_placeholder_overviews_require_leap_rows() -> None:
     )
 
 
-def test_all_demand_other_sector_placeholder_is_routed_before_non_energy() -> None:
+def test_all_demand_other_sector_placeholder_is_routed_before_industry_non_energy_section() -> None:
     template = _load_template()
     df = pd.DataFrame([
         {
@@ -1570,7 +1567,8 @@ def test_all_demand_other_sector_placeholder_is_routed_before_non_energy() -> No
     )
 
     assert assigned.loc[0, "_page_key"] == "others"
-    assert assigned.loc[1, "_page_key"] == "non_energy"
+    assert assigned.loc[1, "_page_key"] == "industry"
+    assert assigned.loc[1, "_section_key"] == "non_energy"
 
 
 def test_transformation_total_selection_uses_rollup_membership_and_source_role() -> None:
