@@ -1234,6 +1234,33 @@ def _has_nonzero_values(values: pd.Series, tolerance: float = 1e-12) -> bool:
     return bool((numeric.abs() > tolerance).any())
 
 
+def effective_chart_suppression_threshold(
+    template: dict,
+    rows: pd.DataFrame | None = None,
+) -> float:
+    """Return the magnitude threshold for the active comparison basis.
+
+    ESTO Extended is a structural comparison basis: its additional categories
+    can be populated only by LEAP while the ESTO Extended and Ninth values are
+    zero. Keep every non-zero category in those dashboards. Completely empty
+    charts are still omitted later when their figures contain no traces.
+    """
+    chart_config = template.get("chart_generation", {})
+    configured = float(chart_config.get("suppression_threshold", 1.0))
+    active_scope = str(template.get("_active_comparison_scope", "")).strip()
+    if not active_scope and rows is not None and "comparison_scope" in rows.columns:
+        scopes = {
+            str(value).strip()
+            for value in rows["comparison_scope"].dropna().unique()
+            if str(value).strip()
+        }
+        if len(scopes) == 1:
+            active_scope = next(iter(scopes))
+    if active_scope.startswith("esto_extended_"):
+        return 0.0
+    return configured
+
+
 def _add_signed_stack_traces(
     fig: go.Figure,
     x_values: pd.Series,
@@ -1921,6 +1948,17 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
     return specs
 
 
+def area_chart_display_label(
+    source_aggregate_label: str,
+    page_scope_overview_label: str,
+    subtree_is_page_complete: bool,
+) -> str:
+    """Keep a mapped aggregate's precise label unless the page defines an override."""
+    if not subtree_is_page_complete and page_scope_overview_label:
+        return page_scope_overview_label
+    return source_aggregate_label
+
+
 _WHITE_BACKGROUND_LAYOUT: dict[str, object] = {"paper_bgcolor": "white", "plot_bgcolor": "white"}
 
 # Dark and muted categorical colours that remain visible on white Plotly
@@ -2372,7 +2410,7 @@ def _build_section_aggregate_charts(
     comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
     base_year = int(chart_config.get("base_year", 2023))
     ninth_source = str(chart_config.get("ninth_source_system", "NINTH"))
-    suppression_threshold = float(chart_config.get("suppression_threshold", 1.0))
+    suppression_threshold = effective_chart_suppression_threshold(template, page_df)
 
     flow_section = non_parent_df.groupby("common_flow_label")["_section_label"].agg(lambda s: s.mode().iloc[0])
     section_flows: dict[str, list[str]] = {}
@@ -2524,7 +2562,7 @@ def _build_flow_group_aggregate_charts(
     comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
     base_year = int(chart_config.get("base_year", 2023))
     ninth_source = str(chart_config.get("ninth_source_system", "NINTH"))
-    suppression_threshold = float(chart_config.get("suppression_threshold", 1.0))
+    suppression_threshold = effective_chart_suppression_threshold(template, page_df)
     synthetic_intermediate_labels = {
         str(code).strip(): str(label).strip()
         for code, label in chart_config.get(
@@ -6344,7 +6382,7 @@ def render_dashboard(
     comparison_source = str(chart_config.get("comparison_source_system", "ESTO"))
     base_year = int(chart_config.get("base_year", 2023))
     ninth_source = str(chart_config.get("ninth_source_system", "NINTH"))
-    suppression_threshold = float(chart_config.get("suppression_threshold", 1.0))
+    suppression_threshold = effective_chart_suppression_threshold(template, assigned_df)
 
     for page_info in page_inventory:
         page_key = page_info["page_key"]
@@ -6491,12 +6529,11 @@ def render_dashboard(
                 source_root_code,
             )
             is_complete_page_root = is_real_page_flow and subtree_is_page_complete
-            if not subtree_is_page_complete and page_scope_overview_label:
-                display_aggregate_label = page_scope_overview_label
-            elif is_real_page_flow and not subtree_is_page_complete:
-                display_aggregate_label = page_label
-            else:
-                display_aggregate_label = source_aggregate_label
+            display_aggregate_label = area_chart_display_label(
+                source_aggregate_label,
+                page_scope_overview_label,
+                subtree_is_page_complete,
+            )
             display_area_spec = {
                 **area_spec,
                 "aggregate_flow_label": display_aggregate_label,

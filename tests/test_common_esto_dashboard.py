@@ -42,6 +42,7 @@ from codebase.common_esto_dashboard_renderer import (
     color_for_code,
     color_for_plotting_name,
     drop_excluded_flow_rows,
+    effective_chart_suppression_threshold,
     guide_page_context,
     guide_page_mapping_table,
     guide_placeholder_status,
@@ -3432,6 +3433,27 @@ def test_mixed_depth_transformation_total_is_its_own_overview_frontier() -> None
     }
 
 
+def test_incomplete_transport_non_road_overview_keeps_precise_label() -> None:
+    from codebase.common_esto_dashboard_renderer import area_chart_display_label
+
+    label = "15.01,15.03-15.06 Transport non-road"
+
+    assert area_chart_display_label(label, "", False) == label
+
+
+def test_incomplete_overview_uses_explicit_page_scope_label() -> None:
+    from codebase.common_esto_dashboard_renderer import area_chart_display_label
+
+    assert (
+        area_chart_display_label(
+            "16.03-16.05,17 Other sector including non-energy",
+            "Other demand",
+            False,
+        )
+        == "Other demand"
+    )
+
+
 def test_page_routing_keeps_transformation_total_and_sector_details(tmp_path: Path) -> None:
     template = _load_template()
     series_config = _load_series_config()
@@ -3555,6 +3577,24 @@ def test_section_aggregate_suppresses_chart_with_only_pre_base_year_projection()
     assert chart_rows == []
     assert len(manifest_rows) == 2
     assert all(row["suppressed"] for row in manifest_rows)
+
+
+def test_esto_extended_scopes_disable_magnitude_suppression() -> None:
+    template = {
+        "chart_generation": {"suppression_threshold": 1.0},
+    }
+    extended_rows = pd.DataFrame(
+        {"comparison_scope": ["esto_extended_leap", "esto_extended_leap"]}
+    )
+    ordinary_rows = pd.DataFrame(
+        {"comparison_scope": ["esto_leap", "esto_leap"]}
+    )
+
+    assert effective_chart_suppression_threshold(template, extended_rows) == 0.0
+    assert effective_chart_suppression_threshold(template, ordinary_rows) == 1.0
+
+    template["_active_comparison_scope"] = "esto_extended_leap_ninth"
+    assert effective_chart_suppression_threshold(template, ordinary_rows) == 0.0
 
 
 def test_section_aggregate_suppresses_redundant_single_flow_chart() -> None:
