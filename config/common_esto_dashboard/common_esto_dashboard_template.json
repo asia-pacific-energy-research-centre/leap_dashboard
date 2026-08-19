@@ -36,7 +36,8 @@
     "suppression_threshold": 1.0,
     "area_chart_flow_labels": {
       "10": "10 Losses and own use",
-      "10.01": "10.01 Own use"
+      "10.01": "10.01 Own use",
+      "15.01": "15.01,15.03-15.06 Transport non-road"
     },
     "synthetic_intermediate_flow_labels": {
       "09.06": "09.06 Gas processing plants (including own use)",
