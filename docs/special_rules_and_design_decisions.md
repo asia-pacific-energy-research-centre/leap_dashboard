@@ -395,7 +395,7 @@ line traces across 311 bundled charts with zero repeated-year traces.
 - 2026-07-30: Added after repeated component rows produced vertical spikes in
   Power detail charts.
 
-## DASH-010: Energy-balance demand lines use declared TFC/TFEC totals
+## DASH-010: Energy-balance demand lines use domestic TFC/TFEC totals
 
 **Status:** Confirmed and implemented
 **Owner:** leap_dashboard
@@ -405,8 +405,13 @@ line traces across 311 bundled charts with zero repeated-year traces.
 ### Current rule
 
 Use declared top-level flow `12 Total final consumption` for the TFC comparison
-line whenever that row exists for a source. Use visible demand detail only as a
-fallback when the requested aggregate is absent.
+line whenever that row exists for a source. LEAP's current `All demand
+aggregated` parent includes positive `04-05 International transport` bunkers,
+which are not domestic demand. For LEAP only, subtract the absolute `04-05`
+amount before drawing the Energy balance overview demand lines. ESTO and 9th
+already provide the domestic boundary directly. Label these comparators
+`Domestic TFC`. Use visible demand detail only as a fallback when the requested
+aggregate is absent.
 
 Flow `13 Total final energy consumption` is temporarily unavailable for the
 production presentation. LEAP currently carries non-energy use inside an

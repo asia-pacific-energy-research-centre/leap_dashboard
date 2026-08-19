@@ -26,6 +26,7 @@ from codebase.common_esto_dashboard_emissions import select_emissions_component_
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
 from codebase.common_esto_dashboard_renderer import (
     _PAGE_CSS,
+    _build_td_sector_chart,
     _build_td_fuel_chart,
     _comparison_projection_area_rows,
     apply_chart_chrome,
@@ -480,11 +481,52 @@ def test_total_demand_fuel_area_keeps_esto_history_without_projection_detail() -
         if trace.visible and getattr(trace, "stackgroup", None)
     }
     assert visible_area_names == {"01 Coal", "17 Electricity"}
-    assert any(trace.name == "LEAP|Target total (TFC)" for trace in figure.data)
+    assert any(trace.name == "LEAP|Target total (Domestic TFC)" for trace in figure.data)
     assert (
         "ESTO historical fuel detail through the base year"
         in figure.layout.meta["stacked_area_note"]
     )
+
+
+def test_energy_balance_demand_totals_exclude_leap_international_transport() -> None:
+    demand_rows = pd.DataFrame([
+        {
+            "_page_key": page_key,
+            "_page_label": page_label,
+            "common_flow_code": flow_code,
+            "common_flow_label": flow_code,
+            "common_product_label": product_label,
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2023,
+            "value": value,
+        }
+        for page_key, page_label, flow_code, product_label, value in [
+            ("transport", "Transport", "15.02", "07.01 Motor gasoline", 20.0),
+            ("industry", "Industry", "14", "08.01 Natural gas", 10.0),
+            ("buildings", "Buildings", "16.01-16.02", "17 Electricity", 30.0),
+            ("others", "Other demand", "16.03-16.05,17", "07.17 Other products", 40.0),
+        ]
+    ])
+    overview_rows = pd.DataFrame([
+        {"source_system": "LEAP", "scenario": "Target", "year": 2023,
+         "common_flow_code": "12", "value": 105.0},
+        {"source_system": "LEAP", "scenario": "Target", "year": 2023,
+         "common_flow_code": "04-05", "value": 5.0},
+    ])
+
+    sector_figure = _build_td_sector_chart(
+        demand_rows, overview_rows, {}, "LEAP", "Target", {}, base_year=2022,
+    )
+    fuel_figure = _build_td_fuel_chart(
+        demand_rows, overview_rows, {}, "LEAP", "Target", base_year=2022,
+    )
+    for figure, trace_name in [
+        (sector_figure, "LEAP|Target (Domestic TFC)"),
+        (fuel_figure, "LEAP|Target total (Domestic TFC)"),
+    ]:
+        total_trace = next(trace for trace in figure.data if trace.name == trace_name)
+        assert list(total_trace.y) == [100.0]
 
 
 def _build_common_esto_rows() -> pd.DataFrame:
@@ -3200,7 +3242,7 @@ def test_energy_balance_fuel_area_uses_esto_history_on_leap_category_frontier() 
         if trace.name == "07.01 Motor gasoline" and trace.visible
     )
     assert list(motor.x) == [2022, 2023]
-    assert figure.layout.title.text == "Final energy demand by fuel (TFC)"
+    assert figure.layout.title.text == "Final energy demand by fuel (Domestic TFC)"
     assert not any("supply" in str(trace.name).casefold() for trace in figure.data)
 
 

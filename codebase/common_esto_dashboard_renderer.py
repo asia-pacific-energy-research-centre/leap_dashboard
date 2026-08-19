@@ -4974,6 +4974,44 @@ def _select_total_rows_by_source(
     return pd.concat(selected, ignore_index=True)
 
 
+def _domestic_tfc_totals(
+    tfc_total_df: pd.DataFrame,
+    overview_flow_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Return total final consumption on the domestic-demand boundary.
+
+    LEAP's ``All demand aggregated`` parent currently includes its positive
+    International transport child.  The latter is an international-bunker
+    supply deduction, not a domestic demand sector, so remove its absolute
+    value from LEAP's declared flow-12 comparison line.  ESTO and 9th rows
+    already use the domestic TFC boundary and retain their declared values.
+    """
+    totals = tfc_total_df.groupby(
+        ["source_system", "scenario", "year"], as_index=False
+    )["value"].sum()
+    if totals.empty or overview_flow_df.empty:
+        return totals
+
+    international_rows = overview_flow_df[
+        overview_flow_df["common_flow_code"].astype(str).eq("04-05")
+    ]
+    if international_rows.empty:
+        return totals
+    international_totals = international_rows.groupby(
+        ["source_system", "scenario", "year"], as_index=False
+    )["value"].sum().rename(columns={"value": "_international_transport"})
+    totals = totals.merge(
+        international_totals,
+        on=["source_system", "scenario", "year"],
+        how="left",
+    )
+    leap_mask = totals["source_system"].astype(str).str.casefold().eq("leap")
+    totals.loc[leap_mask, "value"] -= (
+        totals.loc[leap_mask, "_international_transport"].fillna(0.0).abs()
+    )
+    return totals.drop(columns="_international_transport")
+
+
 def _build_td_sector_chart(
     demand_df: pd.DataFrame,
     overview_flow_df: pd.DataFrame,
@@ -5089,14 +5127,14 @@ def _build_td_sector_chart(
         flow_code="12",
     )
 
-    # TFC demand totals, incl. primary LEAP scenarios: the sector stack above
+    # Domestic TFC totals, incl. primary LEAP scenarios: the sector stack above
     # is split into pos/neg stackgroups when sectors have mixed signs, so it
     # no longer shows a single net total line on its own.
-    tfc_totals = tfc_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
+    tfc_totals = _domestic_tfc_totals(tfc_total_df, overview_flow_df)
     for (src, scen), grp in tfc_totals.groupby(["source_system", "scenario"]):
         if not _has_nonzero_values(grp["value"]):
             continue
-        lbl = series_label_from_values(src, scen, series_labels) + " (TFC)"
+        lbl = series_label_from_values(src, scen, series_labels) + " (Domestic TFC)"
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
             mode="lines+markers", name=lbl, line={"dash": "dash"},
@@ -5105,7 +5143,7 @@ def _build_td_sector_chart(
         trace_meta.append(trace_meta_entry(src, scen, True))
 
     fig.update_layout(
-        title="Final energy demand by sector (TFC)",
+        title="Final energy demand by sector (Domestic TFC)",
         xaxis_title="Year",
         yaxis_title=f"Signed energy ({chart_unit})",
         margin={"l": 64, "r": 28, "t": 100, "b": 160},
@@ -5113,7 +5151,7 @@ def _build_td_sector_chart(
         meta={
             "trace_meta": trace_meta,
             "stacked_area_note": (
-                "Areas show demand sectors; lines show TFC totals by dataset and scenario. "
+                "Areas show domestic demand sectors; lines show domestic TFC totals by dataset and scenario. "
                 + stacked_area_dataset_note(stacked_sources, "demand")
             ),
         },
@@ -5215,14 +5253,14 @@ def _build_td_fuel_chart(
         flow_code="12",
     )
 
-    # Demand total lines, incl. primary LEAP scenarios (see note in
+    # Domestic demand total lines, incl. primary LEAP scenarios (see note in
     # _build_td_sector_chart on why the stacked fuel breakdown alone doesn't
     # show a single net total when fuels have mixed signs).
-    comp_totals = tfc_total_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
+    comp_totals = _domestic_tfc_totals(tfc_total_df, overview_flow_df)
     for (src, scen), grp in comp_totals.groupby(["source_system", "scenario"]):
         if not _has_nonzero_values(grp["value"]):
             continue
-        lbl = series_label_from_values(src, scen, series_labels) + " total (TFC)"
+        lbl = series_label_from_values(src, scen, series_labels) + " total (Domestic TFC)"
         fig.add_trace(go.Scatter(
             x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
             mode="lines+markers", name=lbl, line={"dash": "dash"},
@@ -5231,7 +5269,7 @@ def _build_td_fuel_chart(
         trace_meta.append(trace_meta_entry(src, scen, True))
 
     fig.update_layout(
-        title="Final energy demand by fuel (TFC)",
+        title="Final energy demand by fuel (Domestic TFC)",
         xaxis_title="Year",
         yaxis_title=f"Signed energy ({chart_unit})",
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
@@ -5239,7 +5277,7 @@ def _build_td_fuel_chart(
         meta={
             "trace_meta": trace_meta,
             "stacked_area_note": (
-                "Areas show demand fuels; lines show TFC totals by dataset and scenario. "
+                "Areas show domestic demand fuels; lines show domestic TFC totals by dataset and scenario. "
                 + stacked_area_dataset_note(stacked_sources, "fuel")
             ),
         },
