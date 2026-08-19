@@ -51,6 +51,7 @@
     "page_key": "other_transformation",
     "hide_generic_overview": true,
     "append_inclusive_transformation_label": true,
+    "standalone_own_use_flow_codes": ["10.01.06", "10.01.12", "10.01.17"],
     "overview_summaries": [
       {"section_label": "Other transformation (including own use)", "group_by": "flow_or_product"},
       {"section_label": "Other energy-sector own use", "group_by": "flow_or_product"},

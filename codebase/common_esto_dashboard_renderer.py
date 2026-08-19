@@ -951,6 +951,22 @@ def prepare_other_transformation_page_rows(
         return out
 
     codes = out["common_flow_code"].map(canonical_code)
+    standalone_own_use_codes = {
+        str(code).strip()
+        for code in config.get("standalone_own_use_flow_codes", [])
+        if str(code).strip()
+    }
+    if standalone_own_use_codes:
+        # The Common ESTO export does not always retain the contributor
+        # metadata needed above. Keep only the own-use branches that are
+        # genuinely standalone; all process-linked 10.01.xx rows belong to
+        # their 09.xx ``(including own use)`` boundary.
+        own_use_mask = codes.str.startswith("10.01")
+        out = out[~own_use_mask | codes.isin(standalone_own_use_codes)].copy()
+        if out.empty:
+            return out
+
+    codes = out["common_flow_code"].map(canonical_code)
     labels = out["common_flow_label"].astype(str)
     already_inclusive = labels.str.contains(
         "(including own use)", case=False, regex=False
@@ -2628,6 +2644,16 @@ def _build_flow_group_aggregate_charts(
     for _, node in flow_nodes.iterrows():
         flow_label = str(node["common_flow_label"])
         prefix = str(node["canonical_code"])
+        # A compound boundary can begin at this prefix while extending into a
+        # sibling branch. It is valid for its full-page overview, but cannot
+        # act as the parent of a narrower subsection. Otherwise, for example,
+        # the 16.01 card combines LEAP's 16.01-16.02 Buildings rollup with
+        # Ninth's 16.01 commercial rows.
+        if not _code_expression_contains_expression(
+            prefix,
+            node["common_flow_code"],
+        ):
+            continue
         if flow_label in parent_flow_labels and prefix not in parent_prefixes:
             parent_prefixes.append(prefix)
     for prefix in synthetic_intermediate_labels:

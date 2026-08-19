@@ -2898,6 +2898,48 @@ def test_other_transformation_page_uses_inclusive_boundaries_and_residual_sectio
     assert sections["08"] == "Transfers"
 
 
+def test_other_transformation_hides_process_linked_own_use_without_metadata() -> None:
+    rows = pd.DataFrame([
+        {
+            "common_flow_code": "10.01.03",
+            "common_flow_label": "10.01.03 Liquefaction/regasification plants",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "10.01.05",
+            "common_flow_label": "10.01.05 Coke ovens",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "10.01.06",
+            "common_flow_label": "10.01.06 Coal mines",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "10.01.12",
+            "common_flow_label": "10.01.12 Oil and gas extraction",
+            "_section_label": "Other transformation",
+        },
+        {
+            "common_flow_code": "10.01.17",
+            "common_flow_label": "10.01.17 Non-specified own uses",
+            "_section_label": "Other transformation",
+        },
+    ])
+
+    prepared = prepare_other_transformation_page_rows(
+        rows,
+        rows,
+        _load_template()["other_transformation_page"],
+    )
+
+    assert prepared["common_flow_code"].tolist() == [
+        "10.01.06",
+        "10.01.12",
+        "10.01.17",
+    ]
+
+
 def test_transformation_comparison_frontier_survives_other_source_inclusive_row() -> None:
     rows = pd.DataFrame([
         {
