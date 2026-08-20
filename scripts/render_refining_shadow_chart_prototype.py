@@ -24,7 +24,6 @@ if str(MODULE_ROOT) not in sys.path:
 
 from common_esto_dashboard_renderer import (
     build_area_chart,
-    build_product_chart,
     chart_dataset_tokens_from_figure,
     load_json,
     write_chart_bundle,
@@ -121,7 +120,7 @@ def render_refining_shadow_chart_prototype(
     product_label: str = "07.07 Gas/diesel oil",
     review_key: str = "refining_shadow_review",
     review_label: str = "Refining shadow review",
-    area_chart_title: str = "LEAP Target refinery fuel mix",
+    area_chart_title: str = "LEAP Target fuels and expected output",
 ) -> Path:
     """Render a production-style refining diagnostic through page/bundle writers."""
     template = load_json(template_path)
@@ -140,21 +139,8 @@ def render_refining_shadow_chart_prototype(
     )
     series_labels = {
         "LEAP|Target": "LEAP Target",
-        "ESTIMATION_EXPECTATION|Target": "Expected output",
+        "NINTH|Target": "Expected output (9th Outlook)",
     }
-    figure = build_product_chart(
-        rows,
-        flow_label,
-        product_label,
-        series_labels,
-        primary_source="LEAP",
-        primary_scenario=scenario,
-        comparison_source="ESTO_EXTENDED",
-        base_year=int(template["chart_generation"]["base_year"]),
-    )
-    for trace in figure.data:
-        if str(trace.name).startswith("Estimated expectation"):
-            trace.update(line={"dash": "dash", "color": "#8c55b8"})
     comparison_rows = rows.loc[
         rows["source_system"].eq("ESTIMATION_EXPECTATION")
     ].copy()
@@ -167,18 +153,10 @@ def render_refining_shadow_chart_prototype(
     )
     first_year = int(comparison_rows["year"].min())
     last_year = int(comparison_rows["year"].max())
-    figure.update_layout(
-        title=(
-            f"Shadow comparison review ({first_year}–{last_year}): "
-            f"{flow_label} — {product_label}"
-        ),
-        meta={
-            **dict(figure.layout.meta or {}),
-            "prototype_status": "diagnostic_expected_series_reviewed_boundary",
-        },
-    )
+    comparison_rows["source_system"] = "NINTH"
+    area_chart_rows = pd.concat([area_rows, comparison_rows], ignore_index=True)
     area_figure = build_area_chart(
-        area_rows,
+        area_chart_rows,
         {
             "aggregate_flow_label": flow_label,
             "source_flow_labels": [flow_label],
@@ -187,6 +165,22 @@ def render_refining_shadow_chart_prototype(
         template,
         title_prefix=area_chart_title,
     )
+    for trace in area_figure.data:
+        if str(trace.name).startswith("Expected output (9th Outlook)"):
+            trace.update(
+                name="Expected output (9th Outlook)",
+                line={"dash": "dash", "color": "#8c55b8"},
+            )
+    area_figure.update_layout(
+        title=(
+            f"{area_chart_title} ({first_year}–{last_year}): {flow_label}"
+        ),
+        meta={
+            **dict(area_figure.layout.meta or {}),
+            "prototype_status": "diagnostic_expected_series_reviewed_boundary",
+            "expected_output_source": "9th Outlook",
+        },
+    )
     layout = {
         "dashboards": output_root / "dashboards",
         "chart_bundles": output_root / "chart_bundles",
@@ -194,33 +188,21 @@ def render_refining_shadow_chart_prototype(
     }
     for path in layout.values():
         path.mkdir(parents=True, exist_ok=True)
-    chart_key = f"chart__line__{review_key}__{product_label.split(' ', maxsplit=1)[0].replace('.', '_')}"
     bundle_name = f"{review_key}__charts"
     area_chart_key = f"chart__area__{review_key}__fuel_mix"
     write_chart_bundle(
-        {area_chart_key: area_figure, chart_key: figure},
+        {area_chart_key: area_figure},
         layout["chart_bundles"] / bundle_name,
     )
     chart_rows = [{
         "chart_key": area_chart_key,
         "chart_type": "stacked_area",
-        "title": area_chart_title,
+        "title": f"{area_chart_title} ({first_year}–{last_year})",
         "product_label": "All transformation fuels",
         "section_label": review_label,
         "flow_group_label": flow_label,
         "datasets": chart_dataset_tokens_from_figure(area_figure),
-        "total_abs_value": float(area_rows["value"].abs().sum()),
-        "abs_diff": 0.0,
-        "pct_diff": 0.0,
-    }, {
-        "chart_key": chart_key,
-        "chart_type": "line",
-        "title": f"{flow_label} — {product_label}",
-        "product_label": product_label,
-        "section_label": review_label,
-        "flow_group_label": flow_label,
-        "datasets": chart_dataset_tokens_from_figure(figure),
-        "total_abs_value": float(comparison_rows["source_value_pj"].abs().sum()),
+        "total_abs_value": float(area_chart_rows["value"].abs().sum()),
         "abs_diff": float(comparison_rows["absolute_difference_pj"].max()),
         "pct_diff": float(
             comparison_rows["absolute_percentage_difference"].max()
@@ -237,20 +219,19 @@ def render_refining_shadow_chart_prototype(
         output_path=output_path,
         economy_label=economy,
         page_note=(
-            "Read-only review: estimated expectation uses the maintained "
-            f"comparison boundary ({first_year}–{last_year})."
+            "Read-only review: the expected-output line is the maintained "
+            f"9th Outlook comparator at this boundary ({first_year}–{last_year})."
         ),
         dataset_filter_options=["LEAP", "ESTIMATION_EXPECTATION"],
     )
     (layout["supporting"] / "shadow_chart_manifest.json").write_text(
         json.dumps(
             {
-                "chart_key": chart_key,
                 "review_key": review_key,
                 "diagnostic_path": str(diagnostic_path),
                 "boundary": flow_label,
                 "product": product_label,
-                "figure_layout": figure.to_plotly_json()["layout"],
+                "figure_layout": area_figure.to_plotly_json()["layout"],
                 "area_chart_key": area_chart_key,
                 "area_chart_product_count": int(
                     area_rows["common_product_label"].nunique()
