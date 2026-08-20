@@ -157,7 +157,14 @@ def _load_variable_expected_net_rows(
     transformation_workbook_path: Path, flow_label: str, product_label: str,
     economy: str, scenario: str,
 ) -> pd.DataFrame:
-    """Reconstruct the signed LEAP transformation total from code variables."""
+    """Reconstruct the signed refinery net using LEAP's own-use capacity rule.
+
+    Oil Refining is exceptional: its Exogenous Capacity is deliverable output,
+    after same-refinery output fuels have been consumed as auxiliary use. LEAP
+    grosses that capacity back up internally. Reconstructing from capacity as
+    gross output would therefore understate feedstock and subtract the same
+    output-derived auxiliary use twice.
+    """
     workbook = pd.read_excel(transformation_workbook_path, header=2)
     process_path = "Transformation\\Oil Refining\\Processes\\Oil Refining"
     capacity = workbook.loc[
@@ -180,18 +187,28 @@ def _load_variable_expected_net_rows(
         & workbook["Variable"].astype(str).eq("Auxiliary Fuel Use")
         & workbook["Scenario"].astype(str).eq(scenario)
     ]
+    output_fuel_labels = {
+        value.rsplit("\\", maxsplit=1)[-1].strip().casefold()
+        for value in output_shares["Branch Path"].astype(str)
+    }
+    auxiliary_labels = auxiliary["Branch Path"].astype(str).str.rsplit("\\", n=1).str[-1].str.strip().str.casefold()
+    same_module_auxiliary = auxiliary.loc[auxiliary_labels.isin(output_fuel_labels)]
+    external_auxiliary = auxiliary.loc[~auxiliary_labels.isin(output_fuel_labels)]
     values = []
     for column in [col for col in workbook.columns if str(col).isdigit()]:
         capacity_value = pd.to_numeric(capacity[column], errors="coerce")
         efficiency_value = pd.to_numeric(efficiency[column], errors="coerce")
         share_total = pd.to_numeric(output_shares[column], errors="coerce").fillna(0.0).sum()
-        auxiliary_ratio_total = pd.to_numeric(auxiliary[column], errors="coerce").fillna(0.0).sum()
+        same_module_ratio = pd.to_numeric(same_module_auxiliary[column], errors="coerce").fillna(0.0).sum()
+        external_auxiliary_ratio = pd.to_numeric(external_auxiliary[column], errors="coerce").fillna(0.0).sum()
         if pd.isna(capacity_value) or pd.isna(efficiency_value) or efficiency_value == 0:
             continue
-        gross_output = capacity_value * (share_total / 100.0 if share_total > 1 else share_total)
+        output_share_factor = share_total / 100.0 if share_total > 1 else share_total
+        deliverable_output = capacity_value * output_share_factor
+        gross_output = deliverable_output / (1.0 - same_module_ratio) if same_module_ratio < 1.0 else 0.0
         feedstock_input = -gross_output / (efficiency_value / 100.0 if efficiency_value > 1 else efficiency_value)
-        auxiliary_use = -gross_output * auxiliary_ratio_total
-        values.append({"year": int(column), "value": gross_output + feedstock_input + auxiliary_use})
+        external_auxiliary_use = -gross_output * external_auxiliary_ratio
+        values.append({"year": int(column), "value": deliverable_output + feedstock_input + external_auxiliary_use})
     result = pd.DataFrame(values)
     result["source_system"] = "ESTIMATION_CODE_NET"
     result["scenario"] = scenario
@@ -326,7 +343,10 @@ def render_refining_shadow_chart_prototype(
         meta={
             **dict(area_figure.layout.meta or {}),
             "prototype_status": "pre_seed_variable_expected_output_review",
-            "expected_output_source": "transformation workbook capacity times output share",
+            "expected_output_source": (
+                "transformation workbook deliverable capacity with same-module "
+                "auxiliary-use gross-up"
+            ),
         },
     )
     layout = {
@@ -369,8 +389,8 @@ def render_refining_shadow_chart_prototype(
         page_note=(
             "Read-only review: this preserves the normal signed refinery stack, "
             "ESTO historical total, LEAP Target total, and 9th Target total exactly; "
-            "the purple line is the code-derived signed net total, including gross "
-            "output, feedstock input, and auxiliary own use."
+            "the purple line reconstructs the code-derived signed net total using "
+            "the refinery's deliverable-capacity and own-use rule."
         ),
         dataset_filter_options=["LEAP", "ESTIMATION_EXPECTATION"],
     )
@@ -387,6 +407,10 @@ def render_refining_shadow_chart_prototype(
                 "area_chart_key": area_chart_key,
                 "base_dashboard_bundle_path": str(base_dashboard_bundle_path),
                 "base_dashboard_chart_key": base_dashboard_chart_key,
+                "expected_net_formula": (
+                    "deliverable output - recovered gross feedstock input - "
+                    "external auxiliary use; refinery capacity is deliverable output"
+                ),
             },
             default=str,
             indent=2,
@@ -407,7 +431,7 @@ DIAGNOSTIC_PATH = (
     / "leap_balance_source_differences.csv"
 )
 TEMPLATE_PATH = REPO_ROOT / "config" / "common_esto_dashboard" / "common_esto_dashboard_template.json"
-OUTPUT_ROOT = REPO_ROOT / "outputs" / "shadow_estimation_review" / "01_AUS_refining_target_2023"
+OUTPUT_ROOT = REPO_ROOT / "outputs" / "shadow_estimation_review" / "01_AUS_refining_target_variable_output_review"
 
 if RUN_PROTOTYPE:
     RESULT_PATH = render_refining_shadow_chart_prototype(
