@@ -201,6 +201,32 @@ line and classify the difference as `dashboard_to_code_boundary_mismatch` until
 the mappings establish which extra or missing branches belong in the card. Do
 not change the expected formula just to make a broader Common ESTO card agree.
 
+### 2d. Make a source-proximity pass before selecting the expected value
+
+Before drawing an expected-total line, trace the active calculation backwards
+from the emitted LEAP variable through its intermediate tables to the original
+ESTO, 9th, or other declared source input. Record the candidate stages in
+order, for example:
+
+```text
+source row/value → allocation or estimation result → process/demand variable
+→ LEAP import expression → LEAP result → dashboard rollup
+```
+
+Use the closest upstream **auditable code value** that expresses the intended
+comparison boundary. Prefer an allocation/estimation result before broad seed,
+export, or dashboard aggregation when it is available, stable for the selected
+run, and reconciles to the emitted variable. This prevents a later rollup from
+hiding an upstream allocation or accounting mistake.
+
+Do not select a raw source value merely because it is earlier in the chain when
+the code deliberately transforms its boundary, units, sign, allocation, or
+ownership. In that case, retain the nearest post-transformation value and
+record both the source-to-variable reconciliation and the reason the raw value
+is not the expected LEAP input. If a closer candidate is found after a review
+has been rendered, regenerate the line from that candidate, retain the former
+stage in the evidence, and report whether the conclusion changed.
+
 ### 3. Reconstruct a temporary expectation
 
 Run the method described in the source workflow using only the declared seed,
