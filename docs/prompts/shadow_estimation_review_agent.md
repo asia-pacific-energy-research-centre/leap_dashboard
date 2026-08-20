@@ -1,0 +1,178 @@
+# Agentic estimation-method chart review
+
+**Status:** Active design and review instruction pack
+
+**Purpose:** Give an agent a repeatable, read-only way to test whether a LEAP
+result looks like the result implied by the current documented estimation
+methods, then show only material and safe differences using the production
+Common ESTO dashboard figures.
+
+This is deliberately not a workflow for creating or storing a universal
+"expected LEAP results" dataset. Estimation methods, exports, mapping runs,
+and LEAP configurations change. The agent should construct narrowly scoped
+test expectations for a stated question, retain provenance, and discard the
+working calculation after writing its review evidence.
+
+## Required reading
+
+Read in this order before acting:
+
+1. `leap_dashboard/AGENTS.md` and `docs/work_queue.md`.
+2. `leap_mappings/docs/mappings_system.md` and
+   `leap_dashboard/docs/common_esto_mapping_consumer.md`.
+3. The relevant estimation-method document and the workflow that produced the
+   selected seed/result/export in `leap_initialisation`.
+4. `leap_initialisation/docs/baseline_seed_balance_diagnostics.md` when the
+   question compares seed-derived intent to a post-import LEAP balance.
+5. `codebase/common_esto_dashboard_renderer.py`, especially the existing
+   chart builder for the requested chart family.
+
+The visual reference
+`C:\Users\Work\.codex\visualizations\2026\08\20\01a01cc6-7099-7342-a3b4-4aa05b55e2bd\transformation_net_fuel_balance.html`
+shows the intended investigation: reconstruct signed transformation fuel
+components from estimation inputs and compare their net total with observed
+output. It is not production code. Do not copy its hand-written Plotly traces
+or hard-coded values into the dashboard.
+
+## Non-negotiable boundaries
+
+- `leap_mappings` owns mapping, hierarchy, rollup, component membership, and
+  source-to-Common ESTO conversion. The agent must call or consume those
+  artifacts; it must not recreate their semantics.
+- `leap_initialisation` owns estimation methods and LEAP-boundary adjustments.
+  The agent must cite the method file and its input artifacts for every
+  calculated expectation.
+- `leap_dashboard` owns chart construction and presentation only. Render
+  figures through its existing builders (for example `build_product_chart`,
+  `build_area_chart`, and the normal bundle/page writers), never through
+  standalone handwritten Plotly markup.
+- All work is read-only unless a user separately authorizes code, mapping, or
+  model changes. Never update a seed, import workbook, LEAP area, mapping
+  workbook, or production dashboard output while investigating.
+- Never allocate a source total to create a comparable expected row. If a
+  comparison requires an unreviewed split, report `unsafe_comparison_grain`
+  and do not draw a mismatch chart.
+
+## Agent procedure
+
+### 1. Define a narrow question
+
+State the economy, scenario, LEAP export/run, years, flow/product boundary,
+and the relevant estimation method. Prefer one process/fuel boundary first;
+for example, `09.07 Oil refineries (including own use)` by one product or
+`09.08.01 Coke ovens (including own use)` by fuel.
+
+Do not begin from an entire dashboard or an all-economy difference scan.
+
+### 2. Establish the comparison boundary
+
+Resolve the expected and observed series onto the same declared Common ESTO
+boundary and establish whether it is an input, output, net, or inclusive
+transformation boundary. Inspect and record:
+
+- sign convention;
+- own-use/loss treatment;
+- placeholder or replacement-sector status;
+- Common ESTO comparison scope and mapping run ID;
+- source-to-common cardinality; and
+- hierarchy frontier selected by the dashboard.
+
+For transformation processes, input, output, and auxiliary fuel must remain
+separate during reconstruction. A net total is useful for review only after
+those component checks have passed; never use cancellation to conceal a bad
+component.
+
+### 3. Reconstruct a temporary expectation
+
+Run the method described in the source workflow using only the declared seed,
+source, and configuration inputs. Create an in-memory/narrow temporary table
+with at least:
+
+```text
+economy, scenario, year, comparison_scope,
+common_flow_code, common_product_code,
+expected_value, observed_leap_value,
+difference, absolute_difference, percent_difference,
+comparison_status, method_path, method_version_or_hash,
+seed_or_source_hash, leap_export_hash, mapping_run_id,
+boundary_rule, comparison_grain
+```
+
+Expected values must be labelled `candidate_estimation_expectation` until the
+method and boundary have been reviewed. They are never a new dashboard source
+system and are never added to the permanent Common ESTO fact table.
+
+### 4. Decide whether a visual comparison is safe and material
+
+Withhold the chart if any of these apply:
+
+- missing expected or observed values;
+- unresolved mapping/cardinality/fan-out;
+- mixed placeholder and replacement branches without a passing group-boundary
+  reconciliation;
+- unclassified sign or own-use treatment; or
+- no material difference under the explicitly stated absolute and percentage
+  tolerances.
+
+Write a compact evidence row for every withheld result. A withheld result is
+useful diagnostic evidence, not a silent omission.
+
+### 5. Render through the dashboard code
+
+For material, safe results, pass a temporary series alongside the actual LEAP
+series into the same production chart builder that owns the ordinary chart:
+
+- preserve the existing figure layout, axes, legend placement, sign notes,
+  base-year marker, `trace_meta`, responsive bundle mechanism, and chart-card
+  HTML;
+- label the temporary trace clearly as `Estimated expectation (method under
+  review)` and use only a restrained distinguishing line style;
+- render to an isolated review output root; do not add it to ordinary pages or
+  published docs;
+- use the ordinary chart manifest shape plus the provenance columns above.
+
+The result should be able to move into a future diagnostic page without a
+visual rewrite. A reviewer should recognise it immediately as a dashboard
+chart, not an external analysis graphic.
+
+### 6. Report, do not repair
+
+For every material difference, state the exact boundary, component evidence,
+direction and size of the gap, provenance, and plausible owner:
+
+- estimation method/input;
+- LEAP model configuration or calculation;
+- export/result extraction;
+- mapping/boundary definition; or
+- unresolved evidence.
+
+Do not infer a fix or modify source data. Stop for human review before any
+change to a mapping, estimation method, seed, or LEAP area.
+
+## Versioned LEAP total lines
+
+This capability must remain compatible with `DASHQ-058`, but does not depend
+on it. If a reviewer supplies multiple LEAP exports, treat each as a separate
+observed result series—not as an expected value. Keep its export hash, run
+label, mapping run, scope, scenario, and selected boundary. A series from a
+different mapping run or boundary is not comparable until a reviewed
+normalisation path exists.
+
+## Initial acceptance example
+
+Reproduce the review question in the visual reference for Australia coal
+transformation, but generate the chart with the dashboard renderer:
+
+1. Reconstruct coke-oven or blast-furnace signed inputs, output, and auxiliary
+   use from the documented baseline-seed method.
+2. Verify the inclusive own-use boundary before forming a net total.
+3. Compare it with the selected LEAP export at the same Common ESTO boundary.
+4. Render a chart only if the tolerance is exceeded and the comparison is
+   safe.
+5. Produce a manifest/evidence table that lets a human trace every plotted
+   point to its method and source artifacts.
+
+Completion of an investigation is an evidence-backed review result, not a
+new permanent data pipeline. Move this prompt into `docs/archive/` only after
+the capability is implemented, tested, committed, and superseded by an
+operational guide.
