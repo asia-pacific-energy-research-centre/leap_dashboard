@@ -187,17 +187,19 @@ expected total from the emitted code variables at the fuel-leaf grain:
 
 ```text
 expected total = sum(Activity Level × Final Energy Intensity)
-                 for the selected aggregate-demand sector and scenario
+                 for every emitted aggregate-demand branch in the selected
+                 dashboard boundary and scenario
 ```
 
 Use the emitted workbook's viewing/value table or its parsed expressions; do
 not reconstruct the value from a later baseline seed rollup. Then compare that
-sector total with the normal dashboard card that claims to represent the same
-boundary. If they agree, the purple `Expected total (code settings)` line is a
-direct code-to-LEAP check. If they do not, retain the line and classify the
-difference as `dashboard_to_code_boundary_mismatch` until the mappings establish
-which extra or missing branches belong in the card. Do not change the expected
-formula just to make a broader Common ESTO card agree.
+total with the normal dashboard card that claims to represent the same boundary.
+When a Common ESTO card is explicitly inclusive, first include every emitted
+code branch it owns (for example, `Other sector` plus `Non Energy Use`) before
+classifying a mismatch. If the fully matched boundary still differs, retain the
+line and classify the difference as `dashboard_to_code_boundary_mismatch` until
+the mappings establish which extra or missing branches belong in the card. Do
+not change the expected formula just to make a broader Common ESTO card agree.
 
 ### 3. Reconstruct a temporary expectation
 
@@ -457,14 +459,10 @@ has one Activity Level and one Final Energy Intensity setting per aggregate
 sector/fuel leaf. Its expected sector total is the sum of those products, not
 a value reconstructed from a Common ESTO rollup. Across `2023`–`2060`, the
 Industry card matches its LEAP Target stack within floating-point rounding and
-Transport non-road matches within `0.000008 PJ`. Those are direct code-to-LEAP
-passes.
-
-The currently published Other-sector Common ESTO card differs from the emitted
-`All demand aggregated/Other sector` expectation by up to `201.942 PJ`. The
-review deliberately keeps its purple line visible: the card is labelled
-`16.03-16.05,17 Other sector including non-energy (all demand aggregate)`, so
-the first task is to trace its full mapped branch set before assigning fault to
-the aggregate-demand code. This is an example of
-`dashboard_to_code_boundary_mismatch`, not permission to alter the code formula
-or silently suppress a valid expected result.
+Transport non-road matches within `0.000008 PJ`. The Other-sector card is an
+inclusive boundary: it must sum both emitted `Other sector` and `Non Energy
+Use` branches. With both included, it also matches the LEAP stack within
+`0.000130 PJ`. These are direct code-to-LEAP passes. The initial single-branch
+comparison is retained as a workflow guardrail: a label containing
+`including non-energy` must cause the agent to inspect the component mapping
+before reporting a code-to-LEAP difference.

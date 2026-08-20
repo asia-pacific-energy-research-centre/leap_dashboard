@@ -31,19 +31,22 @@ from common_esto_dashboard_renderer import (
 #%%
 SECTOR_REVIEWS = [
     {
-        "sector": "Industry",
+        "label": "Industry",
+        "code_sectors": ["Industry"],
         "page": "industry",
         "chart_key": "chart__area__14__14_industry_sector",
         "flow_label": "14 Industry sector",
     },
     {
-        "sector": "Transport non road",
+        "label": "Transport non road",
+        "code_sectors": ["Transport non road"],
         "page": "transport",
         "chart_key": "chart__area__flowgroup__transport__15_01_15_03_15_06_transport_non_road__product",
         "flow_label": "15.01,15.03-15.06 Transport non-road",
     },
     {
-        "sector": "Other sector",
+        "label": "Other sector including non-energy",
+        "code_sectors": ["Other sector", "Non Energy Use"],
         "page": "others",
         "chart_key": "chart__area__flowgroup__others__16_03_16_05_17_other_sector_including_non_energy_all_demand_aggregate__product",
         "flow_label": "16.03-16.05,17 Other sector including non-energy (all demand aggregate)",
@@ -70,18 +73,18 @@ def _target_total(raw_figure: dict) -> pd.DataFrame:
     raise ValueError("LEAP Target total trace was not found.")
 
 
-def _code_expected_total(workbook_path: Path, sector: str, scenario: str) -> pd.DataFrame:
+def _code_expected_total(workbook_path: Path, sectors: list[str], scenario: str) -> pd.DataFrame:
     """Sum the emitted Activity Level × Final Energy Intensity fuel leaves."""
     workbook = pd.read_excel(workbook_path, sheet_name="FOR_VIEWING", header=2)
-    branch_prefix = f"Demand\\All demand aggregated\\{sector}\\"
+    branch_prefixes = [f"Demand\\All demand aggregated\\{sector}\\" for sector in sectors]
     scoped = workbook.loc[
         workbook["Scenario"].astype(str).eq(scenario)
-        & workbook["Branch Path"].astype(str).str.startswith(branch_prefix)
+        & workbook["Branch Path"].astype(str).map(lambda path: any(path.startswith(prefix) for prefix in branch_prefixes))
         & workbook["Variable"].astype(str).isin(["Activity Level", "Final Energy Intensity"])
     ].copy()
     year_columns = [column for column in scoped.columns if str(column).isdigit()]
     if scoped.empty or not year_columns:
-        raise ValueError(f"No emitted {sector} activity/intensity rows in {workbook_path}.")
+        raise ValueError(f"No emitted {sectors} activity/intensity rows in {workbook_path}.")
 
     values = scoped.pivot(index="Branch Path", columns="Variable", values=year_columns)
     activity = values.xs("Activity Level", axis=1, level=1)
@@ -113,13 +116,13 @@ def render_aggregated_demand_shadow_chart_prototype(
     for review in SECTOR_REVIEWS:
         bundle_path = dashboard_root / "chart_bundles" / f"{review['page']}__charts.json"
         figure, raw_figure = _load_chart(bundle_path, review["chart_key"])
-        expected = _code_expected_total(workbook_path, review["sector"], scenario)
+        expected = _code_expected_total(workbook_path, review["code_sectors"], scenario)
         observed = _target_total(raw_figure)
         comparison = expected.merge(observed, on="year", how="inner")
         comparison["difference"] = comparison["expected_total"] - comparison["leap_total"]
         projected = comparison.loc[comparison["year"].ge(2023)]
         if projected.empty:
-            raise ValueError(f"No projected comparison years for {review['sector']}.")
+            raise ValueError(f"No projected comparison years for {review['label']}.")
 
         figure.add_trace(go.Scatter(
             x=expected["year"], y=expected["expected_total"], mode="lines",
@@ -133,7 +136,7 @@ def render_aggregated_demand_shadow_chart_prototype(
         ]
         figure.update_layout(meta=meta, title=f"LEAP Target stack, code expectation, and source totals: {review['flow_label']}")
 
-        output_chart_key = f"chart__area__{review_key}__{review['sector'].lower().replace(' ', '_')}"
+        output_chart_key = f"chart__area__{review_key}__{review['label'].lower().replace(' ', '_').replace('-', '_')}"
         figures[output_chart_key] = figure
         max_gap = float(projected["difference"].abs().max())
         chart_rows.append({
@@ -149,7 +152,8 @@ def render_aggregated_demand_shadow_chart_prototype(
             "pct_diff": 0.0,
         })
         manifest_cards.append({
-            "sector": review["sector"],
+            "label": review["label"],
+            "code_sectors": review["code_sectors"],
             "dashboard_chart_key": review["chart_key"],
             "max_code_to_leap_gap_pj": max_gap,
             "comparison_years": [int(year) for year in projected["year"]],
