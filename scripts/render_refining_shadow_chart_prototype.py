@@ -153,40 +153,6 @@ def _load_variable_expected_rows(
     return result
 
 
-def _load_variable_expected_use_rows(
-    transformation_workbook_path: Path, flow_label: str, product_label: str,
-    economy: str, scenario: str,
-) -> pd.DataFrame:
-    """Calculate total auxiliary use from pre-seed capacity and auxiliary ratios."""
-    workbook = pd.read_excel(transformation_workbook_path, header=2)
-    process_path = "Transformation\\Oil Refining\\Processes\\Oil Refining"
-    capacity = workbook.loc[
-        workbook["Branch Path"].astype(str).eq(process_path)
-        & workbook["Variable"].astype(str).eq("Exogenous Capacity")
-        & workbook["Scenario"].astype(str).eq(scenario)
-    ].iloc[0]
-    auxiliary = workbook.loc[
-        workbook["Branch Path"].astype(str).str.startswith(process_path + "\\Auxiliary Fuels\\")
-        & workbook["Variable"].astype(str).eq("Auxiliary Fuel Use")
-        & workbook["Scenario"].astype(str).eq(scenario)
-    ]
-    values = []
-    for column in [col for col in workbook.columns if str(col).isdigit()]:
-        capacity_value = pd.to_numeric(capacity[column], errors="coerce")
-        ratio_total = pd.to_numeric(auxiliary[column], errors="coerce").fillna(0.0).sum()
-        if pd.notna(capacity_value):
-            values.append({"year": int(column), "value": -capacity_value * ratio_total})
-    result = pd.DataFrame(values)
-    result["source_system"] = "ESTIMATION_CODE_USE"
-    result["scenario"] = scenario
-    result["economy"] = economy
-    result["common_flow_code"] = flow_label.split(" ", maxsplit=1)[0]
-    result["common_flow_label"] = flow_label
-    result["common_product_code"] = product_label.split(" ", maxsplit=1)[0]
-    result["common_product_label"] = product_label
-    return result
-
-
 def _load_variable_expected_net_rows(
     transformation_workbook_path: Path, flow_label: str, product_label: str,
     economy: str, scenario: str,
@@ -315,9 +281,6 @@ def render_refining_shadow_chart_prototype(
         transformation_workbook_path, product_label, output_fuel_label,
         flow_label, economy, scenario,
     )
-    code_expected_use_rows = _load_variable_expected_use_rows(
-        transformation_workbook_path, flow_label, product_label, economy, scenario
-    )
     code_expected_net_rows = _load_variable_expected_net_rows(
         transformation_workbook_path, flow_label, product_label, economy, scenario
     )
@@ -351,17 +314,9 @@ def render_refining_shadow_chart_prototype(
         marker={"size": 9, "symbol": "diamond"},
         hovertemplate="%{x}<br>Expected net total: %{y:,.2f} PJ<extra>Transformation settings</extra>",
     ))
-    area_figure.add_trace(go.Scatter(
-        x=code_expected_use_rows["year"], y=code_expected_use_rows["value"],
-        mode="lines+markers", name="Expected own use (transformation settings)",
-        line={"dash": "dash", "color": "#6f4e37", "width": 4},
-        marker={"size": 9, "symbol": "square"},
-        hovertemplate="%{x}<br>Expected own use: %{y:,.2f} PJ<extra>Transformation settings</extra>",
-    ))
     figure_meta = dict(area_figure.layout.meta or {})
     figure_meta["trace_meta"] = list(figure_meta.get("trace_meta", [])) + [
-        {"source_system": "ESTIMATION_CODE", "tag": "tgt", "metric": "both", "active_visible": True},
-        {"source_system": "ESTIMATION_CODE_USE", "tag": "tgt", "metric": "both", "active_visible": True},
+        {"source_system": "ESTIMATION_CODE_NET", "tag": "tgt", "metric": "both", "active_visible": True},
     ]
     area_figure.update_layout(meta=figure_meta)
     area_figure.update_layout(
@@ -414,8 +369,8 @@ def render_refining_shadow_chart_prototype(
         page_note=(
             "Read-only review: this preserves the normal signed refinery stack, "
             "ESTO historical total, LEAP Target total, and 9th Target total exactly; "
-            "the purple line is the code-derived signed net total (gross output, "
-            "feedstock input, and own use); the brown dashed line is its own-use component."
+            "the purple line is the code-derived signed net total, including gross "
+            "output, feedstock input, and auxiliary own use."
         ),
         dataset_filter_options=["LEAP", "ESTIMATION_EXPECTATION"],
     )
