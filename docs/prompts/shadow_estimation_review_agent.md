@@ -294,6 +294,44 @@ Natural gas and electricity rows are not chart-safe in this case because the
 selected diagnostic has no source comparator for them. They must remain
 withheld rather than drawn as zero-valued expected series.
 
+### Recorded lessons and non-negotiable refinery guardrails
+
+The first implementation made three errors. These are retained as workflow
+guardrails rather than treated as one-off prototype details:
+
+1. **Do not begin by blaming LEAP.** When process variables are derived from
+   the mapped 9th projection, first reconcile the code-variable net against
+   the inclusive 9th total. Only the remaining code-to-LEAP difference is a
+   LEAP/import/export review question.
+2. **Do not treat refinery Exogenous Capacity as gross output.** The
+   capacity-like Target override intentionally seeds *deliverable* output for
+   `Oil Refining`: same-module output fuel used as auxiliary energy is already
+   netted from that capacity. LEAP grosses the process internally to supply
+   that auxiliary demand. A shadow reconstruction must recover gross output
+   as `deliverable_output / (1 - same_module_auxiliary_ratio)`, calculate
+   feedstock from that gross output and efficiency, and subtract only
+   *external* auxiliary energy from deliverable output. Subtracting all
+   auxiliary use from deliverable capacity double-counts same-module own use.
+3. **Do not draw a separate own-use total beside this net.** For this boundary
+   it is an accounting component of the same signed net, not a comparable
+   second outcome. Retain component values in the evidence table and hover
+   provenance instead.
+
+For the audited `01_AUS` Target 2023 workbook
+`SEED_AUS_CONSOLIDATED_20260820`, the corrected reconstruction is
+`-52.742 PJ`; the dashboard's 9th Target total is `-52.725 PJ` (difference
+`-0.017 PJ`, approximately `0.03%`). This passes the source-to-process
+reconstruction check. The dashboard LEAP Target net is `-52.154 PJ`; its
+roughly `0.57 PJ` gap from the now-validated expected/9th net is the separate
+next investigation, not evidence against the reconstruction formula.
+
+Required evidence for another refinery run is therefore: selected 9th source
+and mapping run, process-variable workbook/run ID, identification of
+same-module versus external auxiliary fuel labels, the three accounting
+components (deliverable output, recovered gross feedstock, external auxiliary
+use), and the selected LEAP result export. Do not carry any of these numeric
+values to another economy, vintage, or scenario.
+
 ## Case ledger: Australia full-horizon refinery and hydrogen reviews
 
 The first live review was extended to all 38 available Target projection years
@@ -304,6 +342,10 @@ settings)` derived from the pre-seed Exogenous Capacity × Output Share
 variables, a separate 9th Target output line, and an ESTO historical-output
 line. Natural gas and electricity remain actual stack categories only because
 the selected output expectation is gas/diesel.
+
+The refinery *net* expectation uses the more specific deliverable-capacity
+gross-up rule above; it must not be reconstructed with the output-only
+capacity-times-share formula.
 
 The same contract was tested on `09.13 Hydrogen transformation` →
 `16.12 Hydrogen`. Its mapped LEAP stack contains ammonia, e-fuel, and hydrogen
