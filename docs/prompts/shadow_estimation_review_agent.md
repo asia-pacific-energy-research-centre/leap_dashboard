@@ -4,8 +4,10 @@
 
 **Purpose:** Give an agent a repeatable, read-only way to test whether a LEAP
 result looks like the result implied by the current documented estimation
-methods, then show only material and safe differences using the production
-Common ESTO dashboard figures.
+methods, then show material and safe differences using the production Common
+ESTO dashboard figures. An explicitly requested audit may also render a safe
+passing boundary: a close match is evidence that the method/boundary path is
+working, not an error.
 
 This is deliberately not a workflow for creating or storing a universal
 "expected LEAP results" dataset. Estimation methods, exports, mapping runs,
@@ -130,18 +132,42 @@ Withhold the chart if any of these apply:
   tolerances.
 
 Write a compact evidence row for every withheld result. A withheld result is
-useful diagnostic evidence, not a silent omission.
+useful diagnostic evidence, not a silent omission. An explicit user request
+for a full-boundary audit may render a safe non-material match, but the page
+and manifest must label it `audit_pass` rather than presenting it as an alert.
+
+### 4a. Use the full available horizon
+
+For a selected export, first inspect its available year sheets and regenerate
+or select a diagnostic over every requested projection year. Do not project a
+single-year discrepancy forward. Plot every year for which both LEAP and the
+declared source comparator are available at a reviewed comparison grain.
+
+Record years withheld from the expectation line, including the reason (for
+example `ESTO unavailable`, `source unavailable`, or
+`unsafe_comparison_grain`). A LEAP-only fuel may still appear in the actual
+fuel-mix stack, but it must not create an expected-output point.
 
 ### 5. Render through the dashboard code
 
-For material, safe results, pass a temporary series alongside the actual LEAP
-series into the same production chart builder that owns the ordinary chart:
+For material, safe results, pass temporary review rows alongside the actual
+LEAP rows into the same production chart builder that owns the ordinary chart:
 
 - preserve the existing figure layout, axes, legend placement, sign notes,
   base-year marker, `trace_meta`, responsive bundle mechanism, and chart-card
   HTML;
-- label the temporary trace clearly as `Estimated expectation (method under
-  review)` and use only a restrained distinguishing line style;
+- use one composite stacked-area chart for a transformation boundary whenever
+  a fuel mix is useful: LEAP Target fuel areas, the builder's LEAP Target net
+  total, and one restrained dashed expected-output line;
+- derive the expected-line label from its actual provenance. For example, a
+  9th Outlook comparator becomes `Expected output (9th Outlook)`. Do not add
+  a duplicate `9th Outlook` line when it is the expectation itself;
+- include an ESTO historical line only when the maintained comparison supplies
+  an ESTO value at the same boundary. Never add a zero or reconstructed ESTO
+  point merely to complete the visual;
+- use the normal `build_area_chart` path for the composite figure, then the
+  normal bundle/page writers. Preserve its LEAP stack and total-line behaviour
+  rather than hand-assembling Plotly traces;
 - render to an isolated review output root; do not add it to ordinary pages or
   published docs;
 - use the ordinary chart manifest shape plus the provenance columns above.
@@ -149,6 +175,22 @@ series into the same production chart builder that owns the ordinary chart:
 The result should be able to move into a future diagnostic page without a
 visual rewrite. A reviewer should recognise it immediately as a dashboard
 chart, not an external analysis graphic.
+
+### 5a. Review-output contract
+
+Each isolated review root must contain:
+
+```text
+diagnostics/                  # maintained comparison inputs selected for this review
+chart_bundles/<review>__charts.js
+dashboards/<review>.html      # exactly one composite chart card per selected boundary
+supporting_files/shadow_chart_manifest.json
+```
+
+The manifest must state the selected export, year coverage, comparator source,
+withheld years, comparison grain, flow/product boundary, mapping evidence,
+chart key, and review outcome (`material_difference`, `audit_pass`, or
+`withheld`). This is review evidence, not a durable dashboard fact dataset.
 
 ### 6. Report, do not repair
 
@@ -221,3 +263,20 @@ assigning an owner.
 Natural gas and electricity rows are not chart-safe in this case because the
 selected diagnostic has no source comparator for them. They must remain
 withheld rather than drawn as zero-valued expected series.
+
+## Case ledger: Australia full-horizon refinery and hydrogen reviews
+
+The first live review was extended to all 38 available Target projection years
+(`2023`–`2060`) from `AUS TGT 1808 daniel.xlsx`. The isolated refinery review
+uses one composite dashboard chart: all mapped LEAP Target refinery fuels as
+stacked areas, the LEAP Target total, and `Expected output (9th Outlook)` for
+gas/diesel output. The 9th Outlook is the expected-output provenance, so it is
+not duplicated as a second line. Natural gas and electricity remain actual
+stack categories only because the selected output expectation is gas/diesel.
+
+The same contract was tested on `09.13 Hydrogen transformation` →
+`16.12 Hydrogen`. Its mapped LEAP stack contains ammonia, e-fuel, and hydrogen
+and its expected/observed output matches closely across the full horizon. It
+is an `audit_pass` design example, not a mismatch alert. The selected
+projection diagnostic supplied 9th Outlook values, but no maintained ESTO
+hydrogen comparator; therefore no ESTO line is drawn.
