@@ -99,6 +99,34 @@ separate during reconstruction. A net total is useful for review only after
 those component checks have passed; never use cancellation to conceal a bad
 component.
 
+### 2a. Prove the process reconstruction before calling it an expectation
+
+Before plotting an expected net line, make a one-year reconciliation table
+for the selected process and the exact selected run. It must contain, on the
+same signed inclusive boundary:
+
+```text
+stage, gross output, feedstock input, auxiliary/own use, net total,
+artifact path, artifact hash/run ID
+```
+
+The stages are: the source/9th boundary where applicable, the active
+workflow's emitted process variables, and the observed LEAP result. For oil
+refining, `09.07 Oil refineries` plus `10.01.11 Oil refineries` is the
+inclusive source boundary; the latter is represented in LEAP as Auxiliary
+Fuel Use, not as a second net-total line.
+
+When the active method derives its process variables from the mapped 9th
+projection, the mapped inclusive 9th total is the first preservation target:
+the process-variable reconstruction must agree with it within the stated
+tolerance. A gap is an upstream `source_to_process_reconstruction_mismatch`,
+not an assumed LEAP-calculation difference. For oil refining, this specifically
+tests that mapped `09.07 Oil refineries` plus `10.01.11 Oil refineries` is
+preserved through capacity, output shares, feedstock efficiency, and auxiliary
+fuel use. Only after that passes may the agent compare the same reconstructed
+net with LEAP. If either reconciliation fails, withhold the expected-net line
+and render component evidence only.
+
 ### 3. Reconstruct a temporary expectation
 
 Run the method described in the source workflow using only the declared seed,
