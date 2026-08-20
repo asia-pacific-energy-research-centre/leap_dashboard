@@ -44,8 +44,10 @@ or hard-coded values into the dashboard.
   calculated expectation.
 - `leap_dashboard` owns chart construction and presentation only. Render
   figures through its existing builders (for example `build_product_chart`,
-  `build_area_chart`, and the normal bundle/page writers), never through
-  standalone handwritten Plotly markup.
+  `build_area_chart`, and the normal bundle/page writers). A direct
+  `Figure.to_html` export is not a mergeable review output: it does not prove
+  the dashboard's bundle, lazy-loader, filtering, or chart-card contract.
+  Never use standalone handwritten Plotly markup.
 - All work is read-only unless a user separately authorizes code, mapping, or
   model changes. Never update a seed, import workbook, LEAP area, mapping
   workbook, or production dashboard output while investigating.

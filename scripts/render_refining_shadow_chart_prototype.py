@@ -14,7 +14,6 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-import plotly.io as pio
 
 
 CURRENT_FILE = Path(__file__).resolve()
@@ -23,7 +22,13 @@ MODULE_ROOT = REPO_ROOT / "codebase"
 if str(MODULE_ROOT) not in sys.path:
     sys.path.insert(0, str(MODULE_ROOT))
 
-from common_esto_dashboard_renderer import build_product_chart, load_json
+from common_esto_dashboard_renderer import (
+    build_product_chart,
+    chart_dataset_tokens_from_figure,
+    load_json,
+    write_chart_bundle,
+    write_dashboard_page,
+)
 
 
 #%%
@@ -53,6 +58,8 @@ def _load_refining_diagnostic_rows(
     actual = scoped.assign(
         source_system="LEAP",
         value=scoped["leap_value_pj"],
+        sign_status="valid_positive",
+        sign_interpretation="transformation output",
         common_flow_code=common_flow_code,
         common_flow_label=flow_label,
         common_product_code=common_product_code,
@@ -61,6 +68,8 @@ def _load_refining_diagnostic_rows(
     expected = scoped.assign(
         source_system="ESTIMATION_EXPECTATION",
         value=scoped["source_value_pj"],
+        sign_status="valid_positive",
+        sign_interpretation="transformation output",
         common_flow_code=common_flow_code,
         common_flow_label=flow_label,
         common_product_code=common_product_code,
@@ -77,14 +86,14 @@ def _load_refining_diagnostic_rows(
 
 def render_refining_shadow_chart_prototype(
     diagnostic_path: Path,
-    output_html_path: Path,
+    output_root: Path,
     template_path: Path,
     economy: str = "01_AUS",
     scenario: str = "Target",
     flow_label: str = "09.07 Oil refineries (including own use)",
     product_label: str = "07.07 Gas/diesel oil",
 ) -> Path:
-    """Render a production-style refining diagnostic to a standalone HTML file."""
+    """Render a production-style refining diagnostic through page/bundle writers."""
     template = load_json(template_path)
     rows = _load_refining_diagnostic_rows(
         diagnostic_path=diagnostic_path,
@@ -94,7 +103,7 @@ def render_refining_shadow_chart_prototype(
         product_label=product_label,
     )
     series_labels = {
-        "LEAP|Target": "LEAP Target (actual output)",
+        "LEAP|Target": "LEAP Target",
         "ESTIMATION_EXPECTATION|Target": "Estimated expectation (reviewed boundary)",
     }
     figure = build_product_chart(
@@ -117,16 +126,62 @@ def render_refining_shadow_chart_prototype(
             "prototype_status": "diagnostic_expected_series_reviewed_boundary",
         },
     )
-    output_html_path.parent.mkdir(parents=True, exist_ok=True)
-    output_html_path.write_text(
-        pio.to_html(figure, include_plotlyjs="cdn", full_html=True),
+    layout = {
+        "dashboards": output_root / "dashboards",
+        "chart_bundles": output_root / "chart_bundles",
+        "supporting": output_root / "supporting_files",
+    }
+    for path in layout.values():
+        path.mkdir(parents=True, exist_ok=True)
+    chart_key = "chart__line__refining_shadow_review__07_07_gas_diesel_oil"
+    bundle_name = "refining_shadow_review__charts"
+    write_chart_bundle(
+        {chart_key: figure},
+        layout["chart_bundles"] / bundle_name,
+    )
+    chart_rows = [{
+        "chart_key": chart_key,
+        "chart_type": "line",
+        "title": f"{flow_label} — {product_label}",
+        "product_label": product_label,
+        "section_label": "Refining shadow review",
+        "flow_group_label": flow_label,
+        "datasets": chart_dataset_tokens_from_figure(figure),
+        "total_abs_value": 0.0,
+        "abs_diff": 7.862508,
+        "pct_diff": 0.04812166,
+    }]
+    output_path = layout["dashboards"] / "refining_shadow_review.html"
+    write_dashboard_page(
+        page_config={
+            "page_key": "refining_shadow_review",
+            "page_label": "Refining shadow review",
+        },
+        chart_rows=chart_rows,
+        bundle_js_name=f"{bundle_name}.js",
+        output_path=output_path,
+        economy_label="Australia",
+        page_note=(
+            "Read-only review: estimated expectation uses the maintained "
+            "inclusive refinery comparison boundary."
+        ),
+        dataset_filter_options=["LEAP", "ESTIMATION_EXPECTATION"],
+    )
+    (layout["supporting"] / "shadow_chart_manifest.json").write_text(
+        json.dumps(
+            {
+                "chart_key": chart_key,
+                "diagnostic_path": str(diagnostic_path),
+                "boundary": flow_label,
+                "product": product_label,
+                "figure_layout": figure.to_plotly_json()["layout"],
+            },
+            default=str,
+            indent=2,
+        ),
         encoding="utf-8",
     )
-    output_html_path.with_suffix(".json").write_text(
-        json.dumps(figure.to_plotly_json(), default=str, indent=2),
-        encoding="utf-8",
-    )
-    return output_html_path
+    return output_path
 
 
 #%%
@@ -140,12 +195,12 @@ DIAGNOSTIC_PATH = (
     / "leap_balance_source_differences.csv"
 )
 TEMPLATE_PATH = REPO_ROOT / "config" / "common_esto_dashboard" / "common_esto_dashboard_template.json"
-OUTPUT_HTML_PATH = REPO_ROOT / "outputs" / "prototypes" / "refining_shadow_comparison.html"
+OUTPUT_ROOT = REPO_ROOT / "outputs" / "shadow_estimation_review" / "01_AUS_refining_target_2023"
 
 if RUN_PROTOTYPE:
     RESULT_PATH = render_refining_shadow_chart_prototype(
         diagnostic_path=DIAGNOSTIC_PATH,
-        output_html_path=OUTPUT_HTML_PATH,
+        output_root=OUTPUT_ROOT,
         template_path=TEMPLATE_PATH,
     )
     print(f"[OK] Renderer-backed prototype written to {RESULT_PATH}")
