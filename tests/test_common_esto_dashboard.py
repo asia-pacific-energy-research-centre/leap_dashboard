@@ -1148,6 +1148,31 @@ def test_jump_navigation_uses_flow_levels_not_parent_or_leaf_status() -> None:
     assert html.index('data-level="2"') < html.index('data-level="3"')
 
 
+def test_rendered_sections_follow_numeric_navigation_order() -> None:
+    rows = [
+        {
+            "section_label": "Other energy-sector own use",
+            "flow_group_label": "10.01.03 Liquefaction/regasification plants",
+            "chart_key": "chart_10",
+        },
+        {
+            "section_label": "Other transformation (including own use)",
+            "flow_group_label": "09.06 Gas processing plants",
+            "chart_key": "chart_09",
+        },
+        {
+            "section_label": "Transfers",
+            "flow_group_label": "08 Transfers",
+            "chart_key": "chart_08",
+        },
+    ]
+
+    html = _line_sections_html(rows, "Other transformation")
+
+    assert html.index(">Transfers</h2>") < html.index(">Other transformation (including own use)</h2>")
+    assert html.index(">Other transformation (including own use)</h2>") < html.index(">Other energy-sector own use</h2>")
+
+
 def test_jump_navigation_replaces_page_name_with_buildings_tree_nodes() -> None:
     rows = [
         {"section_label": "Buildings", "flow_group_label": label}

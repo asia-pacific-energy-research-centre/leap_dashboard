@@ -526,6 +526,20 @@ def section_order_key(label: object) -> tuple[object, ...]:
     return (1, (), flow_name_without_code(text).casefold(), text.casefold())
 
 
+def _section_tree_order_key(
+    section_label: object,
+    node_labels: list[object],
+) -> tuple[object, ...]:
+    """Order a rendered section by its first visible navigation node.
+
+    Section headings are often descriptive page groupings rather than coded
+    ESTO labels. Using the first visible child keeps the body in the same
+    order as the numeric/alphabetical navigation chips.
+    """
+    node_keys = [section_order_key(label) for label in node_labels]
+    return min(node_keys) if node_keys else section_order_key(section_label)
+
+
 def sign_note_for_chart(df: pd.DataFrame) -> str:
     """Return a compact sign-convention note for chart titles."""
     required = {"sign_convention", "expected_sign", "positive_value_meaning", "negative_value_meaning"}
@@ -4302,7 +4316,11 @@ def line_section_tree(
                 "target": root_targets.get(group, ""),
             })
         hierarchy_tree.append((section_label, nodes))
-    hierarchy_tree.sort(key=lambda item: section_order_key(item[0]))
+    hierarchy_tree.sort(
+        key=lambda item: _section_tree_order_key(
+            item[0], [node["label"] for node in item[1]]
+        )
+    )
     for _section_label, nodes in hierarchy_tree:
         nodes.sort(
             key=lambda node: (
@@ -4584,7 +4602,19 @@ def _line_sections_html(line_rows: list[dict], page_label: str) -> str:
         if sl not in seen:
             seen.append(sl)
     chunks: list[str] = []
-    for section_label in sorted(seen, key=section_order_key):
+    section_order = {
+        section_label: _section_tree_order_key(
+            section_label,
+            [
+                row.get("flow_group_label")
+                for row in line_rows
+                if str(row.get("section_label") or "Other") == section_label
+                and str(row.get("flow_group_label") or "").strip()
+            ],
+        )
+        for section_label in seen
+    }
+    for section_label in sorted(seen, key=section_order.get):
         section_rows = [r for r in line_rows if str(r.get("section_label") or "Other") == section_label]
         anchor = _section_anchor(page_label, section_label)
 
