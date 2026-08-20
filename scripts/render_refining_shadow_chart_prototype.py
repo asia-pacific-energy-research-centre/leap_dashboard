@@ -294,15 +294,23 @@ def render_refining_shadow_chart_prototype(
     area_figure.add_trace(go.Scatter(
         x=code_expected_rows["year"], y=code_expected_rows["value"],
         mode="lines+markers", name="Expected output (transformation settings)",
-        line={"dash": "dash", "color": "#8c55b8"},
+        line={"dash": "dash", "color": "#8c55b8", "width": 4},
+        marker={"size": 9, "symbol": "diamond"},
         hovertemplate="%{x}<br>Expected output: %{y:,.2f} PJ<extra>Transformation settings</extra>",
     ))
     area_figure.add_trace(go.Scatter(
         x=code_expected_use_rows["year"], y=code_expected_use_rows["value"],
         mode="lines+markers", name="Expected own use (transformation settings)",
-        line={"dash": "dash", "color": "#6f4e37"},
+        line={"dash": "dash", "color": "#6f4e37", "width": 4},
+        marker={"size": 9, "symbol": "square"},
         hovertemplate="%{x}<br>Expected own use: %{y:,.2f} PJ<extra>Transformation settings</extra>",
     ))
+    figure_meta = dict(area_figure.layout.meta or {})
+    figure_meta["trace_meta"] = list(figure_meta.get("trace_meta", [])) + [
+        {"source_system": "ESTIMATION_CODE", "tag": "tgt", "metric": "both", "active_visible": True},
+        {"source_system": "ESTIMATION_CODE_USE", "tag": "tgt", "metric": "both", "active_visible": True},
+    ]
+    area_figure.update_layout(meta=figure_meta)
     area_figure.update_layout(
         title=(
             f"{area_chart_title} ({first_year}–{last_year}): {flow_label}"
