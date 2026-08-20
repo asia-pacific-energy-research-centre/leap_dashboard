@@ -23,6 +23,7 @@ if str(MODULE_ROOT) not in sys.path:
     sys.path.insert(0, str(MODULE_ROOT))
 
 from common_esto_dashboard_renderer import (
+    build_area_chart,
     build_product_chart,
     chart_dataset_tokens_from_figure,
     load_json,
@@ -84,6 +85,32 @@ def _load_refining_diagnostic_rows(
     return result
 
 
+def _load_target_area_rows(
+    diagnostic_path: Path,
+    economy: str,
+    scenario: str,
+    flow_label: str,
+) -> pd.DataFrame:
+    """Return all mapped LEAP Target fuel rows for a stacked transformation chart."""
+    source = pd.read_csv(diagnostic_path)
+    scoped = source.loc[
+        source["economy"].astype(str).eq(economy)
+        & source["scenario"].astype(str).eq(scenario)
+        & source["esto_flow"].astype(str).eq(flow_label)
+        & source["leap_value_pj"].notna()
+    ].copy()
+    if scoped.empty:
+        raise ValueError("No mapped LEAP Target rows were found for the area chart.")
+    product_parts = scoped["esto_product"].astype(str).str.split(" ", n=1, expand=True)
+    scoped["source_system"] = "LEAP"
+    scoped["value"] = scoped["leap_value_pj"]
+    scoped["common_flow_code"] = flow_label.split(" ", maxsplit=1)[0]
+    scoped["common_flow_label"] = flow_label
+    scoped["common_product_code"] = product_parts[0]
+    scoped["common_product_label"] = scoped["esto_product"].astype(str)
+    return scoped
+
+
 def render_refining_shadow_chart_prototype(
     diagnostic_path: Path,
     output_root: Path,
@@ -92,6 +119,9 @@ def render_refining_shadow_chart_prototype(
     scenario: str = "Target",
     flow_label: str = "09.07 Oil refineries (including own use)",
     product_label: str = "07.07 Gas/diesel oil",
+    review_key: str = "refining_shadow_review",
+    review_label: str = "Refining shadow review",
+    area_chart_title: str = "LEAP Target refinery fuel mix",
 ) -> Path:
     """Render a production-style refining diagnostic through page/bundle writers."""
     template = load_json(template_path)
@@ -102,9 +132,15 @@ def render_refining_shadow_chart_prototype(
         flow_label=flow_label,
         product_label=product_label,
     )
+    area_rows = _load_target_area_rows(
+        diagnostic_path=diagnostic_path,
+        economy=economy,
+        scenario=scenario,
+        flow_label=flow_label,
+    )
     series_labels = {
         "LEAP|Target": "LEAP Target",
-        "ESTIMATION_EXPECTATION|Target": "Estimated expectation (reviewed boundary)",
+        "ESTIMATION_EXPECTATION|Target": "Expected output",
     }
     figure = build_product_chart(
         rows,
@@ -141,6 +177,16 @@ def render_refining_shadow_chart_prototype(
             "prototype_status": "diagnostic_expected_series_reviewed_boundary",
         },
     )
+    area_figure = build_area_chart(
+        area_rows,
+        {
+            "aggregate_flow_label": flow_label,
+            "source_flow_labels": [flow_label],
+        },
+        series_labels,
+        template,
+        title_prefix=area_chart_title,
+    )
     layout = {
         "dashboards": output_root / "dashboards",
         "chart_bundles": output_root / "chart_bundles",
@@ -148,18 +194,30 @@ def render_refining_shadow_chart_prototype(
     }
     for path in layout.values():
         path.mkdir(parents=True, exist_ok=True)
-    chart_key = "chart__line__refining_shadow_review__07_07_gas_diesel_oil"
-    bundle_name = "refining_shadow_review__charts"
+    chart_key = f"chart__line__{review_key}__{product_label.split(' ', maxsplit=1)[0].replace('.', '_')}"
+    bundle_name = f"{review_key}__charts"
+    area_chart_key = f"chart__area__{review_key}__fuel_mix"
     write_chart_bundle(
-        {chart_key: figure},
+        {area_chart_key: area_figure, chart_key: figure},
         layout["chart_bundles"] / bundle_name,
     )
     chart_rows = [{
+        "chart_key": area_chart_key,
+        "chart_type": "stacked_area",
+        "title": area_chart_title,
+        "product_label": "All transformation fuels",
+        "section_label": review_label,
+        "flow_group_label": flow_label,
+        "datasets": chart_dataset_tokens_from_figure(area_figure),
+        "total_abs_value": float(area_rows["value"].abs().sum()),
+        "abs_diff": 0.0,
+        "pct_diff": 0.0,
+    }, {
         "chart_key": chart_key,
         "chart_type": "line",
         "title": f"{flow_label} — {product_label}",
         "product_label": product_label,
-        "section_label": "Refining shadow review",
+        "section_label": review_label,
         "flow_group_label": flow_label,
         "datasets": chart_dataset_tokens_from_figure(figure),
         "total_abs_value": float(comparison_rows["source_value_pj"].abs().sum()),
@@ -168,19 +226,19 @@ def render_refining_shadow_chart_prototype(
             comparison_rows["absolute_percentage_difference"].max()
         ),
     }]
-    output_path = layout["dashboards"] / "refining_shadow_review.html"
+    output_path = layout["dashboards"] / f"{review_key}.html"
     write_dashboard_page(
         page_config={
-            "page_key": "refining_shadow_review",
-            "page_label": "Refining shadow review",
+            "page_key": review_key,
+            "page_label": review_label,
         },
         chart_rows=chart_rows,
         bundle_js_name=f"{bundle_name}.js",
         output_path=output_path,
-        economy_label="Australia",
+        economy_label=economy,
         page_note=(
             "Read-only review: estimated expectation uses the maintained "
-            f"inclusive refinery comparison boundary ({first_year}–{last_year})."
+            f"comparison boundary ({first_year}–{last_year})."
         ),
         dataset_filter_options=["LEAP", "ESTIMATION_EXPECTATION"],
     )
@@ -188,10 +246,15 @@ def render_refining_shadow_chart_prototype(
         json.dumps(
             {
                 "chart_key": chart_key,
+                "review_key": review_key,
                 "diagnostic_path": str(diagnostic_path),
                 "boundary": flow_label,
                 "product": product_label,
                 "figure_layout": figure.to_plotly_json()["layout"],
+                "area_chart_key": area_chart_key,
+                "area_chart_product_count": int(
+                    area_rows["common_product_label"].nunique()
+                ),
             },
             default=str,
             indent=2,
