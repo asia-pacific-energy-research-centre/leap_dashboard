@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import plotly.graph_objects as go
 
 
 CURRENT_FILE = Path(__file__).resolve()
@@ -23,7 +24,6 @@ if str(MODULE_ROOT) not in sys.path:
     sys.path.insert(0, str(MODULE_ROOT))
 
 from common_esto_dashboard_renderer import (
-    build_area_chart,
     chart_dataset_tokens_from_figure,
     load_json,
     write_chart_bundle,
@@ -182,6 +182,16 @@ def _load_esto_history_rows(
     return result
 
 
+def _load_dashboard_area_figure(bundle_path: Path, chart_key: str) -> go.Figure:
+    """Reuse the normal dashboard's signed refinery chart as the review base."""
+    prefix = "window.COMMON_ESTO_CHART_BUNDLE_DATA="
+    text = bundle_path.read_text(encoding="utf-8")
+    if not text.startswith(prefix):
+        raise ValueError(f"Not a dashboard chart bundle: {bundle_path}")
+    charts = json.loads(text[len(prefix):].rstrip(";\n"))["charts"]
+    return go.Figure(charts[chart_key])
+
+
 def render_refining_shadow_chart_prototype(
     diagnostic_path: Path,
     output_root: Path,
@@ -196,6 +206,8 @@ def render_refining_shadow_chart_prototype(
     transformation_workbook_path: Path | None = None,
     esto_data_path: Path | None = None,
     output_fuel_label: str = "Gas and diesel oil",
+    base_dashboard_bundle_path: Path | None = None,
+    base_dashboard_chart_key: str = "chart__area__09__09_07_oil_refineries_including_own_use",
 ) -> Path:
     """Render a production-style refining diagnostic through page/bundle writers."""
     template = load_json(template_path)
@@ -205,12 +217,6 @@ def render_refining_shadow_chart_prototype(
         scenario=scenario,
         flow_label=flow_label,
         product_label=product_label,
-    )
-    area_rows = _load_target_area_rows(
-        diagnostic_path=diagnostic_path,
-        economy=economy,
-        scenario=scenario,
-        flow_label=flow_label,
     )
     if transformation_workbook_path is None:
         transformation_workbook_path = (
@@ -228,13 +234,6 @@ def render_refining_shadow_chart_prototype(
     esto_rows = _load_esto_history_rows(
         esto_data_path, flow_label, product_label, economy, scenario,
     )
-    series_labels = {
-        "LEAP|Target": "LEAP Target",
-        "LEAP_OUTPUT|Target": "LEAP Target diesel output",
-        "ESTIMATION_CODE|Target": "Expected output (transformation settings)",
-        "NINTH|Target": "9th Target output",
-        "ESTO|Target": "ESTO historical output",
-    }
     comparison_rows = rows.loc[
         rows["source_system"].eq("ESTIMATION_EXPECTATION")
     ].copy()
@@ -247,44 +246,20 @@ def render_refining_shadow_chart_prototype(
     )
     first_year = int(comparison_rows["year"].min())
     last_year = int(comparison_rows["year"].max())
-    comparison_rows["source_system"] = "NINTH"
-    leap_output_rows = area_rows.loc[
-        area_rows["common_product_label"].eq(product_label)
-    ].copy()
-    leap_output_rows["source_system"] = "LEAP_OUTPUT"
-    area_chart_rows = pd.concat(
-        [area_rows, leap_output_rows, code_expected_rows, comparison_rows, esto_rows],
-        ignore_index=True,
-    )
-    area_figure = build_area_chart(
-        area_chart_rows,
-        {
-            "aggregate_flow_label": flow_label,
-            "source_flow_labels": [flow_label],
-        },
-        series_labels,
-        template,
-        title_prefix=area_chart_title,
-    )
-    trace_meta = list((area_figure.layout.meta or {}).get("trace_meta", []))
-    for index, trace in enumerate(area_figure.data):
-        source_system = (
-            str(trace_meta[index].get("source_system", ""))
-            if index < len(trace_meta) else ""
+    if base_dashboard_bundle_path is None:
+        base_dashboard_bundle_path = (
+            REPO_ROOT / "outputs" / "common_esto_dashboard" / "01AUS"
+            / "chart_bundles" / "refining__charts.js"
         )
-        if source_system == "ESTO" and str(trace.name) == product_label:
-            trace.update(visible=False, showlegend=False)
-        if str(trace.name).startswith("Expected output (transformation settings)"):
-            trace.update(
-                name="Expected output (transformation settings)",
-                line={"dash": "dash", "color": "#8c55b8"},
-            )
-        elif str(trace.name).startswith("9th Target output"):
-            trace.update(name="9th Target output", line={"dash": "dot", "color": "#4f6d7a"})
-        elif str(trace.name).startswith("ESTO historical output"):
-            trace.update(name="ESTO historical output", line={"dash": "solid", "color": "#333333"})
-        elif str(trace.name).startswith("LEAP Target diesel output"):
-            trace.update(name="LEAP Target diesel output", line={"dash": "solid", "color": "#D55E00"})
+    area_figure = _load_dashboard_area_figure(
+        base_dashboard_bundle_path, base_dashboard_chart_key
+    )
+    area_figure.add_trace(go.Scatter(
+        x=code_expected_rows["year"], y=code_expected_rows["value"],
+        mode="lines+markers", name="Expected output (transformation settings)",
+        line={"dash": "dash", "color": "#8c55b8"},
+        hovertemplate="%{x}<br>Expected output: %{y:,.2f} PJ<extra>Transformation settings</extra>",
+    ))
     area_figure.update_layout(
         title=(
             f"{area_chart_title} ({first_year}–{last_year}): {flow_label}"
@@ -316,7 +291,7 @@ def render_refining_shadow_chart_prototype(
         "section_label": review_label,
         "flow_group_label": flow_label,
         "datasets": chart_dataset_tokens_from_figure(area_figure),
-        "total_abs_value": float(area_chart_rows["value"].abs().sum()),
+        "total_abs_value": float(code_expected_rows["value"].abs().sum()),
         "abs_diff": float(comparison_rows["absolute_difference_pj"].max()),
         "pct_diff": float(
             comparison_rows["absolute_percentage_difference"].max()
@@ -333,9 +308,9 @@ def render_refining_shadow_chart_prototype(
         output_path=output_path,
         economy_label=economy,
         page_note=(
-            "Read-only review: stacked areas and total are positive LEAP refinery "
-            "outputs only. The diesel-output lines compare LEAP, pre-seed capacity "
-            "× output share, 9th Target, and ESTO history on the same product basis."
+            "Read-only review: this preserves the normal signed refinery stack, "
+            "ESTO historical total, LEAP Target total, and 9th Target total exactly; "
+            "the purple line is the pre-seed capacity × output-share result."
         ),
         dataset_filter_options=["LEAP", "ESTIMATION_EXPECTATION"],
     )
@@ -350,9 +325,8 @@ def render_refining_shadow_chart_prototype(
                 "product": product_label,
                 "figure_layout": area_figure.to_plotly_json()["layout"],
                 "area_chart_key": area_chart_key,
-                "area_chart_product_count": int(
-                    area_rows["common_product_label"].nunique()
-                ),
+                "base_dashboard_bundle_path": str(base_dashboard_bundle_path),
+                "base_dashboard_chart_key": base_dashboard_chart_key,
             },
             default=str,
             indent=2,
