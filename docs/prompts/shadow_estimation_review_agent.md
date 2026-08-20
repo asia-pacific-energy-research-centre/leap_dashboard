@@ -227,6 +227,12 @@ is not the expected LEAP input. If a closer candidate is found after a review
 has been rendered, regenerate the line from that candidate, retain the former
 stage in the evidence, and report whether the conclusion changed.
 
+Visually verify the start and end years of every expected trace. Do not plot a
+zero merely because an export grid has filled a year outside that scenario's
+valid input period. For example, normal supply `Reference`/`Target` exports
+start in the first projection year, while the base-year actual belongs to
+`Current Accounts`; their expected line must begin at the projection year.
+
 ### 2e. Direct supply-setting class
 
 Classify supply flows separately; they do not share one expected-total rule.

@@ -56,7 +56,9 @@ def _sum_workbook_variable(workbook_path: Path, variable: str, scenario: str, si
     expected = rows.apply(pd.to_numeric, errors="coerce").sum().mul(sign).rename("expected_total").reset_index()
     expected.columns = ["year", "expected_total"]
     expected["year"] = expected["year"].astype(int)
-    return expected.sort_values("year")
+    # Reference/Target supply settings begin in the first projection year.
+    # Their base-year zeros are placeholders, not expected historical results.
+    return expected.loc[expected["year"].ge(2023)].sort_values("year")
 
 
 def _international_bunkers_expected(workbook_path: Path, scenario: str) -> pd.DataFrame:
