@@ -90,7 +90,7 @@ def _load_target_area_rows(
     scenario: str,
     flow_label: str,
 ) -> pd.DataFrame:
-    """Return all mapped LEAP Target fuel rows for a stacked transformation chart."""
+    """Return mapped positive LEAP Target outputs for a stacked fuel chart."""
     source = pd.read_csv(diagnostic_path)
     scoped = source.loc[
         source["economy"].astype(str).eq(economy)
@@ -107,7 +107,7 @@ def _load_target_area_rows(
     scoped["common_flow_label"] = flow_label
     scoped["common_product_code"] = product_parts[0]
     scoped["common_product_label"] = scoped["esto_product"].astype(str)
-    return scoped
+    return scoped.loc[scoped["value"] > 0].copy()
 
 
 def _load_variable_expected_rows(
@@ -230,6 +230,7 @@ def render_refining_shadow_chart_prototype(
     )
     series_labels = {
         "LEAP|Target": "LEAP Target",
+        "LEAP_OUTPUT|Target": "LEAP Target diesel output",
         "ESTIMATION_CODE|Target": "Expected output (transformation settings)",
         "NINTH|Target": "9th Target output",
         "ESTO|Target": "ESTO historical output",
@@ -247,8 +248,13 @@ def render_refining_shadow_chart_prototype(
     first_year = int(comparison_rows["year"].min())
     last_year = int(comparison_rows["year"].max())
     comparison_rows["source_system"] = "NINTH"
+    leap_output_rows = area_rows.loc[
+        area_rows["common_product_label"].eq(product_label)
+    ].copy()
+    leap_output_rows["source_system"] = "LEAP_OUTPUT"
     area_chart_rows = pd.concat(
-        [area_rows, code_expected_rows, comparison_rows, esto_rows], ignore_index=True
+        [area_rows, leap_output_rows, code_expected_rows, comparison_rows, esto_rows],
+        ignore_index=True,
     )
     area_figure = build_area_chart(
         area_chart_rows,
@@ -277,6 +283,8 @@ def render_refining_shadow_chart_prototype(
             trace.update(name="9th Target output", line={"dash": "dot", "color": "#4f6d7a"})
         elif str(trace.name).startswith("ESTO historical output"):
             trace.update(name="ESTO historical output", line={"dash": "solid", "color": "#333333"})
+        elif str(trace.name).startswith("LEAP Target diesel output"):
+            trace.update(name="LEAP Target diesel output", line={"dash": "solid", "color": "#D55E00"})
     area_figure.update_layout(
         title=(
             f"{area_chart_title} ({first_year}–{last_year}): {flow_label}"
@@ -325,9 +333,9 @@ def render_refining_shadow_chart_prototype(
         output_path=output_path,
         economy_label=economy,
         page_note=(
-            "Read-only review: expected output is calculated from pre-seed "
-            "transformation capacity and output-share variables; 9th Target and "
-            "ESTO history are separate references."
+            "Read-only review: stacked areas and total are positive LEAP refinery "
+            "outputs only. The diesel-output lines compare LEAP, pre-seed capacity "
+            "× output share, 9th Target, and ESTO history on the same product basis."
         ),
         dataset_filter_options=["LEAP", "ESTIMATION_EXPECTATION"],
     )
