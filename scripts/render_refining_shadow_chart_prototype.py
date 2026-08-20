@@ -1,9 +1,9 @@
 #%%
-"""Render one shadow-comparison prototype through the production chart builder.
+"""Render a maintained refining diagnostic through the production chart builder.
 
-This is a read-only prototype. It deliberately uses a candidate expected series
-from the published Common ESTO data so the visual can be assessed before the
-upstream expected-output contract is implemented.
+This is a read-only prototype. The expected series comes from the maintained
+baseline-seed balance diagnostic, which already applies the reviewed inclusive
+refinery/own-use comparison boundary.
 """
 
 #%%
@@ -27,87 +27,75 @@ from common_esto_dashboard_renderer import build_product_chart, load_json
 
 
 #%%
-def _load_refining_prototype_rows(
-    comparison_data_path: Path,
+def _load_refining_diagnostic_rows(
+    diagnostic_path: Path,
     economy: str,
-    comparison_scope: str,
     scenario: str,
-    flow_code: str,
-    product_code: str,
-    min_year: int,
-    max_year: int,
+    flow_label: str,
+    product_label: str,
 ) -> pd.DataFrame:
-    """Return LEAP output plus a candidate expected series at one common row.
-
-    ``NINTH`` is renamed to ``SHADOW_EXPECTED`` only for this visual. The
-    planned upstream contract will replace it with a LEAP-boundary-adjusted
-    expected value after validating own-use and aggregation semantics.
-    """
-    columns = [
-        "economy",
-        "comparison_scope",
-        "source_system",
-        "scenario",
-        "year",
-        "common_flow_code",
-        "common_flow_label",
-        "common_product_code",
-        "common_product_label",
-        "value",
-    ]
-    source = pd.read_parquet(comparison_data_path, columns=columns)
+    """Return a safe actual/expectation pair from the diagnostic evidence."""
+    source = pd.read_csv(diagnostic_path)
     scoped = source.loc[
         source["economy"].astype(str).eq(economy)
-        & source["comparison_scope"].astype(str).eq(comparison_scope)
-        & source["common_flow_code"].astype(str).eq(flow_code)
-        & source["common_product_code"].astype(str).eq(product_code)
-        & source["year"].between(min_year, max_year)
+        & source["scenario"].astype(str).eq(scenario)
+        & source["esto_flow"].astype(str).eq(flow_label)
+        & source["esto_product"].astype(str).eq(product_label)
+        & source["source_value_pj"].notna()
+        & source["leap_value_pj"].notna()
+        & source["status"].astype(str).isin({"match", "value_mismatch"})
+        & source["comparison_grain"].astype(str).eq(
+            "canonical_allocated_ninth_to_esto_pair"
+        )
     ].copy()
-    actual = scoped.loc[
-        scoped["source_system"].astype(str).eq("LEAP")
-        & scoped["scenario"].astype(str).eq(scenario)
-    ].copy()
-    expected = scoped.loc[
-        scoped["source_system"].astype(str).eq("NINTH")
-        & scoped["scenario"].astype(str).str.casefold().eq(scenario.casefold())
-    ].copy()
-    expected["source_system"] = "SHADOW_EXPECTED"
-    expected["scenario"] = scenario
+    common_flow_code = flow_label.split(" ", maxsplit=1)[0]
+    common_product_code = product_label.split(" ", maxsplit=1)[0]
+    actual = scoped.assign(
+        source_system="LEAP",
+        value=scoped["leap_value_pj"],
+        common_flow_code=common_flow_code,
+        common_flow_label=flow_label,
+        common_product_code=common_product_code,
+        common_product_label=product_label,
+    )
+    expected = scoped.assign(
+        source_system="ESTIMATION_EXPECTATION",
+        value=scoped["source_value_pj"],
+        common_flow_code=common_flow_code,
+        common_flow_label=flow_label,
+        common_product_code=common_product_code,
+        common_product_label=product_label,
+    )
     result = pd.concat([actual, expected], ignore_index=True)
     if result.empty:
-        raise ValueError("No actual/expected prototype rows matched the selected refining case.")
+        raise ValueError(
+            "No safe actual/expected rows matched the selected refining case. "
+            "Run the maintained diagnostic first, or select a supported boundary."
+        )
     return result
 
 
 def render_refining_shadow_chart_prototype(
-    comparison_data_path: Path,
+    diagnostic_path: Path,
     output_html_path: Path,
     template_path: Path,
     economy: str = "01_AUS",
-    comparison_scope: str = "esto_extended_leap_ninth",
     scenario: str = "Target",
-    flow_code: str = "09.07",
-    product_code: str = "07.07",
-    min_year: int = 2022,
-    max_year: int = 2030,
+    flow_label: str = "09.07 Oil refineries (including own use)",
+    product_label: str = "07.07 Gas/diesel oil",
 ) -> Path:
-    """Render a production-style refining shadow chart to a standalone HTML file."""
+    """Render a production-style refining diagnostic to a standalone HTML file."""
     template = load_json(template_path)
-    rows = _load_refining_prototype_rows(
-        comparison_data_path=comparison_data_path,
+    rows = _load_refining_diagnostic_rows(
+        diagnostic_path=diagnostic_path,
         economy=economy,
-        comparison_scope=comparison_scope,
         scenario=scenario,
-        flow_code=flow_code,
-        product_code=product_code,
-        min_year=min_year,
-        max_year=max_year,
+        flow_label=flow_label,
+        product_label=product_label,
     )
-    flow_label = str(rows["common_flow_label"].iloc[0])
-    product_label = str(rows["common_product_label"].iloc[0])
     series_labels = {
         "LEAP|Target": "LEAP Target (actual output)",
-        "SHADOW_EXPECTED|Target": "Expected LEAP boundary (candidate)",
+        "ESTIMATION_EXPECTATION|Target": "Estimated expectation (reviewed boundary)",
     }
     figure = build_product_chart(
         rows,
@@ -120,13 +108,13 @@ def render_refining_shadow_chart_prototype(
         base_year=int(template["chart_generation"]["base_year"]),
     )
     for trace in figure.data:
-        if str(trace.name).startswith("Expected LEAP boundary"):
+        if str(trace.name).startswith("Estimated expectation"):
             trace.update(line={"dash": "dash", "color": "#8c55b8"})
     figure.update_layout(
         title=f"Shadow comparison prototype: {flow_label} — {product_label}",
         meta={
             **dict(figure.layout.meta or {}),
-            "prototype_status": "candidate_expected_series_not_yet_boundary_validated",
+            "prototype_status": "diagnostic_expected_series_reviewed_boundary",
         },
     )
     output_html_path.parent.mkdir(parents=True, exist_ok=True)
@@ -143,19 +131,20 @@ def render_refining_shadow_chart_prototype(
 
 #%%
 RUN_PROTOTYPE = False
-COMPARISON_DATA_PATH = (
+DIAGNOSTIC_PATH = (
     REPO_ROOT.parent
-    / "leap_mappings"
-    / "results"
-    / "common_esto"
-    / "common_esto_comparison_data.parquet"
+    / "leap_initialisation"
+    / "outputs"
+    / "diagnostics"
+    / "ah72_investigation_20260818"
+    / "leap_balance_source_differences.csv"
 )
 TEMPLATE_PATH = REPO_ROOT / "config" / "common_esto_dashboard" / "common_esto_dashboard_template.json"
 OUTPUT_HTML_PATH = REPO_ROOT / "outputs" / "prototypes" / "refining_shadow_comparison.html"
 
 if RUN_PROTOTYPE:
     RESULT_PATH = render_refining_shadow_chart_prototype(
-        comparison_data_path=COMPARISON_DATA_PATH,
+        diagnostic_path=DIAGNOSTIC_PATH,
         output_html_path=OUTPUT_HTML_PATH,
         template_path=TEMPLATE_PATH,
     )

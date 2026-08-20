@@ -64,6 +64,19 @@ for example, `09.07 Oil refineries (including own use)` by one product or
 
 Do not begin from an entire dashboard or an all-economy difference scan.
 
+### 1a. Start from a maintained comparison when one exists
+
+Before reconstructing a method manually, search for the relevant output of
+`run_baseline_seed_balance_diagnostics`. It is the preferred first test because
+it already converts the selected LEAP balance export, applies canonical 9th
+projection comparators, records cardinality, and knows reviewed boundary
+adjustments. A bespoke reconstruction is only justified when that diagnostic
+cannot express the method question.
+
+Record whether the selected evidence is current for the export. An older
+diagnostic can demonstrate an investigation pattern but cannot establish the
+state of a newer LEAP area.
+
 ### 2. Establish the comparison boundary
 
 Resolve the expected and observed series onto the same declared Common ESTO
@@ -176,3 +189,33 @@ Completion of an investigation is an evidence-backed review result, not a
 new permanent data pipeline. Move this prompt into `docs/archive/` only after
 the capability is implemented, tested, committed, and superseded by an
 operational guide.
+
+## Case ledger: Australia refining, first live test
+
+**Question:** Does the `01_AUS` Target balance export reproduce the expected
+refinery product outputs at the inclusive refinery boundary?
+
+**Current evidence:**
+
+- Balance export: `data/leap balances exports/01_AUS/AUS TGT 1808 daniel.xlsx`.
+- Maintained diagnostic: `outputs/diagnostics/ah72_investigation_20260818/`
+  `leap_balance_source_differences.csv` in `leap_initialisation`.
+- Safe boundary: `09.07 Oil refineries (including own use)`, not bare
+  `09.07 Oil refineries`; the former is the reviewed refinery transformation
+  plus own-use comparison boundary.
+- First usable projected comparison: 2023 Target. Its refinery output rows
+  use `canonical_allocated_ninth_to_esto_pair`, so the selected 9th projection
+  has a documented comparison route rather than an ad hoc dashboard split.
+
+The maintained 2023 diagnostic shows a common direction across refinery
+outputs: for example motor gasoline is `-8.969 PJ` (`-4.812%`) and gas/diesel
+oil is `-7.863 PJ` (`-4.812%`) versus the projected expectation. Crude-oil and
+refinery-feedstock inputs are much closer (about `-0.062%`). This is a
+material, reviewable pattern; it is not yet proof of an estimation or LEAP
+defect. The agent must next trace the Target oil-refining process record,
+capacity/output-share expressions, and the selected export's provenance before
+assigning an owner.
+
+Natural gas and electricity rows are not chart-safe in this case because the
+selected diagnostic has no source comparator for them. They must remain
+withheld rather than drawn as zero-valued expected series.
