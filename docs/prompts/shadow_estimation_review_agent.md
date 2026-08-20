@@ -152,6 +152,18 @@ unresolved subtotal allocation has no safe single expected-net line: retain
 the normal dashboard stack and write `unclassified_process_accounting` in the
 evidence instead.
 
+An interim or capacity-constrained module may instead be **endogenously
+dispatched**: `Exogenous Capacity` is an upper bound, not an instruction to
+produce that amount. Evidence can include zero Historical Production and no
+nonzero output trade target. For that class, do not call the difference between
+capacity and realised LEAP output an error, and do not label capacity as
+`Expected output`. Check that realised activity is within capacity and validate
+the conditional process response instead (for example, realised output minus
+realised output divided by the emitted efficiency, with the emitted feedstock
+shares). Render a clearly labelled capacity-envelope line only when useful;
+retain the 9th source trajectory as a separate comparator, not as a failed
+LEAP dispatch target.
+
 This classification is required separately for every economy, scenario, run,
 and process boundary. Named rules in the case ledger below are examples, not
 defaults for other transformation cases.
@@ -391,3 +403,20 @@ and its expected/observed output matches closely across the full horizon. It
 is an `audit_pass` design example, not a mismatch alert. The selected
 projection diagnostic supplied 9th Outlook values, but no maintained ESTO
 hydrogen comparator; therefore no ESTO line is drawn.
+
+## Case ledger: Australia electricity interim, capacity-dispatch check
+
+`Electricity interim` is not an output-target process. In the audited Target
+workbook it has zero Historical Production and zero output trade targets, while
+its 2023 Exogenous Capacity is `950.707 PJ`; that value is a capacity ceiling.
+LEAP realises `913.059 PJ` of electricity (`96.0%` utilisation), and the
+emitted 2023 efficiency (`45.539%`) gives a conditional expected net of
+`913.059 - 913.059 / 0.45539 = -1091.935 PJ`, matching the dashboard LEAP
+Target net (`-1091.935 PJ`, rounding only). The 9th source net is
+`-1116.741 PJ`: it remains a source-trajectory comparator, but its difference
+from realised LEAP dispatch is not by itself an interim-model defect.
+
+For this class, a shadow chart may show the normal LEAP fuel stack and total,
+the 9th total, and a capacity-envelope line. It must not represent the capacity
+line as a code-expected realised output or create a circular “expected” line
+from LEAP activity without labelling it as a conditional response check.
