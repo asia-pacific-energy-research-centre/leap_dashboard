@@ -227,6 +227,23 @@ is not the expected LEAP input. If a closer candidate is found after a review
 has been rendered, regenerate the line from that candidate, retain the former
 stage in the evidence, and report whether the conclusion changed.
 
+### 2e. Direct supply-setting class
+
+Classify supply flows separately; they do not share one expected-total rule.
+For the normal baseline seed, `Resources Exports` are direct emitted settings
+and can form an expected export total after converting to the dashboard's
+negative export sign. International aviation/marine bunkers are direct demand
+requirements: reconstruct their signed supply value from the emitted
+`All demand aggregated/International transport` fuel leaves.
+
+Do not draw an expected production line from `Maximum Production`: it is a
+ceiling, not realised production. Do not draw an expected import line from the
+seeded zero Imports rows: imports are deliberately calculated by LEAP as the
+balancing residual. Record both as withheld classifications. An export gap must
+be retained for diagnosis; first compare the exact resources/fuel set written
+by code with the dashboard's mapped export boundary before treating it as a
+LEAP behaviour issue.
+
 ### 3. Reconstruct a temporary expectation
 
 Run the method described in the source workflow using only the declared seed,
@@ -492,3 +509,16 @@ Use` branches. With both included, it also matches the LEAP stack within
 comparison is retained as a workflow guardrail: a label containing
 `including non-energy` must cause the agent to inspect the component mapping
 before reporting a code-to-LEAP difference.
+
+## Case ledger: Australia Supply, direct-setting review
+
+The Target supply review uses the emitted `Resources Exports` rows from
+`SEED_AUS_CONSOLIDATED_20260820_R2` as the closest durable code-stage export
+value, with the sign reversed for the dashboard export convention. It uses the
+emitted `All demand aggregated/International transport` Activity Level × Final
+Energy Intensity fuel leaves for bunkers. The bunker reconstruction matches the
+LEAP stack to floating-point precision. The export reconstruction has a maximum
+gap of `5056.604 PJ`; retain it as `source_to_dashboard_export_boundary_review`
+until the exact resource/fuel coverage of the seed and dashboard result is
+reconciled. Production and imports are deliberately withheld because Maximum
+Production is a ceiling and imports are LEAP-calculated residuals.
