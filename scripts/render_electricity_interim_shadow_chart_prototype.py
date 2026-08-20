@@ -94,21 +94,14 @@ def render_electricity_interim_shadow_chart_prototype(
         raise ValueError("Electricity interim conditional response does not reproduce LEAP net.")
 
     figure.add_trace(go.Scatter(
-        x=settings["year"], y=settings["capacity"], mode="lines+markers",
-        name="Code capacity envelope (not output target)",
-        line={"dash": "dash", "color": "#8c55b8", "width": 4}, marker={"size": 8, "symbol": "diamond"},
-        hovertemplate="%{x}<br>Code capacity envelope: %{y:,.2f} PJ<extra>Interim settings</extra>",
-    ))
-    figure.add_trace(go.Scatter(
         x=settings["year"], y=settings["conditional_net"], mode="lines",
-        name="Conditional net at realised activity",
-        line={"dash": "dot", "color": "#258f87", "width": 3},
-        hovertemplate="%{x}<br>Conditional net: %{y:,.2f} PJ<extra>Efficiency response check</extra>",
+        name="Expected total (code settings)",
+        line={"dash": "dash", "color": "#8c55b8", "width": 4},
+        hovertemplate="%{x}<br>Expected total: %{y:,.2f} PJ<extra>Code settings</extra>",
     ))
     meta = dict(figure.layout.meta or {})
     meta["trace_meta"] = list(meta.get("trace_meta", [])) + [
-        {"source_system": "ESTIMATION_CAPACITY_ENVELOPE", "tag": "tgt", "metric": "both", "active_visible": True},
-        {"source_system": "ESTIMATION_CONDITIONAL_RESPONSE", "tag": "tgt", "metric": "both", "active_visible": True},
+        {"source_system": "ESTIMATION_CODE_EXPECTATION", "tag": "tgt", "metric": "both", "active_visible": True},
     ]
     figure.update_layout(meta=meta, title="LEAP Target stack, 9th trajectory, and interim capacity-dispatch review")
 
@@ -123,8 +116,8 @@ def render_electricity_interim_shadow_chart_prototype(
         page_config={"page_key": review_key, "page_label": "Electricity interim shadow review"},
         chart_rows=[{"chart_key": output_chart_key, "chart_type": "stacked_area", "title": figure.layout.title.text, "product_label": "All transformation fuels", "section_label": "Electricity interim shadow review", "flow_group_label": "09.01.01,09.02.01 Electricity plants — capacity-dispatched", "datasets": chart_dataset_tokens_from_figure(figure), "total_abs_value": 0.0, "abs_diff": float(projected["response_gap"].abs().max()), "pct_diff": 0.0}],
         bundle_js_name=f"{bundle_name}.js", output_path=output_path, economy_label=economy,
-        page_note="Read-only capacity-dispatch review: Exogenous Capacity is an upper envelope, not an expected realised output. The dotted conditional-net line validates the emitted efficiency against LEAP's realised activity; the 9th line remains a source trajectory.",
-        dataset_filter_options=["LEAP", "ESTIMATION_CAPACITY_ENVELOPE", "ESTIMATION_CONDITIONAL_RESPONSE"],
+        page_note="Read-only review: the purple expected-total line applies the emitted code settings to realised interim activity. The 9th line remains a separate source trajectory.",
+        dataset_filter_options=["LEAP", "ESTIMATION_CODE_EXPECTATION"],
     )
     (layout["supporting"] / "shadow_chart_manifest.json").write_text(json.dumps({"review_key": review_key, "workbook_path": str(workbook_path), "bundle_path": str(bundle_path), "classification": "capacity_dispatched", "max_projected_utilisation": float(projected["capacity_utilisation"].max()), "max_conditional_response_gap_pj": float(projected["response_gap"].abs().max())}, indent=2), encoding="utf-8")
     return output_path
