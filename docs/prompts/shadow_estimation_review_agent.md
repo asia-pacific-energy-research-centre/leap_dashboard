@@ -127,6 +127,35 @@ fuel use. Only after that passes may the agent compare the same reconstructed
 net with LEAP. If either reconciliation fails, withhold the expected-net line
 and render component evidence only.
 
+### 2b. Classify the process accounting before selecting a formula
+
+Do not transfer a formula from one transformation module to another merely
+because both have capacity, efficiency, output-share, or auxiliary-use
+variables. Before calculating an expected net, inspect the active workflow,
+the selected export, and the Common ESTO mappings, then record a small
+classification table for each process or aggregate card:
+
+```text
+process/card, mapped source boundary, capacity basis, output ownership,
+own-use owner, auxiliary denominator, expected-net formula, evidence paths
+```
+
+The classification must establish whether capacity is gross process output,
+deliverable output, or absent/endogenous; whether an auxiliary fuel is supplied
+from the same process output, another transformation module, or a demand/loss
+proxy; and whether the auxiliary-use variable is a fraction, percentage, or
+direct per-unit ratio. Use the formula supported by those facts only. For
+example, a gross-capacity process can use output minus feedstock minus its
+process-owned auxiliary use, while a deliverable-capacity process may require
+a gross-up. A parent card which combines children with different ownership or
+unresolved subtotal allocation has no safe single expected-net line: retain
+the normal dashboard stack and write `unclassified_process_accounting` in the
+evidence instead.
+
+This classification is required separately for every economy, scenario, run,
+and process boundary. Named rules in the case ledger below are examples, not
+defaults for other transformation cases.
+
 ### 3. Reconstruct a temporary expectation
 
 Run the method described in the source workflow using only the declared seed,
@@ -294,10 +323,12 @@ Natural gas and electricity rows are not chart-safe in this case because the
 selected diagnostic has no source comparator for them. They must remain
 withheld rather than drawn as zero-valued expected series.
 
-### Recorded lessons and non-negotiable refinery guardrails
+### Recorded refinery lessons (case-specific example)
 
-The first implementation made three errors. These are retained as workflow
-guardrails rather than treated as one-off prototype details:
+The first implementation made three errors. These are retained as refinery
+guardrails rather than treated as one-off prototype details. They apply only
+after the classification above proves the same refinery accounting boundary;
+they are not a universal transformation formula:
 
 1. **Do not begin by blaming LEAP.** When process variables are derived from
    the mapped 9th projection, first reconcile the code-variable net against
