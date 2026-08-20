@@ -187,6 +187,56 @@ def _load_variable_expected_use_rows(
     return result
 
 
+def _load_variable_expected_net_rows(
+    transformation_workbook_path: Path, flow_label: str, product_label: str,
+    economy: str, scenario: str,
+) -> pd.DataFrame:
+    """Reconstruct the signed LEAP transformation total from code variables."""
+    workbook = pd.read_excel(transformation_workbook_path, header=2)
+    process_path = "Transformation\\Oil Refining\\Processes\\Oil Refining"
+    capacity = workbook.loc[
+        workbook["Branch Path"].astype(str).eq(process_path)
+        & workbook["Variable"].astype(str).eq("Exogenous Capacity")
+        & workbook["Scenario"].astype(str).eq(scenario)
+    ].iloc[0]
+    efficiency = workbook.loc[
+        workbook["Branch Path"].astype(str).eq(process_path)
+        & workbook["Variable"].astype(str).eq("Process Efficiency")
+        & workbook["Scenario"].astype(str).eq(scenario)
+    ].iloc[0]
+    output_shares = workbook.loc[
+        workbook["Branch Path"].astype(str).str.startswith("Transformation\\Oil Refining\\Output Fuels\\")
+        & workbook["Variable"].astype(str).eq("Output Share")
+        & workbook["Scenario"].astype(str).eq(scenario)
+    ]
+    auxiliary = workbook.loc[
+        workbook["Branch Path"].astype(str).str.startswith(process_path + "\\Auxiliary Fuels\\")
+        & workbook["Variable"].astype(str).eq("Auxiliary Fuel Use")
+        & workbook["Scenario"].astype(str).eq(scenario)
+    ]
+    values = []
+    for column in [col for col in workbook.columns if str(col).isdigit()]:
+        capacity_value = pd.to_numeric(capacity[column], errors="coerce")
+        efficiency_value = pd.to_numeric(efficiency[column], errors="coerce")
+        share_total = pd.to_numeric(output_shares[column], errors="coerce").fillna(0.0).sum()
+        auxiliary_ratio_total = pd.to_numeric(auxiliary[column], errors="coerce").fillna(0.0).sum()
+        if pd.isna(capacity_value) or pd.isna(efficiency_value) or efficiency_value == 0:
+            continue
+        gross_output = capacity_value * (share_total / 100.0 if share_total > 1 else share_total)
+        feedstock_input = -gross_output / (efficiency_value / 100.0 if efficiency_value > 1 else efficiency_value)
+        auxiliary_use = -gross_output * auxiliary_ratio_total
+        values.append({"year": int(column), "value": gross_output + feedstock_input + auxiliary_use})
+    result = pd.DataFrame(values)
+    result["source_system"] = "ESTIMATION_CODE_NET"
+    result["scenario"] = scenario
+    result["economy"] = economy
+    result["common_flow_code"] = flow_label.split(" ", maxsplit=1)[0]
+    result["common_flow_label"] = flow_label
+    result["common_product_code"] = product_label.split(" ", maxsplit=1)[0]
+    result["common_product_label"] = product_label
+    return result
+
+
 def _load_esto_history_rows(
     esto_data_path: Path, flow_label: str, product_label: str, economy: str, scenario: str
 ) -> pd.DataFrame:
@@ -268,6 +318,9 @@ def render_refining_shadow_chart_prototype(
     code_expected_use_rows = _load_variable_expected_use_rows(
         transformation_workbook_path, flow_label, product_label, economy, scenario
     )
+    code_expected_net_rows = _load_variable_expected_net_rows(
+        transformation_workbook_path, flow_label, product_label, economy, scenario
+    )
     esto_rows = _load_esto_history_rows(
         esto_data_path, flow_label, product_label, economy, scenario,
     )
@@ -292,11 +345,11 @@ def render_refining_shadow_chart_prototype(
         base_dashboard_bundle_path, base_dashboard_chart_key
     )
     area_figure.add_trace(go.Scatter(
-        x=code_expected_rows["year"], y=code_expected_rows["value"],
-        mode="lines+markers", name="Expected output (transformation settings)",
+        x=code_expected_net_rows["year"], y=code_expected_net_rows["value"],
+        mode="lines+markers", name="Expected net total (transformation settings)",
         line={"dash": "dash", "color": "#8c55b8", "width": 4},
         marker={"size": 9, "symbol": "diamond"},
-        hovertemplate="%{x}<br>Expected output: %{y:,.2f} PJ<extra>Transformation settings</extra>",
+        hovertemplate="%{x}<br>Expected net total: %{y:,.2f} PJ<extra>Transformation settings</extra>",
     ))
     area_figure.add_trace(go.Scatter(
         x=code_expected_use_rows["year"], y=code_expected_use_rows["value"],
@@ -361,8 +414,8 @@ def render_refining_shadow_chart_prototype(
         page_note=(
             "Read-only review: this preserves the normal signed refinery stack, "
             "ESTO historical total, LEAP Target total, and 9th Target total exactly; "
-            "the purple line is the pre-seed capacity × output-share result and the "
-            "brown dashed line is expected auxiliary own use from the same settings."
+            "the purple line is the code-derived signed net total (gross output, "
+            "feedstock input, and own use); the brown dashed line is its own-use component."
         ),
         dataset_filter_options=["LEAP", "ESTIMATION_EXPECTATION"],
     )
