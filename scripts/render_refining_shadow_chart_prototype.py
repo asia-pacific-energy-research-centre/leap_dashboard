@@ -110,6 +110,78 @@ def _load_target_area_rows(
     return scoped
 
 
+def _load_variable_expected_rows(
+    transformation_workbook_path: Path,
+    product_label: str,
+    output_fuel_label: str,
+    flow_label: str,
+    economy: str,
+    scenario: str,
+) -> pd.DataFrame:
+    """Derive expected output from the pre-seed capacity and output-share variables."""
+    workbook = pd.read_excel(transformation_workbook_path, header=2)
+    process_path = "Transformation\\Oil Refining\\Processes\\Oil Refining"
+    capacity = workbook.loc[
+        workbook["Branch Path"].astype(str).eq(process_path)
+        & workbook["Variable"].astype(str).eq("Exogenous Capacity")
+        & workbook["Scenario"].astype(str).eq(scenario)
+    ].iloc[0]
+    share = workbook.loc[
+        workbook["Branch Path"].astype(str).eq(
+            f"Transformation\\Oil Refining\\Output Fuels\\{output_fuel_label}"
+        )
+        & workbook["Variable"].astype(str).eq("Output Share")
+        & workbook["Scenario"].astype(str).eq(scenario)
+    ].iloc[0]
+    year_columns = [column for column in workbook.columns if str(column).isdigit()]
+    values = []
+    for column in year_columns:
+        capacity_value = pd.to_numeric(capacity[column], errors="coerce")
+        share_value = pd.to_numeric(share[column], errors="coerce")
+        if pd.isna(capacity_value) or pd.isna(share_value):
+            continue
+        share_fraction = share_value / 100.0 if abs(share_value) > 1 else share_value
+        values.append({"year": int(column), "value": capacity_value * share_fraction})
+    result = pd.DataFrame(values)
+    result["source_system"] = "ESTIMATION_CODE"
+    result["scenario"] = scenario
+    result["economy"] = economy
+    result["common_flow_code"] = flow_label.split(" ", maxsplit=1)[0]
+    result["common_flow_label"] = flow_label
+    result["common_product_code"] = product_label.split(" ", maxsplit=1)[0]
+    result["common_product_label"] = product_label
+    return result
+
+
+def _load_esto_history_rows(
+    esto_data_path: Path, flow_label: str, product_label: str, economy: str, scenario: str
+) -> pd.DataFrame:
+    """Load the historical source amount without inventing a projection comparator."""
+    source = pd.read_csv(esto_data_path)
+    esto_economy = economy.replace("_", "")
+    selected = source.loc[
+        source["economy"].astype(str).eq(esto_economy)
+        & source["flows"].astype(str).eq("09.07 Oil refineries")
+        & source["products"].astype(str).eq(product_label)
+    ]
+    if selected.empty:
+        return pd.DataFrame()
+    row = selected.iloc[0]
+    values = [
+        {"year": int(column), "value": pd.to_numeric(row[column], errors="coerce")}
+        for column in source.columns if str(column).isdigit() and pd.notna(row[column])
+    ]
+    result = pd.DataFrame(values)
+    result["source_system"] = "ESTO"
+    result["scenario"] = scenario
+    result["economy"] = economy
+    result["common_flow_code"] = flow_label.split(" ", maxsplit=1)[0]
+    result["common_flow_label"] = flow_label
+    result["common_product_code"] = product_label.split(" ", maxsplit=1)[0]
+    result["common_product_label"] = product_label
+    return result
+
+
 def render_refining_shadow_chart_prototype(
     diagnostic_path: Path,
     output_root: Path,
@@ -120,7 +192,10 @@ def render_refining_shadow_chart_prototype(
     product_label: str = "07.07 Gas/diesel oil",
     review_key: str = "refining_shadow_review",
     review_label: str = "Refining shadow review",
-    area_chart_title: str = "LEAP Target fuels and expected output",
+    area_chart_title: str = "LEAP Target fuels, code expectation, and source references",
+    transformation_workbook_path: Path | None = None,
+    esto_data_path: Path | None = None,
+    output_fuel_label: str = "Gas and diesel oil",
 ) -> Path:
     """Render a production-style refining diagnostic through page/bundle writers."""
     template = load_json(template_path)
@@ -137,9 +212,27 @@ def render_refining_shadow_chart_prototype(
         scenario=scenario,
         flow_label=flow_label,
     )
+    if transformation_workbook_path is None:
+        transformation_workbook_path = (
+            REPO_ROOT.parent / "leap_initialisation" / "outputs" / "leap_exports"
+            / "supply_reconciliation" / "baseline_seed" / "runs"
+            / "SEED_AUS_CONSOLIDATED_20260820" / "workbooks"
+            / "transformation_leap_imports_01_AUS_Target.xlsx"
+        )
+    if esto_data_path is None:
+        esto_data_path = REPO_ROOT.parent / "leap_initialisation" / "data" / "00APEC_2024_low_with_subtotals.csv"
+    code_expected_rows = _load_variable_expected_rows(
+        transformation_workbook_path, product_label, output_fuel_label,
+        flow_label, economy, scenario,
+    )
+    esto_rows = _load_esto_history_rows(
+        esto_data_path, flow_label, product_label, economy, scenario,
+    )
     series_labels = {
         "LEAP|Target": "LEAP Target",
-        "NINTH|Target": "Expected output (9th Outlook)",
+        "ESTIMATION_CODE|Target": "Expected output (transformation settings)",
+        "NINTH|Target": "9th Target output",
+        "ESTO|Target": "ESTO historical output",
     }
     comparison_rows = rows.loc[
         rows["source_system"].eq("ESTIMATION_EXPECTATION")
@@ -154,7 +247,9 @@ def render_refining_shadow_chart_prototype(
     first_year = int(comparison_rows["year"].min())
     last_year = int(comparison_rows["year"].max())
     comparison_rows["source_system"] = "NINTH"
-    area_chart_rows = pd.concat([area_rows, comparison_rows], ignore_index=True)
+    area_chart_rows = pd.concat(
+        [area_rows, code_expected_rows, comparison_rows, esto_rows], ignore_index=True
+    )
     area_figure = build_area_chart(
         area_chart_rows,
         {
@@ -165,20 +260,31 @@ def render_refining_shadow_chart_prototype(
         template,
         title_prefix=area_chart_title,
     )
-    for trace in area_figure.data:
-        if str(trace.name).startswith("Expected output (9th Outlook)"):
+    trace_meta = list((area_figure.layout.meta or {}).get("trace_meta", []))
+    for index, trace in enumerate(area_figure.data):
+        source_system = (
+            str(trace_meta[index].get("source_system", ""))
+            if index < len(trace_meta) else ""
+        )
+        if source_system == "ESTO" and str(trace.name) == product_label:
+            trace.update(visible=False, showlegend=False)
+        if str(trace.name).startswith("Expected output (transformation settings)"):
             trace.update(
-                name="Expected output (9th Outlook)",
+                name="Expected output (transformation settings)",
                 line={"dash": "dash", "color": "#8c55b8"},
             )
+        elif str(trace.name).startswith("9th Target output"):
+            trace.update(name="9th Target output", line={"dash": "dot", "color": "#4f6d7a"})
+        elif str(trace.name).startswith("ESTO historical output"):
+            trace.update(name="ESTO historical output", line={"dash": "solid", "color": "#333333"})
     area_figure.update_layout(
         title=(
             f"{area_chart_title} ({first_year}–{last_year}): {flow_label}"
         ),
         meta={
             **dict(area_figure.layout.meta or {}),
-            "prototype_status": "diagnostic_expected_series_reviewed_boundary",
-            "expected_output_source": "9th Outlook",
+            "prototype_status": "pre_seed_variable_expected_output_review",
+            "expected_output_source": "transformation workbook capacity times output share",
         },
     )
     layout = {
@@ -219,8 +325,9 @@ def render_refining_shadow_chart_prototype(
         output_path=output_path,
         economy_label=economy,
         page_note=(
-            "Read-only review: the expected-output line is the maintained "
-            f"9th Outlook comparator at this boundary ({first_year}–{last_year})."
+            "Read-only review: expected output is calculated from pre-seed "
+            "transformation capacity and output-share variables; 9th Target and "
+            "ESTO history are separate references."
         ),
         dataset_filter_options=["LEAP", "ESTIMATION_EXPECTATION"],
     )
@@ -229,6 +336,8 @@ def render_refining_shadow_chart_prototype(
             {
                 "review_key": review_key,
                 "diagnostic_path": str(diagnostic_path),
+                "transformation_workbook_path": str(transformation_workbook_path),
+                "esto_data_path": str(esto_data_path),
                 "boundary": flow_label,
                 "product": product_label,
                 "figure_layout": area_figure.to_plotly_json()["layout"],

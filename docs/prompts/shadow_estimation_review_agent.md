@@ -68,14 +68,14 @@ for example, `09.07 Oil refineries (including own use)` by one product or
 
 Do not begin from an entire dashboard or an all-economy difference scan.
 
-### 1a. Start from a maintained comparison when one exists
+### 1a. Separate the code-variable expectation from downstream comparators
 
-Before reconstructing a method manually, search for the relevant output of
-`run_baseline_seed_balance_diagnostics`. It is the preferred first test because
-it already converts the selected LEAP balance export, applies canonical 9th
-projection comparators, records cardinality, and knows reviewed boundary
-adjustments. A bespoke reconstruction is only justified when that diagnostic
-cannot express the method question.
+First locate the active estimation workflow's own emitted variables or process
+records. For a transformation process this can mean pre-seed capacity, output
+share, efficiency, and auxiliary-use variables; derive the expected output
+from those variables before workbook/seed assembly. The balance diagnostic is
+still required for the observed LEAP stack and a canonical 9th comparator, but
+it is not a substitute for the code-variable expectation.
 
 Record whether the selected evidence is current for the export. An older
 diagnostic can demonstrate an investigation pattern but cannot establish the
@@ -159,9 +159,11 @@ LEAP rows into the same production chart builder that owns the ordinary chart:
 - use one composite stacked-area chart for a transformation boundary whenever
   a fuel mix is useful: LEAP Target fuel areas, the builder's LEAP Target net
   total, and one restrained dashed expected-output line;
-- derive the expected-line label from its actual provenance. For example, a
-  9th Outlook comparator becomes `Expected output (9th Outlook)`. Do not add
-  a duplicate `9th Outlook` line when it is the expectation itself;
+- derive the expected-line label from its actual provenance. When the active
+  workflow emits capacity/output-share variables, label their result
+  `Expected output (transformation settings)` and retain the 9th Target line
+  separately; use `Expected output (9th Outlook)` only when 9th is genuinely
+  the direct method input and no code-variable expectation exists;
 - include an ESTO historical line only when the maintained comparison supplies
   an ESTO value at the same boundary. Never add a zero or reconstructed ESTO
   point merely to complete the visual;
@@ -269,10 +271,11 @@ withheld rather than drawn as zero-valued expected series.
 The first live review was extended to all 38 available Target projection years
 (`2023`–`2060`) from `AUS TGT 1808 daniel.xlsx`. The isolated refinery review
 uses one composite dashboard chart: all mapped LEAP Target refinery fuels as
-stacked areas, the LEAP Target total, and `Expected output (9th Outlook)` for
-gas/diesel output. The 9th Outlook is the expected-output provenance, so it is
-not duplicated as a second line. Natural gas and electricity remain actual
-stack categories only because the selected output expectation is gas/diesel.
+stacked areas, the LEAP Target total, `Expected output (transformation
+settings)` derived from the pre-seed Exogenous Capacity × Output Share
+variables, a separate 9th Target output line, and an ESTO historical-output
+line. Natural gas and electricity remain actual stack categories only because
+the selected output expectation is gas/diesel.
 
 The same contract was tested on `09.13 Hydrogen transformation` →
 `16.12 Hydrogen`. Its mapped LEAP stack contains ammonia, e-fuel, and hydrogen
