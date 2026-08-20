@@ -157,12 +157,16 @@ dispatched**: `Exogenous Capacity` is an upper bound, not an instruction to
 produce that amount. Evidence can include zero Historical Production and no
 nonzero output trade target. For that class, do not call the difference between
 capacity and realised LEAP output an error, and do not label capacity as
-`Expected output`. Check that realised activity is within capacity and validate
-the conditional process response instead (for example, realised output minus
-realised output divided by the emitted efficiency, with the emitted feedstock
-shares). Render a clearly labelled capacity-envelope line only when useful;
-retain the 9th source trajectory as a separate comparator, not as a failed
-LEAP dispatch target.
+`Expected output`. Check that realised activity is within capacity and derive
+one expected total from the emitted conversion settings at that activity (for
+example, realised output minus realised output divided by the emitted
+efficiency, with the emitted feedstock shares). In the chart, call this simply
+`Expected total (code settings)`; its evidence must state that activity is
+LEAP-realised, so it is a settings-response check rather than an independent
+dispatch forecast. Do not draw a capacity-envelope line by default: add one
+only when the review question is specifically about utilisation or a binding
+capacity constraint. Retain the 9th source trajectory as a separate comparator,
+not as a failed LEAP dispatch target.
 
 This classification is required separately for every economy, scenario, run,
 and process boundary. Named rules in the case ledger below are examples, not
@@ -416,7 +420,11 @@ Target net (`-1091.935 PJ`, rounding only). The 9th source net is
 `-1116.741 PJ`: it remains a source-trajectory comparator, but its difference
 from realised LEAP dispatch is not by itself an interim-model defect.
 
-For this class, a shadow chart may show the normal LEAP fuel stack and total,
-the 9th total, and a capacity-envelope line. It must not represent the capacity
-line as a code-expected realised output or create a circular “expected” line
-from LEAP activity without labelling it as a conditional response check.
+For this class, the shadow chart shows the normal LEAP fuel stack and total,
+the 9th total, and one purple `Expected total (code settings)` line. It is
+calculated using realised LEAP activity and the emitted conversion settings,
+which is recorded in the evidence as a settings-response check. A separate
+capacity-envelope line is omitted because it does not improve the output
+comparison; it may be added only for a review explicitly about utilisation or
+binding capacity. The visual label stays plain, while the evidence preserves
+the methodological distinction.
