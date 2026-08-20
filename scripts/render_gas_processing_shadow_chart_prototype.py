@@ -2,9 +2,9 @@
 """Render a dashboard-native gas-processing shadow review from active variables.
 
 This read-only prototype deliberately classifies each dashboard card before
-adding an expected-net line. Only AUS Gas works is currently process-resolved:
-the 09.06 and liquefaction/regasification parent cards retain their ordinary
-dashboard figures until their mixed source and own-use boundaries are proved.
+adding an expected-net line. AUS Gas works is process-owned auxiliary use,
+while LNG own use is emitted by Demand\\Other loss and own use and is added
+back to the inclusive gas-processing boundaries.
 """
 
 #%%
@@ -111,6 +111,30 @@ def _gas_works_expected_net(workbook_path: Path, scenario: str) -> pd.DataFrame:
     return pd.DataFrame(values)
 
 
+def _lng_proxy_expected_net(proxy_workbook_path: Path, scenario: str) -> pd.DataFrame:
+    """Return signed LNG own use from the demand-side proxy's emitted variables."""
+    workbook = pd.read_excel(proxy_workbook_path, header=2)
+    prefix = "Demand\\Other loss and own use\\Liquefaction and regasification plants\\"
+    selected = workbook.loc[
+        workbook["Scenario"].astype(str).eq(scenario)
+        & workbook["Branch Path"].astype(str).str.startswith(prefix)
+    ].copy()
+    activity = selected.loc[selected["Variable"].astype(str).eq("Activity Level")].copy()
+    intensity = selected.loc[selected["Variable"].astype(str).eq("Final Energy Intensity")].copy()
+    activity["fuel"] = activity["Branch Path"].astype(str).str.rsplit("\\", n=1).str[-1]
+    intensity["fuel"] = intensity["Branch Path"].astype(str).str.rsplit("\\", n=1).str[-1]
+    rows = []
+    for column in [value for value in workbook.columns if str(value).isdigit()]:
+        amount = 0.0
+        for fuel in sorted(set(activity["fuel"]) & set(intensity["fuel"])):
+            activity_value = pd.to_numeric(activity.loc[activity["fuel"].eq(fuel), column], errors="coerce").iloc[0]
+            intensity_value = pd.to_numeric(intensity.loc[intensity["fuel"].eq(fuel), column], errors="coerce").iloc[0]
+            if pd.notna(activity_value) and pd.notna(intensity_value):
+                amount += float(activity_value) * float(intensity_value)
+        rows.append({"year": int(column), "value": -amount, "proxy_own_use": -amount})
+    return pd.DataFrame(rows)
+
+
 def _append_expected_line(figure: go.Figure, expected: pd.DataFrame) -> go.Figure:
     """Add the one safe expected series while preserving dashboard styling."""
     figure.add_trace(
@@ -139,6 +163,7 @@ def render_gas_processing_shadow_chart_prototype(
     output_root: Path,
     template_path: Path,
     transformation_workbook_path: Path,
+    proxy_workbook_path: Path,
     base_dashboard_bundle_path: Path,
     economy: str = "01_AUS",
     scenario: str = "Target",
@@ -147,12 +172,13 @@ def render_gas_processing_shadow_chart_prototype(
     load_json(template_path)  # Keep the same template dependency as normal pages.
     figures = _load_bundle_figures(base_dashboard_bundle_path)
     cards = [
-        ("09.06 Gas processing plants (including own use)", "chart__area__flowgroup_parent__other_transformation__09_06__product", "withheld: parent combines differently classified children"),
+        ("09.06 Gas processing plants (including own use)", "chart__area__flowgroup_parent__other_transformation__09_06__product", "safe: Gas works process net plus LNG demand-side own-use proxy"),
         ("09.06.01 Gas works plants (including own use)", "chart__area__flowgroup__other_transformation__09_06_01_gas_works_plants_including_own_use__product", "safe: gross capacity + feedstock + process-owned auxiliary use"),
-        ("09.06.02 Liquefaction/regasification plants (including own use)", "chart__area__flowgroup_parent__other_transformation__09_06_02__product", "withheld: parent mixes liquefaction/regasification and demand-owned 10.01.03 use"),
-        ("09.06.02.01 Liquefaction (including own use)", "chart__area__flowgroup__other_transformation__09_06_02_01_liquefaction_including_own_use__product", "withheld: no reviewed same-boundary 9th/ESTO comparator"),
+        ("09.06.02 Liquefaction/regasification plants (including own use)", "chart__area__flowgroup_parent__other_transformation__09_06_02__product", "safe: demand-side 10.01.03 own-use proxy"),
+        ("09.06.02.01 Liquefaction (including own use)", "chart__area__flowgroup__other_transformation__09_06_02_01_liquefaction_including_own_use__product", "safe code expectation; detailed 9th comparator unavailable"),
     ]
     expected = _gas_works_expected_net(transformation_workbook_path, scenario)
+    lng_expected = _lng_proxy_expected_net(proxy_workbook_path, scenario)
     gas_key = cards[1][1]
     expected_2023 = float(expected.loc[expected["year"].eq(2023), "value"].iloc[0])
     ninth_2023 = _target_total_at_year(base_dashboard_bundle_path, gas_key, "9th Target total", 2023)
@@ -162,7 +188,32 @@ def render_gas_processing_shadow_chart_prototype(
             "Gas works source-to-process reconstruction did not pass: "
             f"expected={expected_2023:.6f}, ninth={ninth_2023:.6f}, gap={reconstruction_gap:.6f}."
         )
+    lng_key = cards[2][1]
+    lng_expected_2023 = float(lng_expected.loc[lng_expected["year"].eq(2023), "value"].iloc[0])
+    lng_ninth_2023 = _target_total_at_year(base_dashboard_bundle_path, lng_key, "9th Target total", 2023)
+    lng_reconstruction_gap = lng_expected_2023 - lng_ninth_2023
+    if abs(lng_reconstruction_gap) >= 0.002:
+        raise ValueError(
+            "LNG proxy source-to-process reconstruction did not pass: "
+            f"expected={lng_expected_2023:.6f}, ninth={lng_ninth_2023:.6f}, gap={lng_reconstruction_gap:.6f}."
+        )
+    parent_expected = expected[["year", "value"]].merge(
+        lng_expected[["year", "value"]], on="year", suffixes=("_gas_works", "_lng")
+    )
+    parent_expected["value"] = parent_expected["value_gas_works"] + parent_expected["value_lng"]
+    parent_key = cards[0][1]
+    parent_expected_2023 = float(parent_expected.loc[parent_expected["year"].eq(2023), "value"].iloc[0])
+    parent_ninth_2023 = _target_total_at_year(base_dashboard_bundle_path, parent_key, "9th Target total", 2023)
+    parent_reconstruction_gap = parent_expected_2023 - parent_ninth_2023
+    if abs(parent_reconstruction_gap) >= 0.002:
+        raise ValueError(
+            "Gas-processing parent reconstruction did not pass: "
+            f"expected={parent_expected_2023:.6f}, ninth={parent_ninth_2023:.6f}, gap={parent_reconstruction_gap:.6f}."
+        )
+    figures[parent_key] = _append_expected_line(figures[parent_key], parent_expected)
     figures[gas_key] = _append_expected_line(figures[gas_key], expected)
+    figures[lng_key] = _append_expected_line(figures[lng_key], lng_expected)
+    figures[cards[3][1]] = _append_expected_line(figures[cards[3][1]], lng_expected)
 
     layout = {
         "dashboards": output_root / "dashboards",
@@ -189,8 +240,8 @@ def render_gas_processing_shadow_chart_prototype(
                 "flow_group_label": f"{label} — {classification}",
                 "datasets": chart_dataset_tokens_from_figure(figure),
                 "total_abs_value": 0.0,
-                "abs_diff": abs(reconstruction_gap) if index == 1 else 0.0,
-                "pct_diff": abs(reconstruction_gap / ninth_2023) if index == 1 and ninth_2023 else 0.0,
+                "abs_diff": [abs(parent_reconstruction_gap), abs(reconstruction_gap), abs(lng_reconstruction_gap), 0.0][index],
+                "pct_diff": [abs(parent_reconstruction_gap / parent_ninth_2023), abs(reconstruction_gap / ninth_2023), abs(lng_reconstruction_gap / lng_ninth_2023), 0.0][index],
             }
         )
     output_path = layout["dashboards"] / f"{review_key}.html"
@@ -202,9 +253,9 @@ def render_gas_processing_shadow_chart_prototype(
         economy_label=economy,
         page_note=(
             "Read-only review: every card reuses its normal dashboard stack and totals. "
-            "Only Gas works has a dashed expected-net line because its exact gross-capacity, "
-            "feedstock, and process-owned auxiliary formula reproduces the mapped 9th total. "
-            "The parent and LNG cards are intentionally unclassified rather than assigned the refinery rule."
+            "Dashed expected-net lines use the active variables for each accounting owner: "
+            "Gas works uses its process variables, while LNG uses the separate Demand Other loss and own use proxy. "
+            "The 09.06 and 09.06.02 parent lines include that proxy instead of omitting it."
         ),
         dataset_filter_options=["LEAP", "ESTIMATION_CODE_NET"],
     )
@@ -216,8 +267,9 @@ def render_gas_processing_shadow_chart_prototype(
                 "scenario": scenario,
                 "base_dashboard_bundle_path": str(base_dashboard_bundle_path),
                 "transformation_workbook_path": str(transformation_workbook_path),
+                "proxy_workbook_path": str(proxy_workbook_path),
                 "classifications": [
-                    {"boundary": label, "classification": classification, "expected_line_drawn": index == 1}
+                    {"boundary": label, "classification": classification, "expected_line_drawn": True}
                     for index, (label, _, classification) in enumerate(cards)
                 ],
                 "gas_works_2023_reconstruction": {
@@ -225,6 +277,18 @@ def render_gas_processing_shadow_chart_prototype(
                     "ninth_target_net_pj": ninth_2023,
                     "difference_pj": reconstruction_gap,
                     "formula": "gross output - gross output / efficiency - gross output * sum(auxiliary ratios)",
+                },
+                "lng_proxy_2023_reconstruction": {
+                    "expected_net_pj": lng_expected_2023,
+                    "ninth_target_net_pj": lng_ninth_2023,
+                    "difference_pj": lng_reconstruction_gap,
+                    "formula": "-sum(Demand Other loss and own use Activity Level * Final Energy Intensity)",
+                },
+                "gas_processing_parent_2023_reconstruction": {
+                    "expected_net_pj": parent_expected_2023,
+                    "ninth_target_net_pj": parent_ninth_2023,
+                    "difference_pj": parent_reconstruction_gap,
+                    "formula": "Gas works expected net + LNG demand-side proxy expected net",
                 },
             },
             indent=2,
@@ -242,6 +306,12 @@ WORKBOOK_PATH = (
     / "supply_reconciliation" / "baseline_seed" / "runs" / "SEED_AUS_CONSOLIDATED_20260820"
     / "workbooks" / "transformation_leap_imports_01_AUS_Target.xlsx"
 )
+PROXY_WORKBOOK_PATH = (
+    REPO_ROOT.parent / "leap_initialisation" / "outputs" / "leap_exports"
+    / "supply_reconciliation" / "baseline_seed" / "runs" / "SEED_AUS_CONSOLIDATED_20260820_R2"
+    / "supporting_files" / "other_loss_own_use_proxy" / "01_AUS"
+    / "other_loss_own_use_proxy_01_AUS_Target_Reference_Current_Accounts.xlsx"
+)
 BUNDLE_PATH = REPO_ROOT / "outputs" / "common_esto_dashboard" / "01AUS" / "chart_bundles" / "other_transformation__charts.js"
 OUTPUT_ROOT = REPO_ROOT / "outputs" / "shadow_estimation_review" / "01_AUS_gas_processing_target_variable_output_review"
 
@@ -250,6 +320,7 @@ if RUN_PROTOTYPE:
         output_root=OUTPUT_ROOT,
         template_path=TEMPLATE_PATH,
         transformation_workbook_path=WORKBOOK_PATH,
+        proxy_workbook_path=PROXY_WORKBOOK_PATH,
         base_dashboard_bundle_path=BUNDLE_PATH,
     )
     print(f"[OK] Renderer-backed prototype written to {RESULT_PATH}")

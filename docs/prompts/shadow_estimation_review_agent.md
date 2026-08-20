@@ -156,6 +156,13 @@ This classification is required separately for every economy, scenario, run,
 and process boundary. Named rules in the case ledger below are examples, not
 defaults for other transformation cases.
 
+When own use is owned by a separate demand/loss proxy, retrieve its emitted
+activity and intensity (or equivalent calculated amount) from that same run
+and add its signed consumption to the inclusive process net. Do not omit it
+merely because it is not an `Auxiliary Fuel Use` row in the transformation
+workbook. The agent may withhold the line only when the proxy output or its
+source route cannot be traced for the selected run.
+
 ### 3. Reconstruct a temporary expectation
 
 Run the method described in the source workflow using only the declared seed,
