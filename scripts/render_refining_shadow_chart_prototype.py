@@ -119,8 +119,23 @@ def render_refining_shadow_chart_prototype(
     for trace in figure.data:
         if str(trace.name).startswith("Estimated expectation"):
             trace.update(line={"dash": "dash", "color": "#8c55b8"})
+    comparison_rows = rows.loc[
+        rows["source_system"].eq("ESTIMATION_EXPECTATION")
+    ].copy()
+    comparison_rows["absolute_difference_pj"] = (
+        comparison_rows["source_value_pj"] - comparison_rows["leap_value_pj"]
+    ).abs()
+    comparison_rows["absolute_percentage_difference"] = (
+        comparison_rows["absolute_difference_pj"]
+        / comparison_rows["source_value_pj"].abs()
+    )
+    first_year = int(comparison_rows["year"].min())
+    last_year = int(comparison_rows["year"].max())
     figure.update_layout(
-        title=f"Shadow comparison prototype: {flow_label} — {product_label}",
+        title=(
+            f"Shadow comparison review ({first_year}–{last_year}): "
+            f"{flow_label} — {product_label}"
+        ),
         meta={
             **dict(figure.layout.meta or {}),
             "prototype_status": "diagnostic_expected_series_reviewed_boundary",
@@ -147,9 +162,11 @@ def render_refining_shadow_chart_prototype(
         "section_label": "Refining shadow review",
         "flow_group_label": flow_label,
         "datasets": chart_dataset_tokens_from_figure(figure),
-        "total_abs_value": 0.0,
-        "abs_diff": 7.862508,
-        "pct_diff": 0.04812166,
+        "total_abs_value": float(comparison_rows["source_value_pj"].abs().sum()),
+        "abs_diff": float(comparison_rows["absolute_difference_pj"].max()),
+        "pct_diff": float(
+            comparison_rows["absolute_percentage_difference"].max()
+        ),
     }]
     output_path = layout["dashboards"] / "refining_shadow_review.html"
     write_dashboard_page(
@@ -163,7 +180,7 @@ def render_refining_shadow_chart_prototype(
         economy_label="Australia",
         page_note=(
             "Read-only review: estimated expectation uses the maintained "
-            "inclusive refinery comparison boundary."
+            f"inclusive refinery comparison boundary ({first_year}–{last_year})."
         ),
         dataset_filter_options=["LEAP", "ESTIMATION_EXPECTATION"],
     )
