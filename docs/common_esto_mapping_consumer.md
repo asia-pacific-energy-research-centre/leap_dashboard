@@ -120,6 +120,11 @@ Worth being exact, because the target shape is not yet what the code does.
 already happened upstream, so the guarantee above is inherited rather than
 exercised here.
 
+The default workflow selects the stable v1 output-contract manifest. Set
+`COMMON_ESTO_USE_OUTPUT_CONTRACT=0` only for a deliberate legacy-artifact
+comparison. Parquet dictionary/categorical text columns are normalized by the
+loader, so a clean checkout does not require a CSV fallback.
+
 The one place this repository applies a mapping itself today is the emissions
 factor join in `codebase/common_esto_dashboard_emissions.py` — factors resolved
 onto `common_product_label`, then a merge and a multiply. That is the shape the

@@ -178,14 +178,14 @@ def test_selected_run_metadata_uses_matching_stage3_status(
     assert metadata["mapping_run_status"] == "completed"
 
 
-def test_legacy_stage3_identity_remains_default(
+def test_legacy_stage3_identity_remains_available_by_explicit_opt_out(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     stage3_path = tmp_path / "results" / "common_esto" / "stage3_run_manifest.json"
     stage3_path.parent.mkdir(parents=True)
     stage3_path.write_text(json.dumps({"run_id": "legacy_run"}), encoding="utf-8")
-    monkeypatch.delenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, raising=False)
+    monkeypatch.setenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, "0")
     monkeypatch.delenv(provenance.OUTPUT_CONTRACT_PATH_ENV_VAR, raising=False)
 
     manifest = provenance.selected_run_manifest(tmp_path)
@@ -239,6 +239,7 @@ def test_failed_latest_stage3_attempt_marks_selected_contract_as_preserved(
 
 
 def test_superseded_artifacts_produce_a_warning_banner(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, "0")
     monkeypatch.setattr(provenance, "stage3_manifest", lambda root: {"run_id": "run_abc"})
     monkeypatch.setattr(provenance, "artifact_mtime", lambda path: pd.Timestamp("2026-07-27 13:00"))
     monkeypatch.setattr(
@@ -257,6 +258,7 @@ def test_superseded_artifacts_produce_a_warning_banner(monkeypatch: pytest.Monke
 
 
 def test_current_artifacts_produce_an_informational_banner(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, "0")
     monkeypatch.setattr(provenance, "stage3_manifest", lambda root: {"run_id": "run_abc"})
     monkeypatch.setattr(provenance, "artifact_mtime", lambda path: pd.Timestamp("2026-07-27 13:00"))
     monkeypatch.setattr(provenance, "pipeline_commits_since", lambda root, cutoff: ([], ""))
@@ -269,6 +271,7 @@ def test_current_artifacts_produce_an_informational_banner(monkeypatch: pytest.M
 
 
 def test_unanswerable_provenance_is_a_warning_not_a_clean_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(provenance.USE_OUTPUT_CONTRACT_ENV_VAR, "0")
     monkeypatch.setattr(provenance, "stage3_manifest", lambda root: {"run_id": "run_abc"})
     monkeypatch.setattr(provenance, "artifact_mtime", lambda path: pd.Timestamp("2026-07-27 13:00"))
     monkeypatch.setattr(provenance, "pipeline_commits_since", lambda root, cutoff: ([], "git log failed"))

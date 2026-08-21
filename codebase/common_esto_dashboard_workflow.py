@@ -223,7 +223,7 @@ RENDER_COMPARISON_SCOPE_VARIANTS = _env_bool(
 # ``common_esto_dashboard_data.DEFAULT_WIDE_FILE_SCOPE``). Use "esto_leap" to
 # read the 2-way LEAP/ESTO comparison instead.
 WIDE_FILE_SCOPE = os.getenv("COMMON_ESTO_WIDE_FILE_SCOPE", "esto_extended_leap_ninth")
-USE_OUTPUT_CONTRACT = _env_bool("COMMON_ESTO_USE_OUTPUT_CONTRACT", default=False)
+USE_OUTPUT_CONTRACT = _env_bool("COMMON_ESTO_USE_OUTPUT_CONTRACT", default=True)
 ECONOMIES: str | list[str] = os.getenv("COMMON_ESTO_ECONOMIES", ["20_USA", "02_BD"])
 MIN_YEAR = 2010
 MAX_YEAR = 2060

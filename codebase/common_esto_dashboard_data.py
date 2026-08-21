@@ -589,10 +589,23 @@ def load_long_common_esto_data(path: Path) -> pd.DataFrame:
     path = Path(path)
     if path.suffix.casefold() == ".parquet":
         df = pd.read_parquet(path)
+        # Arrow dictionary columns become pandas Categoricals. Filling them
+        # with an empty string fails unless that value is first added as a
+        # category, so normalize text-like columns to ordinary objects before
+        # applying the legacy empty-text convention.
         categorical_columns = list(df.select_dtypes(include=["category"]).columns)
         if categorical_columns:
             df[categorical_columns] = df[categorical_columns].astype(object)
-        df = df.fillna("")
+        text_columns = sorted(
+            set(df.select_dtypes(include=["object", "string"]).columns)
+            | {
+                column
+                for column in REQUIRED_COLUMNS
+                if column in df.columns and column not in {"year", "value"}
+            }
+        )
+        if text_columns:
+            df[text_columns] = df[text_columns].astype(object).fillna("")
     else:
         df = pd.read_csv(
             path,

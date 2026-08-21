@@ -150,8 +150,6 @@ def test_variant_render_forwards_basis_options_without_substitute_diagnostics(
     assert [call["comparison_scope"] for call in calls] == [
         "esto_extended_leap_ninth",
         "esto_extended_leap",
-        "esto_leap_ninth",
-        "esto_leap",
     ]
     assert calls[0]["category_basis_options"] == [
         {
@@ -164,19 +162,9 @@ def test_variant_render_forwards_basis_options_without_substitute_diagnostics(
             "label": "LEAP + ESTO Extended",
             "dashboard_key": "20USA__esto_extended_leap",
         },
-        {
-            "comparison_scope": "esto_leap_ninth",
-            "label": "LEAP + ESTO + Ninth (ordinary verification)",
-            "dashboard_key": "20USA__esto_leap_ninth",
-        },
-        {
-            "comparison_scope": "esto_leap",
-            "label": "LEAP + ESTO (ordinary verification)",
-            "dashboard_key": "20USA__esto_leap",
-        },
     ]
     assert calls[0]["additional_pages"] == []
-    assert result["chart_count"] == 8
+    assert result["chart_count"] == 4
     assert "mapping_diagnostics" not in result
     assert not (tmp_path / "outputs" / "diagnostics").exists()
 
