@@ -1094,6 +1094,11 @@ def get_existing_flow_nodes(page_df: pd.DataFrame) -> pd.DataFrame:
         nodes["source_systems"] = nodes["common_flow_label"].map(label_sources)
     else:
         nodes["source_systems"] = [frozenset({""})] * len(nodes)
+    if "is_non_expanding_rollup" in page_df.columns:
+        rollup_flags = page_df.groupby("common_flow_label")["is_non_expanding_rollup"].agg(
+            lambda values: bool(_metadata_bool(values).any())
+        )
+        nodes["is_non_expanding_rollup"] = nodes["common_flow_label"].map(rollup_flags).fillna(False)
     return nodes[nodes["canonical_code"] != ""].reset_index(drop=True)
 
 
