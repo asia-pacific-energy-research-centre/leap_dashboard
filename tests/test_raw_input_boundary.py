@@ -61,46 +61,12 @@ def test_workflow_defaults_are_non_mutating() -> None:
     assert "False False False True" in result.stdout
 
 
-def test_mappings_preflight_loads_when_dashboard_codebase_package_is_loaded(
-    tmp_path: Path,
-) -> None:
-    mappings_root = tmp_path / "leap_mappings"
-    module_path = mappings_root / "codebase" / "mapping_tools" / "source_branch_preflight.py"
-    module_path.parent.mkdir(parents=True)
-    module_path.write_text(
-        "def load_all_demand_aggregated_components(path):\n"
-        "    return path\n\n"
-        "def get_demand_sectors_without_detail(components, economy):\n"
-        "    return [f'{economy}:loaded']\n",
-        encoding="utf-8",
+def test_dashboard_reads_representation_status_as_a_published_upstream_artifact() -> None:
+    source = (REPO_ROOT / "codebase" / "common_esto_dashboard_workflow.py").read_text(
+        encoding="utf-8"
     )
-    config_path = mappings_root / "config" / "all_demand_aggregated_components.json"
-    config_path.parent.mkdir()
-    config_path.write_text("{}\n", encoding="utf-8")
-
-    environment = os.environ.copy()
-    environment["COMMON_ESTO_RUN_DASHBOARD_WORKFLOW"] = "0"
-    environment["COMMON_ESTO_MAPPINGS_ROOT"] = str(mappings_root)
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            (
-                "import sys; "
-                "sys.path.insert(0, '.'); "
-                "import codebase; "
-                "sys.path.insert(0, 'codebase'); "
-                "import common_esto_dashboard_workflow as workflow; "
-                "print(workflow._missing_leap_demand_branches('20USA'))"
-            ),
-        ],
-        cwd=REPO_ROOT,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    assert "['20USA:loaded']" in result.stdout
+    assert "leap_demand_representation_status.csv" in source
+    assert "get_demand_sectors_without_detail" not in source
 
 
 def test_batch_and_qa_scripts_accept_isolated_output_path_overrides() -> None:

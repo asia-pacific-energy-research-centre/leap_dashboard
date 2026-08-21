@@ -1480,24 +1480,13 @@ def area_chart_allowed_for_demand_coverage(
     area_df: pd.DataFrame,
     template: dict,
 ) -> bool:
-    """Keep aggregate-placeholder demand overviews on a LEAP-backed frontier."""
-    coverage_config = template.get("leap_demand_sector_coverage", {})
-    placeholder_page_keys = {
-        str(key)
-        for key in coverage_config.get("show_aggregate_only_page_keys", [])
-    }
-    if str(page_key) not in placeholder_page_keys:
-        return True
+    """Keep all available Common ESTO categories eligible for charting.
 
-    primary_source = str(
-        template.get("chart_generation", {}).get(
-            "primary_area_source_system",
-            "LEAP",
-        )
-    ).casefold()
-    if "source_system" not in area_df.columns:
-        return False
-    return area_df["source_system"].astype(str).str.casefold().eq(primary_source).any()
+    Placeholder representation is presentation metadata.  The Common ESTO
+    facts and hierarchy frontier, not a static LEAP-branch setting, decide
+    whether an overview can render.
+    """
+    return True
 
 
 def equivalent_flow_labels_by_source(df: pd.DataFrame, flow_label: str) -> dict[str, list[str]]:

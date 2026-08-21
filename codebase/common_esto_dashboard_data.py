@@ -1135,29 +1135,14 @@ def filter_common_esto_data(
 
 def filter_template_for_leap_demand_coverage(
     template: dict,
-    missing_leap_branches: set[str] | list[str],
+    representation_status_df: pd.DataFrame | None = None,
 ) -> dict:
-    """Apply the configured demand-page visibility policy for LEAP coverage.
+    """Attach current-run placeholder metadata without hiding ordinary pages.
 
-    ``missing_leap_branches`` is the resolved, economy-scoped list of LEAP
-    demand branch names with no separately modelled detail (see
-    ``leap_mappings.codebase.mapping_tools.source_branch_preflight.get_demand_sectors_without_detail``).
-    A page listed in the template's ``leap_demand_sector_coverage.page_leap_branches``
-    is hidden when every configured LEAP branch is in that missing set, unless
-    its page key is explicitly listed in ``show_aggregate_only_page_keys``.
-    Allowed aggregate-placeholder pages remain visible until real sector detail
-    replaces them upstream.
-    Pages listed in ``leap_demand_sector_coverage.always_skip_page_keys`` are
-    hidden unconditionally: they have no LEAP-to-ESTO mapping at all (not even
-    an aggregate-only one), so ``get_demand_sectors_without_detail`` can never
-    describe them.
-
-    This only suppresses standalone page rendering/navigation (via the
-    resolved ``_hidden_page_keys`` the renderer reads). ``sector_pages`` rules
-    and ``total_demand_page.demand_page_keys`` are left untouched, so ESTO/
-    NINTH rows for a hidden sector keep their real ``_page_key`` instead of
-    falling into ``unassigned``, and ``total_demand`` can still aggregate them
-    even when the standalone sector page is hidden.
+    The upstream representation-status artifact records what the current LEAP
+    export supplied.  It controls notices only: available Common ESTO facts
+    still determine which chart categories render.  ``always_skip_page_keys``
+    remains the sole explicit structural page suppression mechanism.
     """
     coverage_config = template.get("leap_demand_sector_coverage", {})
     if not coverage_config.get("enabled", False):
@@ -1166,38 +1151,70 @@ def filter_template_for_leap_demand_coverage(
     always_skip = {str(key) for key in coverage_config.get("always_skip_page_keys", [])}
     if not page_branches and not always_skip:
         return template
-    missing = {str(branch).casefold() for branch in missing_leap_branches}
-    show_aggregate_only = {
-        str(key) for key in coverage_config.get("show_aggregate_only_page_keys", [])
-    }
-    aggregate_only_page_branches = {
-        str(page_key): [
-            str(branch)
-            for branch in branches
-            if str(branch).casefold() in missing
-        ]
-        for page_key, branches in page_branches.items()
-    }
-    aggregate_only_page_branches = {
-        page_key: branches
-        for page_key, branches in aggregate_only_page_branches.items()
-        if branches
-    }
-    pages_to_drop = {
-        page_key
-        for page_key, branches in page_branches.items()
-        if page_key not in show_aggregate_only
-        and branches
-        and all(str(branch).casefold() in missing for branch in branches)
-    }
-    pages_to_drop |= always_skip
     out = dict(template)
     coverage_config = dict(coverage_config)
+    placeholder_statuses = {
+        "placeholder_only_retained",
+        "partial_detail_placeholder_retained",
+    }
+    active_components: list[dict[str, object]] = []
+    if representation_status_df is not None and not representation_status_df.empty:
+        active_components = representation_status_df.loc[
+            representation_status_df["representation_status"].astype(str).isin(placeholder_statuses),
+            ["component_branch", "detailed_branches", "representation_status"],
+        ].drop_duplicates().to_dict("records")
+    aggregate_only_page_branches: dict[str, list[str]] = {}
+    for page_key, branches in page_branches.items():
+        page_branches_casefold = {str(branch).casefold() for branch in branches}
+        components = []
+        for component in active_components:
+            detailed = {
+                value.strip().casefold()
+                for value in str(component["detailed_branches"]).split(";")
+                if value.strip()
+            }
+            component_branch = str(component["component_branch"]).strip()
+            if (
+                component_branch.casefold() in page_branches_casefold
+                or detailed.intersection(page_branches_casefold)
+            ):
+                components.append(component_branch)
+        if components:
+            aggregate_only_page_branches[str(page_key)] = sorted(set(components))
     coverage_config["_aggregate_only_page_branches"] = aggregate_only_page_branches
-    if pages_to_drop:
-        coverage_config["_hidden_page_keys"] = sorted(pages_to_drop)
+    if always_skip:
+        coverage_config["_hidden_page_keys"] = sorted(always_skip)
     out["leap_demand_sector_coverage"] = coverage_config
     return out
+
+
+def load_leap_demand_representation_status(
+    path: str | Path,
+    economy: str,
+    min_year: int | None = None,
+    max_year: int | None = None,
+) -> pd.DataFrame:
+    """Load one economy's current-run LEAP placeholder/detail evidence."""
+    status_path = Path(path)
+    required = {
+        "economy", "scenario", "year", "component_branch", "detailed_branches",
+        "representation_status",
+    }
+    if not status_path.exists():
+        return pd.DataFrame(columns=sorted(required))
+    status_df = pd.read_csv(status_path)
+    missing = required.difference(status_df.columns)
+    if missing:
+        raise ValueError(f"LEAP demand representation status is missing columns: {sorted(missing)}")
+    economy_key = str(economy).replace("_", "").strip()
+    status_df["economy"] = status_df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
+    status_df = status_df[status_df["economy"].eq(economy_key)].copy()
+    status_df["year"] = pd.to_numeric(status_df["year"], errors="raise").astype(int)
+    if min_year is not None:
+        status_df = status_df[status_df["year"] >= int(min_year)]
+    if max_year is not None:
+        status_df = status_df[status_df["year"] <= int(max_year)]
+    return status_df.reset_index(drop=True)
 
 
 def apply_visible_series(df: pd.DataFrame, visible_series: list[dict[str, str]]) -> pd.DataFrame:

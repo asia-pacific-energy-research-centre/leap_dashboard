@@ -34,7 +34,6 @@
 #   year. Default is False because ESTO is the preferred historical source.
 
 #%%
-import importlib.util
 import copy
 import json
 import os
@@ -64,6 +63,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     filter_template_for_leap_demand_coverage,
     load_active_power_interim_branches,
     load_common_esto_data,
+    load_leap_demand_representation_status,
     load_source_category_map,
     load_unmet_requirements_data,
 )
@@ -155,6 +155,12 @@ _LEAP_MAPPINGS_REPO = _resolve(
 )
 _LEAP_MAPPINGS_CODEBASE = _LEAP_MAPPINGS_REPO / "codebase"
 _LEAP_MAPPINGS_RESULTS = _LEAP_MAPPINGS_REPO / "results" / "common_esto"
+LEAP_DEMAND_REPRESENTATION_STATUS_PATH = _resolve(
+    os.getenv(
+        "COMMON_ESTO_LEAP_DEMAND_REPRESENTATION_STATUS_PATH",
+        str(_LEAP_MAPPINGS_RESULTS / "leap_demand_representation_status.csv"),
+    )
+)
 ESTO_EXACT_ROWS_PATH = prefer_compressed_csv_path(
     _LEAP_MAPPINGS_REPO / "results" / "mapping_relationships" / "esto_results_exact_rows.csv.gz"
 )
@@ -378,28 +384,6 @@ def maybe_regen_common_esto_fast_path() -> None:
     )
 
 
-def _missing_leap_demand_branches(economy: str) -> list[str]:
-    """Return LEAP demand branches with no separately modelled detail for *economy*.
-
-    Delegates to leap_mappings' own config-owned record of which sectors are
-    still only available via 'All demand aggregated'
-    (config/all_demand_aggregated_components.json), resolved per economy.
-    """
-    module_path = _LEAP_MAPPINGS_CODEBASE / "mapping_tools" / "source_branch_preflight.py"
-    module_spec = importlib.util.spec_from_file_location(
-        "_leap_mappings_source_branch_preflight",
-        module_path,
-    )
-    if module_spec is None or module_spec.loader is None:
-        raise ImportError(f"Could not load LEAP mappings preflight module: {module_path}")
-    preflight = importlib.util.module_from_spec(module_spec)
-    module_spec.loader.exec_module(preflight)
-
-    components_path = _LEAP_MAPPINGS_REPO / "config" / "all_demand_aggregated_components.json"
-    components_df = preflight.load_all_demand_aggregated_components(components_path)
-    return preflight.get_demand_sectors_without_detail(components_df, economy)
-
-
 def configured_comparison_scopes(template: dict) -> list[dict[str, object]]:
     """Return validated, configuration-driven category-basis definitions."""
     selector = template.get("comparison_scope_selector", {}) or {}
@@ -475,9 +459,14 @@ def run_dashboard_for_economy(
     """Render every configured Common-category basis for one economy."""
     economy = str(economy).replace("_", "").strip()
     base_template = load_json(TEMPLATE_PATH)
-    missing_leap_branches = _missing_leap_demand_branches(economy)
+    representation_status_df = load_leap_demand_representation_status(
+        LEAP_DEMAND_REPRESENTATION_STATUS_PATH,
+        economy,
+        min_year=MIN_YEAR,
+        max_year=MAX_YEAR,
+    )
     base_template = filter_template_for_leap_demand_coverage(
-        base_template, missing_leap_branches
+        base_template, representation_status_df
     )
     base_template["_power_interim_placeholder_branches"] = (
         load_active_power_interim_branches(
@@ -657,7 +646,17 @@ def run_dashboard_for_economy(
             f"Sector pages hidden (no LEAP-to-ESTO mapping at all for {economy}): "
             f"{', '.join(always_skipped)}"
         )
-    print(f"LEAP demand branches without detail for {economy}: {', '.join(missing_leap_branches) or 'none'}")
+    placeholder_components = sorted(
+        {
+            str(value)
+            for branches in coverage_config.get("_aggregate_only_page_branches", {}).values()
+            for value in branches
+        }
+    )
+    print(
+        f"LEAP placeholder components active in the selected run for {economy}: "
+        f"{', '.join(placeholder_components) or 'none'}"
+    )
     print(f"Input rows read: {len(raw_df):,}")
     print(f"Total charts across category bases: {sum(int(item['chart_count']) for item in scope_results.values()):,}")
 
@@ -673,6 +672,7 @@ def run_dashboard_for_economy(
         "chart_count": sum(int(item["chart_count"]) for item in scope_results.values()),
         "default_chart_count": default_result["chart_count"],
         "scope_results": scope_results,
+        "leap_demand_representation_status_rows": len(representation_status_df),
         "mapping_diagnostics": mapping_diagnostics,
     }
     if convergence_result:

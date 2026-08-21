@@ -983,6 +983,19 @@ aggregate; multi-flow sections remain eligible for flow charts.
   roughly `-3,400 PJ` net balance while its product companion showed about
   `+33,000 PJ` of outputs and `-36,000 PJ` of inputs.
 
+## DASH-034: LEAP demand representation is current-run presentation metadata
+
+**Status:** Implemented; production all-economy verification pending.
+
+The dashboard consumes mappings-owned, run-specific LEAP demand
+representation status rather than inferring placeholder use from static
+configuration. A placeholder status adds notices and preserves the special
+combined international-transport presentation where applicable. It never
+removes ordinary Common ESTO pages or categories, changes the hierarchy
+frontier, fabricates detailed values, or treats an absent representation as
+zero. Partial placeholder/detail overlap remains an upstream audit warning;
+the dashboard does not allocate or otherwise manipulate its values.
+
 ## DASH-024: Refining publishes the inclusive boundary and ordinary charts omit difference diagnostics
 
 **Status:** Implemented.

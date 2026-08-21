@@ -266,15 +266,20 @@ def test_render_rejects_an_economy_absent_from_the_data(tmp_path: Path) -> None:
         _render(tmp_path, economy="99_ZZZ")
 
 
-def test_missing_leap_demand_branches_hide_sector_pages(tmp_path: Path) -> None:
+def test_placeholder_metadata_does_not_hide_sector_pages(tmp_path: Path) -> None:
     baseline = _render(tmp_path / "baseline")
     restricted = _render(
         tmp_path / "restricted",
-        missing_leap_demand_branches=["Transport"],
+        representation_status_df=pd.DataFrame(
+            [{
+                "component_branch": "Road",
+                "detailed_branches": "Freight road;Passenger road",
+                "representation_status": "placeholder_only_retained",
+            }]
+        ),
     )
-    assert restricted["missing_leap_demand_branches"] == ["Transport"]
-    # Hiding a sector page cannot increase the number of rendered charts.
-    assert int(restricted["chart_count"]) <= int(baseline["chart_count"])
+    assert restricted["leap_demand_representation_status_rows"] == 1
+    assert int(restricted["chart_count"]) == int(baseline["chart_count"])
 
 
 def test_power_interim_audit_adds_placeholder_note(tmp_path: Path) -> None:

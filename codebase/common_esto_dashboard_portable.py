@@ -176,7 +176,7 @@ def render_common_esto_dashboard(
     min_year: int | None = 2010,
     max_year: int | None = 2060,
     include_ninth_pre_base_year_data: bool = False,
-    missing_leap_demand_branches: Sequence[str] = (),
+    representation_status_df: pd.DataFrame | None = None,
     dashboard_updated_label: str = "",
     clear_existing: bool = True,
     dashboard_key: str | None = None,
@@ -187,11 +187,9 @@ def render_common_esto_dashboard(
 ) -> dict[str, object]:
     """Render the Common ESTO dashboard for one economy from explicit inputs.
 
-    ``missing_leap_demand_branches`` lists LEAP demand branches that have no
-    separately modelled detail for this economy. It is a caller argument rather
-    than a lookup because the record that answers it is owned by ``leap_mappings``
-    (``config/all_demand_aggregated_components.json``); passing an empty sequence
-    renders every sector page.
+    ``representation_status_df`` is optional current-run upstream presentation
+    metadata. It controls placeholder notices only; common facts still control
+    category and page rendering.
 
     ``source_to_common_map_path`` and ``esto_to_common_map_path`` are optional
     provenance inputs for the guide's native-category table. When omitted, the
@@ -204,7 +202,7 @@ def render_common_esto_dashboard(
     template = json.loads(Path(template_path).read_text(encoding="utf-8"))
     template = filter_template_for_leap_demand_coverage(
         template,
-        list(missing_leap_demand_branches),
+        representation_status_df,
     )
     template["_power_interim_placeholder_branches"] = (
         load_active_power_interim_branches(
@@ -313,7 +311,9 @@ def render_common_esto_dashboard(
         "visible_row_count": int(len(visible_df)),
         "base_year": base_year,
         "ninth_base_year": ninth_base_year,
-        "missing_leap_demand_branches": list(missing_leap_demand_branches),
+        "leap_demand_representation_status_rows": (
+            0 if representation_status_df is None else len(representation_status_df)
+        ),
         "power_interim_placeholder_branches": list(
             template["_power_interim_placeholder_branches"]
         ),

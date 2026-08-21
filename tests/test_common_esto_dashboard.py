@@ -18,6 +18,7 @@ from codebase.common_esto_dashboard_data import (
     filter_ninth_pre_base_year_data,
     filter_template_for_leap_demand_coverage,
     load_active_power_interim_branches,
+    load_leap_demand_representation_status,
     load_source_category_map,
     load_common_esto_data,
     ninth_base_year_for_economy,
@@ -1407,10 +1408,20 @@ def test_single_visible_flow_is_a_level_one_aggregate() -> None:
 
 def test_aggregate_only_domestic_demand_pages_remain_visible() -> None:
     template = _load_template()
+    status = pd.DataFrame(
+        [
+            {
+                "component_branch": component,
+                "detailed_branches": component,
+                "representation_status": "placeholder_only_retained",
+            }
+            for component in ["Industry", "Buildings", "Other sector", "Transport non road"]
+        ]
+    )
 
     filtered = filter_template_for_leap_demand_coverage(
         template,
-        {"Industry", "Buildings", "Other sector", "Transport non road"},
+        status,
     )
 
     assert "_hidden_page_keys" not in filtered["leap_demand_sector_coverage"]
@@ -1443,7 +1454,14 @@ def test_buildings_guide_context_uses_source_mapping_and_placeholder() -> None:
         },
     ]
     template = filter_template_for_leap_demand_coverage(
-        _load_template(), ["Buildings"]
+        _load_template(),
+        pd.DataFrame(
+            [{
+                "component_branch": "Buildings",
+                "detailed_branches": "Buildings",
+                "representation_status": "placeholder_only_retained",
+            }]
+        ),
     )
 
     source_map = pd.DataFrame(
@@ -1668,7 +1686,7 @@ def test_source_category_map_combines_native_and_esto_mappings(tmp_path: Path) -
     assert esto_row["source_product"] == "17 Electricity"
 
 
-def test_aggregate_placeholder_overviews_require_leap_rows() -> None:
+def test_available_common_categories_are_not_hidden_by_placeholder_metadata() -> None:
     from codebase.common_esto_dashboard_renderer import (
         area_chart_allowed_for_demand_coverage,
     )
@@ -1681,11 +1699,7 @@ def test_aggregate_placeholder_overviews_require_leap_rows() -> None:
         ]
     )
 
-    assert not area_chart_allowed_for_demand_coverage(
-        "buildings",
-        detailed_rows,
-        template,
-    )
+    assert area_chart_allowed_for_demand_coverage("buildings", detailed_rows, template)
     assert area_chart_allowed_for_demand_coverage(
         "buildings",
         pd.concat(
@@ -1828,6 +1842,8 @@ def test_transformation_leaf_frontier_does_not_treat_broad_rollup_as_terminal() 
         "common_product_label": "08.01 Natural gas",
         "value": -10.0,
     }
+
+
     categories = [
         ("09", "09 Transformation (including own use)", True),
         (
@@ -1863,6 +1879,20 @@ def test_transformation_leaf_frontier_does_not_treat_broad_rollup_as_terminal() 
             ].astype(str)
         )
         assert selected_codes == {"09.06.02", "09.07"}
+
+
+def test_representation_status_loader_normalizes_economy_and_filters_years(tmp_path: Path) -> None:
+    path = tmp_path / "leap_demand_representation_status.csv"
+    pd.DataFrame(
+        [
+            {"economy": "01_AUS", "scenario": "Reference", "year": 2022, "component_branch": "Road", "detailed_branches": "Freight road;Passenger road", "representation_status": "detailed_only_used"},
+            {"economy": "01_AUS", "scenario": "Target", "year": 2030, "component_branch": "Road", "detailed_branches": "Freight road;Passenger road", "representation_status": "placeholder_only_retained"},
+        ]
+    ).to_csv(path, index=False)
+    loaded = load_leap_demand_representation_status(path, "01AUS", min_year=2025)
+    assert loaded[["economy", "representation_status"]].to_dict("records") == [
+        {"economy": "01AUS", "representation_status": "placeholder_only_retained"}
+    ]
 
 
 def test_common_esto_dashboard_can_render_opt_in_scope_pages(tmp_path: Path) -> None:

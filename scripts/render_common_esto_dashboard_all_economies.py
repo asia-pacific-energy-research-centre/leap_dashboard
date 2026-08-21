@@ -30,6 +30,7 @@ from common_esto_dashboard_data import (  # noqa: E402
     enrich_with_component_metadata,
     filter_common_esto_data,
     filter_template_for_leap_demand_coverage,
+    load_leap_demand_representation_status,
     load_common_esto_data,
 )
 from common_esto_dashboard_renderer import load_json, render_dashboard  # noqa: E402
@@ -44,7 +45,7 @@ from mapping_pipeline_provenance import selected_run_metadata  # noqa: E402
 # publish) at import time unless this env override is set first.
 os.environ.setdefault("COMMON_ESTO_RUN_DASHBOARD_WORKFLOW", "0")
 from common_esto_dashboard_workflow import (  # noqa: E402
-    _missing_leap_demand_branches,
+    LEAP_DEMAND_REPRESENTATION_STATUS_PATH,
     category_basis_options,
     configured_comparison_scopes,
 )
@@ -207,8 +208,13 @@ def _render_one_economy(
         "error": "",
     }
     try:
-        missing_leap_branches = _missing_leap_demand_branches(economy)
-        template = filter_template_for_leap_demand_coverage(template, missing_leap_branches)
+        representation_status_df = load_leap_demand_representation_status(
+            LEAP_DEMAND_REPRESENTATION_STATUS_PATH,
+            economy,
+            min_year=MIN_YEAR,
+            max_year=MAX_YEAR,
+        )
+        template = filter_template_for_leap_demand_coverage(template, representation_status_df)
         definitions = configured_comparison_scopes(template)
         selector_options = category_basis_options(economy, definitions)
         scope_filtered_df = filter_common_esto_data(

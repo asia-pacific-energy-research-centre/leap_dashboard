@@ -1,5 +1,16 @@
 # LEAP dashboard work queue and handover plan
 
+## Current-run LEAP demand representation status — implemented, verification pending
+
+The dashboard now reads the mappings-owned
+`leap_demand_representation_status.csv` artifact generated from the current
+LEAP balance exports. Placeholder status controls warning text and the special
+combined-bunker presentation only. It no longer hides ordinary dashboard
+categories or pages, which continue to render from available Common ESTO facts
+and the existing source-safe hierarchy frontier. Missing representations remain
+unavailable rather than zero; partial detail remains warning-only and no
+dashboard allocation is allowed.
+
 **Snapshot date:** 2026-07-28
 
 **Planning horizon:** four weeks, through 2026-08-24
