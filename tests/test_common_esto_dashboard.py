@@ -377,15 +377,20 @@ def test_emissions_components_keep_demand_sectors_and_combine_signed_transformat
 
     selected, coverage, selection = select_emissions_component_rows(
         rows,
-        {"demand_page_keys": ["industry", "transport", "buildings", "others"]},
+        {
+            "demand_page_keys": ["industry", "transport", "buildings", "others"],
+            "combustion_transformation_flow_code_prefixes": ["09.01", "09.02"],
+            "combustion_own_use_flow_code_prefixes": ["10.01"],
+        },
     )
 
     assert coverage.empty
-    assert set(selected["_sector_label"]) == {"Industry", "Transformation and own use"}
-    assert set(selected["value"]) == {20.0, 30.0, 5.0, 7.0}
+    assert set(selected["_sector_label"]) == {"Industry", "Power generation and own use"}
+    assert set(selected["value"]) == {20.0, 30.0, 5.0}
     assert "08 Transfers" not in set(selected["common_flow_label"])
-    assert (selected["_sector_label"] == "Transformation and own use").sum() == 3
-    assert set(selection["emissions_component"]) == {"Final demand", "Transformation and own use"}
+    assert "09.07 Oil refineries" not in set(selected["common_flow_label"])
+    assert (selected["_sector_label"] == "Power generation and own use").sum() == 2
+    assert set(selection["emissions_component"]) == {"Final demand", "Power generation and own use"}
 
 
 def test_total_demand_sector_area_uses_non_overlapping_parent_child_frontier() -> None:

@@ -90,6 +90,16 @@ non-overlapping detail frontier instead. The generated
 `supporting_files/emissions_source_selection.csv` records which level was used
 for each source and scenario.
 
+The transformation part of the emissions estimate is combustion-only. It
+includes negative power/CHP/heat-plant inputs under `09.01` and `09.02`, plus
+separately reported energy-sector own use under `10.01`. It does not apply a
+combustion factor to conversion feedstocks such as crude sent to refineries,
+natural gas sent to LNG liquefaction, or coal sent to coke ovens. Positive
+transformation outputs, transfers, and `10.02` transmission/distribution
+losses are also excluded. This boundary prevents exact transformation rows,
+inclusive `(including own use)` views, and standalone own-use rows from being
+counted together.
+
 ### What currently determines “aggregate-only”
 
 The current source of truth is

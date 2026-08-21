@@ -913,17 +913,63 @@ def _lowest_transformation_frontier(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _combustion_transformation_rows(
+    assigned_df: pd.DataFrame,
+    config: dict,
+) -> pd.DataFrame:
+    """Return transformation and own-use rows that represent combustion.
+
+    A negative transformation balance is not automatically fuel combustion.
+    Refinery crude, gas sent to LNG liquefaction, and coal sent to coke ovens
+    are conversion feedstocks whose energy reappears as positive outputs.
+    Applying a combustion factor to those inputs materially overstates
+    emissions and can also double count exact, inclusive, and own-use views.
+
+    Power-sector inputs are combustion inputs. Separately reported energy-
+    sector own use is also treated as combustion, while transmission and
+    distribution losses are not assigned a direct combustion factor.
+    """
+    if assigned_df.empty:
+        return assigned_df.copy()
+
+    renderer = _renderer()
+    transformation_prefixes = [
+        str(value).strip()
+        for value in config.get(
+            "combustion_transformation_flow_code_prefixes",
+            ["09.01", "09.02"],
+        )
+        if str(value).strip()
+    ]
+    own_use_prefixes = [
+        str(value).strip()
+        for value in config.get("combustion_own_use_flow_code_prefixes", ["10.01"])
+        if str(value).strip()
+    ]
+    allowed_prefixes = transformation_prefixes + own_use_prefixes
+    if not allowed_prefixes:
+        return assigned_df.iloc[0:0].copy()
+
+    combustion_mask = assigned_df["common_flow_code"].astype(str).apply(
+        lambda code: renderer.code_expression_matches_any_prefix(
+            code,
+            allowed_prefixes,
+        )
+    )
+    return assigned_df[combustion_mask].copy()
+
+
 def select_emissions_component_rows(
     assigned_df: pd.DataFrame,
     config: dict,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Select combustion rows for the two emissions charts.
 
-    Demand uses the existing non-overlapping frontier. Transformation and own
-    use are selected separately at that same lowest available frontier, then
-    only negative signed rows are retained: negative means fuel consumed by a
-    transformation/own-use flow, while positive means fuel output. Transfers
-    (flow 08) and non-energy or mixed demand aggregates are excluded.
+    Demand uses the existing non-overlapping frontier. Power-sector combustion
+    inputs and energy-sector own use are selected separately at the lowest
+    available frontier, then only negative signed rows are retained. Conversion
+    feedstocks, positive outputs, transfers, transmission/distribution losses,
+    and non-energy or mixed demand aggregates are excluded.
 
     Returns ``(rows, coverage_rows, component_selection)``. The returned rows
     have positive ``value`` values and a normalized ``_sector_label`` suitable
@@ -956,12 +1002,11 @@ def select_emissions_component_rows(
     transformation = assigned_df[
         assigned_df["_page_key"].astype(str).isin(_TRANSFORMATION_PAGE_KEYS)
     ].copy()
-    # Transfers are routing operations, not fuel combustion. Select the leaf
-    # frontier before using the sign, because parent transformation rows can
-    # net an input and output to zero.
-    transformation = transformation[
-        ~transformation["common_flow_code"].astype(str).str.startswith("08")
-    ].copy()
+    # Keep combustion rather than every negative balance-table input. This
+    # excludes conversion feedstocks and T&D losses before frontier selection,
+    # so an inclusive transformation rollup cannot duplicate its exact input
+    # and separately reported own-use row.
+    transformation = _combustion_transformation_rows(transformation, config)
     transformation_frontier = _lowest_transformation_frontier(transformation)
     transformation_frontier["signed_value_pj"] = pd.to_numeric(
         transformation_frontier["value"], errors="coerce"
@@ -971,8 +1016,8 @@ def select_emissions_component_rows(
     ].copy()
     if not transformation_rows.empty:
         transformation_rows["value"] = transformation_rows["signed_value_pj"].abs()
-        transformation_rows["_emissions_component"] = "Transformation and own use"
-        transformation_rows["_sector_label"] = "Transformation and own use"
+        transformation_rows["_emissions_component"] = "Power generation and own use"
+        transformation_rows["_sector_label"] = "Power generation and own use"
 
     selected_frames = [frame for frame in (demand_rows, transformation_rows) if not frame.empty]
     if selected_frames:
@@ -988,9 +1033,9 @@ def select_emissions_component_rows(
         pd.DataFrame([{
             "source_system": source,
             "scenario": scenario,
-            "emissions_level": "transformation_leaf_frontier",
+            "emissions_level": "combustion_leaf_frontier",
             "row_count": int(len(group)),
-            "emissions_component": "Transformation and own use",
+            "emissions_component": "Power generation and own use",
         } for (source, scenario), group in transformation_rows.groupby(
             ["source_system", "scenario"], sort=False
         )]),
@@ -1138,11 +1183,12 @@ def build_emissions_page(
 ) -> tuple[list[dict], dict | None]:
     """Build the Emissions page (config-driven bespoke page).
 
-    Applies the active emissions factor set to the final-demand rows and to
-    negative transformation/own-use input rows, then renders exactly two
-    stacked comparison charts: emissions by fuel and emissions by major
-    sector. Positive transformation outputs, transfers, and non-energy demand
-    are not included in the combustion boundary.
+    Applies the active emissions factor set to final demand, negative
+    power-sector combustion inputs, and separately reported energy-sector own
+    use, then renders exactly two stacked comparison charts: emissions by fuel
+    and emissions by major sector. Conversion feedstocks, positive outputs,
+    transfers, transmission/distribution losses, and non-energy demand are not
+    included in the combustion boundary.
 
     Scope, factor set, sector membership, and suppression are config-driven via
     the ``emissions_page`` template key and
@@ -1408,12 +1454,13 @@ def _page_note(
 ) -> str:
     """Give the page a short explanation of what its emissions represent."""
     note = (
-        f"Emissions ({unit}) are estimated from final demand plus transformation "
-        f"and own-use fuel inputs using "
+        f"Emissions ({unit}) are estimated from final demand, power-sector combustion "
+        f"inputs, and energy-sector own use using "
         f"{factor_set.get('label', factor_set.get('key', 'CO2e emissions factors'))}. "
         "Final demand is split into Industry, Transport, Buildings, and Other demand. "
-        "Transformation inputs and own use are combined: negative lowest-level rows "
-        "are treated as fuel consumption, while positive outputs and transfers are excluded. "
+        "Negative power-sector inputs and separately reported energy-sector own use are "
+        "treated as fuel consumption. Conversion feedstocks, positive transformation "
+        "outputs, transfers, and transmission/distribution losses are excluded. "
         "Non-energy use, including unresolved mixed Other-sector aggregates, is excluded."
     )
     if aggregate_sources:
