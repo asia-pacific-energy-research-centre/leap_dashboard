@@ -1244,6 +1244,32 @@ def frontier_flow_labels(nodes: pd.DataFrame, parent_prefix: str, target_level: 
     labels_by_source: dict[str, list[str]] = {}
     for source in sources:
         source_subtree = subtree[subtree["source_systems"].apply(lambda systems: source in systems)]
+
+        # A generated intermediate chart may have a real, observed
+        # NON_EXPANDING boundary at its own prefix.  Prefer that boundary for
+        # the source instead of descending to the target-level children.  The
+        # latter is normally the right choice for a hierarchy-only parent, but
+        # it drops separately mapped contributors (for example LNG
+        # demand-side own use) from an inclusive 09.06.02 chart.
+        parent_rows = source_subtree[
+            source_subtree["canonical_code"].astype(str).eq(str(parent_prefix))
+        ]
+        if "is_non_expanding_rollup" in parent_rows.columns:
+            parent_rows = parent_rows[_metadata_bool(parent_rows["is_non_expanding_rollup"])]
+        else:
+            parent_rows = parent_rows.iloc[0:0]
+        if not parent_rows.empty:
+            boundary_rows = parent_rows[
+                parent_rows["common_flow_label"].astype(str).str.casefold().str.contains(
+                    "including own use", regex=False
+                )
+            ]
+            preferred_rows = boundary_rows if not boundary_rows.empty else parent_rows
+            labels = sorted(preferred_rows["common_flow_label"].astype(str).unique())
+            if labels:
+                labels_by_source[source] = labels
+                continue
+
         labels = _frontier_labels_for_subtree(source_subtree, target_level)
         if labels:
             labels_by_source[source] = labels

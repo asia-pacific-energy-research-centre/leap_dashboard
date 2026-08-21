@@ -45,6 +45,7 @@ from codebase.common_esto_dashboard_renderer import (
     color_for_plotting_name,
     drop_excluded_flow_rows,
     effective_chart_suppression_threshold,
+    frontier_flow_labels,
     guide_page_context,
     guide_page_mapping_table,
     guide_placeholder_status,
@@ -73,6 +74,39 @@ from codebase.common_esto_dashboard_renderer import (
     _jump_nav_html,
     _line_sections_html,
 )
+
+
+def test_frontier_prefers_observed_inclusive_parent_boundary() -> None:
+    nodes = pd.DataFrame([
+        {
+            "common_flow_code": "09.06.02",
+            "common_flow_label": "09.06.02 Liquefaction/regasification plants",
+            "canonical_code": "09.06.02",
+            "depth": 3,
+            "source_systems": frozenset({"LEAP"}),
+            "is_non_expanding_rollup": False,
+        },
+        {
+            "common_flow_code": "09.06.02",
+            "common_flow_label": "09.06.02 Liquefaction/regasification plants (including own use)",
+            "canonical_code": "09.06.02",
+            "depth": 3,
+            "source_systems": frozenset({"LEAP"}),
+            "is_non_expanding_rollup": True,
+        },
+        {
+            "common_flow_code": "09.06.02.01",
+            "common_flow_label": "09.06.02.01 Liquefaction",
+            "canonical_code": "09.06.02.01",
+            "depth": 4,
+            "source_systems": frozenset({"LEAP"}),
+            "is_non_expanding_rollup": False,
+        },
+    ])
+
+    assert frontier_flow_labels(nodes, "09.06.02", 4) == {
+        "LEAP": ["09.06.02 Liquefaction/regasification plants (including own use)"]
+    }
 
 
 def test_extended_comparison_keeps_pre_base_year_historical_rows() -> None:
