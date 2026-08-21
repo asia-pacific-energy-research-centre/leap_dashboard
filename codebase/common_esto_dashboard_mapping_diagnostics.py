@@ -83,7 +83,10 @@ def _read_diagnostic_table(path: Path) -> pd.DataFrame:
         frame = pd.read_parquet(selected_path)
         if len(frame) != int(artifact.get("row_count", -1)):
             raise ValueError(f"Mapping diagnostic row-count mismatch: {selected_path}")
-        return frame.fillna("")
+        # Parquet diagnostics can preserve nullable numeric dtypes.  Pandas
+        # rejects an empty-string fill value for Float64/Int64 columns, while
+        # this renderer needs a display-safe object frame for mixed tables.
+        return frame.astype(object).where(frame.notna(), "")
     return _read_csv(selected_path)
 
 
