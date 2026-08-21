@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Energy balance overview</title>
+  <style>
+:root {
+  color-scheme: light;
+  --page-padding-x: clamp(12px, 1.8vw, 24px);
+  --page-padding-y: clamp(14px, 1.8vw, 24px);
+  --body-font-size: clamp(15px, 0.22vw + 14px, 18px);
+  --title-font-size: clamp(24px, 0.75vw + 18px, 34px);
+  --section-title-size: clamp(18px, 0.45vw + 14px, 24px);
+}
+html { background: #f4f6f8; }
+body {
+  font-family: Segoe UI, Arial, sans-serif;
+  margin: 0;
+  background: #f4f6f8;
+  color: #111;
+  font-size: var(--body-font-size);
+  line-height: 1.45;
+  min-width: 320px;
+}
+a { color: #0b3d5c; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.page-shell { width: 100%; max-width: none; margin: 0 auto; padding: 0 var(--page-padding-x) 32px; box-sizing: border-box; }
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin: 0 0 14px 0;
+  padding: var(--page-padding-y) 0 10px 0;
+  background: rgba(244, 246, 248, 0.96);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #d8dee4;
+}
+.header-main-row { display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 16px; }
+.header-side-controls {
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;
+  gap:8px 10px;flex:1 1 460px;
+}
+.header-inline-controls {
+  display:flex;align-items:center;gap:6px;justify-content:safe flex-end;
+  flex:1 1 100%;flex-wrap:nowrap;margin-left:0;min-width:0;
+  overflow-x:auto;overflow-y:hidden;padding-bottom:2px;
+}
+.dashboard-context { margin-top:6px;color:#4b5563;font-size:13px;line-height:1.35; }
+.dashboard-updated { margin-left:10px;padding-left:10px;border-left:1px solid #c5ccd3;color:#64748b;white-space:nowrap; }
+.dashboard-switcher {
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;white-space:nowrap;
+}
+.dashboard-switcher select {
+  max-width:220px;padding:5px 28px 5px 8px;border:1px solid #c5ccd3;border-radius:6px;
+  background:#fff;color:#111;font:inherit;
+}
+.header-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.header-chip {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border: 1px solid #c5ccd3;
+  border-radius: 6px;
+  background: #fff;
+  color: #0b3d5c;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.header-chip[data-current="true"] {
+  border-color:#1f6feb;
+  box-shadow:0 0 0 2px rgba(31, 111, 235, 0.16);
+  font-weight:700;
+}
+.header-nav-separator { flex:0 0 auto;color:#6b7280;font-weight:700;line-height:1.25;padding:6px 1px; }
+.header-toggle {
+  width: 30px; height: 30px;
+  border: 1px solid #c5ccd3;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b3d5c;
+  cursor: pointer;
+}
+.header-toggle-row { display:flex;justify-content:flex-end;gap:8px;margin-top:8px; }
+.page-header.is-collapsed .header-collapsible { display: none; }
+.page-header.is-collapsed { padding-bottom:0;background:transparent;backdrop-filter:none;border-bottom-color:transparent; }
+.page-header.is-collapsed .header-toggle-row { margin-top:0; }
+.jump-nav {
+  margin-top:8px;padding-top:8px;border-top:1px solid #d8dee4;
+  display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-start;
+}
+.jump-nav-label { font-weight:600;color:#4b5563;font-size:12px;white-space:nowrap;padding-top:4px; }
+.jump-nav-groups { display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 640px; }
+.jump-nav-row { display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0; }
+.jump-nav-row[data-level="2"] { padding-left:18px; }
+.jump-nav-row[data-level="3"] { padding-left:36px; }
+.jump-nav-row[data-level="4"] { padding-left:54px; }
+.jump-chip {
+  position:relative;display:inline-flex;align-items:center;gap:6px;
+  padding:4px 9px;border:1px solid #c5ccd3;border-radius:999px;
+  background:#fff;color:#0b3d5c;text-decoration:none;font-size:12px;line-height:1.25;
+  box-shadow:0 1px 1px rgba(15,23,42,0.04);
+}
+.jump-chip::before { content:"";display:block;width:8px;height:8px;border-radius:999px;flex:0 0 auto;background:#94a3b8; }
+.jump-chip[data-level="1"] { background:#fff4e6;border-color:#f2a65a;color:#7a3b00; }
+.jump-chip[data-level="1"]::before { background:#f97316; }
+.jump-chip[data-level="2"] { background:#ecfdf3;border-color:#86d5a6;color:#166534; }
+.jump-chip[data-level="2"]::before { background:#22c55e; }
+.jump-chip[data-level="3"] { background:#eff6ff;border-color:#93c5fd;color:#1e40af; }
+.jump-chip[data-level="3"]::before { background:#3b82f6; }
+.jump-chip[data-level="4"] { background:#f5edff;border-color:#c69af0;color:#4c1d70; }
+.jump-chip[data-level="4"]::before { background:#9333ea; }
+.visible-note { margin:8px 0 10px 0;padding:8px 12px;background:#fffbe6;border-left:3px solid #f0a500;border-radius:4px;font-size:13px;color:#5a3e00;line-height:1.5; }
+.scenario-toggle {
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;white-space:nowrap;
+}
+.scenario-toggle-buttons { display:flex;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
+.scenario-toggle-btn {
+  padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
+}
+.scenario-toggle-btn + .scenario-toggle-btn { border-left:1px solid #c5ccd3; }
+.scenario-toggle-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.category-basis-switcher { display:flex;align-items:center;gap:6px;font-size:12px;color:#4b5563;white-space:nowrap; }
+.category-basis-switcher span { font-weight:600; }
+.category-basis-switcher select { max-width:210px;padding:5px 28px 5px 8px;border:1px solid #c5ccd3;border-radius:6px;background:#fff;color:#111;font:inherit; }
+.dataset-filter {
+  display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap;flex:0 0 auto;
+  width:max-content;max-width:max-content;
+  font-size:12px;color:#4b5563;
+}
+.dataset-filter-label { flex:0 0 auto;font-weight:600;line-height:1.2;text-align:right; }
+.dataset-filter-buttons { display:flex;flex:0 0 auto;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
+.dataset-filter-btn {
+  padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
+}
+.dataset-filter-btn + .dataset-filter-btn { border-left:1px solid #c5ccd3; }
+.dataset-filter-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.dataset-filter-clear { padding:4px 8px;border:0;background:transparent;color:#1f6feb;font:inherit;cursor:pointer; }
+.dataset-filter-status { width:100%;text-align:right;color:#64748b;font-size:11px; }
+.dataset-filter-status.is-empty { color:#9a3412;font-weight:600; }
+.chart-card.dataset-filtered { display:none; }
+.dataset-group-empty { display:none !important; }
+.dashboard-grid {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:12px;
+  align-items:start;
+}
+.dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.dashboard-grid.expand-1 { grid-template-columns:minmax(0, 1fr); }
+.dashboard-grid.expand-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.dashboard-grid.expand-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.chart-card { margin:0;padding:10px;border:1px solid #d0d7de;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.05); }
+.chart-caption { font-weight:600;margin-bottom:4px; }
+.meta-subline { margin-top:-4px;margin-bottom:8px;color:#4b5563;font-size:12px; }
+.area-data-note { margin:-3px 0 8px 0;color:#64748b;font-size:11px;line-height:1.3;font-style:italic; }
+.chart-load-state { min-height:22px;margin:4px 0 6px 0;color:#64748b;font-size:12px; }
+.chart-load-state[data-loaded="true"] { display:none; }
+.lazy-chart-plot {
+  width:100%;height:clamp(380px, 62vh, 1100px);
+  border:1px solid #d0d7de;border-radius:6px;background:#fff;display:block;box-sizing:border-box;
+}
+.lazy-chart-plot.is-unloaded { background:#f8fafc; }
+.section-heading { margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d; }
+.subsection-heading { margin:14px 0 6px 12px;font-size:15px;font-weight:600;color:#4c1d70;padding-left:8px;border-left:3px solid #c69af0; }
+@media (max-width: 900px) {
+  .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:minmax(0, 1fr); }
+  .dashboard-updated { display:block;margin:4px 0 0 0;padding:0;border-left:0;white-space:normal; }
+}
+@media (max-width: 600px) {
+  .header-side-controls { flex:1 1 100%;min-width:0;justify-content:flex-start; }
+  .header-inline-controls { margin-left:0;flex-wrap:wrap;justify-content:flex-start;width:100%; }
+  .header-links { width:100%; }
+  .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:minmax(0, 1fr); }
+  .lazy-chart-plot { height:420px; }
+}
+
+.dashboard-guide-launch {
+  display:inline-flex;align-items:center;gap:5px;padding:5px 10px;
+  border:1px solid #1f6feb;border-radius:999px;background:#fff;color:#0b3d5c;
+  font:inherit;font-size:12px;font-weight:750;white-space:nowrap;cursor:pointer;
+  box-shadow:0 1px 2px rgba(15,23,42,.08);
+}
+.dashboard-guide-launch:hover,.dashboard-guide-launch:focus-visible {
+  background:#e8f0fe;outline:2px solid rgba(31,111,235,.28);outline-offset:2px;
+}
+.dashboard-guide-launch span { display:inline-grid;place-items:center;width:16px;height:16px;border:1px solid currentColor;border-radius:50%;font-size:10px; }
+.dashboard-guide-backdrop { position:fixed;inset:0;z-index:1000;background:rgba(15,35,55,.66); }
+.dashboard-guide-dialog {
+  position:fixed;left:50%;top:50%;z-index:1010;width:min(680px,calc(100vw - 28px));
+  max-height:calc(100vh - 28px);box-sizing:border-box;overflow:auto;
+  transform:translate(-50%,-50%);padding:18px;border:1px solid #b8c9dc;
+  border-radius:10px;background:#fff;color:#173452;box-shadow:0 22px 70px rgba(13,37,76,.42);
+}
+.dashboard-guide-dialog.guide-has-rich-content { width:min(1180px,calc(100vw - 28px)); }
+.dashboard-guide-backdrop[hidden],.dashboard-guide-dialog[hidden] { display:none!important; }
+.dashboard-guide-progress { color:#64748b;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase; }
+.dashboard-guide-close { float:right;border:0;background:transparent;color:#64748b;font-size:24px;line-height:.8;cursor:pointer; }
+.dashboard-guide-kicker { margin-top:15px;color:#e7672a;font-size:10px;font-weight:850;letter-spacing:.14em; }
+.dashboard-guide-title { margin:5px 0 8px;font-size:23px;line-height:1.18; }
+.dashboard-guide-copy { margin:0;color:#475569;font-size:15px;line-height:1.58;white-space:pre-line; }
+.dashboard-guide-image { display:block;width:100%;max-height:58vh;margin-top:14px;object-fit:contain;border:1px solid #cbd8e7;border-radius:6px;background:#f8fafc; }
+.dashboard-guide-gallery { display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin-top:14px; }
+.dashboard-guide-gallery figure { min-width:0;margin:0; }
+.dashboard-guide-gallery-images { display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:10px; }
+.dashboard-guide-gallery-images img { display:block;width:100%;max-height:56vh;object-fit:contain;border:1px solid #cbd8e7;border-radius:6px;background:#f8fafc; }
+.dashboard-guide-gallery figcaption { margin-top:5px;color:#64748b;font-size:12px;font-weight:650;text-align:center; }
+.dashboard-guide-gallery button { width:34px;height:34px;border:1px solid #93b5d8;border-radius:50%;background:#eef5fc;color:#0b3d5c;font-size:18px;cursor:pointer; }
+.dashboard-guide-gallery button:disabled { opacity:.4;cursor:default; }
+.dashboard-guide-table { margin-top:14px;overflow-x:auto;border:1px solid #cbd8e7;border-radius:6px; }
+.dashboard-guide-table-caption { padding:8px 10px;background:#eef5fc;color:#0b3d5c;font-size:13px;font-weight:750; }
+.dashboard-guide-table-note { margin:8px 10px;color:#7c2d12;font-size:12px;line-height:1.45; }
+.dashboard-guide-table table { width:100%;min-width:640px;border-collapse:collapse;color:#334155;font-size:13px; }
+.dashboard-guide-table th,.dashboard-guide-table td { padding:7px 9px;border-top:1px solid #dbe5ef;text-align:left;vertical-align:top; }
+.dashboard-guide-table th { background:#f8fafc;color:#0b3d5c; }
+.dashboard-guide-table td { white-space:pre-line; }
+.dashboard-guide-image[hidden],.dashboard-guide-gallery[hidden],.dashboard-guide-table[hidden] { display:none!important; }
+.dashboard-guide-actions { display:flex;align-items:center;justify-content:space-between;margin-top:17px; }
+.dashboard-guide-actions button { border:0;border-radius:6px;padding:9px 13px;background:transparent;color:#173452;font-weight:700;cursor:pointer; }
+.dashboard-guide-next { background:#1f6feb!important;color:#fff!important; }
+.dashboard-guide-highlight { position:relative!important;z-index:1005!important;box-shadow:0 0 0 4px #ff9868,0 0 0 8px rgba(255,255,255,.96)!important;border-radius:5px; }
+.page-header.dashboard-guide-layer { z-index:1004; }
+@media (max-width:640px) {
+  .dashboard-guide-dialog { top:auto;bottom:10px;transform:translateX(-50%);max-height:72vh;padding:15px; }
+  .dashboard-guide-title { font-size:20px; }
+  .dashboard-guide-copy { font-size:14px; }
+  .dashboard-guide-gallery { gap:5px; }
+  .dashboard-guide-gallery button { width:29px;height:29px; }
+}
+</style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="page-header" id="page-header">
+      <div class="header-collapsible">
+      <div class="header-main-row">
+        <div style="min-width:220px;flex:1 1 320px;" data-guide-id="page-purpose">
+          <h1 style="margin:0;font-size:24px;line-height:1.15;">Energy balance overview</h1>
+          <div class="dashboard-context" data-guide-id="economy-context">Economy: <strong>United States</strong><span class="dashboard-updated">Updated: 2026-08-21 18:51 JST</span></div>
+        </div>
+        <div class="header-side-controls" data-guide-id="top-controls">
+          
+<div class="scenario-toggle" data-guide-id="scenario-toggle" role="group" aria-label="Scenario">
+  <span>Scenario</span>
+  <div class="scenario-toggle-buttons">
+    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="ref">Reference</button>
+    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="tgt">Target</button>
+  </div>
+</div>
+
+          <label class="dashboard-switcher" data-guide-id="economy-switcher"><span>Economy</span><select data-navigation-select data-dashboard-switcher aria-label="Switch economy"><option value="../../01AUS/dashboards/energy_balance_overview.html">Australia</option><option value="../../02BD/dashboards/energy_balance_overview.html">Brunei Darussalam</option><option value="../../03CDA/dashboards/energy_balance_overview.html">Canada</option><option value="../../04CHL/dashboards/energy_balance_overview.html">Chile</option><option value="../../05PRC/dashboards/energy_balance_overview.html">China</option><option value="../../06HKC/dashboards/energy_balance_overview.html">Hong Kong, China</option><option value="../../07INA/dashboards/energy_balance_overview.html">Indonesia</option><option value="../../08JPN/dashboards/energy_balance_overview.html">Japan</option><option value="../../09ROK/dashboards/energy_balance_overview.html">Korea</option><option value="../../10MAS/dashboards/energy_balance_overview.html">Malaysia</option><option value="../../11MEX/dashboards/energy_balance_overview.html">Mexico</option><option value="../../12NZ/dashboards/energy_balance_overview.html">New Zealand</option><option value="../../13PNG/dashboards/energy_balance_overview.html">Papua New Guinea</option><option value="../../14PE/dashboards/energy_balance_overview.html">Peru</option><option value="../../15PHL/dashboards/energy_balance_overview.html">Philippines</option><option value="../../16RUS/dashboards/energy_balance_overview.html">Russia</option><option value="../../17SGP/dashboards/energy_balance_overview.html">Singapore</option><option value="../../18CT/dashboards/energy_balance_overview.html">Chinese Taipei</option><option value="../../19THA/dashboards/energy_balance_overview.html">Thailand</option><option value="energy_balance_overview.html" selected>United States</option><option value="../../21VN/dashboards/energy_balance_overview.html">Viet Nam</option></select></label>
+          <label class="category-basis-switcher" data-guide-id="category-basis-switcher"><span>Comparison basis</span><select data-navigation-select data-category-basis-switcher aria-label="Choose the comparison basis"><option value="energy_balance_overview.html" selected>LEAP + ESTO Extended + Ninth</option><option value="../../20USA__esto_extended_leap/dashboards/energy_balance_overview.html">LEAP + ESTO Extended</option></select></label>
+          
+          <div class="header-inline-controls" data-guide-id="page-navigation"><a href="energy_balance_overview.html" class="header-chip" data-current="true">Energy balance overview</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="buildings.html" class="header-chip" data-current="false">Buildings</a><a href="industry.html" class="header-chip" data-current="false">Industry</a><a href="transport.html" class="header-chip" data-current="false">Transport</a><a href="other_demand.html" class="header-chip" data-current="false">Other demand</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="power.html" class="header-chip" data-current="false">Power</a><a href="refining.html" class="header-chip" data-current="false">Refining</a><a href="other_transformation.html" class="header-chip" data-current="false">Other transformation</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="supply.html" class="header-chip" data-current="false">Supply</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="emissions.html" class="header-chip" data-current="false">Emissions</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="../../diagnostics/dashboards/mapping_diagnostics.html" class="header-chip" data-current="false">Mapping diagnostics</a></div>
+        </div>
+      </div>
+      
+      </div>
+      <div class="header-toggle-row">
+        <button id="dashboard-guide-launch" class="dashboard-guide-launch" type="button" aria-haspopup="dialog" aria-controls="dashboard-guide-dialog"><span aria-hidden="true">?</span> Guide</button>
+        <button id="header-toggle" class="header-toggle" type="button" aria-expanded="true" aria-label="Collapse header">&#9652;</button>
+      </div>
+    </header>
+    <main class="page-body" data-guide-id="review-workflow">
+      
+      <section data-dataset-filter-section><h2 class="section-heading">Demand composition</h2><section class="section-sort-group"><div class="dashboard-grid overview-grid" data-sortable-grid="overview-demand_composition"><figure class="chart-card" data-guide-id="chart-card" data-default-order="0" data-total-abs="20691429.3773" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP,NINTH"><figcaption class="chart-caption">Final energy demand by sector (TFC)</figcaption><div class="meta-subline">Energy balance overview &gt; Demand composition</div><div class="area-data-note">Areas show domestic demand sectors; lines show domestic TFC totals by dataset and scenario. Stacked areas: LEAP demand detail for the selected scenario.</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__total_demand__sector" class="lazy-chart-plot is-unloaded" role="img" aria-label="Final energy demand by sector (TFC)"></div></figure><figure class="chart-card" data-guide-id="chart-card" data-default-order="1" data-total-abs="20691429.3773" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP,NINTH"><figcaption class="chart-caption">Final energy demand by fuel (TFC)</figcaption><div class="meta-subline">Energy balance overview &gt; Demand composition</div><div class="area-data-note">Areas show domestic demand fuels; lines show domestic TFC totals by dataset and scenario. Stacked areas: LEAP fuel detail for the selected scenario.</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__total_demand__fuel" class="lazy-chart-plot is-unloaded" role="img" aria-label="Final energy demand by fuel (TFC)"></div></figure></div></section></section><section data-dataset-filter-section><h2 class="section-heading">Supply composition</h2><section class="section-sort-group"><div class="dashboard-grid overview-grid" data-sortable-grid="overview-supply_composition"><figure class="chart-card" data-guide-id="chart-card" data-default-order="0" data-total-abs="30528636.7436" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP,NINTH"><figcaption class="chart-caption">Energy supply by balance component</figcaption><div class="meta-subline">Energy balance overview &gt; Supply composition</div><div class="area-data-note">Areas show production, imports and exports; lines show signed net totals by dataset and scenario. Stacked areas: LEAP supply detail for the selected scenario.</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__total_demand__supply_component" class="lazy-chart-plot is-unloaded" role="img" aria-label="Energy supply by balance component"></div></figure><figure class="chart-card" data-guide-id="chart-card" data-default-order="1" data-total-abs="30528636.7436" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP,NINTH"><figcaption class="chart-caption">Energy supply by fuel</figcaption><div class="meta-subline">Energy balance overview &gt; Supply composition</div><div class="area-data-note">Areas show supply fuels; lines show signed net totals by dataset and scenario. Stacked areas: LEAP supply detail for the selected scenario.</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__total_demand__supply_fuel" class="lazy-chart-plot is-unloaded" role="img" aria-label="Energy supply by fuel"></div></figure></div></section></section><section data-dataset-filter-section><h2 class="section-heading">Transformation, transfers, losses and own use</h2><section class="section-sort-group"><div class="dashboard-grid overview-grid" data-sortable-grid="overview-transformation_transfers_losses_and_own_use"><figure class="chart-card" data-guide-id="chart-card" data-default-order="0" data-total-abs="28555363.7749" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP,NINTH"><figcaption class="chart-caption">Transformation, transfers, losses and own use by flow</figcaption><div class="meta-subline">Energy balance overview &gt; Transformation, transfers, losses and own use</div><div class="area-data-note">Areas show signed transformation, transfer, own-use and loss flows; lines show signed net totals by dataset and scenario. Stacked areas: LEAP flow detail for the selected scenario. Note: ESTO historical data do not contain all LNG activity, so a large change between the base year and projections can be expected and does not indicate a dashboard or mapping error;</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__total_demand__transformation_flow" class="lazy-chart-plot is-unloaded" role="img" aria-label="Transformation, transfers, losses and own use by flow"></div></figure><figure class="chart-card" data-guide-id="chart-card" data-default-order="1" data-total-abs="28555363.7749" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP,NINTH"><figcaption class="chart-caption">Transformation, transfers, losses and own use by fuel</figcaption><div class="meta-subline">Energy balance overview &gt; Transformation, transfers, losses and own use</div><div class="area-data-note">Areas show fuels across the complete boundary; lines show signed net totals by dataset and scenario. Stacked areas: LEAP fuel detail for the selected scenario. Note: ESTO historical data do not contain all LNG activity, so a large change between the base year and projections can be expected and does not indicate a dashboard or mapping error;</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__total_demand__transformation_fuel" class="lazy-chart-plot is-unloaded" role="img" aria-label="Transformation, transfers, losses and own use by fuel"></div></figure></div></section></section><section data-dataset-filter-section><h2 class="section-heading">Unmet requirements</h2><section class="section-sort-group"><div class="dashboard-grid expand-1" data-sortable-grid="overview-unmet_requirements"><figure class="chart-card" data-guide-id="chart-card" data-default-order="0" data-total-abs="35293.3518" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="LEAP"><figcaption class="chart-caption">Unmet requirements by fuel</figcaption><div class="meta-subline">Energy balance overview &gt; Unmet requirements</div><div class="area-data-note">Positive values show an energy shortage; negative values show surplus energy. Areas show LEAP Unmet Requirements by mapped Common ESTO fuel category.</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__total_demand__unmet_requirements" class="lazy-chart-plot is-unloaded" role="img" aria-label="Unmet requirements by fuel"></div></figure></div></section></section>
+      <section id="sec-energy_balance_overview__energy_balance_totals" data-dataset-filter-section style="scroll-margin-top:150px;"><h2 class="section-heading">Energy balance totals</h2><section class="section-sort-group"><div class="dashboard-grid expand-2" data-sortable-grid="sec-energy_balance_overview__energy_balance_totals"><figure class="chart-card" data-guide-id="chart-card" data-default-order="0" data-total-abs="23572075.3943" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP,NINTH"><figcaption class="chart-caption">07 Total primary energy supply</figcaption><div class="meta-subline">Energy balance overview &gt; Energy balance totals</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__total_demand__07" class="lazy-chart-plot is-unloaded" role="img" aria-label="07 Total primary energy supply"></div></figure><figure class="chart-card" data-guide-id="chart-card" data-default-order="1" data-total-abs="12665504.1617" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP,NINTH"><figcaption class="chart-caption">12 Total final consumption</figcaption><div class="meta-subline">Energy balance overview &gt; Energy balance totals</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__total_demand__12" class="lazy-chart-plot is-unloaded" role="img" aria-label="12 Total final consumption"></div></figure></div></section></section>
+    </main>
+  </div>
+  
+<div id="dashboard-guide-backdrop" class="dashboard-guide-backdrop" hidden></div>
+<aside id="dashboard-guide-dialog" class="dashboard-guide-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="dashboard-guide-title" aria-describedby="dashboard-guide-copy">
+  <div class="dashboard-guide-progress"><span id="dashboard-guide-step">1</span> of <span id="dashboard-guide-total">1</span><button id="dashboard-guide-close" class="dashboard-guide-close" type="button" aria-label="Close guide">&times;</button></div>
+  <div id="dashboard-guide-kicker" class="dashboard-guide-kicker"></div>
+  <h2 id="dashboard-guide-title" class="dashboard-guide-title"></h2>
+  <p id="dashboard-guide-copy" class="dashboard-guide-copy"></p>
+  <img id="dashboard-guide-image" class="dashboard-guide-image" alt="" hidden>
+  <div id="dashboard-guide-gallery" class="dashboard-guide-gallery" hidden aria-label="Guide screenshots">
+    <button id="dashboard-guide-gallery-previous" type="button" aria-label="Previous screenshot">&larr;</button>
+    <figure><div id="dashboard-guide-gallery-images" class="dashboard-guide-gallery-images"></div><figcaption id="dashboard-guide-gallery-caption"></figcaption></figure>
+    <button id="dashboard-guide-gallery-next" type="button" aria-label="Next screenshot">&rarr;</button>
+  </div>
+  <div id="dashboard-guide-table" class="dashboard-guide-table" hidden></div>
+  <div class="dashboard-guide-actions"><button id="dashboard-guide-back" type="button">Back</button><button id="dashboard-guide-next" class="dashboard-guide-next" type="button">Next <span aria-hidden="true">&rarr;</span></button></div>
+</aside>
+
+  <script>
+(function() {
+  var pageHeader = document.getElementById('page-header');
+  var toggle = document.getElementById('header-toggle');
+  if (!pageHeader || !toggle) return;
+  var key = 'common-esto-header-collapsed';
+  var apply = function(collapsed) {
+    pageHeader.classList.toggle('is-collapsed', collapsed);
+    toggle.textContent = collapsed ? '▾' : '▴';
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggle.setAttribute('aria-label', collapsed ? 'Expand header' : 'Collapse header');
+  };
+  var collapsed = false;
+  try { collapsed = window.localStorage.getItem(key) === 'true'; } catch (e) {}
+  apply(collapsed);
+  toggle.addEventListener('click', function() {
+    collapsed = !pageHeader.classList.contains('is-collapsed');
+    apply(collapsed);
+    try { window.localStorage.setItem(key, collapsed ? 'true' : 'false'); } catch (e) {}
+  });
+})();
+</script>
+  <script>
+(function() {
+  document.querySelectorAll('[data-navigation-select]').forEach(function(select) {
+    select.addEventListener('change', function() {
+      var href = select.value;
+      if (href) window.location.href = href;
+    });
+  });
+})();
+</script>
+  <script>
+(function() {
+  var key = 'common-esto-scenario-mode';
+  var getMode = function() {
+    try {
+      var stored = window.localStorage.getItem(key);
+      if (stored === 'ref' || stored === 'tgt') return stored;
+    } catch (e) {}
+    return 'tgt';
+  };
+  var setMode = function(mode) {
+    try { window.localStorage.setItem(key, mode); } catch (e) {}
+  };
+
+  // Traces are tagged "esto" (always shown), or "ref"/"tgt" (LEAP/9th),
+  // with an independent optional "metric" dimension used only by the
+  // TFC/TFEC sector chart's own Plotly dropdown. See scenario_toggle_tag /
+  // trace_meta_entry in common_esto_dashboard_renderer.py.
+  var computeVisible = function(entry, scenarioMode, metricMode) {
+    var scenarioOk = entry.tag === 'esto' || entry.tag === scenarioMode;
+    var metricOk = !entry.metric || entry.metric === 'both' || entry.metric === metricMode;
+    return (scenarioOk && metricOk) ? entry.active_visible : false;
+  };
+
+  window.applyScenarioMode = function(plot) {
+    if (!window.Plotly || !plot || !plot.layout) return;
+    var meta = plot.layout.meta && plot.layout.meta.trace_meta;
+    if (!meta || !meta.length) return;
+    var scenarioMode = getMode();
+    var metricMode = plot._metricMode || 'tfc';
+    var visible = meta.map(function(entry) { return computeVisible(entry, scenarioMode, metricMode); });
+    window.Plotly.restyle(plot, {visible: visible});
+  };
+
+  var syncButtons = function() {
+    var mode = getMode();
+    document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.scenarioToggle === mode);
+    });
+  };
+  syncButtons();
+
+  document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setMode(btn.dataset.scenarioToggle);
+      syncButtons();
+      document.querySelectorAll('.lazy-chart-plot[data-rendered="true"]').forEach(function(plot) {
+        window.applyScenarioMode(plot);
+      });
+    });
+  });
+})();
+</script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="../chart_bundles/total_demand__charts.js"></script>
+  <script>
+(function() {
+  var plots = Array.from(document.querySelectorAll('.lazy-chart-plot[data-chart-key]'));
+  if (!plots.length || !window.Plotly) return;
+  var bundleData = window.COMMON_ESTO_CHART_BUNDLE_DATA;
+
+  var setState = function(plot, text, loaded) {
+    var state = plot.previousElementSibling;
+    if (state && state.classList.contains('chart-load-state')) {
+      state.dataset.loaded = loaded ? 'true' : 'false';
+      state.textContent = text || '';
+    }
+  };
+
+  var renderPlot = async function(plot) {
+    if (plot.dataset.rendered === 'true' || plot.dataset.rendering === 'true') return;
+    plot.dataset.rendering = 'true';
+    setState(plot, 'Loading chart…', false);
+    try {
+      var bundle = bundleData;
+      var chart = bundle && bundle.charts && bundle.charts[plot.dataset.chartKey];
+      if (!chart) throw new Error('Missing chart: ' + plot.dataset.chartKey);
+      await window.Plotly.newPlot(plot, chart.data || [], chart.layout || {}, {responsive: true});
+      plot.dataset.rendered = 'true';
+      plot.classList.remove('is-unloaded');
+      setState(plot, '', true);
+      window.Plotly.Plots.resize(plot);
+      if (window.applyScenarioMode) {
+        if (plot.on) {
+          plot.on('plotly_buttonclicked', function(ev) {
+            var label = (ev && ev.button && ev.button.label) || '';
+            plot._metricMode = /TFEC/i.test(label) ? 'tfec' : 'tfc';
+            window.applyScenarioMode(plot);
+          });
+        }
+        window.applyScenarioMode(plot);
+      }
+    } catch (err) {
+      plot.classList.add('is-unloaded');
+      setState(plot, 'Chart failed: ' + (err.message || err), false);
+    } finally {
+      plot.dataset.rendering = 'false';
+    }
+  };
+
+  if ('IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) { renderPlot(entry.target); observer.unobserve(entry.target); }
+      });
+    }, {rootMargin: '900px 0px'});
+    plots.forEach(function(p) { observer.observe(p); });
+  } else {
+    plots.forEach(renderPlot);
+  }
+
+  window.addEventListener('resize', function() {
+    plots.forEach(function(p) { if (p.dataset.rendered === 'true') window.Plotly.Plots.resize(p); });
+  });
+})();
+</script>
+  <script>
+(function() {
+  var filter = document.querySelector('[data-dataset-filter-group]');
+  var buttons = Array.from(document.querySelectorAll('[data-dataset-filter]'));
+  if (!filter || !buttons.length) return;
+  var scope = filter.dataset.comparisonScope || 'default';
+  var key = 'common-esto-dataset-filter:' + scope;
+  var status = document.querySelector('[data-dataset-filter-status]');
+  var clear = document.querySelector('[data-dataset-filter-clear]');
+  var available = buttons.map(function(button) { return button.dataset.datasetFilter; });
+  var active = [];
+  try {
+    var stored = JSON.parse(window.localStorage.getItem(key) || '[]');
+    if (Array.isArray(stored)) {
+      active = stored
+        .map(function(d) { return String(d).toUpperCase(); })
+        .filter(function(d) { return available.indexOf(d) !== -1; });
+    }
+  } catch (e) {}
+
+  // A card stays visible only if it contains every highlighted (active) dataset.
+  var apply = function() {
+    buttons.forEach(function(btn) {
+      var selected = active.indexOf(btn.dataset.datasetFilter) !== -1;
+      btn.classList.toggle('active', selected);
+      btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    });
+    var cards = Array.from(document.querySelectorAll('.chart-card[data-datasets]'));
+    var visibleCount = 0;
+    cards.forEach(function(card) {
+      var have = (card.dataset.datasets || '').split(',').filter(Boolean);
+      var hidden = active.some(function(d) { return have.indexOf(d) === -1; });
+      card.classList.toggle('dataset-filtered', hidden);
+      if (!hidden) visibleCount += 1;
+    });
+    document.querySelectorAll('[data-dataset-filter-section]').forEach(function(group) {
+      var groupCards = Array.from(group.querySelectorAll('.chart-card[data-datasets]'));
+      var hasVisibleCard = groupCards.some(function(card) {
+        return !card.classList.contains('dataset-filtered');
+      });
+      group.classList.toggle('dataset-group-empty', groupCards.length > 0 && !hasVisibleCard);
+    });
+    if (status) {
+      var selectedText = active.length ? ' containing ' + active.join(' + ') : '';
+      status.textContent = visibleCount
+        ? 'Showing ' + visibleCount + ' of ' + cards.length + ' charts' + selectedText + '.'
+        : 'No charts on this page show every selected dataset (' + active.join(' + ') + '). Clear the chart filter to show all charts.';
+      status.classList.toggle('is-empty', visibleCount === 0);
+    }
+    if (clear) clear.hidden = active.length === 0;
+    try { window.localStorage.setItem(key, JSON.stringify(active)); } catch (e) {}
+    if (window.Plotly) {
+      document.querySelectorAll('.chart-card:not(.dataset-filtered) .lazy-chart-plot[data-rendered="true"]')
+        .forEach(function(p) { window.Plotly.Plots.resize(p); });
+    }
+  };
+
+  buttons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var d = btn.dataset.datasetFilter;
+      var i = active.indexOf(d);
+      if (i === -1) { active.push(d); } else { active.splice(i, 1); }
+      apply();
+    });
+  });
+  if (clear) {
+    clear.addEventListener('click', function() {
+      active = [];
+      apply();
+    });
+  }
+  apply();
+})();
+</script>
+  <script>
+(function() {
+  var steps = [{"id": "page-purpose", "target": "[data-guide-id='page-purpose']", "title": "What this page is for", "copy": "Start here for a whole-system view of final demand, transformation, supply and the principal energy-balance totals. If something looks wrong, correct it in the model or source data, then rerun the dashboard.\n\n"}, {"id": "top-controls", "target": "[data-guide-id='top-controls']", "title": "Choose what you are viewing", "copy": "Use the controls at the top to change economy, choose Reference or Target when scenario options are available, select which datasets define the comparison basis, and move between dashboard pages."}, {"id": "chart-card", "target": "[data-guide-id='category-basis-switcher'], [data-guide-id='chart-card']", "title": "How common categories make comparison possible", "copy": "Different datasets do not always divide fuels and sectors in the same way. Common categories use the finest non-overlapping grouping that every dataset in the selected comparison basis can represent. The dashboard never divides a published aggregate using assumed shares. This matters for 9th Outlook projections: when the 9th reports only a broad sector or fuel, its allocation among children is unknown, so LEAP and ESTO are aggregated to the 9th level instead of the 9th being disaggregated. A comparison without the 9th can therefore show finer detail.\n\nESTO Extended is a structural mapping basis. Both ordinary and Extended bases use the same published ESTO historical observations; Extended changes the mapping structure, not the history. It adds named children beneath selected ordinary ESTO leaf flows so detailed LEAP branches have valid Common categories in which to appear. It does not invent historical ESTO detail: where ESTO has no measured child value, ESTO remains zero or unavailable while LEAP detail can still be shown. LEAP + ESTO Extended can therefore show more detail than LEAP + ESTO Extended + Ninth, where the 9th may require a broader Common category.\n\nSome Common categories are specially designed comparison boundaries. Labels ending in (including own use) combine a transformation process from flow 09 with its associated energy-sector own use from flow 10 when datasets record those amounts in different branches. This allows the full process to be compared without omitting or double-counting its own use."}, {"id": "overview-page-scope", "target": "[data-guide-id='chart-card']", "title": "What appears on the Energy balance overview", "copy": "This is a bespoke summary page rather than another branch of the detail tree. It brings together reviewed whole-system identities so you can locate a large imbalance or demand change before opening the page that owns the underlying flows.", "table": {"caption": "Energy balance overview contents", "headers": ["Area", "Generally included", "Important quirk"], "rows": [["Supply", "Production (01), imports (02), signed exports (03), and signed international transport (04-05), with total primary energy supply (07) where available", "Stock changes remain outside the projection-comparable supply total."], ["Final demand", "Total final consumption (12), split into the major demand pages and broad fuel groups", "Demand sectors are selected on a non-overlapping frontier; do not add their parents and children again."], ["Transformation, transfers, losses and own use", "The reviewed transformation boundary plus transfers (08), energy-sector own use (10.01), and transmission/distribution losses (10.02), shown by mapping-terminal leaf flow and by fuel", "The by-flow areas use the deepest uncovered nodes while treating the most specific mapping-owned NON_EXPANDING comparison rollups as terminal leaves. A broad nested rollup cannot replace a more specific declared rollup. Negative inputs, own use and losses can offset positive outputs, so read the signed areas as well as the authoritative net total line."], ["Unmet requirements", "LEAP Unmet Requirements rows, grouped by their mapped Common ESTO fuel category", "Positive values show a shortage of energy; negative values show surplus energy. This is a separate LEAP diagnostic, not a mapped balance flow."], ["TFEC", "Not currently displayed", "Flow 13 is temporarily disabled because non-energy use cannot yet be separated from aggregate LEAP Other demand."]]}}, {"id": "overview-boundaries", "target": "[data-guide-id='chart-card']", "title": "Know what each overview total includes", "copy": "These are reviewed comparison views, not a sum of every chart elsewhere in the dashboard. Parent, child and generated rollup rows can coexist in the source surface, so the renderer selects one non-overlapping boundary for each total.", "table": {"caption": "Overview measures", "headers": ["Measure", "What it represents", "Review prompt"], "rows": [["Supply", "Production + imports + signed exports + signed international transport", "Stock changes remain outside this projection-comparable total."], ["TFC", "Energy and non-energy final consumption", "Use it to test the overall demand boundary before opening sector pages."], ["Transformation, transfers, losses and own use", "The complete signed combination of transformation, transfers, energy-sector own use and transmission/distribution losses", "Inputs, own use and losses are normally negative while outputs are positive; the line is their net, while the areas preserve the gross signed composition."]]}}, {"id": "section-navigation", "target": "[data-guide-id='section-navigation']", "title": "Jump to the part you need", "copy": "The chips reproduce the hierarchy represented on this page. A real Common ESTO root appears only when its full routed subtree belongs here; a broader root split across pages is replaced by the page-scope overview label. Page-defined overview aggregates can form a visible level even when they are not technical ESTO tree nodes. Level 1 is orange, level 2 green, level 3 blue, and level 4 or deeper purple. Ordinary ESTO code depth and displayed comparison rollups determine the remaining parent-child levels. Every chip moves within this page without changing the data or scenario.", "optional": true}, {"id": "overview-first", "target": "[data-guide-id='chart-card']", "title": "Start with the summaries, not every chart", "copy": "Start with the summary charts at the top of the page. Use the section summaries to spot important differences or unusual trends, then open the detailed charts only where you need to investigate further."}, {"id": "chart-tools", "target": "[data-guide-id='chart-card'] .lazy-chart-plot", "title": "Use the chart tools", "copy": "Hover to inspect a year, drag to zoom and double-click the chart to reset the view. Click a legend item to remove that series; double-click it to show only that series, then double-click again to restore the others. Use the Plotly toolbar to download a chart. Inputs to transformation are normally negative and outputs positive; page and chart notes call out important sign conventions."}];
+  var guideLabel = "COMMON ESTO DASHBOARD GUIDE";
+  var get = function(selector) { return document.querySelector(selector); };
+  var launch = get('#dashboard-guide-launch');
+  var dialog = get('#dashboard-guide-dialog');
+  var backdrop = get('#dashboard-guide-backdrop');
+  if (!launch || !dialog || !backdrop || launch.dataset.guideBound === '1') return;
+
+  var current = 0;
+  var direction = 1;
+  var launchFocus = null;
+  var galleryItems = [];
+  var galleryIndex = 0;
+  var title = get('#dashboard-guide-title');
+  var copy = get('#dashboard-guide-copy');
+  var image = get('#dashboard-guide-image');
+  var gallery = get('#dashboard-guide-gallery');
+  var galleryImages = get('#dashboard-guide-gallery-images');
+  var galleryCaption = get('#dashboard-guide-gallery-caption');
+  var galleryPrevious = get('#dashboard-guide-gallery-previous');
+  var galleryNext = get('#dashboard-guide-gallery-next');
+  var tableContainer = get('#dashboard-guide-table');
+  var back = get('#dashboard-guide-back');
+  var next = get('#dashboard-guide-next');
+  var closeButton = get('#dashboard-guide-close');
+
+  var clearHighlight = function() {
+    document.querySelectorAll('.dashboard-guide-highlight').forEach(function(node) { node.classList.remove('dashboard-guide-highlight'); });
+    document.querySelectorAll('.dashboard-guide-layer').forEach(function(node) { node.classList.remove('dashboard-guide-layer'); });
+  };
+  var resolveTarget = function(step) {
+    return step.target.split(',').map(function(selector) { return get(selector.trim()); }).find(Boolean) || null;
+  };
+  steps = steps.filter(function(step) { return resolveTarget(step) || !step.optional; });
+  var findAvailableIndex = function(index, stepDirection) {
+    var candidate = Math.max(0, Math.min(index, steps.length - 1));
+    while (candidate >= 0 && candidate < steps.length) {
+      if (resolveTarget(steps[candidate]) || !steps[candidate].optional) return candidate;
+      candidate += stepDirection;
+    }
+    return Math.max(0, Math.min(index, steps.length - 1));
+  };
+  var renderGallery = function() {
+    var item = galleryItems[galleryIndex];
+    galleryImages.replaceChildren();
+    if (!item) return;
+    (item.images || [item]).forEach(function(imageItem) {
+      var node = document.createElement('img');
+      node.src = imageItem.image || '';
+      node.alt = imageItem.alt || '';
+      galleryImages.appendChild(node);
+    });
+    var count = String(galleryIndex + 1) + ' of ' + String(galleryItems.length);
+    galleryCaption.textContent = item.caption ? count + ' — ' + item.caption : count;
+    galleryPrevious.disabled = galleryItems.length < 2;
+    galleryNext.disabled = galleryItems.length < 2;
+  };
+  var renderTable = function(table) {
+    tableContainer.replaceChildren();
+    tableContainer.hidden = !table;
+    if (!table) return;
+    var caption = document.createElement('div');
+    caption.className = 'dashboard-guide-table-caption';
+    caption.textContent = table.caption || '';
+    var note = document.createElement('p');
+    note.className = 'dashboard-guide-table-note';
+    note.textContent = table.note || '';
+    note.hidden = !table.note;
+    var htmlTable = document.createElement('table');
+    var head = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    (table.headers || []).forEach(function(value) { var cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = value; headRow.appendChild(cell); });
+    head.appendChild(headRow);
+    var body = document.createElement('tbody');
+    (table.rows || []).forEach(function(row) { var tableRow = document.createElement('tr'); row.forEach(function(value) { var cell = document.createElement('td'); cell.textContent = value; tableRow.appendChild(cell); }); body.appendChild(tableRow); });
+    htmlTable.append(head, body);
+    tableContainer.append(caption, note, htmlTable);
+  };
+  var show = function(index, stepDirection) {
+    direction = stepDirection || direction;
+    current = findAvailableIndex(index, direction);
+    var step = steps[current];
+    var target = resolveTarget(step);
+    clearHighlight();
+    get('#dashboard-guide-kicker').textContent = guideLabel;
+    get('#dashboard-guide-step').textContent = String(current + 1);
+    get('#dashboard-guide-total').textContent = String(steps.length);
+    title.textContent = step.title;
+    copy.textContent = step.copy;
+    image.hidden = !step.image;
+    if (step.image) { image.src = step.image; image.alt = step.image_alt || step.title; } else { image.removeAttribute('src'); image.alt = ''; }
+    galleryItems = step.gallery || [];
+    galleryIndex = 0;
+    gallery.hidden = !galleryItems.length;
+    if (galleryItems.length) renderGallery(); else { galleryImages.replaceChildren(); galleryCaption.textContent = ''; }
+    renderTable(step.table);
+    dialog.classList.toggle('guide-has-rich-content', Boolean(step.image || galleryItems.length || step.table));
+    back.style.visibility = current === 0 ? 'hidden' : 'visible';
+    next.innerHTML = current === steps.length - 1 ? 'Done <span aria-hidden="true">✓</span>' : 'Next <span aria-hidden="true">→</span>';
+    if (target) {
+      target.classList.add('dashboard-guide-highlight');
+      var pageHeader = target.closest('.page-header');
+      if (pageHeader) pageHeader.classList.add('dashboard-guide-layer');
+      target.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
+    }
+  };
+  var close = function() {
+    dialog.hidden = true;
+    backdrop.hidden = true;
+    clearHighlight();
+    if (launchFocus && launchFocus.focus) launchFocus.focus();
+  };
+  var move = function(stepDirection) {
+    if (stepDirection > 0 && current === steps.length - 1) { close(); return; }
+    show(current + stepDirection, stepDirection);
+  };
+
+  launch.dataset.guideBound = '1';
+  launch.addEventListener('click', function() {
+    launchFocus = document.activeElement;
+    var pageHeader = get('#page-header');
+    if (pageHeader) {
+      pageHeader.classList.remove('is-collapsed');
+      var headerToggle = get('#header-toggle');
+      if (headerToggle) {
+        headerToggle.textContent = '▴';
+        headerToggle.setAttribute('aria-expanded', 'true');
+        headerToggle.setAttribute('aria-label', 'Collapse header');
+      }
+    }
+    dialog.hidden = false;
+    backdrop.hidden = false;
+    show(0, 1);
+    closeButton.focus();
+  });
+  closeButton.addEventListener('click', close);
+  backdrop.addEventListener('click', close);
+  back.addEventListener('click', function() { move(-1); });
+  next.addEventListener('click', function() { move(1); });
+  galleryPrevious.addEventListener('click', function() { galleryIndex = (galleryIndex - 1 + galleryItems.length) % galleryItems.length; renderGallery(); });
+  galleryNext.addEventListener('click', function() { galleryIndex = (galleryIndex + 1) % galleryItems.length; renderGallery(); });
+  document.addEventListener('keydown', function(event) {
+    if (dialog.hidden) return;
+    if (event.key === 'Escape') close();
+    if (event.key === 'ArrowLeft' && event.target.tagName !== 'BUTTON') move(-1);
+    if (event.key === 'ArrowRight' && event.target.tagName !== 'BUTTON') move(1);
+    if (event.key === 'Tab') {
+      var focusable = Array.from(dialog.querySelectorAll('button:not([disabled]),a[href]')).filter(function(node) { return node.offsetParent !== null; });
+      if (!focusable.length) return;
+      var first = focusable[0]; var last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  });
+})();
+</script>
+</body>
+</html>

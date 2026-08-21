@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Other demand</title>
+  <style>
+:root {
+  color-scheme: light;
+  --page-padding-x: clamp(12px, 1.8vw, 24px);
+  --page-padding-y: clamp(14px, 1.8vw, 24px);
+  --body-font-size: clamp(15px, 0.22vw + 14px, 18px);
+  --title-font-size: clamp(24px, 0.75vw + 18px, 34px);
+  --section-title-size: clamp(18px, 0.45vw + 14px, 24px);
+}
+html { background: #f4f6f8; }
+body {
+  font-family: Segoe UI, Arial, sans-serif;
+  margin: 0;
+  background: #f4f6f8;
+  color: #111;
+  font-size: var(--body-font-size);
+  line-height: 1.45;
+  min-width: 320px;
+}
+a { color: #0b3d5c; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.page-shell { width: 100%; max-width: none; margin: 0 auto; padding: 0 var(--page-padding-x) 32px; box-sizing: border-box; }
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  margin: 0 0 14px 0;
+  padding: var(--page-padding-y) 0 10px 0;
+  background: rgba(244, 246, 248, 0.96);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #d8dee4;
+}
+.header-main-row { display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 16px; }
+.header-side-controls {
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;
+  gap:8px 10px;flex:1 1 460px;
+}
+.header-inline-controls {
+  display:flex;align-items:center;gap:6px;justify-content:safe flex-end;
+  flex:1 1 100%;flex-wrap:nowrap;margin-left:0;min-width:0;
+  overflow-x:auto;overflow-y:hidden;padding-bottom:2px;
+}
+.dashboard-context { margin-top:6px;color:#4b5563;font-size:13px;line-height:1.35; }
+.dashboard-updated { margin-left:10px;padding-left:10px;border-left:1px solid #c5ccd3;color:#64748b;white-space:nowrap; }
+.dashboard-switcher {
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;white-space:nowrap;
+}
+.dashboard-switcher select {
+  max-width:220px;padding:5px 28px 5px 8px;border:1px solid #c5ccd3;border-radius:6px;
+  background:#fff;color:#111;font:inherit;
+}
+.header-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.header-chip {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  border: 1px solid #c5ccd3;
+  border-radius: 6px;
+  background: #fff;
+  color: #0b3d5c;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.header-chip[data-current="true"] {
+  border-color:#1f6feb;
+  box-shadow:0 0 0 2px rgba(31, 111, 235, 0.16);
+  font-weight:700;
+}
+.header-nav-separator { flex:0 0 auto;color:#6b7280;font-weight:700;line-height:1.25;padding:6px 1px; }
+.header-toggle {
+  width: 30px; height: 30px;
+  border: 1px solid #c5ccd3;
+  border-radius: 999px;
+  background: #fff;
+  color: #0b3d5c;
+  cursor: pointer;
+}
+.header-toggle-row { display:flex;justify-content:flex-end;gap:8px;margin-top:8px; }
+.page-header.is-collapsed .header-collapsible { display: none; }
+.page-header.is-collapsed { padding-bottom:0;background:transparent;backdrop-filter:none;border-bottom-color:transparent; }
+.page-header.is-collapsed .header-toggle-row { margin-top:0; }
+.jump-nav {
+  margin-top:8px;padding-top:8px;border-top:1px solid #d8dee4;
+  display:flex;flex-wrap:wrap;gap:8px 10px;align-items:flex-start;
+}
+.jump-nav-label { font-weight:600;color:#4b5563;font-size:12px;white-space:nowrap;padding-top:4px; }
+.jump-nav-groups { display:flex;flex-direction:column;gap:6px;min-width:0;flex:1 1 640px; }
+.jump-nav-row { display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;min-width:0; }
+.jump-nav-row[data-level="2"] { padding-left:18px; }
+.jump-nav-row[data-level="3"] { padding-left:36px; }
+.jump-nav-row[data-level="4"] { padding-left:54px; }
+.jump-chip {
+  position:relative;display:inline-flex;align-items:center;gap:6px;
+  padding:4px 9px;border:1px solid #c5ccd3;border-radius:999px;
+  background:#fff;color:#0b3d5c;text-decoration:none;font-size:12px;line-height:1.25;
+  box-shadow:0 1px 1px rgba(15,23,42,0.04);
+}
+.jump-chip::before { content:"";display:block;width:8px;height:8px;border-radius:999px;flex:0 0 auto;background:#94a3b8; }
+.jump-chip[data-level="1"] { background:#fff4e6;border-color:#f2a65a;color:#7a3b00; }
+.jump-chip[data-level="1"]::before { background:#f97316; }
+.jump-chip[data-level="2"] { background:#ecfdf3;border-color:#86d5a6;color:#166534; }
+.jump-chip[data-level="2"]::before { background:#22c55e; }
+.jump-chip[data-level="3"] { background:#eff6ff;border-color:#93c5fd;color:#1e40af; }
+.jump-chip[data-level="3"]::before { background:#3b82f6; }
+.jump-chip[data-level="4"] { background:#f5edff;border-color:#c69af0;color:#4c1d70; }
+.jump-chip[data-level="4"]::before { background:#9333ea; }
+.visible-note { margin:8px 0 10px 0;padding:8px 12px;background:#fffbe6;border-left:3px solid #f0a500;border-radius:4px;font-size:13px;color:#5a3e00;line-height:1.5; }
+.scenario-toggle {
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  font-size:12px;color:#4b5563;white-space:nowrap;
+}
+.scenario-toggle-buttons { display:flex;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
+.scenario-toggle-btn {
+  padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
+}
+.scenario-toggle-btn + .scenario-toggle-btn { border-left:1px solid #c5ccd3; }
+.scenario-toggle-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.category-basis-switcher { display:flex;align-items:center;gap:6px;font-size:12px;color:#4b5563;white-space:nowrap; }
+.category-basis-switcher span { font-weight:600; }
+.category-basis-switcher select { max-width:210px;padding:5px 28px 5px 8px;border:1px solid #c5ccd3;border-radius:6px;background:#fff;color:#111;font:inherit; }
+.dataset-filter {
+  display:inline-flex;align-items:center;gap:4px;flex-wrap:nowrap;flex:0 0 auto;
+  width:max-content;max-width:max-content;
+  font-size:12px;color:#4b5563;
+}
+.dataset-filter-label { flex:0 0 auto;font-weight:600;line-height:1.2;text-align:right; }
+.dataset-filter-buttons { display:flex;flex:0 0 auto;border:1px solid #c5ccd3;border-radius:999px;overflow:hidden; }
+.dataset-filter-btn {
+  padding:5px 12px;border:none;background:#fff;color:#0b3d5c;font:inherit;font-size:12px;cursor:pointer;
+}
+.dataset-filter-btn + .dataset-filter-btn { border-left:1px solid #c5ccd3; }
+.dataset-filter-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.dataset-filter-clear { padding:4px 8px;border:0;background:transparent;color:#1f6feb;font:inherit;cursor:pointer; }
+.dataset-filter-status { width:100%;text-align:right;color:#64748b;font-size:11px; }
+.dataset-filter-status.is-empty { color:#9a3412;font-weight:600; }
+.chart-card.dataset-filtered { display:none; }
+.dataset-group-empty { display:none !important; }
+.dashboard-grid {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0, 1fr));
+  gap:12px;
+  align-items:start;
+}
+.dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.dashboard-grid.expand-1 { grid-template-columns:minmax(0, 1fr); }
+.dashboard-grid.expand-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.dashboard-grid.expand-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+.chart-card { margin:0;padding:10px;border:1px solid #d0d7de;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.05); }
+.chart-caption { font-weight:600;margin-bottom:4px; }
+.meta-subline { margin-top:-4px;margin-bottom:8px;color:#4b5563;font-size:12px; }
+.area-data-note { margin:-3px 0 8px 0;color:#64748b;font-size:11px;line-height:1.3;font-style:italic; }
+.chart-load-state { min-height:22px;margin:4px 0 6px 0;color:#64748b;font-size:12px; }
+.chart-load-state[data-loaded="true"] { display:none; }
+.lazy-chart-plot {
+  width:100%;height:clamp(380px, 62vh, 1100px);
+  border:1px solid #d0d7de;border-radius:6px;background:#fff;display:block;box-sizing:border-box;
+}
+.lazy-chart-plot.is-unloaded { background:#f8fafc; }
+.section-heading { margin:18px 0 8px 0;font-size:var(--section-title-size);color:#23384d; }
+.subsection-heading { margin:14px 0 6px 12px;font-size:15px;font-weight:600;color:#4c1d70;padding-left:8px;border-left:3px solid #c69af0; }
+@media (max-width: 900px) {
+  .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:minmax(0, 1fr); }
+  .dashboard-updated { display:block;margin:4px 0 0 0;padding:0;border-left:0;white-space:normal; }
+}
+@media (max-width: 600px) {
+  .header-side-controls { flex:1 1 100%;min-width:0;justify-content:flex-start; }
+  .header-inline-controls { margin-left:0;flex-wrap:wrap;justify-content:flex-start;width:100%; }
+  .header-links { width:100%; }
+  .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:minmax(0, 1fr); }
+  .lazy-chart-plot { height:420px; }
+}
+
+.dashboard-guide-launch {
+  display:inline-flex;align-items:center;gap:5px;padding:5px 10px;
+  border:1px solid #1f6feb;border-radius:999px;background:#fff;color:#0b3d5c;
+  font:inherit;font-size:12px;font-weight:750;white-space:nowrap;cursor:pointer;
+  box-shadow:0 1px 2px rgba(15,23,42,.08);
+}
+.dashboard-guide-launch:hover,.dashboard-guide-launch:focus-visible {
+  background:#e8f0fe;outline:2px solid rgba(31,111,235,.28);outline-offset:2px;
+}
+.dashboard-guide-launch span { display:inline-grid;place-items:center;width:16px;height:16px;border:1px solid currentColor;border-radius:50%;font-size:10px; }
+.dashboard-guide-backdrop { position:fixed;inset:0;z-index:1000;background:rgba(15,35,55,.66); }
+.dashboard-guide-dialog {
+  position:fixed;left:50%;top:50%;z-index:1010;width:min(680px,calc(100vw - 28px));
+  max-height:calc(100vh - 28px);box-sizing:border-box;overflow:auto;
+  transform:translate(-50%,-50%);padding:18px;border:1px solid #b8c9dc;
+  border-radius:10px;background:#fff;color:#173452;box-shadow:0 22px 70px rgba(13,37,76,.42);
+}
+.dashboard-guide-dialog.guide-has-rich-content { width:min(1180px,calc(100vw - 28px)); }
+.dashboard-guide-backdrop[hidden],.dashboard-guide-dialog[hidden] { display:none!important; }
+.dashboard-guide-progress { color:#64748b;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase; }
+.dashboard-guide-close { float:right;border:0;background:transparent;color:#64748b;font-size:24px;line-height:.8;cursor:pointer; }
+.dashboard-guide-kicker { margin-top:15px;color:#e7672a;font-size:10px;font-weight:850;letter-spacing:.14em; }
+.dashboard-guide-title { margin:5px 0 8px;font-size:23px;line-height:1.18; }
+.dashboard-guide-copy { margin:0;color:#475569;font-size:15px;line-height:1.58;white-space:pre-line; }
+.dashboard-guide-image { display:block;width:100%;max-height:58vh;margin-top:14px;object-fit:contain;border:1px solid #cbd8e7;border-radius:6px;background:#f8fafc; }
+.dashboard-guide-gallery { display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin-top:14px; }
+.dashboard-guide-gallery figure { min-width:0;margin:0; }
+.dashboard-guide-gallery-images { display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:10px; }
+.dashboard-guide-gallery-images img { display:block;width:100%;max-height:56vh;object-fit:contain;border:1px solid #cbd8e7;border-radius:6px;background:#f8fafc; }
+.dashboard-guide-gallery figcaption { margin-top:5px;color:#64748b;font-size:12px;font-weight:650;text-align:center; }
+.dashboard-guide-gallery button { width:34px;height:34px;border:1px solid #93b5d8;border-radius:50%;background:#eef5fc;color:#0b3d5c;font-size:18px;cursor:pointer; }
+.dashboard-guide-gallery button:disabled { opacity:.4;cursor:default; }
+.dashboard-guide-table { margin-top:14px;overflow-x:auto;border:1px solid #cbd8e7;border-radius:6px; }
+.dashboard-guide-table-caption { padding:8px 10px;background:#eef5fc;color:#0b3d5c;font-size:13px;font-weight:750; }
+.dashboard-guide-table-note { margin:8px 10px;color:#7c2d12;font-size:12px;line-height:1.45; }
+.dashboard-guide-table table { width:100%;min-width:640px;border-collapse:collapse;color:#334155;font-size:13px; }
+.dashboard-guide-table th,.dashboard-guide-table td { padding:7px 9px;border-top:1px solid #dbe5ef;text-align:left;vertical-align:top; }
+.dashboard-guide-table th { background:#f8fafc;color:#0b3d5c; }
+.dashboard-guide-table td { white-space:pre-line; }
+.dashboard-guide-image[hidden],.dashboard-guide-gallery[hidden],.dashboard-guide-table[hidden] { display:none!important; }
+.dashboard-guide-actions { display:flex;align-items:center;justify-content:space-between;margin-top:17px; }
+.dashboard-guide-actions button { border:0;border-radius:6px;padding:9px 13px;background:transparent;color:#173452;font-weight:700;cursor:pointer; }
+.dashboard-guide-next { background:#1f6feb!important;color:#fff!important; }
+.dashboard-guide-highlight { position:relative!important;z-index:1005!important;box-shadow:0 0 0 4px #ff9868,0 0 0 8px rgba(255,255,255,.96)!important;border-radius:5px; }
+.page-header.dashboard-guide-layer { z-index:1004; }
+@media (max-width:640px) {
+  .dashboard-guide-dialog { top:auto;bottom:10px;transform:translateX(-50%);max-height:72vh;padding:15px; }
+  .dashboard-guide-title { font-size:20px; }
+  .dashboard-guide-copy { font-size:14px; }
+  .dashboard-guide-gallery { gap:5px; }
+  .dashboard-guide-gallery button { width:29px;height:29px; }
+}
+</style>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="page-header" id="page-header">
+      <div class="header-collapsible">
+      <div class="header-main-row">
+        <div style="min-width:220px;flex:1 1 320px;" data-guide-id="page-purpose">
+          <h1 style="margin:0;font-size:24px;line-height:1.15;">Other demand</h1>
+          <div class="dashboard-context" data-guide-id="economy-context">Economy: <strong>Brunei Darussalam</strong><span class="dashboard-updated">Updated: 2026-08-21 18:37 JST</span></div>
+        </div>
+        <div class="header-side-controls" data-guide-id="top-controls">
+          
+<div class="scenario-toggle" data-guide-id="scenario-toggle" role="group" aria-label="Scenario">
+  <span>Scenario</span>
+  <div class="scenario-toggle-buttons">
+    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="ref">Reference</button>
+    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="tgt">Target</button>
+  </div>
+</div>
+
+          <label class="dashboard-switcher" data-guide-id="economy-switcher"><span>Economy</span><select data-navigation-select data-dashboard-switcher aria-label="Switch economy"><option value="../../01AUS__esto_extended_leap/dashboards/other_demand.html">Australia</option><option value="other_demand.html" selected>Brunei Darussalam</option><option value="../../03CDA__esto_extended_leap/dashboards/other_demand.html">Canada</option><option value="../../04CHL__esto_extended_leap/dashboards/other_demand.html">Chile</option><option value="../../05PRC__esto_extended_leap/dashboards/other_demand.html">China</option><option value="../../06HKC__esto_extended_leap/dashboards/other_demand.html">Hong Kong, China</option><option value="../../07INA__esto_extended_leap/dashboards/other_demand.html">Indonesia</option><option value="../../08JPN__esto_extended_leap/dashboards/other_demand.html">Japan</option><option value="../../09ROK__esto_extended_leap/dashboards/other_demand.html">Korea</option><option value="../../10MAS__esto_extended_leap/dashboards/other_demand.html">Malaysia</option><option value="../../11MEX__esto_extended_leap/dashboards/other_demand.html">Mexico</option><option value="../../12NZ__esto_extended_leap/dashboards/other_demand.html">New Zealand</option><option value="../../13PNG__esto_extended_leap/dashboards/other_demand.html">Papua New Guinea</option><option value="../../14PE__esto_extended_leap/dashboards/other_demand.html">Peru</option><option value="../../15PHL__esto_extended_leap/dashboards/other_demand.html">Philippines</option><option value="../../16RUS__esto_extended_leap/dashboards/other_demand.html">Russia</option><option value="../../17SGP__esto_extended_leap/dashboards/other_demand.html">Singapore</option><option value="../../18CT__esto_extended_leap/dashboards/other_demand.html">Chinese Taipei</option><option value="../../19THA__esto_extended_leap/dashboards/other_demand.html">Thailand</option><option value="../../20USA__esto_extended_leap/dashboards/other_demand.html">United States</option><option value="../../21VN__esto_extended_leap/dashboards/other_demand.html">Viet Nam</option></select></label>
+          <label class="category-basis-switcher" data-guide-id="category-basis-switcher"><span>Comparison basis</span><select data-navigation-select data-category-basis-switcher aria-label="Choose the comparison basis"><option value="../../02BD/dashboards/other_demand.html">LEAP + ESTO Extended + Ninth</option><option value="other_demand.html" selected>LEAP + ESTO Extended</option></select></label>
+          
+          <div class="header-inline-controls" data-guide-id="page-navigation"><a href="energy_balance_overview.html" class="header-chip" data-current="false">Energy balance overview</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="buildings.html" class="header-chip" data-current="false">Buildings</a><a href="industry.html" class="header-chip" data-current="false">Industry</a><a href="transport.html" class="header-chip" data-current="false">Transport</a><a href="other_demand.html" class="header-chip" data-current="true">Other demand</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="power.html" class="header-chip" data-current="false">Power</a><a href="refining.html" class="header-chip" data-current="false">Refining</a><a href="other_transformation.html" class="header-chip" data-current="false">Other transformation</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="supply.html" class="header-chip" data-current="false">Supply</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="emissions.html" class="header-chip" data-current="false">Emissions</a><span class="header-nav-separator" aria-hidden="true">|</span><a href="../../diagnostics/dashboards/mapping_diagnostics.html" class="header-chip" data-current="false">Mapping diagnostics</a></div>
+        </div>
+      </div>
+      <div class="jump-nav" data-guide-id="section-navigation"><span class="jump-nav-label">Sections:</span><div class="jump-nav-groups"><div class="jump-nav-row" data-level="1" data-hierarchy-depth="1"><a href="#sec-other_demand__other_demand__16_03_16_05_other_sector_all_demand_aggregate" class="jump-chip" data-level="1" data-hierarchy-depth="1">16.03-16.05 Other sector (all demand aggregate)</a></div><div class="jump-nav-row" data-level="2" data-hierarchy-depth="2"><a href="#sec-other_demand__other_demand__16_03_agriculture" class="jump-chip" data-level="2" data-hierarchy-depth="2">16.03 Agriculture</a><a href="#sec-other_demand__other_demand__16_03_16_04_agriculture_and_fishing" class="jump-chip" data-level="2" data-hierarchy-depth="2">16.03-16.04 Agriculture and fishing</a><a href="#sec-other_demand__other_demand__16_05_non_specified_others" class="jump-chip" data-level="2" data-hierarchy-depth="2">16.05 Non-specified others</a></div></div></div>
+      </div>
+      <div class="header-toggle-row">
+        <button id="dashboard-guide-launch" class="dashboard-guide-launch" type="button" aria-haspopup="dialog" aria-controls="dashboard-guide-dialog"><span aria-hidden="true">?</span> Guide</button>
+        <button id="header-toggle" class="header-toggle" type="button" aria-expanded="true" aria-label="Collapse header">&#9652;</button>
+      </div>
+    </header>
+    <main class="page-body" data-guide-id="review-workflow">
+      <div class="visible-note">LEAP placeholder in use: &#x27;All demand aggregated&#x27; supplies Other sector on this page. Detailed LEAP sector and subsector values are not yet available; missing detail should not be read as zero.</div>
+      <section data-dataset-filter-section><h2 class="section-heading">Overview</h2><section class="section-sort-group"><div class="dashboard-grid expand-1" data-sortable-grid="overview"><figure class="chart-card" data-guide-id="chart-card" data-default-order="0" data-total-abs="9.7739" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP"><figcaption class="chart-caption">Other demand</figcaption><div class="meta-subline">Other demand &gt; Overview</div><div class="area-data-note">Stacked areas: ESTO Extended historical through 2022; LEAP projection after 2022.</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__16__16_other_sector_all_demand_aggregate" class="lazy-chart-plot is-unloaded" role="img" aria-label="Other demand"></div></figure></div></section></section>
+      <section id="sec-other_demand__other_demand" data-dataset-filter-section style="scroll-margin-top:150px;"><h2 class="section-heading">Other demand</h2><section class="section-sort-group"><div class="dashboard-grid expand-1" data-sortable-grid="sec-other_demand__other_demand"><figure class="chart-card" data-guide-id="chart-card" data-default-order="0" data-total-abs="9.7739" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP"><figcaption class="chart-caption">Aggregate by product: Other demand</figcaption><div class="meta-subline">Other demand &gt; Other demand</div><div class="area-data-note">Stacked areas: ESTO Extended historical through 2022; LEAP projection after 2022.</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__section__others__other_demand__product" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aggregate by product: Other demand"></div></figure></div></section><section id="sec-other_demand__other_demand__16_03_agriculture" data-dataset-filter-section style="scroll-margin-top:150px;"><h3 class="subsection-heading">16.03 Agriculture</h3><section class="section-sort-group"><div class="dashboard-grid expand-2" data-sortable-grid="sec-other_demand__other_demand__16_03_agriculture"><figure class="chart-card" data-guide-id="chart-card" data-default-order="0" data-total-abs="0.0005" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP"><figcaption class="chart-caption">Aggregate by product: 16.03 Agriculture</figcaption><div class="meta-subline">Other demand &gt; Other demand &gt; 16.03 Agriculture</div><div class="area-data-note">Stacked areas: ESTO Extended historical through 2022; LEAP projection after 2022.</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__flowgroup__others__16_03_agriculture__product" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aggregate by product: 16.03 Agriculture"></div></figure><figure class="chart-card" data-guide-id="chart-card" data-default-order="1" data-total-abs="0.0005" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED"><figcaption class="chart-caption">07.07 Gas/diesel oil</figcaption><div class="meta-subline">Other demand &gt; Other demand &gt; 16.03 Agriculture</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__16_03_agriculture__07_07_gas_diesel_oil" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.07 Gas/diesel oil"></div></figure></div></section></section><section id="sec-other_demand__other_demand__16_03_16_04_agriculture_and_fishing" data-dataset-filter-section style="scroll-margin-top:150px;"><h3 class="subsection-heading">16.03-16.04 Agriculture and fishing</h3><section class="section-sort-group"><div class="dashboard-grid expand-2" data-sortable-grid="sec-other_demand__other_demand__16_03_16_04_agriculture_and_fishing"><figure class="chart-card" data-guide-id="chart-card" data-default-order="0" data-total-abs="0.0005" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP"><figcaption class="chart-caption">Aggregate by product: 16.03-16.04 Agriculture and fishing</figcaption><div class="meta-subline">Other demand &gt; Other demand &gt; 16.03-16.04 Agriculture and fishing</div><div class="area-data-note">Stacked areas: ESTO Extended historical through 2022; LEAP projection after 2022.</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__flowgroup__others__16_03_16_04_agriculture_and_fishing__product" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aggregate by product: 16.03-16.04 Agriculture and fishing"></div></figure><figure class="chart-card" data-guide-id="chart-card" data-default-order="1" data-total-abs="0.0005" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED"><figcaption class="chart-caption">07.07 Gas/diesel oil</figcaption><div class="meta-subline">Other demand &gt; Other demand &gt; 16.03-16.04 Agriculture and fishing</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__16_03_16_04_agriculture_and_fishing__07_07_gas_diesel_oil" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.07 Gas/diesel oil"></div></figure></div></section></section><section id="sec-other_demand__other_demand__16_03_16_05_other_sector_all_demand_aggregate" data-dataset-filter-section style="scroll-margin-top:150px;"><h3 class="subsection-heading">16.03-16.05 Other sector (all demand aggregate)</h3><section class="section-sort-group"><div class="dashboard-grid expand-2" data-sortable-grid="sec-other_demand__other_demand__16_03_16_05_other_sector_all_demand_aggregate"><figure class="chart-card" data-guide-id="chart-card" data-default-order="0" data-total-abs="4.8867" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP"><figcaption class="chart-caption">Aggregate by product: 16.03-16.05 Other sector (all demand aggregate)</figcaption><div class="meta-subline">Other demand &gt; Other demand &gt; 16.03-16.05 Other sector (all demand aggregate)</div><div class="area-data-note">Stacked areas: ESTO Extended historical through 2022; LEAP projection after 2022.</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__flowgroup__others__16_03_16_05_other_sector_all_demand_aggregate__product" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aggregate by product: 16.03-16.05 Other sector (all demand aggregate)"></div></figure><figure class="chart-card" data-guide-id="chart-card" data-default-order="1" data-total-abs="4.8867" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED"><figcaption class="chart-caption">07.07 Gas/diesel oil</figcaption><div class="meta-subline">Other demand &gt; Other demand &gt; 16.03-16.05 Other sector (all demand aggregate)</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__16_03_16_05_other_sector_all_demand_aggregate__07_07_gas_diesel_oil" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.07 Gas/diesel oil"></div></figure></div></section></section><section id="sec-other_demand__other_demand__16_05_non_specified_others" data-dataset-filter-section style="scroll-margin-top:150px;"><h3 class="subsection-heading">16.05 Non-specified others</h3><section class="section-sort-group"><div class="dashboard-grid expand-2" data-sortable-grid="sec-other_demand__other_demand__16_05_non_specified_others"><figure class="chart-card" data-guide-id="chart-card" data-default-order="0" data-total-abs="4.8861" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED,LEAP"><figcaption class="chart-caption">Aggregate by product: 16.05 Non-specified others</figcaption><div class="meta-subline">Other demand &gt; Other demand &gt; 16.05 Non-specified others</div><div class="area-data-note">Stacked areas: ESTO Extended historical through 2022; LEAP projection after 2022.</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__area__flowgroup__others__16_05_non_specified_others__product" class="lazy-chart-plot is-unloaded" role="img" aria-label="Aggregate by product: 16.05 Non-specified others"></div></figure><figure class="chart-card" data-guide-id="chart-card" data-default-order="1" data-total-abs="4.8861" data-abs-diff="0.0000" data-pct-diff="0.000000" data-datasets="ESTO_EXTENDED"><figcaption class="chart-caption">07.07 Gas/diesel oil</figcaption><div class="meta-subline">Other demand &gt; Other demand &gt; 16.05 Non-specified others</div><div class="chart-load-state" data-loaded="false">Chart queued</div><div data-chart-key="chart__line__16_05_non_specified_others__07_07_gas_diesel_oil" class="lazy-chart-plot is-unloaded" role="img" aria-label="07.07 Gas/diesel oil"></div></figure></div></section></section></section>
+    </main>
+  </div>
+  
+<div id="dashboard-guide-backdrop" class="dashboard-guide-backdrop" hidden></div>
+<aside id="dashboard-guide-dialog" class="dashboard-guide-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="dashboard-guide-title" aria-describedby="dashboard-guide-copy">
+  <div class="dashboard-guide-progress"><span id="dashboard-guide-step">1</span> of <span id="dashboard-guide-total">1</span><button id="dashboard-guide-close" class="dashboard-guide-close" type="button" aria-label="Close guide">&times;</button></div>
+  <div id="dashboard-guide-kicker" class="dashboard-guide-kicker"></div>
+  <h2 id="dashboard-guide-title" class="dashboard-guide-title"></h2>
+  <p id="dashboard-guide-copy" class="dashboard-guide-copy"></p>
+  <img id="dashboard-guide-image" class="dashboard-guide-image" alt="" hidden>
+  <div id="dashboard-guide-gallery" class="dashboard-guide-gallery" hidden aria-label="Guide screenshots">
+    <button id="dashboard-guide-gallery-previous" type="button" aria-label="Previous screenshot">&larr;</button>
+    <figure><div id="dashboard-guide-gallery-images" class="dashboard-guide-gallery-images"></div><figcaption id="dashboard-guide-gallery-caption"></figcaption></figure>
+    <button id="dashboard-guide-gallery-next" type="button" aria-label="Next screenshot">&rarr;</button>
+  </div>
+  <div id="dashboard-guide-table" class="dashboard-guide-table" hidden></div>
+  <div class="dashboard-guide-actions"><button id="dashboard-guide-back" type="button">Back</button><button id="dashboard-guide-next" class="dashboard-guide-next" type="button">Next <span aria-hidden="true">&rarr;</span></button></div>
+</aside>
+
+  <script>
+(function() {
+  var pageHeader = document.getElementById('page-header');
+  var toggle = document.getElementById('header-toggle');
+  if (!pageHeader || !toggle) return;
+  var key = 'common-esto-header-collapsed';
+  var apply = function(collapsed) {
+    pageHeader.classList.toggle('is-collapsed', collapsed);
+    toggle.textContent = collapsed ? '▾' : '▴';
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggle.setAttribute('aria-label', collapsed ? 'Expand header' : 'Collapse header');
+  };
+  var collapsed = false;
+  try { collapsed = window.localStorage.getItem(key) === 'true'; } catch (e) {}
+  apply(collapsed);
+  toggle.addEventListener('click', function() {
+    collapsed = !pageHeader.classList.contains('is-collapsed');
+    apply(collapsed);
+    try { window.localStorage.setItem(key, collapsed ? 'true' : 'false'); } catch (e) {}
+  });
+})();
+</script>
+  <script>
+(function() {
+  document.querySelectorAll('[data-navigation-select]').forEach(function(select) {
+    select.addEventListener('change', function() {
+      var href = select.value;
+      if (href) window.location.href = href;
+    });
+  });
+})();
+</script>
+  <script>
+(function() {
+  var key = 'common-esto-scenario-mode';
+  var getMode = function() {
+    try {
+      var stored = window.localStorage.getItem(key);
+      if (stored === 'ref' || stored === 'tgt') return stored;
+    } catch (e) {}
+    return 'tgt';
+  };
+  var setMode = function(mode) {
+    try { window.localStorage.setItem(key, mode); } catch (e) {}
+  };
+
+  // Traces are tagged "esto" (always shown), or "ref"/"tgt" (LEAP/9th),
+  // with an independent optional "metric" dimension used only by the
+  // TFC/TFEC sector chart's own Plotly dropdown. See scenario_toggle_tag /
+  // trace_meta_entry in common_esto_dashboard_renderer.py.
+  var computeVisible = function(entry, scenarioMode, metricMode) {
+    var scenarioOk = entry.tag === 'esto' || entry.tag === scenarioMode;
+    var metricOk = !entry.metric || entry.metric === 'both' || entry.metric === metricMode;
+    return (scenarioOk && metricOk) ? entry.active_visible : false;
+  };
+
+  window.applyScenarioMode = function(plot) {
+    if (!window.Plotly || !plot || !plot.layout) return;
+    var meta = plot.layout.meta && plot.layout.meta.trace_meta;
+    if (!meta || !meta.length) return;
+    var scenarioMode = getMode();
+    var metricMode = plot._metricMode || 'tfc';
+    var visible = meta.map(function(entry) { return computeVisible(entry, scenarioMode, metricMode); });
+    window.Plotly.restyle(plot, {visible: visible});
+  };
+
+  var syncButtons = function() {
+    var mode = getMode();
+    document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.scenarioToggle === mode);
+    });
+  };
+  syncButtons();
+
+  document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setMode(btn.dataset.scenarioToggle);
+      syncButtons();
+      document.querySelectorAll('.lazy-chart-plot[data-rendered="true"]').forEach(function(plot) {
+        window.applyScenarioMode(plot);
+      });
+    });
+  });
+})();
+</script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="../chart_bundles/others__charts.js"></script>
+  <script>
+(function() {
+  var plots = Array.from(document.querySelectorAll('.lazy-chart-plot[data-chart-key]'));
+  if (!plots.length || !window.Plotly) return;
+  var bundleData = window.COMMON_ESTO_CHART_BUNDLE_DATA;
+
+  var setState = function(plot, text, loaded) {
+    var state = plot.previousElementSibling;
+    if (state && state.classList.contains('chart-load-state')) {
+      state.dataset.loaded = loaded ? 'true' : 'false';
+      state.textContent = text || '';
+    }
+  };
+
+  var renderPlot = async function(plot) {
+    if (plot.dataset.rendered === 'true' || plot.dataset.rendering === 'true') return;
+    plot.dataset.rendering = 'true';
+    setState(plot, 'Loading chart…', false);
+    try {
+      var bundle = bundleData;
+      var chart = bundle && bundle.charts && bundle.charts[plot.dataset.chartKey];
+      if (!chart) throw new Error('Missing chart: ' + plot.dataset.chartKey);
+      await window.Plotly.newPlot(plot, chart.data || [], chart.layout || {}, {responsive: true});
+      plot.dataset.rendered = 'true';
+      plot.classList.remove('is-unloaded');
+      setState(plot, '', true);
+      window.Plotly.Plots.resize(plot);
+      if (window.applyScenarioMode) {
+        if (plot.on) {
+          plot.on('plotly_buttonclicked', function(ev) {
+            var label = (ev && ev.button && ev.button.label) || '';
+            plot._metricMode = /TFEC/i.test(label) ? 'tfec' : 'tfc';
+            window.applyScenarioMode(plot);
+          });
+        }
+        window.applyScenarioMode(plot);
+      }
+    } catch (err) {
+      plot.classList.add('is-unloaded');
+      setState(plot, 'Chart failed: ' + (err.message || err), false);
+    } finally {
+      plot.dataset.rendering = 'false';
+    }
+  };
+
+  if ('IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) { renderPlot(entry.target); observer.unobserve(entry.target); }
+      });
+    }, {rootMargin: '900px 0px'});
+    plots.forEach(function(p) { observer.observe(p); });
+  } else {
+    plots.forEach(renderPlot);
+  }
+
+  window.addEventListener('resize', function() {
+    plots.forEach(function(p) { if (p.dataset.rendered === 'true') window.Plotly.Plots.resize(p); });
+  });
+})();
+</script>
+  <script>
+(function() {
+  var filter = document.querySelector('[data-dataset-filter-group]');
+  var buttons = Array.from(document.querySelectorAll('[data-dataset-filter]'));
+  if (!filter || !buttons.length) return;
+  var scope = filter.dataset.comparisonScope || 'default';
+  var key = 'common-esto-dataset-filter:' + scope;
+  var status = document.querySelector('[data-dataset-filter-status]');
+  var clear = document.querySelector('[data-dataset-filter-clear]');
+  var available = buttons.map(function(button) { return button.dataset.datasetFilter; });
+  var active = [];
+  try {
+    var stored = JSON.parse(window.localStorage.getItem(key) || '[]');
+    if (Array.isArray(stored)) {
+      active = stored
+        .map(function(d) { return String(d).toUpperCase(); })
+        .filter(function(d) { return available.indexOf(d) !== -1; });
+    }
+  } catch (e) {}
+
+  // A card stays visible only if it contains every highlighted (active) dataset.
+  var apply = function() {
+    buttons.forEach(function(btn) {
+      var selected = active.indexOf(btn.dataset.datasetFilter) !== -1;
+      btn.classList.toggle('active', selected);
+      btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    });
+    var cards = Array.from(document.querySelectorAll('.chart-card[data-datasets]'));
+    var visibleCount = 0;
+    cards.forEach(function(card) {
+      var have = (card.dataset.datasets || '').split(',').filter(Boolean);
+      var hidden = active.some(function(d) { return have.indexOf(d) === -1; });
+      card.classList.toggle('dataset-filtered', hidden);
+      if (!hidden) visibleCount += 1;
+    });
+    document.querySelectorAll('[data-dataset-filter-section]').forEach(function(group) {
+      var groupCards = Array.from(group.querySelectorAll('.chart-card[data-datasets]'));
+      var hasVisibleCard = groupCards.some(function(card) {
+        return !card.classList.contains('dataset-filtered');
+      });
+      group.classList.toggle('dataset-group-empty', groupCards.length > 0 && !hasVisibleCard);
+    });
+    if (status) {
+      var selectedText = active.length ? ' containing ' + active.join(' + ') : '';
+      status.textContent = visibleCount
+        ? 'Showing ' + visibleCount + ' of ' + cards.length + ' charts' + selectedText + '.'
+        : 'No charts on this page show every selected dataset (' + active.join(' + ') + '). Clear the chart filter to show all charts.';
+      status.classList.toggle('is-empty', visibleCount === 0);
+    }
+    if (clear) clear.hidden = active.length === 0;
+    try { window.localStorage.setItem(key, JSON.stringify(active)); } catch (e) {}
+    if (window.Plotly) {
+      document.querySelectorAll('.chart-card:not(.dataset-filtered) .lazy-chart-plot[data-rendered="true"]')
+        .forEach(function(p) { window.Plotly.Plots.resize(p); });
+    }
+  };
+
+  buttons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var d = btn.dataset.datasetFilter;
+      var i = active.indexOf(d);
+      if (i === -1) { active.push(d); } else { active.splice(i, 1); }
+      apply();
+    });
+  });
+  if (clear) {
+    clear.addEventListener('click', function() {
+      active = [];
+      apply();
+    });
+  }
+  apply();
+})();
+</script>
+  <script>
+(function() {
+  var steps = [{"id": "page-purpose", "target": "[data-guide-id='page-purpose']", "title": "What this page is for", "copy": "Use Other demand to review agriculture, fishing, non-specified demand and aggregate-only demand that has not yet been replaced by detailed LEAP branches. If something looks wrong, correct it in the model or source data, then rerun the dashboard.\n\n"}, {"id": "top-controls", "target": "[data-guide-id='top-controls']", "title": "Choose what you are viewing", "copy": "Use the controls at the top to change economy, choose Reference or Target when scenario options are available, select which datasets define the comparison basis, and move between dashboard pages."}, {"id": "chart-card", "target": "[data-guide-id='category-basis-switcher'], [data-guide-id='chart-card']", "title": "How common categories make comparison possible", "copy": "Different datasets do not always divide fuels and sectors in the same way. Common categories use the finest non-overlapping grouping that every dataset in the selected comparison basis can represent. The dashboard never divides a published aggregate using assumed shares. This matters for 9th Outlook projections: when the 9th reports only a broad sector or fuel, its allocation among children is unknown, so LEAP and ESTO are aggregated to the 9th level instead of the 9th being disaggregated. A comparison without the 9th can therefore show finer detail.\n\nESTO Extended is a structural mapping basis. Both ordinary and Extended bases use the same published ESTO historical observations; Extended changes the mapping structure, not the history. It adds named children beneath selected ordinary ESTO leaf flows so detailed LEAP branches have valid Common categories in which to appear. It does not invent historical ESTO detail: where ESTO has no measured child value, ESTO remains zero or unavailable while LEAP detail can still be shown. LEAP + ESTO Extended can therefore show more detail than LEAP + ESTO Extended + Ninth, where the 9th may require a broader Common category.\n\nSome Common categories are specially designed comparison boundaries. Labels ending in (including own use) combine a transformation process from flow 09 with its associated energy-sector own use from flow 10 when datasets record those amounts in different branches. This allows the full process to be compared without omitting or double-counting its own use."}, {"id": "other-demand-page-scope", "target": "[data-guide-id='chart-card']", "title": "What appears on Other demand", "copy": "Other demand owns final energy uses outside Industry, Transport and Buildings, plus one temporary combined placeholder used where LEAP detail is not yet separable. The table shows each Common sector and fuel on this page beside the native categories mapped into it for the participating datasets.", "dynamic_content": "page_mapping_table", "table": {"caption": "Page categories and published source mappings", "headers": ["Common sector", "Common fuel", "LEAP sector", "LEAP fuel"], "rows": [["16.03 Agriculture", "07.07 Gas/diesel oil", "Other sector/Agriculture", "Gas and diesel oil"], ["16.03-16.04 Agriculture and fishing", "07.07 Gas/diesel oil", "Agriculture and fishing", "Gas and diesel oil"], ["16.03-16.05 Other sector (all demand aggregate)", "07.07 Gas/diesel oil", "All demand aggregated/Other sector", "Gas and diesel oil"], ["16.05 Non-specified others", "07.07 Gas/diesel oil", "Other sector/Non specified others", "Gas and diesel oil"]], "note": ""}}, {"id": "other-demand-review", "target": "[data-guide-id='chart-card']", "title": "Treat aggregate-only demand as a boundary, not detail", "copy": "Other demand covers agriculture, fishing and non-specified demand. For economies still using the All demand aggregated LEAP placeholder, a combined Other-sector/non-energy row may appear here until detailed branches replace it. Do not infer a sector or non-energy split that the model does not provide."}, {"id": "section-navigation", "target": "[data-guide-id='section-navigation']", "title": "Jump to the part you need", "copy": "The chips reproduce the hierarchy represented on this page. A real Common ESTO root appears only when its full routed subtree belongs here; a broader root split across pages is replaced by the page-scope overview label. Page-defined overview aggregates can form a visible level even when they are not technical ESTO tree nodes. Level 1 is orange, level 2 green, level 3 blue, and level 4 or deeper purple. Ordinary ESTO code depth and displayed comparison rollups determine the remaining parent-child levels. Every chip moves within this page without changing the data or scenario.", "optional": true}, {"id": "overview-first", "target": "[data-guide-id='chart-card']", "title": "Start with the summaries, not every chart", "copy": "Start with the summary charts at the top of the page. Use the section summaries to spot important differences or unusual trends, then open the detailed charts only where you need to investigate further."}, {"id": "placeholder-status", "target": ".visible-note", "title": "What the placeholder warning means", "copy": "The yellow warning means LEAP is using a placeholder for Other sector. A placeholder is a broad total from the 'All demand aggregated' branch, used until this part of the economy is modelled separately. It preserves the total but cannot provide sector or subsector detail, which is why detailed LEAP charts are missing. Treat that detail as unavailable, not as zero.", "dynamic_content": "placeholder_status"}, {"id": "chart-tools", "target": "[data-guide-id='chart-card'] .lazy-chart-plot", "title": "Use the chart tools", "copy": "Hover to inspect a year, drag to zoom and double-click the chart to reset the view. Click a legend item to remove that series; double-click it to show only that series, then double-click again to restore the others. Use the Plotly toolbar to download a chart. Inputs to transformation are normally negative and outputs positive; page and chart notes call out important sign conventions."}];
+  var guideLabel = "COMMON ESTO DASHBOARD GUIDE";
+  var get = function(selector) { return document.querySelector(selector); };
+  var launch = get('#dashboard-guide-launch');
+  var dialog = get('#dashboard-guide-dialog');
+  var backdrop = get('#dashboard-guide-backdrop');
+  if (!launch || !dialog || !backdrop || launch.dataset.guideBound === '1') return;
+
+  var current = 0;
+  var direction = 1;
+  var launchFocus = null;
+  var galleryItems = [];
+  var galleryIndex = 0;
+  var title = get('#dashboard-guide-title');
+  var copy = get('#dashboard-guide-copy');
+  var image = get('#dashboard-guide-image');
+  var gallery = get('#dashboard-guide-gallery');
+  var galleryImages = get('#dashboard-guide-gallery-images');
+  var galleryCaption = get('#dashboard-guide-gallery-caption');
+  var galleryPrevious = get('#dashboard-guide-gallery-previous');
+  var galleryNext = get('#dashboard-guide-gallery-next');
+  var tableContainer = get('#dashboard-guide-table');
+  var back = get('#dashboard-guide-back');
+  var next = get('#dashboard-guide-next');
+  var closeButton = get('#dashboard-guide-close');
+
+  var clearHighlight = function() {
+    document.querySelectorAll('.dashboard-guide-highlight').forEach(function(node) { node.classList.remove('dashboard-guide-highlight'); });
+    document.querySelectorAll('.dashboard-guide-layer').forEach(function(node) { node.classList.remove('dashboard-guide-layer'); });
+  };
+  var resolveTarget = function(step) {
+    return step.target.split(',').map(function(selector) { return get(selector.trim()); }).find(Boolean) || null;
+  };
+  steps = steps.filter(function(step) { return resolveTarget(step) || !step.optional; });
+  var findAvailableIndex = function(index, stepDirection) {
+    var candidate = Math.max(0, Math.min(index, steps.length - 1));
+    while (candidate >= 0 && candidate < steps.length) {
+      if (resolveTarget(steps[candidate]) || !steps[candidate].optional) return candidate;
+      candidate += stepDirection;
+    }
+    return Math.max(0, Math.min(index, steps.length - 1));
+  };
+  var renderGallery = function() {
+    var item = galleryItems[galleryIndex];
+    galleryImages.replaceChildren();
+    if (!item) return;
+    (item.images || [item]).forEach(function(imageItem) {
+      var node = document.createElement('img');
+      node.src = imageItem.image || '';
+      node.alt = imageItem.alt || '';
+      galleryImages.appendChild(node);
+    });
+    var count = String(galleryIndex + 1) + ' of ' + String(galleryItems.length);
+    galleryCaption.textContent = item.caption ? count + ' — ' + item.caption : count;
+    galleryPrevious.disabled = galleryItems.length < 2;
+    galleryNext.disabled = galleryItems.length < 2;
+  };
+  var renderTable = function(table) {
+    tableContainer.replaceChildren();
+    tableContainer.hidden = !table;
+    if (!table) return;
+    var caption = document.createElement('div');
+    caption.className = 'dashboard-guide-table-caption';
+    caption.textContent = table.caption || '';
+    var note = document.createElement('p');
+    note.className = 'dashboard-guide-table-note';
+    note.textContent = table.note || '';
+    note.hidden = !table.note;
+    var htmlTable = document.createElement('table');
+    var head = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    (table.headers || []).forEach(function(value) { var cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = value; headRow.appendChild(cell); });
+    head.appendChild(headRow);
+    var body = document.createElement('tbody');
+    (table.rows || []).forEach(function(row) { var tableRow = document.createElement('tr'); row.forEach(function(value) { var cell = document.createElement('td'); cell.textContent = value; tableRow.appendChild(cell); }); body.appendChild(tableRow); });
+    htmlTable.append(head, body);
+    tableContainer.append(caption, note, htmlTable);
+  };
+  var show = function(index, stepDirection) {
+    direction = stepDirection || direction;
+    current = findAvailableIndex(index, direction);
+    var step = steps[current];
+    var target = resolveTarget(step);
+    clearHighlight();
+    get('#dashboard-guide-kicker').textContent = guideLabel;
+    get('#dashboard-guide-step').textContent = String(current + 1);
+    get('#dashboard-guide-total').textContent = String(steps.length);
+    title.textContent = step.title;
+    copy.textContent = step.copy;
+    image.hidden = !step.image;
+    if (step.image) { image.src = step.image; image.alt = step.image_alt || step.title; } else { image.removeAttribute('src'); image.alt = ''; }
+    galleryItems = step.gallery || [];
+    galleryIndex = 0;
+    gallery.hidden = !galleryItems.length;
+    if (galleryItems.length) renderGallery(); else { galleryImages.replaceChildren(); galleryCaption.textContent = ''; }
+    renderTable(step.table);
+    dialog.classList.toggle('guide-has-rich-content', Boolean(step.image || galleryItems.length || step.table));
+    back.style.visibility = current === 0 ? 'hidden' : 'visible';
+    next.innerHTML = current === steps.length - 1 ? 'Done <span aria-hidden="true">✓</span>' : 'Next <span aria-hidden="true">→</span>';
+    if (target) {
+      target.classList.add('dashboard-guide-highlight');
+      var pageHeader = target.closest('.page-header');
+      if (pageHeader) pageHeader.classList.add('dashboard-guide-layer');
+      target.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});
+    }
+  };
+  var close = function() {
+    dialog.hidden = true;
+    backdrop.hidden = true;
+    clearHighlight();
+    if (launchFocus && launchFocus.focus) launchFocus.focus();
+  };
+  var move = function(stepDirection) {
+    if (stepDirection > 0 && current === steps.length - 1) { close(); return; }
+    show(current + stepDirection, stepDirection);
+  };
+
+  launch.dataset.guideBound = '1';
+  launch.addEventListener('click', function() {
+    launchFocus = document.activeElement;
+    var pageHeader = get('#page-header');
+    if (pageHeader) {
+      pageHeader.classList.remove('is-collapsed');
+      var headerToggle = get('#header-toggle');
+      if (headerToggle) {
+        headerToggle.textContent = '▴';
+        headerToggle.setAttribute('aria-expanded', 'true');
+        headerToggle.setAttribute('aria-label', 'Collapse header');
+      }
+    }
+    dialog.hidden = false;
+    backdrop.hidden = false;
+    show(0, 1);
+    closeButton.focus();
+  });
+  closeButton.addEventListener('click', close);
+  backdrop.addEventListener('click', close);
+  back.addEventListener('click', function() { move(-1); });
+  next.addEventListener('click', function() { move(1); });
+  galleryPrevious.addEventListener('click', function() { galleryIndex = (galleryIndex - 1 + galleryItems.length) % galleryItems.length; renderGallery(); });
+  galleryNext.addEventListener('click', function() { galleryIndex = (galleryIndex + 1) % galleryItems.length; renderGallery(); });
+  document.addEventListener('keydown', function(event) {
+    if (dialog.hidden) return;
+    if (event.key === 'Escape') close();
+    if (event.key === 'ArrowLeft' && event.target.tagName !== 'BUTTON') move(-1);
+    if (event.key === 'ArrowRight' && event.target.tagName !== 'BUTTON') move(1);
+    if (event.key === 'Tab') {
+      var focusable = Array.from(dialog.querySelectorAll('button:not([disabled]),a[href]')).filter(function(node) { return node.offsetParent !== null; });
+      if (!focusable.length) return;
+      var first = focusable[0]; var last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  });
+})();
+</script>
+</body>
+</html>
