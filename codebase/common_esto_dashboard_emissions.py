@@ -39,6 +39,9 @@ SUPPORTED_MAPPING_AXES = (NINTH_FUEL_AXIS, ESTO_PRODUCT_AXIS, ESTO_PRODUCT_FLOW_
 
 DEFAULT_EMISSIONS_UNIT = "Mt CO2e"
 EMISSIONS_COLUMN = "emissions_value"
+DEFAULT_FLOW_POLICY_PATH = (
+    "config/common_esto_dashboard/esto_emissions_flow_policy.csv"
+)
 
 _LEAP_MAPPINGS_ROOT: Path | None = None
 
@@ -90,6 +93,143 @@ def _resolve_mappings_path(path: str | Path) -> Path:
     """Resolve a leap_mappings-relative path."""
     path_obj = Path(str(path).replace("\\", "/"))
     return path_obj if path_obj.is_absolute() else leap_mappings_root() / path_obj
+
+
+def load_emissions_flow_policy(path: str | Path = DEFAULT_FLOW_POLICY_PATH) -> pd.DataFrame:
+    """Load and validate the original-ESTO-flow combustion policy.
+
+    ``measured_in_dashboard`` means that fuel use on the flow is eligible for
+    the dashboard's factor-based combustion estimate. It does not mean that
+    the source balance contains directly measured emissions.
+    """
+    policy_path = _resolve_repo_path(path)
+    policy = pd.read_csv(policy_path, dtype=str, keep_default_na=False)
+    required = [
+        "esto_flow_code",
+        "esto_flow_name",
+        "esto_flow",
+        "measured_in_dashboard",
+        "treatment",
+        "notes",
+    ]
+    missing = set(required) - set(policy.columns)
+    if missing:
+        raise ValueError(
+            f"{policy_path} is missing required columns: {sorted(missing)}"
+        )
+
+    policy = policy[required].copy()
+    for column in required:
+        policy[column] = policy[column].astype(str).str.strip()
+    blank_codes = policy["esto_flow_code"].eq("")
+    duplicate_codes = policy["esto_flow_code"].duplicated(keep=False)
+    if blank_codes.any() or duplicate_codes.any():
+        duplicates = sorted(set(policy.loc[duplicate_codes, "esto_flow_code"]))
+        raise ValueError(
+            f"{policy_path} must contain one non-blank row per ESTO flow code; "
+            f"duplicate codes: {duplicates or 'none'}."
+        )
+
+    measured = policy["measured_in_dashboard"].str.casefold()
+    invalid = ~measured.isin({"true", "false"})
+    if invalid.any():
+        values = sorted(set(policy.loc[invalid, "measured_in_dashboard"]))
+        raise ValueError(
+            f"{policy_path} measured_in_dashboard must contain TRUE/FALSE only; "
+            f"found: {values}."
+        )
+    policy["measured_in_dashboard"] = measured.eq("true")
+    return policy.sort_values("esto_flow_code").reset_index(drop=True)
+
+
+def _flow_code_tokens(expression: object) -> list[str]:
+    """Return the distinct ESTO flow codes in a common-code expression."""
+    return list(dict.fromkeys(re.findall(r"\d+(?:\.\d+)*", str(expression))))
+
+
+def _resolve_policy_code(code: str, policy_codes: set[str]) -> str | None:
+    """Resolve an extended Common ESTO code to its longest original ancestor."""
+    parts = str(code).split(".")
+    for length in range(len(parts), 0, -1):
+        candidate = ".".join(parts[:length])
+        if candidate in policy_codes:
+            return candidate
+    return None
+
+
+def apply_emissions_flow_policy(
+    rows: pd.DataFrame,
+    policy: pd.DataFrame,
+    selection_stage: str,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Filter rows through the original-ESTO-flow policy.
+
+    Common ESTO can extend the original hierarchy (for example detailed road
+    vehicle rows). Such rows inherit the longest original ESTO ancestor. A
+    compound or rollup row is eligible only when every component resolves and
+    every resolved original flow is measured; mixed combustion/non-combustion
+    rollups therefore fail closed.
+    """
+    if rows.empty:
+        diagnostic_columns = [
+            "selection_stage",
+            "common_flow_code",
+            "common_flow_label",
+            "flow_code_expression",
+            "input_flow_codes",
+            "resolved_esto_flow_codes",
+            "policy_status",
+            "policy_treatments",
+            "policy_notes",
+        ]
+        return rows.copy(), pd.DataFrame(columns=diagnostic_columns)
+
+    policy_by_code = policy.set_index("esto_flow_code")
+    policy_codes = set(policy_by_code.index.astype(str))
+    work = rows.copy()
+    if "component_flow_code" in work.columns:
+        component = work["component_flow_code"].fillna("").astype(str).str.strip()
+    else:
+        component = pd.Series("", index=work.index, dtype=str)
+    fallback = work["common_flow_code"].fillna("").astype(str).str.strip()
+    work["_policy_flow_expression"] = component.where(component.ne(""), fallback)
+
+    records: list[dict[str, object]] = []
+    include_mask: list[bool] = []
+    for _, row in work.iterrows():
+        expression = str(row["_policy_flow_expression"])
+        tokens = _flow_code_tokens(expression)
+        resolved = [_resolve_policy_code(token, policy_codes) for token in tokens]
+        unresolved = [token for token, match in zip(tokens, resolved) if match is None]
+        resolved_codes = list(dict.fromkeys(match for match in resolved if match))
+        measured = [
+            bool(policy_by_code.loc[code, "measured_in_dashboard"])
+            for code in resolved_codes
+        ]
+        include = bool(tokens) and not unresolved and bool(measured) and all(measured)
+        if not tokens or unresolved:
+            status = "unresolved"
+        elif include:
+            status = "included"
+        else:
+            status = "excluded"
+        include_mask.append(include)
+        treatments = [str(policy_by_code.loc[code, "treatment"]) for code in resolved_codes]
+        notes = [str(policy_by_code.loc[code, "notes"]) for code in resolved_codes]
+        records.append({
+            "selection_stage": selection_stage,
+            "common_flow_code": str(row["common_flow_code"]),
+            "common_flow_label": str(row["common_flow_label"]),
+            "flow_code_expression": expression,
+            "input_flow_codes": "; ".join(tokens),
+            "resolved_esto_flow_codes": "; ".join(resolved_codes),
+            "policy_status": status,
+            "policy_treatments": "; ".join(dict.fromkeys(treatments)),
+            "policy_notes": "; ".join(dict.fromkeys(notes)),
+        })
+
+    diagnostic = pd.DataFrame(records).drop_duplicates().reset_index(drop=True)
+    return work.loc[include_mask].drop(columns=["_policy_flow_expression"]), diagnostic
 
 
 #%%
@@ -845,17 +985,6 @@ def _demand_rows(assigned_df: pd.DataFrame, config: dict) -> pd.DataFrame:
 _TRANSFORMATION_PAGE_KEYS = {"power", "refining", "other_transformation"}
 
 
-def _is_non_energy_or_mixed_demand(df: pd.DataFrame) -> pd.Series:
-    """Identify demand rows that cannot be treated as combustion fuel use."""
-    flow_code = df["common_flow_code"].astype(str)
-    flow_label = df["common_flow_label"].astype(str).str.casefold()
-    return (
-        df["_page_key"].astype(str).eq("non_energy")
-        | flow_code.str.startswith("17")
-        | flow_label.str.contains("including non-energy", regex=False)
-    )
-
-
 def _lowest_transformation_frontier(df: pd.DataFrame) -> pd.DataFrame:
     """Keep the deepest available transformation flow per source/fuel.
 
@@ -913,56 +1042,11 @@ def _lowest_transformation_frontier(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _combustion_transformation_rows(
-    assigned_df: pd.DataFrame,
-    config: dict,
-) -> pd.DataFrame:
-    """Return transformation and own-use rows that represent combustion.
-
-    A negative transformation balance is not automatically fuel combustion.
-    Refinery crude, gas sent to LNG liquefaction, and coal sent to coke ovens
-    are conversion feedstocks whose energy reappears as positive outputs.
-    Applying a combustion factor to those inputs materially overstates
-    emissions and can also double count exact, inclusive, and own-use views.
-
-    Power-sector inputs are combustion inputs. Separately reported energy-
-    sector own use is also treated as combustion, while transmission and
-    distribution losses are not assigned a direct combustion factor.
-    """
-    if assigned_df.empty:
-        return assigned_df.copy()
-
-    renderer = _renderer()
-    transformation_prefixes = [
-        str(value).strip()
-        for value in config.get(
-            "combustion_transformation_flow_code_prefixes",
-            ["09.01", "09.02"],
-        )
-        if str(value).strip()
-    ]
-    own_use_prefixes = [
-        str(value).strip()
-        for value in config.get("combustion_own_use_flow_code_prefixes", ["10.01"])
-        if str(value).strip()
-    ]
-    allowed_prefixes = transformation_prefixes + own_use_prefixes
-    if not allowed_prefixes:
-        return assigned_df.iloc[0:0].copy()
-
-    combustion_mask = assigned_df["common_flow_code"].astype(str).apply(
-        lambda code: renderer.code_expression_matches_any_prefix(
-            code,
-            allowed_prefixes,
-        )
-    )
-    return assigned_df[combustion_mask].copy()
-
-
 def select_emissions_component_rows(
     assigned_df: pd.DataFrame,
     config: dict,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    flow_policy: pd.DataFrame | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Select combustion rows for the two emissions charts.
 
     Demand uses the existing non-overlapping frontier. Power-sector combustion
@@ -971,12 +1055,18 @@ def select_emissions_component_rows(
     feedstocks, positive outputs, transfers, transmission/distribution losses,
     and non-energy or mixed demand aggregates are excluded.
 
-    Returns ``(rows, coverage_rows, component_selection)``. The returned rows
-    have positive ``value`` values and a normalized ``_sector_label`` suitable
-    for both the fuel and major-sector charts.
+    The maintained original-ESTO-flow CSV is the authority for which rows are
+    measured. Returns ``(rows, coverage_rows, component_selection,
+    flow_policy_resolution)``. The selected rows have positive ``value``
+    values and a normalized ``_sector_label`` suitable for both charts.
     """
+    flow_policy = flow_policy if flow_policy is not None else load_emissions_flow_policy(
+        config.get("flow_policy_path", DEFAULT_FLOW_POLICY_PATH)
+    )
     demand = _demand_rows(assigned_df, config).copy()
-    demand = demand[~_is_non_energy_or_mixed_demand(demand)].copy()
+    demand, demand_policy_resolution = apply_emissions_flow_policy(
+        demand, flow_policy, "demand_detail"
+    )
     demand_frontier = select_non_overlapping_rows(demand)
     coverage = frontier_coverage_check(demand, demand_frontier)
 
@@ -985,7 +1075,9 @@ def select_emissions_component_rows(
         assigned_df["_page_key"].astype(str).eq("total_demand")
         & assigned_df["common_flow_code"].astype(str).eq(aggregate_flow_code)
     ].copy()
-    overview = overview[~_is_non_energy_or_mixed_demand(overview)].copy()
+    overview, overview_policy_resolution = apply_emissions_flow_policy(
+        overview, flow_policy, "demand_aggregate_fallback"
+    )
     demand_rows, demand_selection = select_emissions_demand_rows(
         demand_frontier, overview, aggregate_flow_code
     )
@@ -1002,11 +1094,11 @@ def select_emissions_component_rows(
     transformation = assigned_df[
         assigned_df["_page_key"].astype(str).isin(_TRANSFORMATION_PAGE_KEYS)
     ].copy()
-    # Keep combustion rather than every negative balance-table input. This
-    # excludes conversion feedstocks and T&D losses before frontier selection,
-    # so an inclusive transformation rollup cannot duplicate its exact input
-    # and separately reported own-use row.
-    transformation = _combustion_transformation_rows(transformation, config)
+    # Apply the original ESTO policy before frontier selection so conversion
+    # feedstocks and T&D losses cannot suppress or duplicate eligible own use.
+    transformation, transformation_policy_resolution = apply_emissions_flow_policy(
+        transformation, flow_policy, "transformation_and_own_use"
+    )
     transformation_frontier = _lowest_transformation_frontier(transformation)
     transformation_frontier["signed_value_pj"] = pd.to_numeric(
         transformation_frontier["value"], errors="coerce"
@@ -1045,7 +1137,15 @@ def select_emissions_component_rows(
     ) if any(not frame.empty for frame in component_rows) else pd.DataFrame(
         columns=["source_system", "scenario", "emissions_level", "row_count", "emissions_component"]
     )
-    return selected, coverage, component_selection
+    flow_policy_resolution = pd.concat(
+        [
+            demand_policy_resolution,
+            overview_policy_resolution,
+            transformation_policy_resolution,
+        ],
+        ignore_index=True,
+    ).drop_duplicates().reset_index(drop=True)
+    return selected, coverage, component_selection, flow_policy_resolution
 
 
 def select_emissions_demand_rows(
@@ -1164,6 +1264,9 @@ def emissions_page_enabled(
             )
         )
     )
+    required.append(
+        _resolve_repo_path(config.get("flow_policy_path", DEFAULT_FLOW_POLICY_PATH))
+    )
     return all(path.exists() for path in required)
 
 
@@ -1183,12 +1286,11 @@ def build_emissions_page(
 ) -> tuple[list[dict], dict | None]:
     """Build the Emissions page (config-driven bespoke page).
 
-    Applies the active emissions factor set to final demand, negative
-    power-sector combustion inputs, and separately reported energy-sector own
-    use, then renders exactly two stacked comparison charts: emissions by fuel
-    and emissions by major sector. Conversion feedstocks, positive outputs,
-    transfers, transmission/distribution losses, and non-energy demand are not
-    included in the combustion boundary.
+    Applies the active emissions factor set to rows admitted by the maintained
+    original-ESTO-flow policy, then renders exactly two stacked comparison
+    charts: emissions by fuel and emissions by major sector. Conversion
+    feedstocks, positive outputs, transfers, transmission/distribution losses,
+    and non-energy demand are not included in the combustion boundary.
 
     Scope, factor set, sector membership, and suppression are config-driven via
     the ``emissions_page`` template key and
@@ -1217,8 +1319,11 @@ def build_emissions_page(
     page_label = str(config.get("page_label", "Emissions"))
     base_year = int(template.get("chart_generation", {}).get("base_year", 2023))
 
-    demand_df, coverage_check, source_selection = select_emissions_component_rows(
-        assigned_df, config
+    flow_policy = load_emissions_flow_policy(
+        config.get("flow_policy_path", DEFAULT_FLOW_POLICY_PATH)
+    )
+    demand_df, coverage_check, source_selection, flow_policy_resolution = (
+        select_emissions_component_rows(assigned_df, config, flow_policy)
     )
 
     comparison_scope = str(
@@ -1266,6 +1371,8 @@ def build_emissions_page(
         )
     diagnostics["frontier_coverage_check"] = coverage_check
     diagnostics["source_selection"] = source_selection
+    diagnostics["flow_policy"] = flow_policy
+    diagnostics["flow_policy_resolution"] = flow_policy_resolution
     for name, frame in diagnostics.items():
         frame.to_csv(layout["supporting"] / f"emissions_{name}.csv", index=False)
     emissions_df.groupby(
@@ -1461,7 +1568,9 @@ def _page_note(
         "Negative power-sector inputs and separately reported energy-sector own use are "
         "treated as fuel consumption. Conversion feedstocks, positive transformation "
         "outputs, transfers, and transmission/distribution losses are excluded. "
-        "Non-energy use, including unresolved mixed Other-sector aggregates, is excluded."
+        "Non-energy use, including unresolved mixed Other-sector aggregates, is excluded. "
+        "The maintained original-ESTO-flow policy controls this boundary; extended Common "
+        "ESTO rows inherit their longest original-flow ancestor and mixed rollups fail closed."
     )
     if aggregate_sources:
         note += (

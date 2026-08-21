@@ -808,16 +808,18 @@ while retaining Residential and Industry child detail groups.
 **Owner:** leap_dashboard
 **Type:** Derived-quantity presentation
 **Affected areas:** Emissions page; `codebase/common_esto_dashboard_emissions.py`;
-`config/common_esto_dashboard/emissions_factor_sets.json`
+`config/common_esto_dashboard/emissions_factor_sets.json`;
+`config/common_esto_dashboard/esto_emissions_flow_policy.csv`
 
 ### Current rule
 
-The Emissions page is derived, not sourced. Every chart is
-`final energy demand x emissions factor`, applied to the same demand rows the
-sector pages plot, so LEAP, ESTO, and the 9th edition are compared on one
-consistent basis.
+The Emissions page is derived, not sourced. Every chart is eligible fuel use
+multiplied by an emissions factor, so LEAP, ESTO, and the 9th edition are
+compared on one consistent factor-based basis. The word "measured" in the flow
+policy means included in this dashboard estimate; it does not claim that ESTO
+contains directly measured emissions.
 
-Four rules make that derivation reproducible:
+Five rules make that derivation reproducible:
 
 1. **The factor axis is declared, not assumed.** A factor set names the axis its
    factors are keyed on (`ninth_fuel`, `esto_product`, or `esto_product_flow`).
@@ -837,7 +839,18 @@ Four rules make that derivation reproducible:
 3. **A blank factor means no emissions, not missing data.** Blanks resolve to
    zero, so electricity, heat, hydrogen, and the renewable carriers contribute
    nothing at the point of final use rather than dropping out of a total.
-4. **Only one non-overlapping frontier is summed.** Sector pages carry a whole
+4. **Original ESTO flows declare the combustion boundary.**
+   `esto_emissions_flow_policy.csv` contains every original flow from
+   `00APEC_2024_low_with_subtotals.csv`, its inclusion flag, treatment, and
+   rationale. Final-energy demand (`13`-`16`), negative power/CHP/heat-plant
+   inputs (`09.01`-`09.02`), and energy-sector own use (`10.01`) are eligible.
+   Supply rows, transfers, conversion feedstocks, network losses, balance
+   items, non-energy use, and electricity/heat output measures are not.
+   Extended Common ESTO codes inherit the longest original ESTO ancestor. A
+   compound row is eligible only when all of its resolved original components
+   are eligible, so mixed final/non-energy and transformation/own-use rollups
+   fail closed.
+5. **Only one non-overlapping frontier is summed.** Sector pages carry a whole
    flow hierarchy plus generated rollups that span several pages
    (`16.03-16.05,17 Other sector including non-energy`). A row that covers
    another row of the same source and scenario on both axes is dropped, keeping
@@ -845,11 +858,16 @@ Four rules make that derivation reproducible:
    each other - `16 Other sector` and `16.03-16.05,17` share `16.03-16.05` - so
    no set of aggregates is guaranteed to partition demand.
 
-Scope is deliberately final energy demand only. Combustion in transformation
-and the power sector is excluded, which is why electricity carries a zero
-factor here rather than an implied grid intensity. Adding transformation page
-keys to `emissions_page.demand_page_keys` would double count against the fuels
-those inputs produce.
+The boundary includes direct combustion in final energy demand, power
+generation, and energy-sector own use. It deliberately excludes conversion
+feedstocks: crude sent to refineries, gas sent to LNG/gas-processing plants,
+coal sent to coke ovens or blast furnaces, and inputs to petrochemical,
+biofuel, charcoal, and hydrogen conversion are not assumed to be burned merely
+because the balance value is negative. Their separately reported `10.01` own
+use is eligible. Positive transformation outputs are always excluded by sign.
+`10.02` network losses are also excluded because a lost unit of energy is not
+direct combustion at the loss row; its upstream generation emissions are
+already counted. Electricity and heat carry zero point-of-use factors.
 
 Conflicts are resolved by declared strategy and reported, never silently
 averaged. Several 9th fuels mapping to one ESTO product resolve by
@@ -864,7 +882,10 @@ resolve by `component_conflict_resolution`. Both land in
 per common fuel with its contributing 9th fuels and ESTO components),
 `emissions_factor_conflicts.csv`, `emissions_dropped_factor_rows.csv`,
 `emissions_axis_values_without_factor.csv` (expected empty), and
-`emissions_frontier_coverage_check.csv`.
+`emissions_frontier_coverage_check.csv`. It also contains a copy of the policy
+as `emissions_flow_policy.csv` and the row-by-row inheritance/result audit as
+`emissions_flow_policy_resolution.csv`; the latter must contain no
+`policy_status == unresolved` rows for a production contract.
 
 The coverage check compares every dropped aggregate against the detail retained
 inside it; a gap above `emissions_page.frontier_coverage_tolerance_pj` means the
@@ -875,6 +896,12 @@ agree where all three report the same demand: for 20USA at 2022 all three read
 
 ### History
 
+- 2026-08-21: Replaced hard-coded transformation prefixes with the complete
+  original-ESTO-flow policy. This fixed LNG liquefaction and similar conversion
+  feedstocks being treated as combustion while retaining separately reported
+  plant own use. The aggregate fallback moved from `12 Total final
+  consumption`, which includes non-energy use, to `13 Total final energy
+  consumption`.
 - 2026-08-06: Added the Emissions page. The first implementation summed every
   demand row and reported 4,838 Mt CO2e for 20USA 2022 against 3,443 for LEAP;
   the gap was parent and child flows counted together, which is what rule 4

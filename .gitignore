@@ -54,6 +54,7 @@ Thumbs.db
 *.code-workspace
 !.gitkeep
 !tests/fixtures/**/*.csv
+!config/common_esto_dashboard/esto_emissions_flow_policy.csv
 
 # Committed dashboard site assets (docs/ = GitHub Pages source)
 # HTML, JS, JSON in docs/ are committed; heavy data files inside docs/ are not.

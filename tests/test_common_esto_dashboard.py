@@ -375,12 +375,11 @@ def test_emissions_components_keep_demand_sectors_and_combine_signed_transformat
         },
     ])
 
-    selected, coverage, selection = select_emissions_component_rows(
+    selected, coverage, selection, flow_policy_resolution = select_emissions_component_rows(
         rows,
         {
             "demand_page_keys": ["industry", "transport", "buildings", "others"],
-            "combustion_transformation_flow_code_prefixes": ["09.01", "09.02"],
-            "combustion_own_use_flow_code_prefixes": ["10.01"],
+            "aggregate_flow_code": "13",
         },
     )
 
@@ -391,6 +390,7 @@ def test_emissions_components_keep_demand_sectors_and_combine_signed_transformat
     assert "09.07 Oil refineries" not in set(selected["common_flow_label"])
     assert (selected["_sector_label"] == "Power generation and own use").sum() == 2
     assert set(selection["emissions_component"]) == {"Final demand", "Power generation and own use"}
+    assert set(flow_policy_resolution["policy_status"]) == {"included", "excluded"}
 
 
 def test_total_demand_sector_area_uses_non_overlapping_parent_child_frontier() -> None:
