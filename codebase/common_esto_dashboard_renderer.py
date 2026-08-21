@@ -1263,7 +1263,15 @@ def frontier_flow_labels(nodes: pd.DataFrame, parent_prefix: str, target_level: 
             parent_rows = parent_rows[_metadata_bool(parent_rows["is_non_expanding_rollup"])]
         else:
             parent_rows = parent_rows.iloc[0:0]
-        if not parent_rows.empty:
+        # Ninth's broad 09.06 row contains only the gas-side input while its
+        # LNG output is reported in the observed 09.06.02 child.  Do not use
+        # that incomplete parent as a comparator for the inclusive 09.06
+        # summary; resolve its child frontier instead.
+        use_parent_boundary = not (
+            str(parent_prefix) == "09.06"
+            and str(source).casefold() == "ninth"
+        )
+        if use_parent_boundary and not parent_rows.empty:
             boundary_rows = parent_rows[
                 parent_rows["common_flow_label"].astype(str).str.casefold().str.contains(
                     "including own use", regex=False
@@ -5208,6 +5216,11 @@ def _build_td_sector_chart(
     # no longer shows a single net total line on its own.
     tfc_totals = _domestic_tfc_totals(tfc_total_df, overview_flow_df)
     for (src, scen), grp in tfc_totals.groupby(["source_system", "scenario"]):
+        # Areas show ESTO through the base year and LEAP only afterwards.
+        # Start LEAP's declared total at the same handover so a visible
+        # calibration difference is not misread as a stack-summation error.
+        if str(src).casefold() == str(primary_source).casefold():
+            grp = grp[grp["year"] > resolved_base_year]
         if not _has_nonzero_values(grp["value"]):
             continue
         lbl = series_label_from_values(src, scen, series_labels) + " (Domestic TFC)"
@@ -5334,6 +5347,8 @@ def _build_td_fuel_chart(
     # show a single net total when fuels have mixed signs).
     comp_totals = _domestic_tfc_totals(tfc_total_df, overview_flow_df)
     for (src, scen), grp in comp_totals.groupby(["source_system", "scenario"]):
+        if str(src).casefold() == str(primary_source).casefold():
+            grp = grp[grp["year"] > resolved_base_year]
         if not _has_nonzero_values(grp["value"]):
             continue
         lbl = series_label_from_values(src, scen, series_labels) + " total (Domestic TFC)"
@@ -5649,6 +5664,45 @@ def _build_balance_flow_total_chart(
         margin={"l": 64, "r": 28, "t": 84, "b": 160},
         legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
         meta={"trace_meta": trace_meta},
+    )
+    apply_chart_chrome(fig, base_year)
+    return fig
+
+
+def build_hydrogen_electrolysers_electricity_input_chart(
+    input_df: pd.DataFrame,
+    series_labels: dict[str, str],
+    *,
+    base_year: int,
+) -> go.Figure:
+    """Build a LEAP-only chart for the unmapped electrolyser electricity input."""
+    fig = go.Figure()
+    trace_meta: list[dict] = []
+    for scenario, group in input_df.groupby("scenario", dropna=False):
+        group = group.sort_values("year")
+        label = series_label_from_values("LEAP", str(scenario), series_labels)
+        fig.add_trace(go.Scatter(
+            x=group["year"], y=group["value"], mode="lines+markers",
+            name=label,
+            hovertemplate=(
+                "%{x}<br>Electricity input: %{y:,.2f}PJ<extra>"
+                + escape(label) + "</extra>"
+            ),
+        ))
+        trace_meta.append(trace_meta_entry("LEAP", str(scenario), True))
+    fig.update_layout(
+        title="09.13.01 Electrolysers - Electricity for hydrogen (LEAP-only input)",
+        xaxis_title="Year",
+        yaxis_title="Signed energy (PJ)",
+        margin={"l": 64, "r": 28, "t": 84, "b": 160},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.20, "xanchor": "left", "x": 0},
+        meta={
+            "trace_meta": trace_meta,
+            "stacked_area_note": (
+                "LEAP-only diagnostic: Electricity for hydrogen used by Hydrogen transformation/Electrolysers. "
+                "Imports of this product are deliberately excluded."
+            ),
+        },
     )
     apply_chart_chrome(fig, base_year)
     return fig
@@ -6404,6 +6458,7 @@ def render_dashboard(
     additional_pages: list[dict[str, str]] | None = None,
     source_category_map: pd.DataFrame | None = None,
     unmet_requirements_df: pd.DataFrame | None = None,
+    hydrogen_electricity_input_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Render page bundles, dashboard pages, and a chart manifest."""
     series_labels = series_config.get("series_labels", {})
@@ -6534,6 +6589,10 @@ def render_dashboard(
     base_year = int(chart_config.get("base_year", 2023))
     ninth_source = str(chart_config.get("ninth_source_system", "NINTH"))
     suppression_threshold = effective_chart_suppression_threshold(template, assigned_df)
+    hydrogen_electricity_input_df = (
+        pd.DataFrame() if hydrogen_electricity_input_df is None
+        else hydrogen_electricity_input_df.copy()
+    )
 
     for page_info in page_inventory:
         page_key = page_info["page_key"]
@@ -6823,6 +6882,39 @@ def render_dashboard(
                 "datasets": chart_dataset_tokens_from_figure(chart_figure),
                 "stacked_area_note": stacked_area_note_from_figure(chart_figure),
                 **metrics,
+            })
+
+        if (
+            page_key == safe_slug(other_transformation_config.get("page_key", "other_transformation"))
+            and not hydrogen_electricity_input_df.empty
+        ):
+            chart_key = "chart__line__09_13_01_electrolysers__electricity_for_hydrogen_input"
+            figure = build_hydrogen_electrolysers_electricity_input_chart(
+                hydrogen_electricity_input_df, series_labels, base_year=base_year,
+            )
+            charts[chart_key] = figure
+            manifest_rows.append({
+                "page_key": page_key,
+                "page_label": page_label,
+                "section_label": "Other transformation (including own use)",
+                "chart_type": "line",
+                "chart_key": chart_key,
+                "common_flow_label": "09.13.01 Electrolysers (LEAP-only input)",
+                "common_product_label": "Electricity for hydrogen (LEAP-only input)",
+                "row_count": int(len(hydrogen_electricity_input_df)),
+                "source_flow_labels": "Hydrogen transformation/Electrolysers",
+                "sign_note": "Negative values are LEAP electricity input; import rows are excluded.",
+                "suppressed": False,
+            })
+            chart_rows.append({
+                "chart_key": chart_key,
+                "chart_type": "line",
+                "title": "09.13.01 Electrolysers - Electricity for hydrogen (LEAP-only input)",
+                "product_label": "Electricity for hydrogen (LEAP-only input)",
+                "section_label": "Other transformation (including own use)",
+                "flow_group_label": "09.13.01 Electrolysers (including own use)",
+                "datasets": chart_dataset_tokens_from_figure(figure),
+                "stacked_area_note": stacked_area_note_from_figure(figure),
             })
 
         if not charts:

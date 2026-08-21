@@ -43,6 +43,14 @@ inspection of the current upstream mapping artifacts.
 
 ## Post-snapshot completion on 2026-08-12
 
+- **DASHQ-062 is in progress.** The Other transformation page now adds a
+  clearly labelled LEAP-only Electrolysers electricity-input diagnostic from
+  the raw LEAP results, excluding the confusing Resources/Imports rows for
+  that product. It also aligns the broad 09.06 Ninth comparator with its
+  observed child frontier and starts LEAP Domestic-TFC comparison lines after
+  the ESTO-to-LEAP handover year. Production-render verification remains
+  pending.
+
 - Section navigation and matching body sections now sort automatically by the
   natural numeric ESTO code at each hierarchy level. Labels without a leading
   code use alphabetical fallback ordering.
