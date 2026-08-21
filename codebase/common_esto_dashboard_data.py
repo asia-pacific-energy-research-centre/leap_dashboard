@@ -193,65 +193,6 @@ UNMET_REQUIREMENTS_COLUMNS = [
     "value",
 ]
 
-HYDROGEN_ELECTRICITY_INPUT_COLUMNS = [
-    "source_system",
-    "scenario",
-    "year",
-    "value",
-]
-
-
-def load_hydrogen_electricity_input_data(
-    raw_leap_results_path: Path,
-    *,
-    economy: str,
-    min_year: int | None = None,
-    max_year: int | None = None,
-) -> pd.DataFrame:
-    """Load the LEAP-only electrolyser electricity input diagnostic.
-
-    ``Electricity for hydrogen`` has no reviewed Common ESTO product mapping,
-    so it must not be merged into normal comparison charts.  Select the exact
-    Electrolysers branch only; this deliberately excludes Resources/Imports
-    rows carrying the same LEAP product.
-    """
-    empty = pd.DataFrame(columns=HYDROGEN_ELECTRICITY_INPUT_COLUMNS)
-    raw_path = Path(raw_leap_results_path)
-    if not raw_path.exists():
-        return empty
-
-    raw = pd.read_csv(
-        raw_path,
-        usecols=["economy", "scenario", "year", "leap_flow", "leap_product", "value"],
-        low_memory=False,
-    )
-    raw["economy"] = raw["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
-    selected = raw[
-        raw["economy"].eq(str(economy).replace("_", "").strip())
-        & raw["leap_flow"].astype(str).str.strip().str.casefold().eq(
-            "hydrogen transformation/electrolysers"
-        )
-        & raw["leap_product"].astype(str).str.strip().str.casefold().eq(
-            "electricity for hydrogen"
-        )
-    ].copy()
-    if selected.empty:
-        return empty
-    selected["year"] = pd.to_numeric(selected["year"], errors="coerce")
-    selected["value"] = pd.to_numeric(selected["value"], errors="coerce").fillna(0.0)
-    if min_year is not None:
-        selected = selected[selected["year"] >= min_year]
-    if max_year is not None:
-        selected = selected[selected["year"] <= max_year]
-    selected = selected[selected["value"].abs() > 1e-12]
-    if selected.empty:
-        return empty
-    selected["source_system"] = "LEAP"
-    return selected[HYDROGEN_ELECTRICITY_INPUT_COLUMNS].sort_values(
-        ["scenario", "year"], ignore_index=True
-    )
-
-
 def load_unmet_requirements_data(
     raw_leap_results_path: Path,
     source_to_common_map_path: Path,

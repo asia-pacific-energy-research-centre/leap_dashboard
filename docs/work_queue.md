@@ -43,13 +43,13 @@ inspection of the current upstream mapping artifacts.
 
 ## Post-snapshot completion on 2026-08-12
 
-- **DASHQ-062 is in progress.** The Other transformation page now adds a
-  clearly labelled LEAP-only Electrolysers electricity-input diagnostic from
-  the raw LEAP results, excluding the confusing Resources/Imports rows for
-  that product. It also aligns the broad 09.06 Ninth comparator with its
-  observed child frontier and starts LEAP Domestic-TFC comparison lines after
-  the ESTO-to-LEAP handover year. Production-render verification remains
-  pending.
+- **DASHQ-062 is in progress.** The broad 09.06 Ninth comparator now uses its
+  observed child frontier. Electrolysers green-electricity input is instead
+  awaiting the upstream Common ESTO mapping recorded as `MAPQ-055` in
+  `leap_mappings`: it must appear as the mapped negative area in the existing
+  Hydrogen transformation chart, not as a raw-LEAP-only diagnostic. The
+  post-2026-08-21 mapping run and production render remain the verification
+  gate.
 
 - Section navigation and matching body sections now sort automatically by the
   natural numeric ESTO code at each hierarchy level. Labels without a leading

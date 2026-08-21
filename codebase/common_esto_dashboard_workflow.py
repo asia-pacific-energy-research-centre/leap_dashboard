@@ -64,7 +64,6 @@ from common_esto_dashboard_data import (  # noqa: E402
     load_active_power_interim_branches,
     load_common_esto_data,
     load_leap_demand_representation_status,
-    load_hydrogen_electricity_input_data,
     load_source_category_map,
     load_unmet_requirements_data,
 )
@@ -557,12 +556,6 @@ def run_dashboard_for_economy(
             min_year=MIN_YEAR,
             max_year=MAX_YEAR,
         )
-        hydrogen_electricity_input_df = load_hydrogen_electricity_input_data(
-            RAW_LEAP_RESULTS_PATH,
-            economy=economy,
-            min_year=MIN_YEAR,
-            max_year=MAX_YEAR,
-        )
         layout = build_output_layout(
             OUTPUT_ROOT, dashboard_key, clear_existing=CLEAR_EXISTING_OUTPUTS
         )
@@ -588,10 +581,6 @@ def run_dashboard_for_economy(
         unmet_requirements_df.to_csv(
             layout["supporting"] / "unmet_requirements_fuel_mapping.csv", index=False
         )
-        hydrogen_electricity_input_df.to_csv(
-            layout["supporting"] / "hydrogen_electrolysers_electricity_input.csv",
-            index=False,
-        )
         manifest_df = render_dashboard(
             visible_df,
             scope_template,
@@ -608,7 +597,6 @@ def run_dashboard_for_economy(
             ],
             source_category_map=source_category_map,
             unmet_requirements_df=unmet_requirements_df,
-            hydrogen_electricity_input_df=hydrogen_electricity_input_df,
         )
         scope_result: dict[str, object] = {
             "comparison_scope": comparison_scope,
