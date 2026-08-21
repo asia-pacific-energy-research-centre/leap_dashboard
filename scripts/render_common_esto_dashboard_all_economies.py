@@ -247,6 +247,10 @@ def _render_one_economy(
             scope_template["_active_dataset_filter_options"] = list(
                 definition["source_systems"]
             )
+            if "ESTO_EXTENDED" in definition["source_systems"]:
+                scope_template["chart_generation"][
+                    "comparison_source_system"
+                ] = "ESTO_EXTENDED"
             scope_template["_dashboard_key_suffix"] = output_suffix
             scope_template["_category_basis_options"] = selector_options
             visible_df = apply_sign_semantics(

@@ -119,3 +119,13 @@ def test_batch_and_qa_scripts_accept_isolated_output_path_overrides() -> None:
     assert "COMMON_ESTO_DASHBOARD_OUTPUT_ROOT" in batch_source
     assert "COMMON_ESTO_DASHBOARD_OUTPUT_ROOT" in readiness_source
     assert "COMMON_ESTO_DASHBOARD_OUTPUT_ROOT" in noise_source
+
+
+def test_batch_renderer_uses_extended_esto_as_the_historical_source() -> None:
+    batch_source = (
+        REPO_ROOT / "scripts" / "render_common_esto_dashboard_all_economies.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'if "ESTO_EXTENDED" in definition["source_systems"]:' in batch_source
+    assert '"comparison_source_system"' in batch_source
+    assert '] = "ESTO_EXTENDED"' in batch_source
