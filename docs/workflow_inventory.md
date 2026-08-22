@@ -53,6 +53,7 @@ be extended as though they own the dashboard contract:
 
 | Script | Status | Use |
 |---|---|---|
+| `codebase/leap_model_flow_generator.py` | Deferred prototype, retained | Parses selected LEAP template and balance exports into an exploratory in-memory flow topology. It currently copies a static HTML prototype rather than rendering that topology; it is not a production dashboard or Sankey generator. Do not extend or publish it before the routing and reconciliation gates in `docs/common_esto_sankey_balance_routing_design.md` are met. |
 | `scripts/render_mapping_tree_explorer_prototype.py` | Superseded prototype, retained | Earlier three-case explorer used for historical comparison; new explorer work belongs in `render_full_mapping_tree_explorer.py`. |
 
 The transformation rollup prototype remains actively useful because it renders

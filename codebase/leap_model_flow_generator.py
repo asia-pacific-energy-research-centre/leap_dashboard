@@ -2,9 +2,18 @@
 """
 LEAP Model Flow Generator
 ==========================
-Automated generator that ingests a user-provided LEAP export template
-(leap_export_templates/*.xlsx) and LEAP energy balance export (leap balances exports/*.xlsx)
-and synthesizes the interactive fluid flow visualization HTML.
+PROTOTYPE ONLY — this is not part of the production Common ESTO dashboard and
+must not be used to publish an energy-flow or Sankey view. It explores whether
+a LEAP export template and energy-balance export contain enough information to
+describe a flow topology. The generated HTML is currently a copied static
+prototype; `model_topology` is not injected into it.
+
+Do not promote this workflow until reviewed, explicit routing and reconciliation
+rules satisfy the requirements in `docs/common_esto_sankey_balance_routing_design.md`.
+
+The prototype ingests a user-provided LEAP export template
+(`leap_export_templates/*.xlsx`) and LEAP energy balance export
+(`leap balances exports/*.xlsx`) and synthesizes an in-memory topology.
 
 Extracts:
 1. Transformation hierarchy & module order from template sheet sequence.
