@@ -31,6 +31,7 @@ from codebase.common_esto_dashboard_renderer import (
     _build_td_fuel_chart,
     _comparison_projection_area_rows,
     area_spec_is_placeholder_only_demand_child,
+    aggregate_only_demand_page_active,
     apply_chart_chrome,
     assert_unique_line_trace_x,
     assign_pages,
@@ -163,6 +164,28 @@ def test_demand_frontier_does_not_cross_filter_historical_and_projection_sources
 
     assert selected.loc[selected["source_system"] == "ESTO_EXTENDED", "common_flow_code"].tolist() == ["15.02"]
     assert selected.loc[selected["source_system"] == "LEAP", "common_flow_code"].tolist() == ["15"]
+
+
+def test_extended_comparison_falls_back_to_esto_history_for_missing_flow() -> None:
+    rows = pd.DataFrame([
+        {"source_system": "ESTO", "scenario": "historical", "year": 2021, "common_flow_code": "10.02", "common_flow_label": "10.02 Losses", "common_product_label": "17 Electricity", "value": -4.0},
+        {"source_system": "LEAP", "scenario": "Target", "year": 2023, "common_flow_code": "10.02", "common_flow_label": "10.02 Losses", "common_product_label": "17 Electricity", "value": -5.0},
+    ])
+
+    selected, source = _comparison_projection_area_rows(
+        rows,
+        scenario_name="Target",
+        primary_source="LEAP",
+        comparison_source="ESTO_EXTENDED",
+        base_year=2022,
+        group_col="common_product_label",
+        detail_col="common_product_label",
+        detail_minimum=1,
+    )
+
+    assert source == "LEAP"
+    assert selected["year"].tolist() == [2021, 2023]
+    assert selected.loc[selected["year"] == 2021, "source_system"].iloc[0] == "ESTO"
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -1782,6 +1805,29 @@ def test_placeholder_only_buildings_hide_leaf_flow_aggregate_cards() -> None:
     )
     assert not charts
     assert not manifest_rows
+
+
+def test_active_placeholder_demand_page_is_aggregate_only() -> None:
+    template = filter_template_for_leap_demand_coverage(
+        _load_template(),
+        pd.DataFrame([{
+            "component_branch": "Industry",
+            "detailed_branches": "Industry",
+            "representation_status": "placeholder_only_retained",
+        }]),
+    )
+
+    assert aggregate_only_demand_page_active("industry", template)
+    assert not area_spec_is_placeholder_only_demand_child(
+        "industry",
+        {"aggregate_flow_prefix": "14", "aggregate_flow_label": "14 Industry sector"},
+        template,
+    )
+    assert area_spec_is_placeholder_only_demand_child(
+        "industry",
+        {"aggregate_flow_prefix": "14.03", "aggregate_flow_label": "14.03 Manufacturing"},
+        template,
+    )
 
 
 def test_partial_placeholder_detail_keeps_leaf_flow_aggregate_cards() -> None:

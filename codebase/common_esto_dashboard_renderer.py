@@ -1430,12 +1430,23 @@ def _comparison_projection_area_rows(
     # legacy ESTO default for ordinary scopes, so resolve that label here when
     # the filtered frame contains only the Extended comparison source.
     available_sources = set(source_column.unique())
+    comparison_key = comparison_source.casefold()
+    # ESTO Extended is preferred when it has history, but it is not a
+    # complete replacement for ESTO. Some loss/own-use flows exist in the
+    # ordinary ESTO series only, so retain their pre-base-year history instead
+    # of silently starting the chart at the base year.
     if (
-        comparison_source.casefold() == "esto"
+        comparison_key == "esto"
         and "esto" not in available_sources
         and "esto_extended" in available_sources
     ):
         comparison_source = "ESTO_EXTENDED"
+    elif comparison_key == "esto_extended":
+        extended_historical = df[
+            source_column.eq("esto_extended") & df["year"].le(base_year)
+        ]
+        if extended_historical.empty and "esto" in available_sources:
+            comparison_source = "ESTO"
     selected_source = ""
     projected = df.iloc[0:0].copy()
     ninth_base_year = ninth_base_year_for_rows(df, base_year)
@@ -1515,6 +1526,24 @@ def placeholder_only_demand_flow_prefixes(page_key: str, template: dict) -> list
     ]
 
 
+def aggregate_only_demand_page_active(page_key: str, template: dict) -> bool:
+    """Return whether a demand page must show its placeholder total only."""
+    coverage = template.get("leap_demand_sector_coverage", {}) or {}
+    configured_pages = {
+        str(value).strip()
+        for value in coverage.get("show_aggregate_only_page_keys", [])
+        if str(value).strip()
+    }
+    active_pages = coverage.get("_aggregate_only_page_branches", {}) or {}
+    return page_key in configured_pages and bool(active_pages.get(page_key))
+
+
+def placeholder_demand_root_prefixes(page_key: str, template: dict) -> set[str]:
+    """Return top-level Common ESTO roots retained for a placeholder page."""
+    prefixes = placeholder_only_demand_flow_prefixes(page_key, template)
+    return {code_prefix(prefix, 1) for prefix in prefixes if code_prefix(prefix, 1)}
+
+
 def drop_placeholder_only_demand_detail_rows(
     page_key: str,
     page_df: pd.DataFrame,
@@ -1546,6 +1575,11 @@ def area_spec_is_placeholder_only_demand_child(
     source_root_code = str(area_spec.get("aggregate_flow_prefix") or "").strip()
     if not source_root_code:
         source_root_code = code_candidate_text(area_spec.get("aggregate_flow_label", ""))
+    if aggregate_only_demand_page_active(page_key, template):
+        root_prefixes = placeholder_demand_root_prefixes(page_key, template)
+        if source_root_code in root_prefixes:
+            return False
+        return code_depth(source_root_code) > 1
     return code_expression_matches_any_prefix(
         source_root_code,
         placeholder_only_demand_flow_prefixes(page_key, template),
@@ -3024,6 +3058,16 @@ def build_product_chart(
 ) -> go.Figure:
     """Build a line chart for one common flow/product row."""
     chart_df = _non_overlapping_common_row_frontier(chart_df)
+    if base_year is not None and comparison_source.casefold() == "esto_extended":
+        has_extended_history = (
+            chart_df["source_system"].astype(str).str.casefold().eq("esto_extended")
+            & chart_df["year"].le(base_year)
+        ).any()
+        if not has_extended_history and (
+            chart_df["source_system"].astype(str).str.casefold().eq("esto")
+            & chart_df["year"].le(base_year)
+        ).any():
+            comparison_source = "ESTO"
     chart_unit = _chart_unit(chart_df)
     fig = go.Figure()
     trace_meta: list[dict] = []
@@ -5175,6 +5219,17 @@ def _build_td_sector_chart(
     stacked_sources: set[str] = set()
     resolved_base_year = 2023 if base_year is None else int(base_year)
 
+    # The line below is the declared domestic TFC boundary. Calculate it
+    # before constructing the stack so an aggregate-only/non-energy branch can
+    # be retained as a visible balancing remainder rather than leaving a gap
+    # between the area envelope and its authoritative total.
+    tfc_total_df = _select_total_rows_by_source(
+        demand_df,
+        overview_flow_df,
+        flow_code="12",
+    )
+    tfc_totals = _domestic_tfc_totals(tfc_total_df, overview_flow_df)
+
     def stack_source(scenario_name: str) -> pd.DataFrame:
         """Return ESTO historical plus the most detailed projected source."""
         rows, _ = _comparison_projection_area_rows(
@@ -5222,6 +5277,27 @@ def _build_td_sector_chart(
         scenario_df = projected_source_rows
         if not stack_source_name:
             continue
+        stack_totals = scenario_df.groupby(
+            ["source_system", "scenario", "year"], as_index=False
+        )["value"].sum().rename(columns={"value": "_stack_total"})
+        target_totals = tfc_totals.rename(columns={"value": "_tfc_total"})
+        remainder = target_totals.merge(
+            stack_totals,
+            on=["source_system", "scenario", "year"],
+            how="inner",
+        )
+        remainder["value"] = remainder["_tfc_total"] - remainder["_stack_total"]
+        remainder = remainder[remainder["value"].abs() > 1e-12].copy()
+        if not remainder.empty:
+            remainder["_page_key"] = "industry"
+            remainder["_page_label"] = "Industry"
+            remainder_rows = pd.DataFrame(index=remainder.index)
+            for column in scenario_df.columns:
+                if column in remainder.columns:
+                    remainder_rows[column] = remainder[column].to_numpy()
+                else:
+                    remainder_rows[column] = pd.NA
+            scenario_df = pd.concat([scenario_df, remainder_rows], ignore_index=True)
         if (scenario_df["source_system"].astype(str).str.casefold() == "esto").any():
             stacked_sources.add("ESTO")
         stacked_sources.add(stack_source_name)
@@ -5261,16 +5337,9 @@ def _build_td_sector_chart(
 
     # Explicit flow 12 is the reliable total. The displayed detail can contain
     # several valid hierarchy views and must not be added together.
-    tfc_total_df = _select_total_rows_by_source(
-        demand_df,
-        overview_flow_df,
-        flow_code="12",
-    )
-
     # Domestic TFC totals, incl. primary LEAP scenarios: the sector stack above
     # is split into pos/neg stackgroups when sectors have mixed signs, so it
     # no longer shows a single net total line on its own.
-    tfc_totals = _domestic_tfc_totals(tfc_total_df, overview_flow_df)
     for (src, scen), grp in tfc_totals.groupby(["source_system", "scenario"]):
         if not _has_nonzero_values(grp["value"]):
             continue
@@ -6802,11 +6871,18 @@ def render_dashboard(
                 **metrics,
             })
 
-        detail_page_df = drop_placeholder_only_demand_detail_rows(
-            page_key,
-            page_df,
-            template,
-        )
+        if aggregate_only_demand_page_active(page_key, template):
+            # A page-level placeholder supplies one broad total, not a valid
+            # sector/product decomposition. Keep its top-level overview card
+            # above, but do not manufacture detail cards from ESTO rows that
+            # the active LEAP placeholder does not represent.
+            detail_page_df = page_df.iloc[0:0].copy()
+        else:
+            detail_page_df = drop_placeholder_only_demand_detail_rows(
+                page_key,
+                page_df,
+                template,
+            )
         flow_nodes = get_existing_flow_nodes(detail_page_df)
         all_canonical = set(flow_nodes["canonical_code"].astype(str))
         parent_flow_labels: set[str] = set()

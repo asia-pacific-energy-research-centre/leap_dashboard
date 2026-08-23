@@ -113,7 +113,10 @@ def _portable_diagnostics_table(frame: pd.DataFrame, columns: list[str]) -> str:
     if frame.empty:
         return '<p class="empty-state">No non-zero unmapped LEAP branches were recorded.</p>'
     if not available:
-        return '<p class="empty-state">The category-recognition QA file has no displayable columns.</p>'
+        # The fast mapping path emits source-row evidence with a different
+        # schema from the maintainer QA workbook. Show that evidence rather
+        # than rendering an empty diagnostics panel.
+        available = [str(column) for column in frame.columns]
     header = "".join(f"<th>{escape(column)}</th>" for column in available)
     rows = []
     for _, row in frame.loc[:, available].iterrows():
