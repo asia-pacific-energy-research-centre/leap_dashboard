@@ -1593,6 +1593,81 @@ def equivalent_flow_labels_by_source(df: pd.DataFrame, flow_label: str) -> dict[
     return labels_by_source
 
 
+def _simple_hierarchy_code(value: object) -> str:
+    """Return a simple dotted code, excluding compound comparison categories."""
+    text = str(value or "").strip()
+    return text if re.fullmatch(r"\d+(?:\.\d+)*", text) else ""
+
+
+def _drop_non_additive_detail_frontiers(
+    work: pd.DataFrame,
+    context_columns: list[str],
+) -> set[int]:
+    """Prefer an observed parent when its published children do not add to it.
+
+    Some source exports contain placeholder technology rows which repeat a
+    parent total rather than allocating it.  A detail frontier is only valid
+    when it adds to the observed parent for the same product and series.  This
+    check is deliberately data-driven: it applies to every simple flow
+    hierarchy, not just road transport.  If no parent is published, no value
+    is invented and the available rows remain visible for reconciliation.
+    """
+    required = {"common_flow_code", "common_product_code", "year", "value"}
+    if not required.issubset(work.columns):
+        return set()
+
+    group_columns = [*context_columns, "common_product_code"]
+    drop_row_numbers: set[int] = set()
+    grouped = work.groupby(group_columns, dropna=False, sort=False)
+    for _, group in grouped:
+        code_by_row = group["common_flow_code"].map(_simple_hierarchy_code)
+        codes = sorted({code for code in code_by_row if code})
+        parent_codes = [
+            code for code in codes
+            if any(other != code and code_matches_prefix(other, code) for other in codes)
+        ]
+        selected_parents: list[str] = []
+        for parent_code in sorted(parent_codes, key=lambda code: (code_depth(code), code)):
+            if any(code_matches_prefix(parent_code, existing) for existing in selected_parents):
+                continue
+            descendant_codes = [
+                code for code in codes
+                if code != parent_code and code_matches_prefix(code, parent_code)
+            ]
+            terminal_codes = [
+                code for code in descendant_codes
+                if not any(
+                    other != code and code_matches_prefix(other, code)
+                    for other in descendant_codes
+                )
+            ]
+            if not terminal_codes:
+                continue
+            parent_values = (
+                group.loc[code_by_row.eq(parent_code)]
+                .groupby("year", as_index=False)["value"].sum()
+                .rename(columns={"value": "parent_value"})
+            )
+            detail_values = (
+                group.loc[code_by_row.isin(terminal_codes)]
+                .groupby("year", as_index=False)["value"].sum()
+                .rename(columns={"value": "detail_value"})
+            )
+            compared = parent_values.merge(detail_values, on="year", how="inner")
+            if compared.empty:
+                continue
+            difference = (compared["parent_value"] - compared["detail_value"]).abs()
+            scale = compared[["parent_value", "detail_value"]].abs().max(axis=1)
+            is_non_additive = (difference > (1e-6 + scale * 1e-6)).any()
+            if not is_non_additive:
+                continue
+            selected_parents.append(parent_code)
+            drop_row_numbers.update(
+                group.loc[code_by_row.isin(descendant_codes), "_frontier_row_number"].astype(int)
+            )
+    return drop_row_numbers
+
+
 def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
     """Choose one observed, non-overlapping common-row frontier.
 
@@ -1622,6 +1697,12 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
         if column in work.columns
     ]
     drop_row_numbers: set[int] = set()
+
+    # Prefer an observed parent over a detail frontier only when the facts show
+    # that the children are not additive.  This covers future non-road
+    # placeholder patterns as well as road-technology placeholders, without
+    # creating a balancing remainder when neither representation is usable.
+    drop_row_numbers.update(_drop_non_additive_detail_frontiers(work, context_columns))
 
     # Some generated comparison categories are aggregate-backed without being
     # NON_EXPANDING rollups. For example, the LEAP all-demand placeholder is
@@ -5197,6 +5278,7 @@ def _build_td_sector_chart(
     fig = go.Figure()
     trace_meta: list[dict] = []
     stacked_sources: set[str] = set()
+    stack_reconciliation_rows: list[pd.DataFrame] = []
     resolved_base_year = 2023 if base_year is None else int(base_year)
 
     # The line below is the declared domestic TFC boundary. It is deliberately
@@ -5256,6 +5338,7 @@ def _build_td_sector_chart(
         scenario_df = projected_source_rows
         if not stack_source_name:
             continue
+        stack_reconciliation_rows.append(scenario_df)
         if (scenario_df["source_system"].astype(str).str.casefold() == "esto").any():
             stacked_sources.add("ESTO")
         stacked_sources.add(stack_source_name)
@@ -5309,6 +5392,49 @@ def _build_td_sector_chart(
         ))
         trace_meta.append(trace_meta_entry(src, scen, True))
 
+    reconciliation_warning = ""
+    if stack_reconciliation_rows:
+        stack_totals = (
+            pd.concat(stack_reconciliation_rows, ignore_index=True).drop_duplicates()
+            .groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum()
+            .rename(columns={"value": "stack_value"})
+            .drop_duplicates()
+        )
+        total_values = (
+            tfc_totals.groupby(["source_system", "scenario", "year"], as_index=False)["value"]
+            .sum()
+            .rename(columns={"value": "tfc_value"})
+        )
+        reconciliation = stack_totals.merge(
+            total_values,
+            on=["source_system", "scenario", "year"],
+            how="inner",
+        )
+        if not reconciliation.empty:
+            reconciliation["gap"] = reconciliation["tfc_value"] - reconciliation["stack_value"]
+            scale = reconciliation[["tfc_value", "stack_value"]].abs().max(axis=1)
+            mismatches = reconciliation[
+                reconciliation["gap"].abs() > (1e-6 + scale * 1e-6)
+            ]
+            if not mismatches.empty:
+                descriptions: list[str] = []
+                for (source, scenario), group in mismatches.groupby(
+                    ["source_system", "scenario"], sort=False
+                ):
+                    years = sorted(group["year"].astype(int).unique())
+                    year_text = str(years[0]) if len(years) == 1 else f"{years[0]}–{years[-1]}"
+                    max_gap = group["gap"].abs().max()
+                    descriptions.append(
+                        f"{series_label_from_values(source, scenario, series_labels)} "
+                        f"({year_text}; maximum gap {max_gap:,.2f}{chart_unit})"
+                    )
+                reconciliation_warning = (
+                    " Warning: the displayed sector frontier does not reconcile to the "
+                    "Domestic TFC line for " + "; ".join(descriptions) + ". "
+                    "This indicates a non-additive or incomplete source hierarchy; "
+                    "no balancing remainder is added."
+                )
+
     fig.update_layout(
         title="Final energy demand by sector (Domestic TFC)",
         xaxis_title="Year",
@@ -5321,6 +5447,7 @@ def _build_td_sector_chart(
                 "Areas show domestic demand sectors, including non-energy use where published; "
                 "lines show domestic TFC totals by dataset and scenario. "
                 + stacked_area_dataset_note(stacked_sources, "demand")
+                + reconciliation_warning
             ),
         },
     )

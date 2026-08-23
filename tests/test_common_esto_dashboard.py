@@ -454,6 +454,61 @@ def test_total_demand_sector_area_uses_non_overlapping_parent_child_frontier() -
     assert selected["value"].sum() == 20.0
 
 
+def test_common_row_frontier_prefers_non_additive_observed_parent() -> None:
+    rows = []
+    for year, parent_value, child_values in [
+        (2022, 20.0, (20.0, 20.0)),
+        (2023, 24.0, (24.0, 24.0)),
+    ]:
+        for flow_code, value in [
+            ("15.02.01", parent_value),
+            ("15.02.01.01", child_values[0]),
+            ("15.02.01.02", child_values[1]),
+        ]:
+            rows.append({
+                "common_flow_code": flow_code,
+                "common_flow_label": flow_code,
+                "common_product_code": "07.01",
+                "common_product_label": "07.01 Motor gasoline",
+                "source_system": "ESTO",
+                "comparison_scope": "esto_leap_ninth",
+                "economy": "01_AUS",
+                "scenario": "Historical",
+                "year": year,
+                "value": value,
+                "common_row_id": f"{flow_code}_{year}",
+                "is_non_expanding_rollup": False,
+            })
+
+    selected = _non_overlapping_common_row_frontier(pd.DataFrame(rows))
+
+    assert set(selected["common_flow_code"]) == {"15.02.01"}
+    assert selected.groupby("year")["value"].sum().to_dict() == {2022: 20.0, 2023: 24.0}
+
+
+def test_common_row_frontier_keeps_detail_when_non_additive_parent_is_absent() -> None:
+    rows = pd.DataFrame([
+        {
+            "common_flow_code": "15.02.01.01", "common_flow_label": "15.02.01.01",
+            "common_product_code": "07.01", "source_system": "ESTO",
+            "comparison_scope": "esto_leap_ninth", "economy": "01_AUS",
+            "scenario": "Historical", "year": 2022, "value": 20.0,
+            "common_row_id": "child_one", "is_non_expanding_rollup": False,
+        },
+        {
+            "common_flow_code": "15.02.01.02", "common_flow_label": "15.02.01.02",
+            "common_product_code": "07.01", "source_system": "ESTO",
+            "comparison_scope": "esto_leap_ninth", "economy": "01_AUS",
+            "scenario": "Historical", "year": 2022, "value": 20.0,
+            "common_row_id": "child_two", "is_non_expanding_rollup": False,
+        },
+    ])
+
+    selected = _non_overlapping_common_row_frontier(rows)
+
+    assert set(selected["common_row_id"]) == {"child_one", "child_two"}
+
+
 def test_total_demand_fuel_area_uses_non_overlapping_parent_child_frontier() -> None:
     rows = []
     for source_system, scenario, year, parent_value, child_one, child_two in [
@@ -615,6 +670,8 @@ def test_sector_stack_does_not_add_a_synthetic_tfc_remainder() -> None:
     stack_traces = [trace for trace in figure.data if getattr(trace, "stackgroup", None)]
     assert len(stack_traces) == 2
     assert {tuple(trace.y) for trace in stack_traces} == {(40.0,)}
+    assert "does not reconcile" in figure.layout.meta["stacked_area_note"]
+    assert "no balancing remainder is added" in figure.layout.meta["stacked_area_note"]
 
 
 def test_sector_stack_retains_published_non_energy_without_inventing_leap_values() -> None:

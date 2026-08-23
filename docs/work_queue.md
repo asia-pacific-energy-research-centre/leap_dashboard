@@ -2,6 +2,14 @@
 
 ## Current-run LEAP demand representation status — implemented, verification pending
 
+- **DASHQ-061 — non-additive hierarchy fallback and reconciliation warning.**
+  Dashboard aggregate frontiers now retain an observed parent when its published
+  child frontier is non-additive for the same source/product series. If an
+  affected source publishes only the inconsistent detail rows, the dashboard
+  keeps the facts visible and warns that the sector stack does not reconcile to
+  Domestic TFC; it never creates a balancing remainder. Production AUS
+  regeneration remains required.
+
 The dashboard now reads the mappings-owned
 `leap_demand_representation_status.csv` artifact generated from the current
 LEAP balance exports. Placeholder status controls warning text and the special
