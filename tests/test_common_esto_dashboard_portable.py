@@ -97,7 +97,7 @@ def test_configured_comparison_scopes_use_maintained_selector() -> None:
     assert [item["is_default"] for item in definitions] == [True, False]
 
 
-def test_variant_render_forwards_basis_options_and_writes_export_diagnostics(
+def test_variant_render_forwards_basis_options_and_copies_shared_diagnostics(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -135,6 +135,8 @@ def test_variant_render_forwards_basis_options_and_writes_export_diagnostics(
         ]),
     )
 
+    shared_diagnostics = tmp_path / "shared_mapping_diagnostics.html"
+    shared_diagnostics.write_text("<html>full mapping diagnostics</html>", encoding="utf-8")
     result = render_common_esto_dashboard_variants(
         economy="20_USA",
         comparison_data_path=COMPARISON_FIXTURE,
@@ -143,6 +145,7 @@ def test_variant_render_forwards_basis_options_and_writes_export_diagnostics(
         series_config_path=SERIES_CONFIG_PATH,
         source_to_common_map_path=tmp_path / "source.csv",
         esto_to_common_map_path=tmp_path / "esto.csv",
+        mapping_diagnostics_source_page_path=shared_diagnostics,
         output_root=tmp_path / "outputs",
         dashboard_updated_label="test",
     )
@@ -169,30 +172,29 @@ def test_variant_render_forwards_basis_options_and_writes_export_diagnostics(
         "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
     }]
     assert result["chart_count"] == 4
-    assert result["mapping_diagnostics"]["unmapped_branch_count"] == 0
-    assert (tmp_path / "outputs" / "diagnostics" / "dashboards" / "mapping_diagnostics.html").is_file()
+    copied_page = tmp_path / "outputs" / "diagnostics" / "dashboards" / "mapping_diagnostics.html"
+    assert result["mapping_diagnostics"]["source_page"] == str(shared_diagnostics)
+    assert copied_page.read_text(encoding="utf-8") == "<html>full mapping diagnostics</html>"
 
 
-def test_portable_mapping_diagnostics_shows_unmapped_categories(tmp_path: Path) -> None:
-    qa_path = tmp_path / "qa_nonzero_unmapped_leap_branches.csv"
-    pd.DataFrame([{
-        "leap_flow": "Freight road",
-        "leap_product": "Gas and diesel oil",
-        "indirect_esto_flow": "",
-        "indirect_esto_product": "",
-        "qa_status": "nonzero_unmapped_leap_branch_without_esto_pair",
-    }]).to_csv(qa_path, index=False)
+def test_variant_render_omits_diagnostics_when_shared_page_is_unavailable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[dict[str, object]] = []
 
-    result = portable.write_portable_mapping_diagnostics_page(
-        output_root=tmp_path / "output",
-        economy="20_USA",
-        unmapped_branches_path=qa_path,
+    def fake_render(**kwargs: object) -> dict[str, object]:
+        captured.append(kwargs)
+        return {"chart_count": 1}
+
+    monkeypatch.setattr(portable, "render_common_esto_dashboard", fake_render)
+    render_common_esto_dashboard_variants(
+        economy="20_USA", comparison_data_path=COMPARISON_FIXTURE,
+        common_rows_path=ROWS_FIXTURE, template_path=TEMPLATE_PATH,
+        series_config_path=SERIES_CONFIG_PATH, output_root=tmp_path / "outputs",
     )
 
-    html = Path(str(result["page"])).read_text(encoding="utf-8")
-    assert "Imported LEAP category recognition" in html
-    assert "Freight road" in html
-    assert "fully imported into the main LEAP areas" in html
+    assert captured[0]["additional_pages"] == []
 
 
 def test_extended_scope_renders_ordinary_history_under_extended_identity(
