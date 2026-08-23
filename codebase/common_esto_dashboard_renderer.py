@@ -5318,8 +5318,8 @@ def _build_td_sector_chart(
         meta={
             "trace_meta": trace_meta,
             "stacked_area_note": (
-                "Areas use the LEAP domestic-demand sector boundary; published non-energy use is "
-                "included in Other demand. Lines show domestic TFC totals by dataset and scenario. "
+                "Areas show domestic demand sectors, including non-energy use where published; "
+                "lines show domestic TFC totals by dataset and scenario. "
                 + stacked_area_dataset_note(stacked_sources, "demand")
             ),
         },
@@ -5826,14 +5826,14 @@ def build_unmet_requirements_chart(
     return fig
 
 
-def _combine_non_energy_with_other_demand_for_total_demand(demand_df: pd.DataFrame) -> pd.DataFrame:
-    """Use LEAP's combined Other-demand sector for published non-energy rows."""
+def _split_non_energy_sector_for_total_demand(demand_df: pd.DataFrame) -> pd.DataFrame:
+    """Keep published non-energy demand distinct in the overview stack."""
     out = demand_df.copy()
     non_energy_mask = out.get(
         "_section_key", pd.Series("", index=out.index)
     ).astype(str).eq("non_energy")
-    out.loc[non_energy_mask, "_page_key"] = "others"
-    out.loc[non_energy_mask, "_page_label"] = "Other demand"
+    out.loc[non_energy_mask, "_page_key"] = "non_energy"
+    out.loc[non_energy_mask, "_page_label"] = "Non-energy use"
     return out
 
 
@@ -5896,7 +5896,7 @@ def build_total_demand_page(
     # it is easy to find in the detailed navigation. On the balance overview,
     # combine it with Other demand: that is the matching LEAP sector boundary
     # while its source export retains a combined Other/non-energy aggregate.
-    demand_df = _combine_non_energy_with_other_demand_for_total_demand(demand_df)
+    demand_df = _split_non_energy_sector_for_total_demand(demand_df)
 
     overview_flow_codes = [str(code) for code in config.get("overview_flow_codes", [])]
     overview_flow_df = assigned_df[

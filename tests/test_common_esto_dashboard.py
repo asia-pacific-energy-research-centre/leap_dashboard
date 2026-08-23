@@ -27,7 +27,7 @@ from codebase.common_esto_dashboard_emissions import select_emissions_component_
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
 from codebase.common_esto_dashboard_renderer import (
     _PAGE_CSS,
-    _combine_non_energy_with_other_demand_for_total_demand,
+    _split_non_energy_sector_for_total_demand,
     _build_td_sector_chart,
     _build_td_fuel_chart,
     _comparison_projection_area_rows,
@@ -617,7 +617,7 @@ def test_sector_stack_does_not_add_a_synthetic_tfc_remainder() -> None:
     assert {tuple(trace.y) for trace in stack_traces} == {(40.0,)}
 
 
-def test_sector_stack_combines_published_non_energy_with_other_demand() -> None:
+def test_sector_stack_retains_published_non_energy_without_inventing_leap_values() -> None:
     demand_rows = pd.DataFrame([
         {
             "_page_key": "industry", "_page_label": "Industry",
@@ -658,23 +658,22 @@ def test_sector_stack_combines_published_non_energy_with_other_demand() -> None:
          "common_flow_code": "12", "value": 55.0},
     ])
 
-    demand_rows = _combine_non_energy_with_other_demand_for_total_demand(demand_rows)
+    demand_rows = _split_non_energy_sector_for_total_demand(demand_rows)
 
     figure = _build_td_sector_chart(
         demand_rows, overview_rows, {}, "LEAP", "Target", {}, base_year=2022,
     )
 
-    other_demand = [
+    non_energy = [
         trace for trace in figure.data
-        if trace.name == "Other demand" and trace.visible is True
+        if trace.name == "Non-energy use" and trace.visible is True
     ]
-    assert other_demand
-    assert {tuple(trace.x) for trace in other_demand} == {(2022, 2023)}
-    assert {tuple(trace.y) for trace in other_demand} == {(15.0, 10.0)}
-    assert not any(trace.name == "Non-energy use" for trace in figure.data)
+    assert non_energy
+    assert {tuple(trace.x) for trace in non_energy} == {(2022,)}
+    assert {tuple(trace.y) for trace in non_energy} == {(10.0,)}
     leap_total = next(trace for trace in figure.data if trace.name == "LEAP|Target (Domestic TFC)")
     assert list(leap_total.y) == [55.0]
-    assert "included in Other demand" in figure.layout.meta["stacked_area_note"]
+    assert "including non-energy use" in figure.layout.meta["stacked_area_note"]
 
 
 def _build_common_esto_rows() -> pd.DataFrame:
