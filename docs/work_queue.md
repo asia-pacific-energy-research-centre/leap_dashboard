@@ -10,6 +10,16 @@
   Domestic TFC; it never creates a balancing remainder. Production AUS
   regeneration remains required.
 
+- **DASHQ-063 — lightweight Version 1 comparison traces.**
+  Version comparison currently renders a complete dashboard for both the old
+  and new exports, then adds the old chart traces to the new dashboard. Design
+  a trace-only Version 1 render that preserves the same chart keys, source
+  selection, units, routing and hierarchy-frontier rules, while skipping old
+  HTML pages, manifests, the secondary dashboard scope and other presentation
+  outputs. This is an optimisation task, not a mapping shortcut: paired
+  comparison output must remain trace-equivalent to the current two-full-
+  dashboard workflow before it can replace it.
+
 The dashboard now reads the mappings-owned
 `leap_demand_representation_status.csv` artifact generated from the current
 LEAP balance exports. Placeholder status controls warning text and the special
