@@ -5828,6 +5828,17 @@ def build_unmet_requirements_chart(
     return fig
 
 
+def _split_non_energy_sector_for_total_demand(demand_df: pd.DataFrame) -> pd.DataFrame:
+    """Keep exact non-energy demand distinct in the overview sector stack."""
+    out = demand_df.copy()
+    non_energy_mask = out.get(
+        "_section_key", pd.Series("", index=out.index)
+    ).astype(str).eq("non_energy")
+    out.loc[non_energy_mask, "_page_key"] = "non_energy"
+    out.loc[non_energy_mask, "_page_label"] = "Non-energy use"
+    return out
+
+
 def build_total_demand_page(
     assigned_df: pd.DataFrame,
     template: dict,
@@ -5883,6 +5894,12 @@ def build_total_demand_page(
     demand_df = assigned_df[assigned_df["_page_key"].isin(demand_page_keys)].copy()
     if demand_df.empty:
         return [], None
+    # Exact flow 17 is shown in the Industry page's Non-energy use section so
+    # it is easy to find in the detailed navigation. On the balance overview,
+    # however, it must remain a distinct sector: it belongs in TFC and is the
+    # part that makes the published ESTO stack add to the declared TFC line.
+    # LEAP is allowed to omit it until the source export provides the branch.
+    demand_df = _split_non_energy_sector_for_total_demand(demand_df)
 
     overview_flow_codes = [str(code) for code in config.get("overview_flow_codes", [])]
     overview_flow_df = assigned_df[

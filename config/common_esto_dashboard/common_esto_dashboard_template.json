@@ -256,7 +256,7 @@
     "enabled": true,
     "page_label": "Energy balance overview",
     "overview_flow_codes": ["07", "12"],
-    "demand_page_keys": ["industry", "transport", "buildings", "others", "non_energy"],
+    "demand_page_keys": ["industry", "transport", "buildings", "others"],
     "supply_codes": ["01", "02", "03", "04-05"],
     "tfec_enabled": false,
     "tfec_status": "Temporarily disabled because non-energy use cannot yet be separated from aggregated Other-sector LEAP demand.",

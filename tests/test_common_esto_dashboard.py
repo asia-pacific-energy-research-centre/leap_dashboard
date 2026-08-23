@@ -27,6 +27,7 @@ from codebase.common_esto_dashboard_emissions import select_emissions_component_
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
 from codebase.common_esto_dashboard_renderer import (
     _PAGE_CSS,
+    _split_non_energy_sector_for_total_demand,
     _build_td_sector_chart,
     _build_td_fuel_chart,
     _comparison_projection_area_rows,
@@ -625,7 +626,8 @@ def test_sector_stack_retains_published_non_energy_without_inventing_leap_values
             "value": 40.0,
         },
         {
-            "_page_key": "non_energy", "_page_label": "Non-energy use",
+            "_page_key": "industry", "_page_label": "Industry",
+            "_section_key": "non_energy",
             "common_flow_code": "17", "common_flow_label": "17 Non-energy use",
             "source_system": "ESTO", "scenario": "historical", "year": 2022,
             "value": 10.0,
@@ -643,6 +645,8 @@ def test_sector_stack_retains_published_non_energy_without_inventing_leap_values
         {"source_system": "LEAP", "scenario": "Target", "year": 2023,
          "common_flow_code": "12", "value": 55.0},
     ])
+
+    demand_rows = _split_non_energy_sector_for_total_demand(demand_rows)
 
     figure = _build_td_sector_chart(
         demand_rows, overview_rows, {}, "LEAP", "Target", {}, base_year=2022,
