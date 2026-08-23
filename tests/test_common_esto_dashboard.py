@@ -25,6 +25,7 @@ from codebase.common_esto_dashboard_data import (
 )
 from codebase.common_esto_dashboard_emissions import select_emissions_component_rows
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
+from codebase.common_esto_dashboard_portable import dashboard_base_year_from_leap_data
 from codebase.common_esto_dashboard_renderer import (
     _PAGE_CSS,
     _split_non_energy_sector_for_total_demand,
@@ -80,6 +81,24 @@ from codebase.common_esto_dashboard_renderer import (
     _jump_nav_html,
     _line_sections_html,
 )
+
+
+def test_dashboard_base_year_uses_first_available_leap_year() -> None:
+    comparison_df = pd.DataFrame({
+        "source_system": ["ESTO_EXTENDED", "LEAP", "LEAP", "9TH"],
+        "year": [2024, 2025, 2023, 2022],
+    })
+
+    assert dashboard_base_year_from_leap_data(comparison_df, 2022) == 2023
+
+
+def test_dashboard_base_year_uses_configured_fallback_without_leap_rows() -> None:
+    comparison_df = pd.DataFrame({
+        "source_system": ["ESTO_EXTENDED", "9TH"],
+        "year": [2024, 2022],
+    })
+
+    assert dashboard_base_year_from_leap_data(comparison_df, 2022) == 2022
 
 
 def test_frontier_prefers_observed_inclusive_parent_boundary() -> None:

@@ -68,6 +68,7 @@ from common_esto_dashboard_renderer import render_dashboard, set_code_colors_pat
 __all__ = [
     "OPTIONAL_DASHBOARD_INPUTS",
     "REQUIRED_DASHBOARD_INPUTS",
+    "dashboard_base_year_from_leap_data",
     "normalize_dashboard_economy_key",
     "render_common_esto_dashboard",
     "render_common_esto_dashboard_variants",
@@ -103,6 +104,26 @@ def normalize_dashboard_economy_key(economy: object) -> str:
     if not key:
         raise ValueError("An economy code is required (for example '20_USA').")
     return key
+
+
+def dashboard_base_year_from_leap_data(
+    comparison_df: pd.DataFrame,
+    configured_base_year: int,
+) -> int:
+    """Return the first available LEAP year, or the configured fallback.
+
+    The base year marks the handover between historical ESTO and the LEAP
+    scenario in the dashboard. It must therefore follow the supplied LEAP
+    export rather than an assumption embedded in the shared template.
+    """
+    if comparison_df.empty or not {"source_system", "year"}.issubset(comparison_df.columns):
+        return int(configured_base_year)
+    leap_rows = comparison_df["source_system"].astype(str).str.upper().eq("LEAP")
+    leap_years = pd.to_numeric(comparison_df.loc[leap_rows, "year"], errors="coerce")
+    leap_years = leap_years.dropna()
+    if leap_years.empty:
+        return int(configured_base_year)
+    return int(leap_years.min())
 
 
 def copy_mapping_diagnostics_page(
@@ -266,7 +287,10 @@ def render_common_esto_dashboard(
     )
     raw_df = enrich_with_component_metadata(raw_df, Path(common_rows_path))
 
-    base_year = int(template.get("chart_generation", {}).get("base_year", 2022))
+    configured_base_year = int(template.get("chart_generation", {}).get("base_year", 2022))
+    economy_raw_df = raw_df[raw_df["economy"].astype(str).eq(economy_key)]
+    base_year = dashboard_base_year_from_leap_data(economy_raw_df, configured_base_year)
+    template.setdefault("chart_generation", {})["base_year"] = base_year
     ninth_base_year = ninth_base_year_for_economy(economy_key, base_year)
     input_row_count = len(raw_df)
     raw_df = filter_ninth_pre_base_year_data(
