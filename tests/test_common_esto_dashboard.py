@@ -27,7 +27,7 @@ from codebase.common_esto_dashboard_emissions import select_emissions_component_
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
 from codebase.common_esto_dashboard_renderer import (
     _PAGE_CSS,
-    _split_non_energy_sector_for_total_demand,
+    _combine_non_energy_with_other_demand_for_total_demand,
     _build_td_sector_chart,
     _build_td_fuel_chart,
     _comparison_projection_area_rows,
@@ -617,13 +617,19 @@ def test_sector_stack_does_not_add_a_synthetic_tfc_remainder() -> None:
     assert {tuple(trace.y) for trace in stack_traces} == {(40.0,)}
 
 
-def test_sector_stack_retains_published_non_energy_without_inventing_leap_values() -> None:
+def test_sector_stack_combines_published_non_energy_with_other_demand() -> None:
     demand_rows = pd.DataFrame([
         {
             "_page_key": "industry", "_page_label": "Industry",
             "common_flow_code": "14", "common_flow_label": "14 Industry",
             "source_system": "ESTO", "scenario": "historical", "year": 2022,
             "value": 40.0,
+        },
+        {
+            "_page_key": "others", "_page_label": "Other demand",
+            "common_flow_code": "16.03-16.05", "common_flow_label": "16.03-16.05 Other sector",
+            "source_system": "ESTO", "scenario": "historical", "year": 2022,
+            "value": 5.0,
         },
         {
             "_page_key": "industry", "_page_label": "Industry",
@@ -638,30 +644,37 @@ def test_sector_stack_retains_published_non_energy_without_inventing_leap_values
             "source_system": "LEAP", "scenario": "Target", "year": 2023,
             "value": 45.0,
         },
+        {
+            "_page_key": "others", "_page_label": "Other demand",
+            "common_flow_code": "16.03-16.05,17", "common_flow_label": "16.03-16.05,17 Other sector including non-energy",
+            "source_system": "LEAP", "scenario": "Target", "year": 2023,
+            "value": 10.0,
+        },
     ])
     overview_rows = pd.DataFrame([
         {"source_system": "ESTO", "scenario": "historical", "year": 2022,
-         "common_flow_code": "12", "value": 50.0},
+         "common_flow_code": "12", "value": 55.0},
         {"source_system": "LEAP", "scenario": "Target", "year": 2023,
          "common_flow_code": "12", "value": 55.0},
     ])
 
-    demand_rows = _split_non_energy_sector_for_total_demand(demand_rows)
+    demand_rows = _combine_non_energy_with_other_demand_for_total_demand(demand_rows)
 
     figure = _build_td_sector_chart(
         demand_rows, overview_rows, {}, "LEAP", "Target", {}, base_year=2022,
     )
 
-    non_energy = [
+    other_demand = [
         trace for trace in figure.data
-        if trace.name == "Non-energy use" and trace.visible is True
+        if trace.name == "Other demand" and trace.visible is True
     ]
-    assert non_energy
-    assert {tuple(trace.x) for trace in non_energy} == {(2022,)}
-    assert {tuple(trace.y) for trace in non_energy} == {(10.0,)}
+    assert other_demand
+    assert {tuple(trace.x) for trace in other_demand} == {(2022, 2023)}
+    assert {tuple(trace.y) for trace in other_demand} == {(15.0, 10.0)}
+    assert not any(trace.name == "Non-energy use" for trace in figure.data)
     leap_total = next(trace for trace in figure.data if trace.name == "LEAP|Target (Domestic TFC)")
     assert list(leap_total.y) == [55.0]
-    assert "projected stack remains incomplete" in figure.layout.meta["stacked_area_note"]
+    assert "included in Other demand" in figure.layout.meta["stacked_area_note"]
 
 
 def _build_common_esto_rows() -> pd.DataFrame:

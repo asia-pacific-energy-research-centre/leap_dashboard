@@ -5318,10 +5318,8 @@ def _build_td_sector_chart(
         meta={
             "trace_meta": trace_meta,
             "stacked_area_note": (
-                "Areas show domestic demand sectors (including non-energy use where published); "
-                "lines show domestic TFC totals by dataset and scenario. If a source has not yet "
-                "published non-energy demand, its projected stack remains incomplete and the TFC line "
-                "shows that real coverage gap. "
+                "Areas use the LEAP domestic-demand sector boundary; published non-energy use is "
+                "included in Other demand. Lines show domestic TFC totals by dataset and scenario. "
                 + stacked_area_dataset_note(stacked_sources, "demand")
             ),
         },
@@ -5828,14 +5826,14 @@ def build_unmet_requirements_chart(
     return fig
 
 
-def _split_non_energy_sector_for_total_demand(demand_df: pd.DataFrame) -> pd.DataFrame:
-    """Keep exact non-energy demand distinct in the overview sector stack."""
+def _combine_non_energy_with_other_demand_for_total_demand(demand_df: pd.DataFrame) -> pd.DataFrame:
+    """Use LEAP's combined Other-demand sector for published non-energy rows."""
     out = demand_df.copy()
     non_energy_mask = out.get(
         "_section_key", pd.Series("", index=out.index)
     ).astype(str).eq("non_energy")
-    out.loc[non_energy_mask, "_page_key"] = "non_energy"
-    out.loc[non_energy_mask, "_page_label"] = "Non-energy use"
+    out.loc[non_energy_mask, "_page_key"] = "others"
+    out.loc[non_energy_mask, "_page_label"] = "Other demand"
     return out
 
 
@@ -5896,10 +5894,9 @@ def build_total_demand_page(
         return [], None
     # Exact flow 17 is shown in the Industry page's Non-energy use section so
     # it is easy to find in the detailed navigation. On the balance overview,
-    # however, it must remain a distinct sector: it belongs in TFC and is the
-    # part that makes the published ESTO stack add to the declared TFC line.
-    # LEAP is allowed to omit it until the source export provides the branch.
-    demand_df = _split_non_energy_sector_for_total_demand(demand_df)
+    # combine it with Other demand: that is the matching LEAP sector boundary
+    # while its source export retains a combined Other/non-energy aggregate.
+    demand_df = _combine_non_energy_with_other_demand_for_total_demand(demand_df)
 
     overview_flow_codes = [str(code) for code in config.get("overview_flow_codes", [])]
     overview_flow_df = assigned_df[
