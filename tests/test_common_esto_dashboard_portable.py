@@ -136,7 +136,10 @@ def test_variant_render_forwards_basis_options_and_copies_shared_diagnostics(
     )
 
     shared_diagnostics = tmp_path / "shared_mapping_diagnostics.html"
-    shared_diagnostics.write_text("<html>full mapping diagnostics</html>", encoding="utf-8")
+    shared_diagnostics.write_text(
+        '<a href="#" onclick="history.back();return false;">← Back to economy dashboard</a>',
+        encoding="utf-8",
+    )
     result = render_common_esto_dashboard_variants(
         economy="20_USA",
         comparison_data_path=COMPARISON_FIXTURE,
@@ -174,7 +177,9 @@ def test_variant_render_forwards_basis_options_and_copies_shared_diagnostics(
     assert result["chart_count"] == 4
     copied_page = tmp_path / "outputs" / "diagnostics" / "dashboards" / "mapping_diagnostics.html"
     assert result["mapping_diagnostics"]["source_page"] == str(shared_diagnostics)
-    assert copied_page.read_text(encoding="utf-8") == "<html>full mapping diagnostics</html>"
+    assert copied_page.read_text(encoding="utf-8") == (
+        '<a href="../../20USA/dashboards/index.html">← Back to economy dashboard</a>'
+    )
 
 
 def test_variant_render_omits_diagnostics_when_shared_page_is_unavailable(

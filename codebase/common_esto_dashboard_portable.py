@@ -34,7 +34,6 @@ Use ``common_esto_dashboard_workflow.py`` when those pages are wanted.
 from __future__ import annotations
 
 import json
-import shutil
 import sys
 from copy import deepcopy
 from collections.abc import Sequence
@@ -109,15 +108,23 @@ def normalize_dashboard_economy_key(economy: object) -> str:
 def copy_mapping_diagnostics_page(
     *,
     output_root: Path | str,
+    economy: str,
     source_page_path: Path | str | None,
 ) -> dict[str, str] | None:
-    """Copy the full shared Mapping diagnostics page into an export dashboard."""
+    """Copy the shared page and give it a durable link back to one dashboard."""
     source_page = Path(source_page_path) if source_page_path else None
     if source_page is None or not source_page.is_file():
         return None
     page_path = Path(output_root) / "diagnostics" / "dashboards" / "mapping_diagnostics.html"
     page_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source_page, page_path)
+    dashboard_href = f"../../{normalize_dashboard_economy_key(economy)}/dashboards/index.html"
+    page_html = source_page.read_text(encoding="utf-8")
+    page_html = page_html.replace(
+        '<a href="#" onclick="history.back();return false;">← Back to economy dashboard</a>',
+        f'<a href="{dashboard_href}">← Back to economy dashboard</a>',
+        1,
+    )
+    page_path.write_text(page_html, encoding="utf-8")
     return {"page": str(page_path), "source_page": str(source_page)}
 
 
@@ -347,6 +354,7 @@ def render_common_esto_dashboard_variants(
     economy_key = normalize_dashboard_economy_key(kwargs["economy"])
     diagnostics_result = copy_mapping_diagnostics_page(
         output_root=output_root,
+        economy=economy_key,
         source_page_path=kwargs.get("mapping_diagnostics_source_page_path"),
     )
     diagnostics_page = {
