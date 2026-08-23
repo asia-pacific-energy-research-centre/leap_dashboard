@@ -166,7 +166,7 @@ def test_demand_frontier_does_not_cross_filter_historical_and_projection_sources
     assert selected.loc[selected["source_system"] == "LEAP", "common_flow_code"].tolist() == ["15"]
 
 
-def test_extended_comparison_falls_back_to_esto_history_for_missing_flow() -> None:
+def test_extended_comparison_does_not_mix_in_esto_history() -> None:
     rows = pd.DataFrame([
         {"source_system": "ESTO", "scenario": "historical", "year": 2021, "common_flow_code": "10.02", "common_flow_label": "10.02 Losses", "common_product_label": "17 Electricity", "value": -4.0},
         {"source_system": "LEAP", "scenario": "Target", "year": 2023, "common_flow_code": "10.02", "common_flow_label": "10.02 Losses", "common_product_label": "17 Electricity", "value": -5.0},
@@ -184,8 +184,8 @@ def test_extended_comparison_falls_back_to_esto_history_for_missing_flow() -> No
     )
 
     assert source == "LEAP"
-    assert selected["year"].tolist() == [2021, 2023]
-    assert selected.loc[selected["year"] == 2021, "source_system"].iloc[0] == "ESTO"
+    assert selected["year"].tolist() == [2023]
+    assert selected["source_system"].tolist() == ["LEAP"]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -593,6 +593,27 @@ def test_energy_balance_demand_totals_exclude_leap_international_transport() -> 
     ]:
         total_trace = next(trace for trace in figure.data if trace.name == trace_name)
         assert list(total_trace.y) == [100.0]
+
+
+def test_sector_stack_does_not_add_a_synthetic_tfc_remainder() -> None:
+    demand_rows = pd.DataFrame([{
+        "_page_key": "industry", "_page_label": "Industry",
+        "common_flow_code": "14", "common_flow_label": "14 Industry",
+        "source_system": "ESTO", "scenario": "historical", "year": 2022,
+        "value": 40.0,
+    }])
+    overview_rows = pd.DataFrame([{
+        "source_system": "ESTO", "scenario": "historical", "year": 2022,
+        "common_flow_code": "12", "value": 50.0,
+    }])
+
+    figure = _build_td_sector_chart(
+        demand_rows, overview_rows, {}, "LEAP", "Target", {}, base_year=2022,
+    )
+
+    stack_traces = [trace for trace in figure.data if getattr(trace, "stackgroup", None)]
+    assert len(stack_traces) == 2
+    assert {tuple(trace.y) for trace in stack_traces} == {(40.0,)}
 
 
 def _build_common_esto_rows() -> pd.DataFrame:

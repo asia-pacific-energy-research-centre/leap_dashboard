@@ -1431,22 +1431,12 @@ def _comparison_projection_area_rows(
     # the filtered frame contains only the Extended comparison source.
     available_sources = set(source_column.unique())
     comparison_key = comparison_source.casefold()
-    # ESTO Extended is preferred when it has history, but it is not a
-    # complete replacement for ESTO. Some loss/own-use flows exist in the
-    # ordinary ESTO series only, so retain their pre-base-year history instead
-    # of silently starting the chart at the base year.
     if (
         comparison_key == "esto"
         and "esto" not in available_sources
         and "esto_extended" in available_sources
     ):
         comparison_source = "ESTO_EXTENDED"
-    elif comparison_key == "esto_extended":
-        extended_historical = df[
-            source_column.eq("esto_extended") & df["year"].le(base_year)
-        ]
-        if extended_historical.empty and "esto" in available_sources:
-            comparison_source = "ESTO"
     selected_source = ""
     projected = df.iloc[0:0].copy()
     ninth_base_year = ninth_base_year_for_rows(df, base_year)
@@ -3058,16 +3048,6 @@ def build_product_chart(
 ) -> go.Figure:
     """Build a line chart for one common flow/product row."""
     chart_df = _non_overlapping_common_row_frontier(chart_df)
-    if base_year is not None and comparison_source.casefold() == "esto_extended":
-        has_extended_history = (
-            chart_df["source_system"].astype(str).str.casefold().eq("esto_extended")
-            & chart_df["year"].le(base_year)
-        ).any()
-        if not has_extended_history and (
-            chart_df["source_system"].astype(str).str.casefold().eq("esto")
-            & chart_df["year"].le(base_year)
-        ).any():
-            comparison_source = "ESTO"
     chart_unit = _chart_unit(chart_df)
     fig = go.Figure()
     trace_meta: list[dict] = []
@@ -5219,10 +5199,9 @@ def _build_td_sector_chart(
     stacked_sources: set[str] = set()
     resolved_base_year = 2023 if base_year is None else int(base_year)
 
-    # The line below is the declared domestic TFC boundary. Calculate it
-    # before constructing the stack so an aggregate-only/non-energy branch can
-    # be retained as a visible balancing remainder rather than leaving a gap
-    # between the area envelope and its authoritative total.
+    # The line below is the declared domestic TFC boundary. It is deliberately
+    # separate from the stack: a discrepancy must expose a missing or
+    # overlapping source category, never be hidden by a manufactured row.
     tfc_total_df = _select_total_rows_by_source(
         demand_df,
         overview_flow_df,
@@ -5277,27 +5256,6 @@ def _build_td_sector_chart(
         scenario_df = projected_source_rows
         if not stack_source_name:
             continue
-        stack_totals = scenario_df.groupby(
-            ["source_system", "scenario", "year"], as_index=False
-        )["value"].sum().rename(columns={"value": "_stack_total"})
-        target_totals = tfc_totals.rename(columns={"value": "_tfc_total"})
-        remainder = target_totals.merge(
-            stack_totals,
-            on=["source_system", "scenario", "year"],
-            how="inner",
-        )
-        remainder["value"] = remainder["_tfc_total"] - remainder["_stack_total"]
-        remainder = remainder[remainder["value"].abs() > 1e-12].copy()
-        if not remainder.empty:
-            remainder["_page_key"] = "industry"
-            remainder["_page_label"] = "Industry"
-            remainder_rows = pd.DataFrame(index=remainder.index)
-            for column in scenario_df.columns:
-                if column in remainder.columns:
-                    remainder_rows[column] = remainder[column].to_numpy()
-                else:
-                    remainder_rows[column] = pd.NA
-            scenario_df = pd.concat([scenario_df, remainder_rows], ignore_index=True)
         if (scenario_df["source_system"].astype(str).str.casefold() == "esto").any():
             stacked_sources.add("ESTO")
         stacked_sources.add(stack_source_name)
