@@ -1497,22 +1497,59 @@ def area_chart_allowed_for_demand_coverage(
     return True
 
 
-def flow_group_aggregate_allowed_for_demand_coverage(
-    page_key: str,
-    template: dict,
-) -> bool:
-    """Return whether detailed flow aggregate cards have LEAP detail to summarize.
-
-    The page-level aggregate remains useful while ``All demand aggregated`` is
-    active.  Its child Common flows do not: an ``Aggregate by product`` card
-    would look like LEAP supplied a sector/fuel breakdown when it supplied
-    only the broad placeholder.  Suppress those child cards only when the
-    coverage audit says the page is wholly placeholder-only.  Partial-detail
-    cases remain visible because they contain real LEAP detail to summarize.
-    """
+def placeholder_only_demand_flow_prefixes(page_key: str, template: dict) -> list[str]:
+    """Return Common ESTO flow prefixes with no detailed LEAP representation."""
     coverage = template.get("leap_demand_sector_coverage", {}) or {}
     placeholder_only_pages = coverage.get("_placeholder_only_page_branches", {}) or {}
-    return not bool(placeholder_only_pages.get(page_key, []))
+    active_components = {
+        str(component).strip()
+        for component in placeholder_only_pages.get(page_key, [])
+        if str(component).strip()
+    }
+    component_prefixes = coverage.get("placeholder_component_flow_prefixes", {}) or {}
+    return [
+        str(prefix).strip()
+        for component in active_components
+        for prefix in component_prefixes.get(component, [])
+        if str(prefix).strip()
+    ]
+
+
+def drop_placeholder_only_demand_detail_rows(
+    page_key: str,
+    page_df: pd.DataFrame,
+    template: dict,
+) -> pd.DataFrame:
+    """Remove child rows represented only by an active demand placeholder.
+
+    The page-level aggregate remains useful while ``All demand aggregated`` is
+    active. Its child Common flows do not: charts below the page aggregate
+    would look like LEAP supplied a sector/fuel breakdown when it supplied
+    only the broad placeholder. Partial-detail components stay visible because
+    their coverage audit records real LEAP detail.
+    """
+    prefixes = placeholder_only_demand_flow_prefixes(page_key, template)
+    if page_df.empty or not prefixes or "common_flow_code" not in page_df.columns:
+        return page_df.copy()
+    placeholder_mask = page_df["common_flow_code"].apply(
+        lambda code: code_expression_matches_any_prefix(code, prefixes)
+    )
+    return page_df.loc[~placeholder_mask].copy()
+
+
+def area_spec_is_placeholder_only_demand_child(
+    page_key: str,
+    area_spec: dict[str, object],
+    template: dict,
+) -> bool:
+    """Return whether an overview spec is a child of a placeholder-only branch."""
+    source_root_code = str(area_spec.get("aggregate_flow_prefix") or "").strip()
+    if not source_root_code:
+        source_root_code = code_candidate_text(area_spec.get("aggregate_flow_label", ""))
+    return code_expression_matches_any_prefix(
+        source_root_code,
+        placeholder_only_demand_flow_prefixes(page_key, template),
+    )
 
 
 def equivalent_flow_labels_by_source(df: pd.DataFrame, flow_label: str) -> dict[str, list[str]]:
@@ -2659,6 +2696,7 @@ def _build_flow_group_aggregate_charts(
     flow's rows actually resolve to more than one distinct component flow
     (i.e. the common flow label is a rollup of several raw ESTO/LEAP flows).
     """
+    page_df = drop_placeholder_only_demand_detail_rows(page_key, page_df, template)
     charts: dict[str, go.Figure] = {}
     chart_rows: list[dict] = []
     manifest_rows: list[dict] = []
@@ -2848,13 +2886,7 @@ def _build_flow_group_aggregate_charts(
             ordered_flows.append(flow_label)
 
     flows_per_section: dict[str, int] = {}
-    show_leaf_flow_aggregates = flow_group_aggregate_allowed_for_demand_coverage(
-        page_key,
-        template,
-    )
     for flow_label in ordered_flows:
-        if not show_leaf_flow_aggregates:
-            continue
         section_label = str(flow_section.get(flow_label, page_label))
         flows_per_section[section_label] = flows_per_section.get(section_label, 0) + 1
 
@@ -6705,6 +6737,8 @@ def render_dashboard(
             source_root_code = str(area_spec.get("aggregate_flow_prefix") or "").strip()
             if not source_root_code:
                 source_root_code = code_candidate_text(source_aggregate_label)
+            if area_spec_is_placeholder_only_demand_child(page_key, area_spec, template):
+                continue
             is_real_page_flow = source_aggregate_label in page_flow_labels
             subtree_is_page_complete = _flow_subtree_is_page_complete(
                 assigned_df,
@@ -6768,7 +6802,12 @@ def render_dashboard(
                 **metrics,
             })
 
-        flow_nodes = get_existing_flow_nodes(page_df)
+        detail_page_df = drop_placeholder_only_demand_detail_rows(
+            page_key,
+            page_df,
+            template,
+        )
+        flow_nodes = get_existing_flow_nodes(detail_page_df)
         all_canonical = set(flow_nodes["canonical_code"].astype(str))
         parent_flow_labels: set[str] = set()
         for _, node in flow_nodes.iterrows():
@@ -6778,7 +6817,7 @@ def render_dashboard(
 
         # Section aggregate charts: two per section (by product, by flow), summing all non-parent flows.
         section_charts, section_chart_rows, section_manifest_rows = _build_section_aggregate_charts(
-            page_df, page_key, page_label, parent_flow_labels, template, series_labels,
+            detail_page_df, page_key, page_label, parent_flow_labels, template, series_labels,
         )
         charts.update(section_charts)
         chart_rows.extend(section_chart_rows)
@@ -6786,21 +6825,21 @@ def render_dashboard(
 
         # Subsection aggregate charts: two per flow-group subsection (by product, by sub-flow).
         flow_group_charts, flow_group_chart_rows, flow_group_manifest_rows = _build_flow_group_aggregate_charts(
-            page_df, page_key, page_label, parent_flow_labels, template, series_labels,
+            detail_page_df, page_key, page_label, parent_flow_labels, template, series_labels,
         )
         charts.update(flow_group_charts)
         chart_rows.extend(flow_group_chart_rows)
         manifest_rows.extend(flow_group_manifest_rows)
 
-        pairs = page_df[["common_flow_label", "common_product_label"]].drop_duplicates().sort_values(["common_flow_label", "common_product_label"])
+        pairs = detail_page_df[["common_flow_label", "common_product_label"]].drop_duplicates().sort_values(["common_flow_label", "common_product_label"])
         for _, pair in pairs.iterrows():
             flow_label = pair["common_flow_label"]
             product_label = pair["common_product_label"]
             if flow_label in parent_flow_labels:
                 continue
-            pair_rows = page_df[
-                (page_df["common_flow_label"] == flow_label)
-                & (page_df["common_product_label"] == product_label)
+            pair_rows = detail_page_df[
+                (detail_page_df["common_flow_label"] == flow_label)
+                & (detail_page_df["common_product_label"] == product_label)
             ]
             section_label = str(pair_rows["_section_label"].mode().iloc[0]) if not pair_rows.empty else page_label
             chart_key = f"chart__line__{safe_slug(flow_label)}__{safe_slug(product_label)}"

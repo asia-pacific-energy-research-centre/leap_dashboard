@@ -30,6 +30,7 @@ from codebase.common_esto_dashboard_renderer import (
     _build_td_sector_chart,
     _build_td_fuel_chart,
     _comparison_projection_area_rows,
+    area_spec_is_placeholder_only_demand_child,
     apply_chart_chrome,
     assert_unique_line_trace_x,
     assign_pages,
@@ -46,7 +47,8 @@ from codebase.common_esto_dashboard_renderer import (
     color_for_plotting_name,
     drop_excluded_flow_rows,
     effective_chart_suppression_threshold,
-    flow_group_aggregate_allowed_for_demand_coverage,
+    drop_placeholder_only_demand_detail_rows,
+    placeholder_only_demand_flow_prefixes,
     frontier_flow_labels,
     guide_page_context,
     guide_page_mapping_table,
@@ -1731,9 +1733,6 @@ def test_placeholder_only_buildings_hide_leaf_flow_aggregate_cards() -> None:
         }]),
     )
 
-    assert not flow_group_aggregate_allowed_for_demand_coverage("buildings", template)
-    assert flow_group_aggregate_allowed_for_demand_coverage("industry", template)
-
     rows = pd.DataFrame([
         {
             "source_system": "ESTO",
@@ -1760,6 +1759,7 @@ def test_placeholder_only_buildings_hide_leaf_flow_aggregate_cards() -> None:
         "suppression_threshold": 1.0,
     }
 
+    visible_rows = drop_placeholder_only_demand_detail_rows("buildings", rows, template)
     charts, _chart_rows, manifest_rows = _build_flow_group_aggregate_charts(
         rows,
         page_key="buildings",
@@ -1769,6 +1769,17 @@ def test_placeholder_only_buildings_hide_leaf_flow_aggregate_cards() -> None:
         series_labels={"ESTO|historical": "ESTO historical"},
     )
 
+    assert visible_rows.empty
+    assert area_spec_is_placeholder_only_demand_child(
+        "buildings",
+        {"aggregate_flow_prefix": "16.02", "aggregate_flow_label": "16.02 Residential"},
+        template,
+    )
+    assert not area_spec_is_placeholder_only_demand_child(
+        "buildings",
+        {"aggregate_flow_prefix": "16", "aggregate_flow_label": "16 Buildings"},
+        template,
+    )
     assert not charts
     assert not manifest_rows
 
@@ -1783,7 +1794,35 @@ def test_partial_placeholder_detail_keeps_leaf_flow_aggregate_cards() -> None:
         }]),
     )
 
-    assert flow_group_aggregate_allowed_for_demand_coverage("buildings", template)
+    rows = pd.DataFrame([
+        {"common_flow_code": "16.02", "common_flow_label": "16.02 Residential"},
+        {"common_flow_code": "16.01.01", "common_flow_label": "16.01.01 Datacentres"},
+    ])
+
+    assert len(drop_placeholder_only_demand_detail_rows("buildings", rows, template)) == 2
+
+
+def test_non_road_placeholder_keeps_road_detail_charts() -> None:
+    template = filter_template_for_leap_demand_coverage(
+        _load_template(),
+        pd.DataFrame([{
+            "component_branch": "Transport non road",
+            "detailed_branches": "Transport non road",
+            "representation_status": "placeholder_only_retained",
+        }]),
+    )
+    rows = pd.DataFrame([
+        {"common_flow_code": "15.01", "common_flow_label": "15.01 Road transport"},
+        {"common_flow_code": "15.02", "common_flow_label": "15.02 Rail transport"},
+        {"common_flow_code": "15.03", "common_flow_label": "15.03 Domestic navigation"},
+    ])
+
+    visible = drop_placeholder_only_demand_detail_rows("transport", rows, template)
+
+    assert visible["common_flow_label"].tolist() == ["15.01 Road transport"]
+    assert placeholder_only_demand_flow_prefixes("transport", template) == [
+        "15.02", "15.03", "15.04", "15.05", "15.06",
+    ]
 
 
 def test_all_demand_other_sector_placeholder_is_routed_before_industry_non_energy_section() -> None:

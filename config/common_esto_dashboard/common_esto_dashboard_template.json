@@ -306,6 +306,13 @@
       "buildings": ["Buildings"],
       "others": ["Other sector"]
     },
+    "placeholder_component_flow_prefixes": {
+      "Industry": ["14"],
+      "Road": ["15.01"],
+      "Transport non road": ["15.02", "15.03", "15.04", "15.05", "15.06"],
+      "Buildings": ["16.01", "16.02"],
+      "Other sector": ["16.03", "16.04", "16.05", "17"]
+    },
     "always_skip_page_keys": [],
     "require_primary_source_page_keys": [],
     "_note": "page_leap_branches maps each domestic demand page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. International transport is a signed supply deduction and is routed to Supply, not domestic demand. Exact flow 17 is presented in the Industry page's Non-energy use section; the combined Other sector including non-energy placeholder remains routed to Other demand by its explicit routing special case."
