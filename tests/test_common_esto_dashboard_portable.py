@@ -97,7 +97,7 @@ def test_configured_comparison_scopes_use_maintained_selector() -> None:
     assert [item["is_default"] for item in definitions] == [True, False]
 
 
-def test_variant_render_forwards_basis_options_without_substitute_diagnostics(
+def test_variant_render_forwards_basis_options_and_writes_export_diagnostics(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -163,10 +163,36 @@ def test_variant_render_forwards_basis_options_without_substitute_diagnostics(
             "dashboard_key": "20USA__esto_extended_leap",
         },
     ]
-    assert calls[0]["additional_pages"] == []
+    assert calls[0]["additional_pages"] == [{
+        "page_key": "mapping_diagnostics",
+        "page_label": "Mapping diagnostics",
+        "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
+    }]
     assert result["chart_count"] == 4
-    assert "mapping_diagnostics" not in result
-    assert not (tmp_path / "outputs" / "diagnostics").exists()
+    assert result["mapping_diagnostics"]["unmapped_branch_count"] == 0
+    assert (tmp_path / "outputs" / "diagnostics" / "dashboards" / "mapping_diagnostics.html").is_file()
+
+
+def test_portable_mapping_diagnostics_shows_unmapped_categories(tmp_path: Path) -> None:
+    qa_path = tmp_path / "qa_nonzero_unmapped_leap_branches.csv"
+    pd.DataFrame([{
+        "leap_flow": "Freight road",
+        "leap_product": "Gas and diesel oil",
+        "indirect_esto_flow": "",
+        "indirect_esto_product": "",
+        "qa_status": "nonzero_unmapped_leap_branch_without_esto_pair",
+    }]).to_csv(qa_path, index=False)
+
+    result = portable.write_portable_mapping_diagnostics_page(
+        output_root=tmp_path / "output",
+        economy="20_USA",
+        unmapped_branches_path=qa_path,
+    )
+
+    html = Path(str(result["page"])).read_text(encoding="utf-8")
+    assert "Imported LEAP category recognition" in html
+    assert "Freight road" in html
+    assert "fully imported into the main LEAP areas" in html
 
 
 def test_extended_scope_renders_ordinary_history_under_extended_identity(

@@ -635,7 +635,9 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "No failed anchor contexts for this dashboard economy." in html
     assert "LEAP flow tree: original vs mapped representation" in html
     assert "Caution: treat this section as provisional." in html
-    assert "until the relevant LEAP exports have been checked and confirmed" in html
+    assert "until the detailed LEAP sectors are fully imported into the main LEAP areas" in html
+    assert "Imported LEAP category recognition" in html
+    assert "A category is marked for review here when a non-zero LEAP flow/product pair" in html
     assert "Prepare reviewed source exception" not in html
     assert "download-exception-candidate" not in html
     assert "Original raw source tree" in html

@@ -13,10 +13,11 @@ executed at import, and the only in-repo dependencies are the three production
 dashboard modules. It is what the developer launcher and the portable release
 both call, so both run identical rendering code.
 
-The maintainer workflow separately renders the hierarchy/rollup diagnostics
-page from the full ``leap_mappings`` results tree. The portable release does
-not carry that complete diagnostics contract, so it does not publish a reduced
-or substitute diagnostics page.
+The maintainer workflow separately renders the full APEC-wide hierarchy/rollup
+diagnostics page from the complete ``leap_mappings`` results tree. The portable
+release instead publishes a clearly labelled per-export Mapping diagnostics
+page from its mapping-chain category-recognition QA; it does not substitute for
+the APEC-wide hierarchy contract.
 
 Deliberately **not** included here:
 
@@ -37,6 +38,7 @@ import json
 import sys
 from copy import deepcopy
 from collections.abc import Sequence
+from html import escape
 from pathlib import Path
 
 import pandas as pd
@@ -71,6 +73,7 @@ __all__ = [
     "normalize_dashboard_economy_key",
     "render_common_esto_dashboard",
     "render_common_esto_dashboard_variants",
+    "write_portable_mapping_diagnostics_page",
 ]
 
 
@@ -102,6 +105,77 @@ def normalize_dashboard_economy_key(economy: object) -> str:
     if not key:
         raise ValueError("An economy code is required (for example '20_USA').")
     return key
+
+
+def _portable_diagnostics_table(frame: pd.DataFrame, columns: list[str]) -> str:
+    """Render a small escaped table for the portable mapping QA page."""
+    available = [column for column in columns if column in frame.columns]
+    if frame.empty:
+        return '<p class="empty-state">No non-zero unmapped LEAP branches were recorded.</p>'
+    if not available:
+        return '<p class="empty-state">The category-recognition QA file has no displayable columns.</p>'
+    header = "".join(f"<th>{escape(column)}</th>" for column in available)
+    rows = []
+    for _, row in frame.loc[:, available].iterrows():
+        cells = "".join(
+            f"<td>{escape('' if pd.isna(row[column]) else str(row[column]))}</td>"
+            for column in available
+        )
+        rows.append(f"<tr>{cells}</tr>")
+    return f'<div class="table-scroll"><table><thead><tr>{header}</tr></thead><tbody>{"".join(rows)}</tbody></table></div>'
+
+
+def write_portable_mapping_diagnostics_page(
+    *,
+    output_root: Path | str,
+    economy: str,
+    unmapped_branches_path: Path | str | None,
+    dashboard_updated_label: str = "",
+) -> dict[str, str | int]:
+    """Write the per-export category-recognition page used by review tools.
+
+    This only presents the mapping-chain QA generated for the submitted export.
+    It deliberately does not recreate the maintainer-only APEC hierarchy checks.
+    """
+    output_root = Path(output_root)
+    economy_key = normalize_dashboard_economy_key(economy)
+    qa_path = Path(unmapped_branches_path) if unmapped_branches_path else None
+    if qa_path is not None and qa_path.is_file():
+        unmapped = pd.read_csv(qa_path)
+        qa_note = f"Category-recognition QA: {qa_path.name}"
+    else:
+        unmapped = pd.DataFrame()
+        qa_note = "The mapping-chain category-recognition QA file was not available for this run."
+
+    dashboard_dir = output_root / "diagnostics" / "dashboards"
+    supporting_dir = output_root / "diagnostics" / "supporting_files"
+    dashboard_dir.mkdir(parents=True, exist_ok=True)
+    supporting_dir.mkdir(parents=True, exist_ok=True)
+    page_path = dashboard_dir / "mapping_diagnostics.html"
+    summary_path = supporting_dir / "mapping_diagnostics_summary.csv"
+    pd.DataFrame([{
+        "metric": "Non-zero unmapped LEAP branches",
+        "rows": len(unmapped),
+    }]).to_csv(summary_path, index=False)
+    table_html = _portable_diagnostics_table(
+        unmapped,
+        ["leap_flow", "leap_product", "indirect_esto_flow", "indirect_esto_product", "qa_status"],
+    )
+    page_path.write_text(
+        f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapping diagnostics | {escape(economy_key)}</title><style>
+body{{font-family:Inter,Segoe UI,Arial,sans-serif;margin:0;background:#f4f6f8;color:#172033}}.shell{{max-width:1200px;margin:auto;padding:20px}}header,.panel{{background:#fff;border:1px solid #d9e1ea;border-radius:10px;padding:16px;margin-bottom:16px}}h1,h2{{margin:0 0 10px}}.subtle,.empty-state{{color:#5f6b7a;line-height:1.5}}.warning{{background:#fff4e5;color:#8a4b08;border-radius:7px;padding:11px;line-height:1.5}}.count{{font-size:28px;font-weight:700;color:#9b1c1c}}.table-scroll{{overflow:auto}}table{{border-collapse:collapse;width:100%;font-size:13px}}th,td{{border:1px solid #d9e1ea;padding:7px 9px;text-align:left;vertical-align:top}}th{{background:#e8f0fa}}a{{color:#1b5e9a}}</style></head>
+<body><main class="shell"><header><a href="../../{escape(economy_key)}/dashboards/index.html">← Back to economy dashboard</a><h1>Mapping diagnostics</h1><p class="subtle">Per-export review for {escape(economy_key)}. Updated: {escape(dashboard_updated_label)}</p></header>
+<section class="panel"><h2>Imported LEAP category recognition</h2><p class="subtle">The import retains LEAP labels after known aliases are normalised. A category appears below only when a non-zero LEAP flow/product pair has no direct maintained LEAP-to-ESTO mapping. It is a mapping-review signal, not a claim that the source label is invalid.</p><p class="count">{len(unmapped):,}</p><p class="subtle">non-zero unmapped LEAP branch(es)</p></section>
+<section class="panel"><p class="warning"><strong>ESTO Extended caution.</strong> Do not treat missing detailed LEAP branches as mapping failures until the detailed LEAP sectors are fully imported into the main LEAP areas.</p></section>
+<section class="panel"><h2>Non-zero unmapped LEAP branches</h2>{table_html}</section><footer class="subtle">{escape(qa_note)}</footer></main></body></html>""",
+        encoding="utf-8",
+    )
+    return {
+        "page": str(page_path),
+        "summary": str(summary_path),
+        "unmapped_branch_count": len(unmapped),
+    }
 
 
 def configured_comparison_scopes(template: dict) -> list[dict[str, object]]:
@@ -324,10 +398,21 @@ def render_common_esto_dashboard(
 def render_common_esto_dashboard_variants(
     **kwargs: object,
 ) -> dict[str, object]:
-    """Render every configured comparison basis and shared diagnostics page."""
+    """Render every configured comparison basis and the per-export QA page."""
     template_path = Path(str(kwargs["template_path"]))
     output_root = Path(str(kwargs["output_root"]))
     economy_key = normalize_dashboard_economy_key(kwargs["economy"])
+    diagnostics_result = write_portable_mapping_diagnostics_page(
+        output_root=output_root,
+        economy=economy_key,
+        unmapped_branches_path=kwargs.get("mapping_diagnostics_unmapped_branches_path"),
+        dashboard_updated_label=str(kwargs.get("dashboard_updated_label", "")),
+    )
+    diagnostics_page = {
+        "page_key": "mapping_diagnostics",
+        "page_label": "Mapping diagnostics",
+        "file": "../../diagnostics/dashboards/mapping_diagnostics.html",
+    }
     definitions = configured_comparison_scopes(
         json.loads(template_path.read_text(encoding="utf-8"))
     )
@@ -343,13 +428,14 @@ def render_common_esto_dashboard_variants(
     default_result: dict[str, object] | None = None
     for definition in definitions:
         call_kwargs = deepcopy(kwargs)
+        call_kwargs.pop("mapping_diagnostics_unmapped_branches_path", None)
         call_kwargs.update({
             "comparison_scope": str(definition["comparison_scope"]),
             "dashboard_key": f"{economy_key}{definition['output_suffix']}",
             "category_basis_options": options,
             "active_dataset_filter_options": list(definition["source_systems"]),
             "dashboard_key_suffix": str(definition["output_suffix"]),
-            "additional_pages": [],
+            "additional_pages": [diagnostics_page],
             "clear_existing": True,
         })
         result = render_common_esto_dashboard(**call_kwargs)
@@ -361,6 +447,7 @@ def render_common_esto_dashboard_variants(
     combined = dict(default_result)
     combined["output_root"] = str(output_root)
     combined["scope_results"] = scope_results
+    combined["mapping_diagnostics"] = diagnostics_result
     combined["chart_count"] = sum(
         int(result.get("chart_count", 0)) for result in scope_results.values()
     )

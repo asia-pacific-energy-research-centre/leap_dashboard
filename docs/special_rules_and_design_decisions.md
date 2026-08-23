@@ -1096,7 +1096,7 @@ mapping evidence. The equivalent NINTH section does not inherit this warning.
 
 LEAP anchor contexts whose child mappings belong to an `esto_extended_*` scope
 are suppressed from the issue cards and exception browser until the detailed
-LEAP export coverage required for that scope is confirmed. The source-pair map
+LEAP sectors are fully imported into the main LEAP areas. The source-pair map
 is the authority for this temporary presentation filter, since the anchor
 artifact may retain only an ordinary-scope copy of the same context.
 
