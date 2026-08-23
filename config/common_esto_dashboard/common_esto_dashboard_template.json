@@ -85,7 +85,7 @@
       "match": {"common_flow_code_exact": "17"},
       "action": "route",
       "page_key": "industry",
-      "page_label": "Industry",
+      "page_label": "Industry and non-energy",
       "section_key": "non_energy",
       "section_label": "Non-energy use",
       "temporary": false,
@@ -188,7 +188,7 @@
     },
     {
       "page_key": "industry",
-      "page_label": "Industry",
+      "page_label": "Industry and non-energy",
       "priority": 60,
       "flow_code_prefixes": [
         "14"
