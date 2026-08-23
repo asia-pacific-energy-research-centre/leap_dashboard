@@ -38,6 +38,91 @@ SCOPE_PRIORITY = {
 }
 
 
+def _exclude_unconfirmed_leap_extended_contexts(
+    context_values: pd.DataFrame,
+    source_to_common: pd.DataFrame,
+) -> tuple[pd.DataFrame, int]:
+    """Hide LEAP anchor contexts whose child detail belongs to ESTO Extended.
+
+    The current LEAP exports do not yet confirm that every detailed branch
+    required by ESTO Extended is present. The anchor artifact may retain only
+    an ordinary-scope record even where its source child maps exclusively to
+    the Extended structure, so mapping provenance (not merely the anchor
+    scope) defines this temporary exclusion.
+    """
+    context_keys = [
+        "source_system", "validation_axis", "economy", "scenario", "year",
+        "other_axis_value", "parent_code",
+    ]
+    required = {"comparison_scope", "child_code", *context_keys}
+    if context_values.empty or not required.issubset(context_values.columns):
+        return context_values.copy(), 0
+
+    working = context_values.copy()
+    case_keys = [column for column in context_keys if column != "source_system"]
+    is_leap_extended = (
+        working["source_system"].astype(str).eq("LEAP")
+        & working["comparison_scope"].astype(str).str.startswith("esto_extended_")
+    )
+    extended_contexts = working.loc[is_leap_extended, context_keys].drop_duplicates()
+
+    map_columns = {
+        "comparison_scope", "source_system", "original_source_flow",
+        "original_source_product",
+    }
+    extended_pairs = pd.DataFrame(columns=["child_code", "other_axis_value"])
+    if not source_to_common.empty and map_columns.issubset(source_to_common.columns):
+        extended_pairs = source_to_common[
+            source_to_common["source_system"].astype(str).eq("LEAP")
+            & source_to_common["comparison_scope"].astype(str).str.startswith("esto_extended_")
+        ][["original_source_flow", "original_source_product"]].drop_duplicates()
+        extended_pairs = extended_pairs.rename(columns={
+            "original_source_flow": "child_code",
+            "original_source_product": "other_axis_value",
+        })
+
+    if extended_contexts.empty and extended_pairs.empty:
+        return working, 0
+
+    marked = working.merge(
+        extended_contexts.assign(_is_extended_scope_context=True),
+        on=context_keys,
+        how="left",
+    ).merge(
+        extended_pairs.assign(_has_extended_mapped_child=True),
+        on=["child_code", "other_axis_value"],
+        how="left",
+    )
+    marked["_suppress_until_leap_export_complete"] = (
+        marked["_is_extended_scope_context"].eq(True)
+        | (
+            marked["source_system"].astype(str).eq("LEAP")
+            & marked["_has_extended_mapped_child"].eq(True)
+        )
+    )
+    suppressed_case_keys = marked.loc[
+        marked["_suppress_until_leap_export_complete"],
+        ["source_system", *case_keys],
+    ].drop_duplicates()
+    if suppressed_case_keys.empty:
+        return working, 0
+
+    marked = marked.merge(
+        suppressed_case_keys.assign(_suppress_case=True),
+        on=["source_system", *case_keys],
+        how="left",
+    )
+    suppress_mask = marked["_suppress_case"].eq(True)
+    suppressed_cases = len(marked.loc[suppress_mask, context_keys].drop_duplicates())
+    return (
+        marked.loc[~suppress_mask].drop(columns=[
+            "_is_extended_scope_context", "_has_extended_mapped_child",
+            "_suppress_until_leap_export_complete", "_suppress_case",
+        ]),
+        suppressed_cases,
+    )
+
+
 def _read_csv(path: Path) -> pd.DataFrame:
     """Read an optional diagnostic artifact as text-friendly values."""
     if not path.exists():
@@ -1721,9 +1806,15 @@ def write_mapping_diagnostics_page(
         leaf_reconciliation_candidates,
         dashboard_economy,
     )
+    reviewable_anchor_context_values, suppressed_leap_extended_case_count = (
+        _exclude_unconfirmed_leap_extended_contexts(
+            anchor_child_context_values,
+            source_to_common,
+        )
+    )
     paired_anchor_context_values, paired_exception_context_groups = (
         _partition_paired_tree_exceptions(
-            anchor_child_context_values,
+            reviewable_anchor_context_values,
             scoped_anchor,
         )
     )
@@ -1848,6 +1939,7 @@ h1,h2,h3 {{ margin:0 0 10px; }} h2 {{ margin-top:28px; }} .subtle {{ color:#5f6b
 .table-scroll {{ overflow:auto; max-height:480px; }} table {{ border-collapse:collapse; width:100%; font-size:12px; }} th {{ position:sticky; top:0; background:#e8f0fa; }} th,td {{ border:1px solid #d9e1ea; padding:6px 8px; text-align:left; vertical-align:top; }} .table-note,.empty-state {{ color:#5f6b7a; font-size:13px; }} footer {{ margin:22px 0; font-size:12px; color:#5f6b7a; }} a {{ color:#1b5e9a; }}
 {dashboard_guide["css"]}</style></head><body><div class="shell"><header><a href="#" onclick="history.back();return false;">← Back to economy dashboard</a>{dashboard_guide["launch_button_html"]}<h1>APEC-wide mapping diagnostics</h1><p class="subtle">Structural checks start from the summed APEC balance. Economy evidence is calculated only for failed APEC anchors. Updated: {escape(dashboard_updated_label)}<br>{escape(contract_note)}</p></header>
 <section class="panel"><h2>How to read a hierarchy case</h2><div class="guide-grid"><div class="guide-card guide-good"><strong>Manual LEAP roll-up</strong>Only constructed LEAP subtotal branches receive this label; they are compared with their immediate source-tree children.</div><div class="guide-card guide-good"><strong>One-to-many fan-out</strong>One raw parent can reach several ESTO components. Those routes are not additional source-tree parents.</div><div class="guide-card guide-neutral"><strong>De-duplicated frontier</strong>Mapped component rows can overlap. The frontier counts each Common ESTO row once, so do not add the displayed component rows.</div><div class="guide-card guide-warning"><strong>Raw source contradiction</strong>If a raw parent is 0 while its children are non-zero, the original source hierarchy disagrees with itself. It is not, by itself, a missing mapping.</div></div></section>
+<section class="panel"><p class="source-warning"><strong>LEAP ESTO Extended cases are currently suppressed.</strong> {suppressed_leap_extended_case_count:,} LEAP anchor contexts contain child mappings that belong to an ESTO Extended scope. They are excluded until the required detailed LEAP export coverage has been confirmed; the page does not treat their absent detail as a mapping failure.</p></section>
 <details class="panel collapsed-panel"><summary><h2>All rollup boundaries</h2><span></span></summary><div><p class="subtle">Mapping-owned rollup edges across every ESTO flow. Green means a rolled value equals its contributors within tolerance; red means it does not. Values aggregate all products for the chosen source, scenario, and year.</p><div class="rollup-controls"><label>Dataset<select id="rollup-source"></select></label><label>Scenario<select id="rollup-scenario"></select></label><label>Year<select id="rollup-year"></select></label></div>{rollup_boundary_register}</div></details>
 <section class="panel"><h2>All sector rollup structure</h2><p class="subtle">Start with the collapsed major-sector overview, choose a sector, or search for a flow. The graph never treats rollup composition as an ordinary hierarchy branch.</p><div class="rollup-explainer"><div><strong>Normal hierarchy</strong>A solid blue arrow means the child has the displayed parent in the ESTO flow tree.</div><div><strong>Registered rollup</strong>A dotted ochre arrow means the input contributes to a compiled comparison boundary; it is not another parent-child edge.</div><div><strong>NON_EXPANDING vs DETACHED</strong>NON_EXPANDING replaces a comparison frontier without adding another hierarchy branch. DETACHED remains outside ordinary ancestor totals and is intentional, not an orphan.</div><div><strong>ESTO Extended</strong>Extended-only rows are purple. Include them only when you need to inspect the extension; values always come from the selected dataset.</div></div><div class="rollup-filter-grid"><label class="special-rollup-toggle"><input id="include-extended-rows" type="checkbox" autocomplete="off"> Include ESTO Extended-only rows</label><label>Major sector<select id="rollup-sector"></select></label><label>Rollup type<select id="rollup-mode"><option value="NONE" selected>Hierarchy only</option><option value="ALL">All rollup types</option><option value="EXPANDING">EXPANDING</option><option value="NON_EXPANDING">NON_EXPANDING</option><option value="DETACHED">DETACHED</option></select></label><label>Validation/status<select id="rollup-status"><option value="ALL">All statuses</option><option value="ISSUES">Issues only</option><option value="PASS">Reconciled only</option><option value="UNAVAILABLE">Unavailable only</option></select></label><label>Search for a flow<input id="rollup-search" type="search" placeholder="Code or label" autocomplete="off"></label><span class="basis-state" id="rollup-basis-state">Showing original ESTO structure</span></div><div class="rollup-legend"><span><i class="legend-line"></i>normal hierarchy</span><span><i class="legend-line rollup"></i>rollup composition</span><span><i class="legend-line detached"></i>intentional DETACHED boundary</span><span>Purple node = Extended-only addition; red = orphan, duplicate, inconsistency, or failed validation.</span></div><div class="rollup-graph-toolbar"><button type="button" id="rollup-fit">Fit width</button><button type="button" id="rollup-zoom-out">−</button><button type="button" id="rollup-zoom-reset">100%</button><button type="button" id="rollup-zoom-in">+</button><button type="button" id="rollup-clear-selection">Clear selection</button><span class="rollup-graph-help">Click a node to highlight its parent, children, and rollup relationships. Choose a major sector (or click one) to expand it.</span></div><div class="rollup-graph-wrap"><div id="rollup-graph"></div></div><div class="rollup-summary"><h3>Rows in the current graph</h3><p class="rollup-summary-status" id="rollup-summary-status"></p><div class="table-scroll"><table id="rollup-summary-table"><thead><tr><th>Flow code</th><th>Flow label</th><th>Parent flow</th><th>Relationship type</th><th>Rollup type</th><th>Original / Extended</th><th>Child count</th><th>Rollup membership</th><th>Validation / status</th></tr></thead><tbody></tbody></table></div></div></section>
 <label class="zero-toggle"><input id="show-zero-children" type="checkbox" autocomplete="off" onchange="document.body.classList.toggle('show-zero-children', this.checked)"> Show zero-value children and mapped components</label>

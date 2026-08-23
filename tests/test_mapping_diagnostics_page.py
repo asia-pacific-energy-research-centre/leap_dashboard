@@ -10,6 +10,7 @@ from codebase.common_esto_dashboard_mapping_diagnostics import (
     _anchor_value_summary,
     _context_value_formatter,
     _direct_parent_mapping_reconciles,
+    _exclude_unconfirmed_leap_extended_contexts,
     _exception_classification_description,
     _partition_paired_tree_exceptions,
     _mapping_cardinality_diagnostics,
@@ -134,6 +135,46 @@ def test_paired_tree_excludes_every_matched_exception() -> None:
         "source_issue",
         "unreviewed_source_issue",
     }
+
+
+def test_unconfirmed_leap_extended_contexts_hide_their_ordinary_scope_duplicates() -> None:
+    base_context = {
+        "source_system": "LEAP",
+        "validation_axis": "flow",
+        "economy": "01AUS",
+        "scenario": "Reference",
+        "year": 2030,
+        "other_axis_value": "Gas and diesel oil",
+        "parent_code": "Freight road",
+        "child_code": "Freight road/LCVs",
+        "parent_value": 1.08,
+        "frontier_sum": 0.0,
+        "raw_child_value": 0.45,
+    }
+    contexts = pd.DataFrame([
+        {**base_context, "comparison_scope": "esto_leap_ninth"},
+        {
+            **base_context,
+            "source_system": "NINTH",
+            "parent_code": "Other parent",
+            "comparison_scope": "esto_leap_ninth",
+        },
+    ])
+    source_to_common = pd.DataFrame([{
+        "comparison_scope": "esto_extended_leap_ninth",
+        "source_system": "LEAP",
+        "original_source_flow": "Freight road/LCVs",
+        "original_source_product": "Gas and diesel oil",
+    }])
+
+    filtered, suppressed_cases = _exclude_unconfirmed_leap_extended_contexts(
+        contexts,
+        source_to_common,
+    )
+
+    assert suppressed_cases == 1
+    assert len(filtered) == 1
+    assert filtered.iloc[0]["source_system"] == "NINTH"
 
 
 def test_direct_parent_mapping_with_zero_difference_is_not_an_issue_card() -> None:

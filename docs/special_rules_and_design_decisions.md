@@ -1094,10 +1094,18 @@ flattened, inconsistent, or otherwise messy LEAP balance exports. Reviewers
 must verify the relevant LEAP exports before treating this section as reliable
 mapping evidence. The equivalent NINTH section does not inherit this warning.
 
+LEAP anchor contexts whose child mappings belong to an `esto_extended_*` scope
+are suppressed from the issue cards and exception browser until the detailed
+LEAP export coverage required for that scope is confirmed. The source-pair map
+is the authority for this temporary presentation filter, since the anchor
+artifact may retain only an ordinary-scope copy of the same context.
+
 ### History
 
 - 2026-08-10: Added after live review found flat LEAP export structures and
   inconsistent raw-versus-normalized signs producing misleading issue cards.
+- 2026-08-23: Suppressed ESTO Extended-related LEAP anchor contexts pending
+  confirmed detailed LEAP export coverage.
 
 ## DASH-028: Source exceptions are reviewed outside the dashboard
 
