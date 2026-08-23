@@ -616,6 +616,50 @@ def test_sector_stack_does_not_add_a_synthetic_tfc_remainder() -> None:
     assert {tuple(trace.y) for trace in stack_traces} == {(40.0,)}
 
 
+def test_sector_stack_retains_published_non_energy_without_inventing_leap_values() -> None:
+    demand_rows = pd.DataFrame([
+        {
+            "_page_key": "industry", "_page_label": "Industry",
+            "common_flow_code": "14", "common_flow_label": "14 Industry",
+            "source_system": "ESTO", "scenario": "historical", "year": 2022,
+            "value": 40.0,
+        },
+        {
+            "_page_key": "non_energy", "_page_label": "Non-energy use",
+            "common_flow_code": "17", "common_flow_label": "17 Non-energy use",
+            "source_system": "ESTO", "scenario": "historical", "year": 2022,
+            "value": 10.0,
+        },
+        {
+            "_page_key": "industry", "_page_label": "Industry",
+            "common_flow_code": "14", "common_flow_label": "14 Industry",
+            "source_system": "LEAP", "scenario": "Target", "year": 2023,
+            "value": 45.0,
+        },
+    ])
+    overview_rows = pd.DataFrame([
+        {"source_system": "ESTO", "scenario": "historical", "year": 2022,
+         "common_flow_code": "12", "value": 50.0},
+        {"source_system": "LEAP", "scenario": "Target", "year": 2023,
+         "common_flow_code": "12", "value": 55.0},
+    ])
+
+    figure = _build_td_sector_chart(
+        demand_rows, overview_rows, {}, "LEAP", "Target", {}, base_year=2022,
+    )
+
+    non_energy = [
+        trace for trace in figure.data
+        if trace.name == "Non-energy use" and trace.visible is True
+    ]
+    assert non_energy
+    assert {tuple(trace.x) for trace in non_energy} == {(2022,)}
+    assert {tuple(trace.y) for trace in non_energy} == {(10.0,)}
+    leap_total = next(trace for trace in figure.data if trace.name == "LEAP|Target (Domestic TFC)")
+    assert list(leap_total.y) == [55.0]
+    assert "projected stack remains incomplete" in figure.layout.meta["stacked_area_note"]
+
+
 def _build_common_esto_rows() -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for scope in ["leap_vs_esto_vs_ninth", "leap_vs_ninth"]:

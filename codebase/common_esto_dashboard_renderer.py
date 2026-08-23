@@ -5318,7 +5318,10 @@ def _build_td_sector_chart(
         meta={
             "trace_meta": trace_meta,
             "stacked_area_note": (
-                "Areas show domestic demand sectors; lines show domestic TFC totals by dataset and scenario. "
+                "Areas show domestic demand sectors (including non-energy use where published); "
+                "lines show domestic TFC totals by dataset and scenario. If a source has not yet "
+                "published non-energy demand, its projected stack remains incomplete and the TFC line "
+                "shows that real coverage gap. "
                 + stacked_area_dataset_note(stacked_sources, "demand")
             ),
         },
