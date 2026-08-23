@@ -1497,6 +1497,24 @@ def area_chart_allowed_for_demand_coverage(
     return True
 
 
+def flow_group_aggregate_allowed_for_demand_coverage(
+    page_key: str,
+    template: dict,
+) -> bool:
+    """Return whether detailed flow aggregate cards have LEAP detail to summarize.
+
+    The page-level aggregate remains useful while ``All demand aggregated`` is
+    active.  Its child Common flows do not: an ``Aggregate by product`` card
+    would look like LEAP supplied a sector/fuel breakdown when it supplied
+    only the broad placeholder.  Suppress those child cards only when the
+    coverage audit says the page is wholly placeholder-only.  Partial-detail
+    cases remain visible because they contain real LEAP detail to summarize.
+    """
+    coverage = template.get("leap_demand_sector_coverage", {}) or {}
+    placeholder_only_pages = coverage.get("_placeholder_only_page_branches", {}) or {}
+    return not bool(placeholder_only_pages.get(page_key, []))
+
+
 def equivalent_flow_labels_by_source(df: pd.DataFrame, flow_label: str) -> dict[str, list[str]]:
     """Match a displayed flow name to source-specific equivalent labels."""
     target_name = flow_name_without_code(flow_label).casefold()
@@ -2830,7 +2848,13 @@ def _build_flow_group_aggregate_charts(
             ordered_flows.append(flow_label)
 
     flows_per_section: dict[str, int] = {}
+    show_leaf_flow_aggregates = flow_group_aggregate_allowed_for_demand_coverage(
+        page_key,
+        template,
+    )
     for flow_label in ordered_flows:
+        if not show_leaf_flow_aggregates:
+            continue
         section_label = str(flow_section.get(flow_label, page_label))
         flows_per_section[section_label] = flows_per_section.get(section_label, 0) + 1
 

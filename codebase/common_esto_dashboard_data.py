@@ -1163,6 +1163,7 @@ def filter_template_for_leap_demand_coverage(
             ["component_branch", "detailed_branches", "representation_status"],
         ].drop_duplicates().to_dict("records")
     aggregate_only_page_branches: dict[str, list[str]] = {}
+    placeholder_only_page_branches: dict[str, list[str]] = {}
     for page_key, branches in page_branches.items():
         page_branches_casefold = {str(branch).casefold() for branch in branches}
         components = []
@@ -1177,10 +1178,24 @@ def filter_template_for_leap_demand_coverage(
                 component_branch.casefold() in page_branches_casefold
                 or detailed.intersection(page_branches_casefold)
             ):
-                components.append(component_branch)
+                components.append(component)
         if components:
-            aggregate_only_page_branches[str(page_key)] = sorted(set(components))
+            aggregate_only_page_branches[str(page_key)] = sorted({
+                str(component["component_branch"]).strip()
+                for component in components
+            })
+        placeholder_only_components = [
+            str(component["component_branch"]).strip()
+            for component in components
+            if str(component["representation_status"]).strip()
+            == "placeholder_only_retained"
+        ]
+        if placeholder_only_components:
+            placeholder_only_page_branches[str(page_key)] = sorted(
+                set(placeholder_only_components)
+            )
     coverage_config["_aggregate_only_page_branches"] = aggregate_only_page_branches
+    coverage_config["_placeholder_only_page_branches"] = placeholder_only_page_branches
     if always_skip:
         coverage_config["_hidden_page_keys"] = sorted(always_skip)
     out["leap_demand_sector_coverage"] = coverage_config

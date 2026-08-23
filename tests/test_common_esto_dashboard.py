@@ -46,6 +46,7 @@ from codebase.common_esto_dashboard_renderer import (
     color_for_plotting_name,
     drop_excluded_flow_rows,
     effective_chart_suppression_threshold,
+    flow_group_aggregate_allowed_for_demand_coverage,
     frontier_flow_labels,
     guide_page_context,
     guide_page_mapping_table,
@@ -1718,6 +1719,71 @@ def test_available_common_categories_are_not_hidden_by_placeholder_metadata() ->
         detailed_rows,
         template,
     )
+
+
+def test_placeholder_only_buildings_hide_leaf_flow_aggregate_cards() -> None:
+    template = filter_template_for_leap_demand_coverage(
+        _load_template(),
+        pd.DataFrame([{
+            "component_branch": "Buildings",
+            "detailed_branches": "Buildings",
+            "representation_status": "placeholder_only_retained",
+        }]),
+    )
+
+    assert not flow_group_aggregate_allowed_for_demand_coverage("buildings", template)
+    assert flow_group_aggregate_allowed_for_demand_coverage("industry", template)
+
+    rows = pd.DataFrame([
+        {
+            "source_system": "ESTO",
+            "scenario": "historical",
+            "year": 2022,
+            "common_flow_code": flow_code,
+            "common_flow_label": flow_label,
+            "common_product_code": "17",
+            "common_product_label": "17 Electricity",
+            "_section_label": "Buildings",
+            "value": 10.0,
+        }
+        for flow_code, flow_label in [
+            ("16.01.99", "16.01.99 Commercial and public services unallocated"),
+            ("16.02", "16.02 Residential"),
+        ]
+    ])
+    template["chart_generation"] = {
+        "primary_area_source_system": "LEAP",
+        "primary_area_scenario": "Target",
+        "comparison_source_system": "ESTO",
+        "ninth_source_system": "NINTH",
+        "base_year": 2022,
+        "suppression_threshold": 1.0,
+    }
+
+    charts, _chart_rows, manifest_rows = _build_flow_group_aggregate_charts(
+        rows,
+        page_key="buildings",
+        page_label="Buildings",
+        parent_flow_labels=set(),
+        template=template,
+        series_labels={"ESTO|historical": "ESTO historical"},
+    )
+
+    assert not charts
+    assert not manifest_rows
+
+
+def test_partial_placeholder_detail_keeps_leaf_flow_aggregate_cards() -> None:
+    template = filter_template_for_leap_demand_coverage(
+        _load_template(),
+        pd.DataFrame([{
+            "component_branch": "Buildings",
+            "detailed_branches": "Buildings",
+            "representation_status": "partial_detail_placeholder_retained",
+        }]),
+    )
+
+    assert flow_group_aggregate_allowed_for_demand_coverage("buildings", template)
 
 
 def test_all_demand_other_sector_placeholder_is_routed_before_industry_non_energy_section() -> None:
