@@ -18,7 +18,13 @@
   HTML pages, manifests, the secondary dashboard scope and other presentation
   outputs. This is an optimisation task, not a mapping shortcut: paired
   comparison output must remain trace-equivalent to the current two-full-
-  dashboard workflow before it can replace it.
+  dashboard workflow before it can replace it. The web app currently estimates
+  a Version 1/Version 2 comparison as two dashboard runs, which correctly
+  reflects the present full-render workflow. Once this optimisation is proven,
+  replace that fixed 2x estimate with a benchmarked comparison estimate: it
+  should still be described as two versions, but it need not remain exactly
+  twice a standard dashboard run because the trace-only work removes some of
+  the second render's presentation cost.
 
 The dashboard now reads the mappings-owned
 `leap_demand_representation_status.csv` artifact generated from the current
