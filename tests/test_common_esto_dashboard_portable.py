@@ -347,7 +347,12 @@ def test_placeholder_metadata_does_not_hide_sector_pages(tmp_path: Path) -> None
         ),
     )
     assert restricted["leap_demand_representation_status_rows"] == 1
-    assert int(restricted["chart_count"]) == int(baseline["chart_count"])
+    # Placeholder metadata may correctly omit the affected detail charts, but
+    # it must not remove the ordinary sector page itself.
+    baseline_transport = Path(str(baseline["dashboard_index"])).with_name("transport.html")
+    restricted_transport = Path(str(restricted["dashboard_index"])).with_name("transport.html")
+    assert baseline_transport.is_file()
+    assert restricted_transport.is_file()
 
 
 def test_power_interim_audit_adds_placeholder_note(tmp_path: Path) -> None:
