@@ -5977,6 +5977,7 @@ def build_total_demand_page(
     current_dashboard: str = "",
     dashboard_updated_label: str = "",
     unmet_requirements_df: pd.DataFrame | None = None,
+    write_page: bool = True,
 ) -> tuple[list[dict], dict | None]:
     """Build the total demand summary page (config-driven bespoke page).
 
@@ -6261,18 +6262,19 @@ def build_total_demand_page(
 
     bundle_name = "total_demand__charts.json"
     write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
-    write_dashboard_page(
-        {"page_key": "total_demand", "page_label": page_label},
-        chart_rows=chart_rows,
-        bundle_js_name=bundle_name.replace(".json", ".js"),
-        output_path=layout["dashboards"] / page_file_name("total_demand"),
-        all_pages=all_pages,
-        economy_label=economy_label,
-        dashboard_switcher=dashboard_switcher,
-        current_dashboard=current_dashboard,
-        dashboard_updated_label=dashboard_updated_label,
-        **category_basis_ui_kwargs(template),
-    )
+    if write_page:
+        write_dashboard_page(
+            {"page_key": "total_demand", "page_label": page_label},
+            chart_rows=chart_rows,
+            bundle_js_name=bundle_name.replace(".json", ".js"),
+            output_path=layout["dashboards"] / page_file_name("total_demand"),
+            all_pages=all_pages,
+            economy_label=economy_label,
+            dashboard_switcher=dashboard_switcher,
+            current_dashboard=current_dashboard,
+            dashboard_updated_label=dashboard_updated_label,
+            **category_basis_ui_kwargs(template),
+        )
     page_row = {
         "file": page_file_name("total_demand"), "label": page_label,
         "area_chart_count": sum(row["chart_type"] == "stacked_area" for row in chart_rows),
@@ -6444,6 +6446,7 @@ def build_scope_specific_pages(
     dashboard_switcher: list[dict[str, str]] | None,
     current_dashboard: str,
     dashboard_updated_label: str = "",
+    write_pages: bool = True,
 ) -> tuple[list[dict], list[dict]]:
     """Build optional pages for alternate comparison scopes such as LEAP vs 9th."""
     config = template.get("scope_specific_pages", {})
@@ -6487,19 +6490,20 @@ def build_scope_specific_pages(
         bundle_name = f"{page_key}__charts.json"
         write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
         page_file = page_file_name(page_key)
-        write_dashboard_page(
-            {"page_key": page_key, "page_label": page_label},
-            chart_rows=chart_rows,
-            bundle_js_name=bundle_name.replace(".json", ".js"),
-            output_path=layout["dashboards"] / page_file,
-            all_pages=all_pages,
-            economy_label=economy_label,
-            dashboard_switcher=dashboard_switcher,
-            current_dashboard=current_dashboard,
-            page_note=str(scope_page.get("page_note", "")),
-            dashboard_updated_label=dashboard_updated_label,
-            **category_basis_ui_kwargs(template),
-        )
+        if write_pages:
+            write_dashboard_page(
+                {"page_key": page_key, "page_label": page_label},
+                chart_rows=chart_rows,
+                bundle_js_name=bundle_name.replace(".json", ".js"),
+                output_path=layout["dashboards"] / page_file,
+                all_pages=all_pages,
+                economy_label=economy_label,
+                dashboard_switcher=dashboard_switcher,
+                current_dashboard=current_dashboard,
+                page_note=str(scope_page.get("page_note", "")),
+                dashboard_updated_label=dashboard_updated_label,
+                **category_basis_ui_kwargs(template),
+            )
         page_rows.append({
             "file": page_file,
             "label": page_label,
@@ -6639,8 +6643,16 @@ def render_dashboard(
     additional_pages: list[dict[str, str]] | None = None,
     source_category_map: pd.DataFrame | None = None,
     unmet_requirements_df: pd.DataFrame | None = None,
+    trace_only: bool = False,
 ) -> pd.DataFrame:
-    """Render page bundles, dashboard pages, and a chart manifest."""
+    """Render dashboard charts, optionally writing only comparison trace bundles.
+
+    ``trace_only`` deliberately retains the complete chart construction path:
+    source selection, hierarchy frontiers, scenario handling, and routing all
+    remain shared with a normal dashboard render.  It omits presentation-only
+    HTML and audit files, retaining the Plotly bundles consumed by version
+    comparison.
+    """
     series_labels = series_config.get("series_labels", {})
     current_dashboard = str(template.get("_current_dashboard_key", layout["root"].name))
     dashboard_switcher = _normalise_dashboard_switcher(series_config, current_dashboard)
@@ -6670,8 +6682,9 @@ def render_dashboard(
         assigned_df,
         template.get("total_demand_page", {}),
     )
-    page_summary_df = build_page_assignment_summary(assigned_df)
-    page_summary_df.to_csv(layout["supporting"] / "page_assignment_summary.csv", index=False)
+    if not trace_only:
+        page_summary_df = build_page_assignment_summary(assigned_df)
+        page_summary_df.to_csv(layout["supporting"] / "page_assignment_summary.csv", index=False)
 
     secondary_config = template.get("secondary_pages", {})
     secondary_pages_by_key: dict[str, dict] = {}
@@ -7077,29 +7090,30 @@ def render_dashboard(
         bundle_name = f"{page_key}__charts.json"
         write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
         page_file = page_file_name(page_key)
-        write_dashboard_page(
-            {"page_key": page_key, "page_label": page_label},
-            chart_rows=chart_rows,
-            bundle_js_name=bundle_name.replace(".json", ".js"),
-            output_path=layout["dashboards"] / page_file,
-            all_pages=page_inventory,
-            economy_label=economy_label,
-            dashboard_switcher=dashboard_switcher,
-            current_dashboard=current_dashboard,
-            page_note=(
-                str(secondary_page.get("page_note", ""))
-                if secondary_page
-                else page_placeholder_note(page_key, template)
-            ),
-            dashboard_updated_label=dashboard_updated_label,
-            guide_context=guide_page_context(
-                page_key,
-                chart_rows,
-                template,
-                source_category_map,
-            ),
-            **category_basis_ui_kwargs(template),
-        )
+        if not trace_only:
+            write_dashboard_page(
+                {"page_key": page_key, "page_label": page_label},
+                chart_rows=chart_rows,
+                bundle_js_name=bundle_name.replace(".json", ".js"),
+                output_path=layout["dashboards"] / page_file,
+                all_pages=page_inventory,
+                economy_label=economy_label,
+                dashboard_switcher=dashboard_switcher,
+                current_dashboard=current_dashboard,
+                page_note=(
+                    str(secondary_page.get("page_note", ""))
+                    if secondary_page
+                    else page_placeholder_note(page_key, template)
+                ),
+                dashboard_updated_label=dashboard_updated_label,
+                guide_context=guide_page_context(
+                    page_key,
+                    chart_rows,
+                    template,
+                    source_category_map,
+                ),
+                **category_basis_ui_kwargs(template),
+            )
         page_rows.append({
             "file": page_file,
             "label": page_label,
@@ -7115,17 +7129,19 @@ def render_dashboard(
         current_dashboard=current_dashboard,
         dashboard_updated_label=dashboard_updated_label,
         unmet_requirements_df=unmet_requirements_df,
+        write_page=not trace_only,
     )
     manifest_rows.extend(td_manifest_rows)
     if td_page_row:
         page_rows.append(td_page_row)
 
-    for legacy_page_key in _PUBLIC_PAGE_FILES:
-        write_legacy_page_redirect(layout["dashboards"], legacy_page_key)
+    if not trace_only:
+        for legacy_page_key in _PUBLIC_PAGE_FILES:
+            write_legacy_page_redirect(layout["dashboards"], legacy_page_key)
 
     emissions_manifest_rows: list[dict] = []
     emissions_page_row: dict | None = None
-    if emissions_page_enabled(template, assigned_df):
+    if not trace_only and emissions_page_enabled(template, assigned_df):
         emissions_manifest_rows, emissions_page_row = build_emissions_page(
             assigned_df, template, series_labels, layout, page_inventory,
             primary_source=primary_source, primary_scenario=primary_scenario,
@@ -7154,6 +7170,7 @@ def render_dashboard(
         dashboard_switcher,
         current_dashboard,
         dashboard_updated_label,
+        write_pages=not trace_only,
     )
     manifest_rows.extend(scope_manifest_rows)
     page_rows.extend(scope_page_rows)
@@ -7171,20 +7188,21 @@ def render_dashboard(
                 "line_chart_count": 0,
             })
 
-    write_index(
-        page_rows,
-        layout["dashboards"] / "index.html",
-        economy_label=economy_label,
-        dashboard_switcher=dashboard_switcher,
-        current_dashboard=current_dashboard,
-        dashboard_updated_label=dashboard_updated_label,
-        **category_basis_ui_kwargs(template),
-    )
     manifest_df = finalize_chart_manifest(pd.DataFrame(manifest_rows))
     active_scope = str(template.get("_active_comparison_scope", "")).strip()
     if active_scope and "comparison_scope" not in manifest_df.columns:
         manifest_df.insert(0, "comparison_scope", active_scope)
-    manifest_df.to_csv(layout["supporting"] / "chart_manifest.csv", index=False)
+    if not trace_only:
+        write_index(
+            page_rows,
+            layout["dashboards"] / "index.html",
+            economy_label=economy_label,
+            dashboard_switcher=dashboard_switcher,
+            current_dashboard=current_dashboard,
+            dashboard_updated_label=dashboard_updated_label,
+            **category_basis_ui_kwargs(template),
+        )
+        manifest_df.to_csv(layout["supporting"] / "chart_manifest.csv", index=False)
     return manifest_df
 
 #%%

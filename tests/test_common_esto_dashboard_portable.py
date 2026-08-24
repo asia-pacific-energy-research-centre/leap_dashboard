@@ -13,6 +13,7 @@ from codebase.common_esto_dashboard_portable import (
     configured_comparison_scopes,
     normalize_dashboard_economy_key,
     render_common_esto_dashboard,
+    render_common_esto_comparison_traces,
     render_common_esto_dashboard_variants,
 )
 from codebase.common_esto_dashboard_renderer import (
@@ -278,6 +279,40 @@ def test_render_writes_dashboard_index_and_manifest(tmp_path: Path) -> None:
 
     bundles = list((tmp_path / "outputs" / "20USA" / "chart_bundles").glob("*.js"))
     assert bundles, "expected at least one Plotly chart bundle"
+
+
+def test_trace_only_render_is_bundle_equivalent_without_presentation_outputs(
+    tmp_path: Path,
+) -> None:
+    """Comparison traces must be byte-identical to a normal renderer's bundles."""
+    full = _render(tmp_path / "full")
+    traces = render_common_esto_comparison_traces(
+        economy="20_USA",
+        comparison_data_path=COMPARISON_FIXTURE,
+        common_rows_path=ROWS_FIXTURE,
+        template_path=TEMPLATE_PATH,
+        series_config_path=SERIES_CONFIG_PATH,
+        output_root=tmp_path / "traces",
+        dashboard_updated_label="fixed-label-for-tests",
+        min_year=2020,
+        max_year=2030,
+    )
+
+    full_bundles = Path(str(full["output_root"])) / "chart_bundles"
+    trace_bundles = Path(str(traces["comparison_trace_root"])) / "chart_bundles"
+    full_names = sorted(path.name for path in full_bundles.glob("*.json"))
+    trace_names = sorted(path.name for path in trace_bundles.glob("*.json"))
+    assert trace_names == full_names
+    for name in full_names:
+        # Bundle bytes include every plotted value, year, trace meta entry,
+        # source label, unit, and scenario. Exact equality also proves missing
+        # charts and incompatible-year omissions match the full path.
+        assert (trace_bundles / name).read_bytes() == (full_bundles / name).read_bytes()
+
+    trace_root = Path(str(traces["comparison_trace_root"]))
+    assert not list((trace_root / "dashboards").glob("*.html"))
+    assert not (trace_root / "supporting_files" / "chart_manifest.csv").exists()
+    assert not (trace_root / "supporting_files" / "sign_semantics_summary.csv").exists()
 
 
 def test_render_is_independent_of_the_current_working_directory(

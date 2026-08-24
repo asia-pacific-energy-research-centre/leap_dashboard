@@ -71,6 +71,7 @@ __all__ = [
     "dashboard_base_year_from_leap_data",
     "normalize_dashboard_economy_key",
     "render_common_esto_dashboard",
+    "render_common_esto_comparison_traces",
     "render_common_esto_dashboard_variants",
     "copy_mapping_diagnostics_page",
 ]
@@ -232,6 +233,7 @@ def render_common_esto_dashboard(
     active_dataset_filter_options: Sequence[str] = (),
     dashboard_key_suffix: str = "",
     additional_pages: Sequence[dict[str, str]] = (),
+    trace_only: bool = False,
 ) -> dict[str, object]:
     """Render the Common ESTO dashboard for one economy from explicit inputs.
 
@@ -277,7 +279,9 @@ def render_common_esto_dashboard(
             Path(source_to_common_map_path) if source_to_common_map_path is not None else None,
             Path(esto_to_common_map_path) if esto_to_common_map_path is not None else None,
         )
-        if source_to_common_map_path is not None or esto_to_common_map_path is not None
+        if not trace_only and (
+            source_to_common_map_path is not None or esto_to_common_map_path is not None
+        )
         else None
     )
 
@@ -336,8 +340,9 @@ def render_common_esto_dashboard(
         dashboard_key or economy_key,
         clear_existing=clear_existing,
     )
-    sign_summary_df = build_sign_semantics_summary(visible_df)
-    sign_summary_df.to_csv(layout["supporting"] / "sign_semantics_summary.csv", index=False)
+    if not trace_only:
+        sign_summary_df = build_sign_semantics_summary(visible_df)
+        sign_summary_df.to_csv(layout["supporting"] / "sign_semantics_summary.csv", index=False)
     manifest_df: pd.DataFrame = render_dashboard(
         visible_df,
         template,
@@ -347,14 +352,17 @@ def render_common_esto_dashboard(
         dashboard_updated_label=dashboard_updated_label,
         source_category_map=source_category_map,
         additional_pages=list(additional_pages),
+        trace_only=trace_only,
     )
 
     return {
         "economy": economy_key,
         "output_root": str(layout["root"]),
-        "dashboard_index": str(layout["dashboards"] / "index.html"),
-        "chart_manifest": str(layout["supporting"] / "chart_manifest.csv"),
-        "sign_semantics_summary": str(layout["supporting"] / "sign_semantics_summary.csv"),
+        "dashboard_index": str(layout["dashboards"] / "index.html") if not trace_only else "",
+        "chart_manifest": str(layout["supporting"] / "chart_manifest.csv") if not trace_only else "",
+        "sign_semantics_summary": str(layout["supporting"] / "sign_semantics_summary.csv") if not trace_only else "",
+        "comparison_trace_root": str(layout["root"]) if trace_only else "",
+        "chart_bundle_directory": str(layout["chart_bundles"]),
         "chart_count": int(len(manifest_df)),
         "input_row_count": int(input_row_count),
         "excluded_pre_base_year_rows": int(excluded_pre_base_year_rows),
@@ -370,6 +378,19 @@ def render_common_esto_dashboard(
         ),
         "code_colors_path": str(code_colors_path) if code_colors_path else "",
     }
+
+
+def render_common_esto_comparison_traces(**kwargs: object) -> dict[str, object]:
+    """Render the normal dashboard chart bundles without presentation outputs.
+
+    This is intentionally a thin call-through to :func:`render_common_esto_dashboard`.
+    Version comparison therefore shares every reviewed input, mapping-derived
+    row, source/scenario decision, routing rule, and hierarchy frontier with
+    the full renderer instead of maintaining a second comparison mapping path.
+    """
+    call_kwargs = dict(kwargs)
+    call_kwargs["trace_only"] = True
+    return render_common_esto_dashboard(**call_kwargs)
 
 
 def render_common_esto_dashboard_variants(
