@@ -6973,18 +6973,16 @@ def render_dashboard(
                 **metrics,
             })
 
-        if aggregate_only_demand_page_active(page_key, template):
-            # A page-level placeholder supplies one broad total, not a valid
-            # sector/product decomposition. Keep its top-level overview card
-            # above, but do not manufacture detail cards from ESTO rows that
-            # the active LEAP placeholder does not represent.
-            detail_page_df = page_df.iloc[0:0].copy()
-        else:
-            detail_page_df = drop_placeholder_only_demand_detail_rows(
-                page_key,
-                page_df,
-                template,
-            )
+        # A placeholder removes detail only for the Common ESTO components it
+        # represents. For example, a combined International transport
+        # placeholder must suppress its 04-05 detail, not every Supply chart.
+        # A page whose entire demand boundary is placeholder-only naturally
+        # becomes empty after this component-level filter.
+        detail_page_df = drop_placeholder_only_demand_detail_rows(
+            page_key,
+            page_df,
+            template,
+        )
         flow_nodes = get_existing_flow_nodes(detail_page_df)
         all_canonical = set(flow_nodes["canonical_code"].astype(str))
         parent_flow_labels: set[str] = set()

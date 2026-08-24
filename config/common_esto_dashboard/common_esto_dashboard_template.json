@@ -308,6 +308,7 @@
       "others": ["Other sector"]
     },
     "placeholder_component_flow_prefixes": {
+      "International transport": ["04-05"],
       "Industry": ["14"],
       "Road": ["15.01"],
       "Transport non road": ["15.02", "15.03", "15.04", "15.05", "15.06"],

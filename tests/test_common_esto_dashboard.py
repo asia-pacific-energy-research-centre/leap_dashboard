@@ -2028,6 +2028,30 @@ def test_non_road_placeholder_keeps_road_detail_charts() -> None:
     ]
 
 
+def test_international_placeholder_keeps_unaffected_supply_detail_charts() -> None:
+    template = filter_template_for_leap_demand_coverage(
+        _load_template(),
+        pd.DataFrame([{
+            "component_branch": "International transport",
+            "detailed_branches": "International transport",
+            "representation_status": "placeholder_only_retained",
+        }]),
+    )
+    rows = pd.DataFrame([
+        {"common_flow_code": "01", "common_flow_label": "01 Production"},
+        {"common_flow_code": "04-05", "common_flow_label": "04-05 International transport"},
+        {"common_flow_code": "09", "common_flow_label": "09 Total transformation sector"},
+    ])
+
+    visible = drop_placeholder_only_demand_detail_rows("supply", rows, template)
+
+    assert aggregate_only_demand_page_active("supply", template)
+    assert visible["common_flow_label"].tolist() == [
+        "01 Production",
+        "09 Total transformation sector",
+    ]
+
+
 def test_all_demand_other_sector_placeholder_is_routed_before_industry_non_energy_section() -> None:
     template = _load_template()
     df = pd.DataFrame([
