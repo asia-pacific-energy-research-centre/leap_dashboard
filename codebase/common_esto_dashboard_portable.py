@@ -138,7 +138,10 @@ def copy_mapping_diagnostics_page(
         return None
     page_path = Path(output_root) / "diagnostics" / "dashboards" / "mapping_diagnostics.html"
     page_path.parent.mkdir(parents=True, exist_ok=True)
-    dashboard_href = f"../../{normalize_dashboard_economy_key(economy)}/dashboards/index.html"
+    dashboard_href = (
+        f"../../{normalize_dashboard_economy_key(economy)}"
+        "/dashboards/energy_balance_overview.html"
+    )
     page_html = source_page.read_text(encoding="utf-8")
     page_html = page_html.replace(
         '<a href="#" onclick="history.back();return false;">← Back to economy dashboard</a>',

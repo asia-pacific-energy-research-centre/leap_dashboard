@@ -178,7 +178,7 @@ def test_variant_render_forwards_basis_options_and_copies_shared_diagnostics(
     copied_page = tmp_path / "outputs" / "diagnostics" / "dashboards" / "mapping_diagnostics.html"
     assert result["mapping_diagnostics"]["source_page"] == str(shared_diagnostics)
     assert copied_page.read_text(encoding="utf-8") == (
-        '<a href="../../20USA/dashboards/index.html">← Back to economy dashboard</a>'
+        '<a href="../../20USA/dashboards/energy_balance_overview.html">← Back to economy dashboard</a>'
     )
 
 
