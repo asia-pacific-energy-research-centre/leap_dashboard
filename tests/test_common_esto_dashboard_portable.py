@@ -285,10 +285,32 @@ def test_trace_only_render_is_bundle_equivalent_without_presentation_outputs(
     tmp_path: Path,
 ) -> None:
     """Comparison traces must be byte-identical to a normal renderer's bundles."""
-    full = _render(tmp_path / "full")
+    maintained_fixture = tmp_path / "maintained_scope_fixture.csv"
+    maintained_df = pd.read_csv(COMPARISON_FIXTURE)
+    maintained_df["comparison_scope"] = maintained_df["comparison_scope"].replace(
+        {
+            "esto_leap_ninth": "esto_extended_leap_ninth",
+            "esto_leap": "esto_extended_leap",
+        }
+    )
+    maintained_df["source_system"] = maintained_df["source_system"].replace(
+        {"ESTO": "ESTO_EXTENDED"}
+    )
+    maintained_df.to_csv(maintained_fixture, index=False)
+    full = render_common_esto_dashboard_variants(
+        economy="20_USA",
+        comparison_data_path=maintained_fixture,
+        common_rows_path=ROWS_FIXTURE,
+        template_path=TEMPLATE_PATH,
+        series_config_path=SERIES_CONFIG_PATH,
+        output_root=tmp_path / "full" / "outputs",
+        dashboard_updated_label="fixed-label-for-tests",
+        min_year=2020,
+        max_year=2030,
+    )
     traces = render_common_esto_comparison_traces(
         economy="20_USA",
-        comparison_data_path=COMPARISON_FIXTURE,
+        comparison_data_path=maintained_fixture,
         common_rows_path=ROWS_FIXTURE,
         template_path=TEMPLATE_PATH,
         series_config_path=SERIES_CONFIG_PATH,
@@ -298,7 +320,8 @@ def test_trace_only_render_is_bundle_equivalent_without_presentation_outputs(
         max_year=2030,
     )
 
-    full_bundles = Path(str(full["output_root"])) / "chart_bundles"
+    default_full = full["scope_results"]["esto_extended_leap_ninth"]
+    full_bundles = Path(str(default_full["chart_bundle_directory"]))
     trace_bundles = Path(str(traces["comparison_trace_root"])) / "chart_bundles"
     full_names = sorted(path.name for path in full_bundles.glob("*.json"))
     trace_names = sorted(path.name for path in trace_bundles.glob("*.json"))

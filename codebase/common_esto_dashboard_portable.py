@@ -389,7 +389,31 @@ def render_common_esto_comparison_traces(**kwargs: object) -> dict[str, object]:
     the full renderer instead of maintaining a second comparison mapping path.
     """
     call_kwargs = dict(kwargs)
-    call_kwargs["trace_only"] = True
+    template_path = Path(str(call_kwargs["template_path"]))
+    economy_key = normalize_dashboard_economy_key(call_kwargs["economy"])
+    definitions = configured_comparison_scopes(
+        json.loads(template_path.read_text(encoding="utf-8"))
+    )
+    default = next(item for item in definitions if item["is_default"])
+    options = [
+        {
+            "comparison_scope": str(item["comparison_scope"]),
+            "label": str(item["label"]),
+            "dashboard_key": f"{economy_key}{item['output_suffix']}",
+        }
+        for item in definitions
+    ]
+    call_kwargs.update(
+        {
+            "comparison_scope": str(default["comparison_scope"]),
+            "dashboard_key": f"{economy_key}{default['output_suffix']}",
+            "category_basis_options": options,
+            "active_dataset_filter_options": list(default["source_systems"]),
+            "dashboard_key_suffix": str(default["output_suffix"]),
+            "clear_existing": True,
+            "trace_only": True,
+        }
+    )
     return render_common_esto_dashboard(**call_kwargs)
 
 

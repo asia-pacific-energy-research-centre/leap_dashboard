@@ -7141,7 +7141,7 @@ def render_dashboard(
 
     emissions_manifest_rows: list[dict] = []
     emissions_page_row: dict | None = None
-    if not trace_only and emissions_page_enabled(template, assigned_df):
+    if emissions_page_enabled(template, assigned_df):
         emissions_manifest_rows, emissions_page_row = build_emissions_page(
             assigned_df, template, series_labels, layout, page_inventory,
             primary_source=primary_source, primary_scenario=primary_scenario,
@@ -7149,6 +7149,7 @@ def render_dashboard(
             dashboard_switcher=dashboard_switcher,
             current_dashboard=current_dashboard,
             dashboard_updated_label=dashboard_updated_label,
+            write_page=not trace_only,
         )
     manifest_rows.extend(emissions_manifest_rows)
     if emissions_page_row:

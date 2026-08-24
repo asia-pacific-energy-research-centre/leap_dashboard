@@ -1283,6 +1283,7 @@ def build_emissions_page(
     current_dashboard: str = "",
     dashboard_updated_label: str = "",
     factor_config_path: str | Path | None = None,
+    write_page: bool = True,
 ) -> tuple[list[dict], dict | None]:
     """Build the Emissions page (config-driven bespoke page).
 
@@ -1354,6 +1355,7 @@ def build_emissions_page(
             current_dashboard, dashboard_updated_label,
             f"No emissions charts: an emissions factor input could not be read ({error}).",
             scope_ui_kwargs,
+            write_page=write_page,
         )
     unit = str(factor_set.get("emissions_unit", DEFAULT_EMISSIONS_UNIT))
 
@@ -1368,18 +1370,20 @@ def build_emissions_page(
             "No emissions charts: none of the demand fuels for this economy carry an "
             f"emissions factor. Unmatched fuels: {', '.join(missing_labels) or 'none'}.",
             scope_ui_kwargs,
+            write_page=write_page,
         )
     diagnostics["frontier_coverage_check"] = coverage_check
     diagnostics["source_selection"] = source_selection
     diagnostics["flow_policy"] = flow_policy
     diagnostics["flow_policy_resolution"] = flow_policy_resolution
-    for name, frame in diagnostics.items():
-        frame.to_csv(layout["supporting"] / f"emissions_{name}.csv", index=False)
-    emissions_df.groupby(
-        ["source_system", "scenario", "year", "_sector_label", "common_product_label"], as_index=False
-    )[EMISSIONS_COLUMN].sum().to_csv(
-        layout["supporting"] / "emissions_by_sector_and_fuel.csv", index=False
-    )
+    if write_page:
+        for name, frame in diagnostics.items():
+            frame.to_csv(layout["supporting"] / f"emissions_{name}.csv", index=False)
+        emissions_df.groupby(
+            ["source_system", "scenario", "year", "_sector_label", "common_product_label"], as_index=False
+        )[EMISSIONS_COLUMN].sum().to_csv(
+            layout["supporting"] / "emissions_by_sector_and_fuel.csv", index=False
+        )
 
     charts: dict[str, go.Figure] = {}
     chart_rows: list[dict] = []
@@ -1458,28 +1462,29 @@ def build_emissions_page(
     )
     bundle_name = f"{page_key}__charts.json"
     write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
-    write_dashboard_page(
-        {"page_key": page_key, "page_label": page_label},
-        chart_rows=chart_rows,
-        bundle_js_name=bundle_name.replace(".json", ".js"),
-        output_path=layout["dashboards"] / f"{page_key}.html",
-        all_pages=all_pages,
-        economy_label=economy_label,
-        dashboard_switcher=dashboard_switcher,
-        current_dashboard=current_dashboard,
-        page_note=_page_note(
-            factor_set,
-            unit,
-            sorted(
-                source_selection.loc[
-                    source_selection.get("emissions_level", pd.Series(dtype=str)).eq("aggregate"),
-                    "source_system",
-                ].astype(str).unique()
+    if write_page:
+        write_dashboard_page(
+            {"page_key": page_key, "page_label": page_label},
+            chart_rows=chart_rows,
+            bundle_js_name=bundle_name.replace(".json", ".js"),
+            output_path=layout["dashboards"] / f"{page_key}.html",
+            all_pages=all_pages,
+            economy_label=economy_label,
+            dashboard_switcher=dashboard_switcher,
+            current_dashboard=current_dashboard,
+            page_note=_page_note(
+                factor_set,
+                unit,
+                sorted(
+                    source_selection.loc[
+                        source_selection.get("emissions_level", pd.Series(dtype=str)).eq("aggregate"),
+                        "source_system",
+                    ].astype(str).unique()
+                ),
             ),
-        ),
-        dashboard_updated_label=dashboard_updated_label,
-        **scope_ui_kwargs,
-    )
+            dashboard_updated_label=dashboard_updated_label,
+            **scope_ui_kwargs,
+        )
     page_row = {
         "file": f"{page_key}.html",
         "label": page_label,
@@ -1501,6 +1506,8 @@ def _write_explained_empty_page(
     dashboard_updated_label: str,
     reason: str,
     scope_ui_kwargs: dict[str, object] | None = None,
+    *,
+    write_page: bool = True,
 ) -> tuple[list[dict], dict]:
     """Write a chartless Emissions page that explains why it has no charts.
 
@@ -1512,19 +1519,20 @@ def _write_explained_empty_page(
     print(f"Emissions page rendered without charts: {reason}")
     bundle_name = f"{page_key}__charts.json"
     renderer.write_chart_bundle({}, layout["chart_bundles"] / bundle_name)
-    renderer.write_dashboard_page(
-        {"page_key": page_key, "page_label": page_label},
-        chart_rows=[],
-        bundle_js_name=bundle_name.replace(".json", ".js"),
-        output_path=layout["dashboards"] / f"{page_key}.html",
-        all_pages=all_pages,
-        economy_label=economy_label,
-        dashboard_switcher=dashboard_switcher,
-        current_dashboard=current_dashboard,
-        page_note=reason,
-        dashboard_updated_label=dashboard_updated_label,
-        **(scope_ui_kwargs or {}),
-    )
+    if write_page:
+        renderer.write_dashboard_page(
+            {"page_key": page_key, "page_label": page_label},
+            chart_rows=[],
+            bundle_js_name=bundle_name.replace(".json", ".js"),
+            output_path=layout["dashboards"] / f"{page_key}.html",
+            all_pages=all_pages,
+            economy_label=economy_label,
+            dashboard_switcher=dashboard_switcher,
+            current_dashboard=current_dashboard,
+            page_note=reason,
+            dashboard_updated_label=dashboard_updated_label,
+            **(scope_ui_kwargs or {}),
+        )
     return [], {
         "file": f"{page_key}.html",
         "label": page_label,
