@@ -493,6 +493,26 @@ def _flow_subtree_is_page_complete(
     return routed_pages == {safe_slug(page_key)}
 
 
+def overview_navigation_root_code(
+    page_df: pd.DataFrame,
+    aggregate_flow_label: str,
+    fallback_prefix: str,
+) -> str:
+    """Use an overview's full compound flow boundary for its navigation root."""
+    matching_codes = [
+        str(value).strip()
+        for value in page_df.loc[
+            page_df["common_flow_label"].astype(str).eq(str(aggregate_flow_label)),
+            "common_flow_code",
+        ].dropna().unique()
+        if str(value).strip()
+    ]
+    compound_codes = [
+        code for code in matching_codes if _is_compound_code_expression(code)
+    ]
+    return compound_codes[0] if len(compound_codes) == 1 else fallback_prefix
+
+
 def _is_compound_code_expression(value: object) -> bool:
     """Return True for a comma list or inclusive range of ESTO codes."""
     records = parse_code_expression(value)
@@ -6961,10 +6981,15 @@ def render_dashboard(
             ):
                 continue
             is_real_page_flow = source_aggregate_label in page_flow_labels
+            navigation_root_code = overview_navigation_root_code(
+                page_df,
+                source_aggregate_label,
+                source_root_code,
+            )
             subtree_is_page_complete = _flow_subtree_is_page_complete(
                 assigned_df,
                 page_key,
-                source_root_code,
+                navigation_root_code,
             )
             is_complete_page_root = is_real_page_flow and subtree_is_page_complete
             display_aggregate_label = area_chart_display_label(

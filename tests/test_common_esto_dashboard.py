@@ -82,6 +82,7 @@ from codebase.common_esto_dashboard_renderer import (
     _flow_subtree_is_page_complete,
     _jump_nav_html,
     _line_sections_html,
+    overview_navigation_root_code,
 )
 
 
@@ -1533,6 +1534,25 @@ def test_jump_navigation_preserves_compound_rollup_containment() -> None:
     assert 'data-level="2" data-hierarchy-depth="2">05 International aviation bunkers</a>' in html
 
 
+def test_compound_supply_overview_uses_its_full_boundary_for_navigation() -> None:
+    page_df = pd.DataFrame([
+        {
+            "common_flow_code": "04-05",
+            "common_flow_label": "04-05 International transport (bunkers)",
+        }
+    ])
+    assigned_df = page_df.assign(_page_key="supply")
+
+    root_code = overview_navigation_root_code(
+        page_df,
+        "04-05 International transport (bunkers)",
+        "04",
+    )
+
+    assert root_code == "04-05"
+    assert _flow_subtree_is_page_complete(assigned_df, "supply", root_code)
+
+
 def test_unparented_top_level_flows_remain_level_one() -> None:
     rows = [
         {"section_label": "Supply", "flow_group_label": "01 Production"},
@@ -2389,8 +2409,6 @@ def test_supply_uses_combined_bunker_boundary_while_placeholder_is_active(
             "International transport (bunkers)",
             "04-05 International transport (bunkers)",
         ),
-        ("04", "International marine bunkers", "04 International marine bunkers"),
-        ("05", "International aviation bunkers", "05 International aviation bunkers"),
     ]:
         for source_system, scenario, value in [
             ("ESTO", "historical", -4.0),
@@ -2426,6 +2444,10 @@ def test_supply_uses_combined_bunker_boundary_while_placeholder_is_active(
     assert "05 International aviation bunkers" not in supply_flows
 
     supply_html = (layout["dashboards"] / "supply.html").read_text(encoding="utf-8")
+    assert (
+        'class="jump-chip" data-level="1" data-hierarchy-depth="1">'
+        '04-05 International transport (bunkers)</a>'
+    ) in supply_html
     assert (
         "cannot be viewed separately until the placeholder demand sector is replaced"
         in supply_html

@@ -10,6 +10,12 @@
   remains available. Detail returns automatically when its interim branch no
   longer appears as `interim_only_retained` in the rendered period.
 
+- **DASHQ-065 — combined-bunker overview navigation.** The Supply navigation
+  now uses the complete `04-05` Common-flow expression when checking whether
+  an overview card belongs wholly to Supply. This retains the orange
+  International transport chip when a dashboard has only the combined bunker
+  boundary, rather than separate 04 and 05 rows.
+
 - **DASHQ-061 — non-additive hierarchy fallback and reconciliation warning.**
   Dashboard aggregate frontiers now retain an observed parent when its published
   child frontier is non-additive for the same source/product series. If an
