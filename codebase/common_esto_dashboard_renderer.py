@@ -7181,6 +7181,16 @@ def render_dashboard(
                 ),
                 "datasets": chart_dataset_tokens_from_figure(chart_figure),
                 "stacked_area_note": stacked_area_note_from_figure(chart_figure),
+                "known_missing_branch_notes": "\n".join(
+                    dict.fromkeys(
+                        note.strip()
+                        for value in pair_rows.get(
+                            "known_missing_branch_notes", pd.Series(dtype=object)
+                        )
+                        for note in str(value).splitlines()
+                        if note.strip()
+                    )
+                ),
                 **metrics,
             })
 
