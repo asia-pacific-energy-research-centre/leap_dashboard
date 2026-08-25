@@ -16,6 +16,12 @@
   International transport chip when a dashboard has only the combined bunker
   boundary, rather than separate 04 and 05 rows.
 
+- **DASHQ-066 — cross-page placeholder suppression.** Apply the active
+  placeholder set across routed dashboard pages. In particular, an Other
+  sector placeholder must suppress its code-17 Non-energy detail cards and
+  their empty Industry navigation chip, while retaining unrelated Industry
+  charts.
+
 - **DASHQ-061 — non-additive hierarchy fallback and reconciliation warning.**
   Dashboard aggregate frontiers now retain an observed parent when its published
   child frontier is non-additive for the same source/product series. If an

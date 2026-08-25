@@ -1519,12 +1519,24 @@ def area_chart_allowed_for_demand_coverage(
 
 
 def placeholder_only_demand_flow_prefixes(page_key: str, template: dict) -> list[str]:
-    """Return Common ESTO flow prefixes with no detailed LEAP representation."""
+    """Return active placeholder prefixes, including cross-page routed flows.
+
+    Placeholder components are recorded under the dashboard page that owns
+    their LEAP branch. Their Common ESTO flows can deliberately render on a
+    different page: ``Other sector`` is one such component, while its exact
+    flow 17 is shown in Industry as Non-energy use. Detail charts must follow
+    the representation status, not the storage page of that status.
+
+    ``page_key`` remains part of the public helper signature because callers
+    use it to describe the page being rendered; the active placeholder set is
+    intentionally global to the current dashboard run.
+    """
     coverage = template.get("leap_demand_sector_coverage", {}) or {}
     placeholder_only_pages = coverage.get("_placeholder_only_page_branches", {}) or {}
     active_components = {
         str(component).strip()
-        for component in placeholder_only_pages.get(page_key, [])
+        for page_components in placeholder_only_pages.values()
+        for component in page_components
         if str(component).strip()
     }
     component_prefixes = coverage.get("placeholder_component_flow_prefixes", {}) or {}

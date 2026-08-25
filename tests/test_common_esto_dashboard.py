@@ -2097,6 +2097,26 @@ def test_international_placeholder_keeps_unaffected_supply_detail_charts() -> No
     ]
 
 
+def test_other_sector_placeholder_hides_routed_non_energy_detail() -> None:
+    """Code 17 renders under Industry but is covered by Other sector's placeholder."""
+    template = filter_template_for_leap_demand_coverage(
+        _load_template(),
+        pd.DataFrame([{
+            "component_branch": "Other sector",
+            "detailed_branches": "Other sector",
+            "representation_status": "placeholder_only_retained",
+        }]),
+    )
+    rows = pd.DataFrame([
+        {"common_flow_code": "14", "common_flow_label": "14 Industry sector"},
+        {"common_flow_code": "17", "common_flow_label": "17 Non-energy use"},
+    ])
+
+    visible = drop_placeholder_only_demand_detail_rows("industry", rows, template)
+
+    assert visible["common_flow_label"].tolist() == ["14 Industry sector"]
+
+
 def test_all_demand_other_sector_placeholder_is_routed_before_industry_non_energy_section() -> None:
     template = _load_template()
     df = pd.DataFrame([
