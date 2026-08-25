@@ -319,6 +319,12 @@
     "require_primary_source_page_keys": [],
     "_note": "page_leap_branches maps each domestic demand page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. International transport is a signed supply deduction and is routed to Supply, not domestic demand. Exact flow 17 is presented in the Industry page's Non-energy use section; the combined Other sector including non-energy placeholder remains routed to Other demand by its explicit routing special case."
   },
+  "power_interim_branch_flow_prefixes": {
+    "Electricity interim": ["09.01.01", "09.02.01"],
+    "CHP interim": ["09.01.02", "09.02.02"],
+    "Heat plant interim": ["09.01.03", "09.02.03"],
+    "_note": "When an interim branch is retained in the upstream fallback audit, hide its Power detail cards. The page-level Power aggregates remain until each interim branch is replaced by its completed LEAP source branch."
+  },
   "scope_specific_pages": {
     "enabled": false,
     "_note": "Optional diagnostic alternate-scope pages. Keep disabled by default until each page has been reviewed for production usefulness; when enabled, pages are generated only when matching rows exist in the input data.",

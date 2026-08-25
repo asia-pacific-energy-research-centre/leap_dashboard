@@ -1534,26 +1534,60 @@ def placeholder_demand_root_prefixes(page_key: str, template: dict) -> set[str]:
     return {code_prefix(prefix, 1) for prefix in prefixes if code_prefix(prefix, 1)}
 
 
+def active_power_interim_flow_prefixes(template: dict) -> list[str]:
+    """Return Common ESTO flow prefixes represented by active interim branches."""
+    configured = template.get("power_interim_branch_flow_prefixes", {}) or {}
+    active_branches = {
+        str(value).strip().casefold()
+        for value in template.get("_power_interim_placeholder_branches", [])
+        if str(value).strip()
+    }
+    return [
+        str(prefix).strip()
+        for branch, prefixes in configured.items()
+        if str(branch).strip().casefold() in active_branches
+        for prefix in prefixes
+        if str(prefix).strip()
+    ]
+
+
+def power_interim_flow_is_active(
+    page_key: str,
+    code_or_label: object,
+    template: dict,
+) -> bool:
+    """Return whether a Power chart belongs to an active interim branch."""
+    return page_key == "power" and code_expression_matches_any_prefix(
+        code_or_label,
+        active_power_interim_flow_prefixes(template),
+    )
+
+
 def drop_placeholder_only_demand_detail_rows(
     page_key: str,
     page_df: pd.DataFrame,
     template: dict,
 ) -> pd.DataFrame:
-    """Remove child rows represented only by an active demand placeholder.
+    """Remove detail rows represented only by an active placeholder.
 
     The page-level aggregate remains useful while ``All demand aggregated`` is
     active. Its child Common flows do not: charts below the page aggregate
     would look like LEAP supplied a sector/fuel breakdown when it supplied
-    only the broad placeholder. Partial-detail components stay visible because
-    their coverage audit records real LEAP detail.
+    only the broad placeholder. The same rule applies to the matching Power
+    flows when an interim branch is retained. Partial-detail demand components
+    stay visible because their coverage audit records real LEAP detail.
     """
-    prefixes = placeholder_only_demand_flow_prefixes(page_key, template)
-    if page_df.empty or not prefixes or "common_flow_code" not in page_df.columns:
+    if page_df.empty or "common_flow_code" not in page_df.columns:
         return page_df.copy()
-    placeholder_mask = page_df["common_flow_code"].apply(
-        lambda code: code_expression_matches_any_prefix(code, prefixes)
+    demand_prefixes = placeholder_only_demand_flow_prefixes(page_key, template)
+    power_prefixes = active_power_interim_flow_prefixes(template) if page_key == "power" else []
+    if not demand_prefixes and not power_prefixes:
+        return page_df.copy()
+    hidden_mask = page_df["common_flow_code"].apply(
+        lambda code: code_expression_matches_any_prefix(code, demand_prefixes)
+        or code_expression_matches_any_prefix(code, power_prefixes)
     )
-    return page_df.loc[~placeholder_mask].copy()
+    return page_df.loc[~hidden_mask].copy()
 
 
 def area_spec_is_placeholder_only_demand_child(
@@ -6921,7 +6955,10 @@ def render_dashboard(
             source_root_code = str(area_spec.get("aggregate_flow_prefix") or "").strip()
             if not source_root_code:
                 source_root_code = code_candidate_text(source_aggregate_label)
-            if area_spec_is_placeholder_only_demand_child(page_key, area_spec, template):
+            if (
+                area_spec_is_placeholder_only_demand_child(page_key, area_spec, template)
+                or power_interim_flow_is_active(page_key, source_root_code, template)
+            ):
                 continue
             is_real_page_flow = source_aggregate_label in page_flow_labels
             subtree_is_page_complete = _flow_subtree_is_page_complete(

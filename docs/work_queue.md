@@ -2,6 +2,14 @@
 
 ## Current-run LEAP demand representation status — implemented, verification pending
 
+- **DASHQ-064 — interim Power detail suppression.** Active entries in the
+  upstream fallback audit now suppress only the matching Power detail cards:
+  Electricity interim suppresses electricity-plant cards, CHP interim
+  suppresses CHP cards (including Gas, Others, and petroleum-product CHP), and
+  Heat plant interim suppresses heat-plant cards. The page-level Power summary
+  remains available. Detail returns automatically when its interim branch no
+  longer appears as `interim_only_retained` in the rendered period.
+
 - **DASHQ-061 — non-additive hierarchy fallback and reconciliation warning.**
   Dashboard aggregate frontiers now retain an observed parent when its published
   child frontier is non-additive for the same source/product series. If an
@@ -28,12 +36,13 @@
 
 The dashboard now reads the mappings-owned
 `leap_demand_representation_status.csv` artifact generated from the current
-LEAP balance exports. Placeholder status controls warning text and the special
-combined-bunker presentation only. It no longer hides ordinary dashboard
-categories or pages, which continue to render from available Common ESTO facts
-and the existing source-safe hierarchy frontier. Missing representations remain
-unavailable rather than zero; partial detail remains warning-only and no
-dashboard allocation is allowed.
+LEAP balance exports. Placeholder status controls warning text and selective
+presentation: demand placeholders hide only their represented detail, and
+interim Power branches hide only their matching Power detail. Ordinary
+unaffected categories and page-level summaries continue to render from
+available Common ESTO facts and the existing source-safe hierarchy frontier.
+Missing representations remain unavailable rather than zero; partial detail
+remains warning-only and no dashboard allocation is allowed.
 
 **Snapshot date:** 2026-07-28
 

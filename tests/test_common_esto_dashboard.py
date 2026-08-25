@@ -33,6 +33,7 @@ from codebase.common_esto_dashboard_renderer import (
     _build_td_fuel_chart,
     _comparison_projection_area_rows,
     area_spec_is_placeholder_only_demand_child,
+    active_power_interim_flow_prefixes,
     aggregate_only_demand_page_active,
     apply_chart_chrome,
     assert_unique_line_trace_x,
@@ -61,6 +62,7 @@ from codebase.common_esto_dashboard_renderer import (
     set_code_colors_path,
     page_placeholder_note,
     pick_area_specs,
+    power_interim_flow_is_active,
     prepare_other_transformation_page_rows,
     render_dashboard,
     finalize_chart_manifest,
@@ -354,6 +356,29 @@ def test_power_interim_placeholder_adds_page_note_and_guide_status() -> None:
     assert "interim power placeholder branches" in status
     assert "missing detail as unavailable, not as zero" in status
     assert context["placeholder_in_use"] is True
+
+
+def test_power_interim_placeholder_hides_only_its_power_detail_cards() -> None:
+    template = _load_template()
+    template["_power_interim_placeholder_branches"] = ["CHP interim"]
+    rows = pd.DataFrame([
+        {"common_flow_code": "09.01.01,09.02.01", "common_flow_label": "Electricity plants"},
+        {"common_flow_code": "09.01.02.02,09.02.02.02", "common_flow_label": "Gas CHP (all producers)"},
+        {"common_flow_code": "09.01.02.03,09.02.02.03", "common_flow_label": "Others CHP (all producers)"},
+        {"common_flow_code": "09.01.03,09.02.03", "common_flow_label": "Heat plants"},
+        {"common_flow_code": "09.01-09.02", "common_flow_label": "Power sector"},
+    ])
+
+    visible = drop_placeholder_only_demand_detail_rows("power", rows, template)
+
+    assert active_power_interim_flow_prefixes(template) == ["09.01.02", "09.02.02"]
+    assert visible["common_flow_label"].tolist() == [
+        "Electricity plants",
+        "Heat plants",
+        "Power sector",
+    ]
+    assert power_interim_flow_is_active("power", "09.01.02.04,09.02.02.04", template)
+    assert not power_interim_flow_is_active("power", "09.01.01,09.02.01", template)
 
 
 def test_emissions_components_keep_demand_sectors_and_combine_signed_transformation_use() -> None:
