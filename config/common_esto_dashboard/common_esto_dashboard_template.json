@@ -315,9 +315,16 @@
       "Buildings": ["16.01", "16.02"],
       "Other sector": ["16.03", "16.04", "16.05", "17"]
     },
+    "page_placeholder_components": {
+      "supply": ["International transport"],
+      "industry": ["Industry"],
+      "transport": ["Road", "Transport non road"],
+      "buildings": ["Buildings"],
+      "others": ["Other sector"]
+    },
     "always_skip_page_keys": [],
     "require_primary_source_page_keys": [],
-    "_note": "page_leap_branches maps each domestic demand page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. A placeholder_only_retained component keeps its broad aggregate boundary but suppresses its by-product/by-flow detail cards and their otherwise-empty section navigation after routing; those cards return when the detailed LEAP branch replaces the placeholder. International transport is a signed supply deduction and is routed to Supply, not domestic demand. Exact flow 17 is presented in the Industry page's Non-energy use section; the combined Other sector including non-energy placeholder remains routed to Other demand by its explicit routing special case, so its active prefix set must also suppress routed 17 detail on Industry."
+    "_note": "page_leap_branches maps each domestic demand page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. A placeholder_only_retained component keeps its broad aggregate boundary but suppresses its by-product/by-flow detail cards and their otherwise-empty section navigation after routing; those cards return when the detailed LEAP branch replaces the placeholder. When every page_placeholder_components entry is placeholder-only, suppress that page's parent detail code too while preserving its overview. International transport is a signed supply deduction and is routed to Supply, not domestic demand. Exact flow 17 is presented in the Industry page's Non-energy use section; the combined Other sector including non-energy placeholder remains routed to Other demand by its explicit routing special case, so its active prefix set must also suppress routed 17 detail on Industry."
   },
   "power_interim_branch_flow_prefixes": {
     "Electricity interim": ["09.01.01", "09.02.01"],

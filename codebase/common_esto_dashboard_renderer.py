@@ -1566,6 +1566,42 @@ def placeholder_demand_root_prefixes(page_key: str, template: dict) -> set[str]:
     return {code_prefix(prefix, 1) for prefix in prefixes if code_prefix(prefix, 1)}
 
 
+def placeholder_only_demand_detail_root_prefixes(page_key: str, template: dict) -> list[str]:
+    """Return page roots that are broad placeholders rather than usable detail.
+
+    Detail rows can use a parent code (for example ``15 Transport``) even when
+    its LEAP coverage is supplied only through its child placeholder
+    components.  Suppress that parent in the detail pipeline only when every
+    configured component for the page is placeholder-only.  Overview charts
+    are built before this filter and intentionally retain the broad boundary.
+    """
+    coverage = template.get("leap_demand_sector_coverage", {}) or {}
+    expected_components = {
+        str(component).strip()
+        for component in (
+            coverage.get("page_placeholder_components", {}) or {}
+        ).get(page_key, [])
+        if str(component).strip()
+    }
+    active_components = {
+        str(component).strip()
+        for component in (
+            coverage.get("_placeholder_only_page_branches", {}) or {}
+        ).get(page_key, [])
+        if str(component).strip()
+    }
+    if not expected_components or not expected_components.issubset(active_components):
+        return []
+
+    component_prefixes = coverage.get("placeholder_component_flow_prefixes", {}) or {}
+    return sorted({
+        code_prefix(prefix, 1)
+        for component in expected_components
+        for prefix in component_prefixes.get(component, [])
+        if code_prefix(prefix, 1)
+    })
+
+
 def active_power_interim_flow_prefixes(template: dict) -> list[str]:
     """Return Common ESTO flow prefixes represented by active interim branches."""
     configured = template.get("power_interim_branch_flow_prefixes", {}) or {}
@@ -1612,13 +1648,36 @@ def drop_placeholder_only_demand_detail_rows(
     if page_df.empty or "common_flow_code" not in page_df.columns:
         return page_df.copy()
     demand_prefixes = placeholder_only_demand_flow_prefixes(page_key, template)
+    demand_detail_roots = placeholder_only_demand_detail_root_prefixes(page_key, template)
     power_prefixes = active_power_interim_flow_prefixes(template) if page_key == "power" else []
-    if not demand_prefixes and not power_prefixes:
+    if not demand_prefixes and not demand_detail_roots and not power_prefixes:
         return page_df.copy()
     hidden_mask = page_df["common_flow_code"].apply(
         lambda code: code_expression_matches_any_prefix(code, demand_prefixes)
+        or code_expression_matches_any_prefix(code, demand_detail_roots)
         or code_expression_matches_any_prefix(code, power_prefixes)
     )
+
+    # A renderer row can use a compound parent (for example ``09.01-09.02``)
+    # while the rows beneath it use the actual electricity/CHP child codes.
+    # If every available child is already hidden as placeholder-only, the parent
+    # is only another presentation of the same unavailable detail. This runs in
+    # the detail pipeline, so the independently built overview is retained.
+    flow_codes = page_df["common_flow_code"].fillna("").astype(str)
+    unique_codes = list(dict.fromkeys(code for code in flow_codes if code.strip()))
+    hidden_codes = set(flow_codes.loc[hidden_mask])
+    parent_codes_to_hide: set[str] = set()
+    for parent_code in unique_codes:
+        child_codes = [
+            child_code
+            for child_code in unique_codes
+            if child_code != parent_code
+            and _code_expression_contains_expression(parent_code, child_code)
+        ]
+        if child_codes and all(child_code in hidden_codes for child_code in child_codes):
+            parent_codes_to_hide.add(parent_code)
+    if parent_codes_to_hide:
+        hidden_mask = hidden_mask | flow_codes.isin(parent_codes_to_hide)
     return page_df.loc[~hidden_mask].copy()
 
 

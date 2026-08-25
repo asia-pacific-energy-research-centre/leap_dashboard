@@ -2060,6 +2060,7 @@ def test_non_road_placeholder_keeps_road_detail_charts() -> None:
         }]),
     )
     rows = pd.DataFrame([
+        {"common_flow_code": "15", "common_flow_label": "15 Transport sector"},
         {"common_flow_code": "15.01", "common_flow_label": "15.01 Road transport"},
         {"common_flow_code": "15.02", "common_flow_label": "15.02 Rail transport"},
         {"common_flow_code": "15.03", "common_flow_label": "15.03 Domestic navigation"},
@@ -2067,10 +2068,38 @@ def test_non_road_placeholder_keeps_road_detail_charts() -> None:
 
     visible = drop_placeholder_only_demand_detail_rows("transport", rows, template)
 
-    assert visible["common_flow_label"].tolist() == ["15.01 Road transport"]
+    assert visible["common_flow_label"].tolist() == [
+        "15 Transport sector",
+        "15.01 Road transport",
+    ]
     assert placeholder_only_demand_flow_prefixes("transport", template) == [
         "15.02", "15.03", "15.04", "15.05", "15.06",
     ]
+
+
+def test_all_transport_placeholders_hide_parent_detail_card() -> None:
+    template = filter_template_for_leap_demand_coverage(
+        _load_template(),
+        pd.DataFrame([
+            {
+                "component_branch": "Road",
+                "detailed_branches": "Passenger road; Freight road",
+                "representation_status": "placeholder_only_retained",
+            },
+            {
+                "component_branch": "Transport non road",
+                "detailed_branches": "Transport non road",
+                "representation_status": "placeholder_only_retained",
+            },
+        ]),
+    )
+    rows = pd.DataFrame([
+        {"common_flow_code": "15", "common_flow_label": "15 Transport sector"},
+        {"common_flow_code": "15.01", "common_flow_label": "15.01 Road transport"},
+        {"common_flow_code": "15.02", "common_flow_label": "15.02 Rail transport"},
+    ])
+
+    assert drop_placeholder_only_demand_detail_rows("transport", rows, template).empty
 
 
 def test_international_placeholder_keeps_unaffected_supply_detail_charts() -> None:
@@ -2115,6 +2144,41 @@ def test_other_sector_placeholder_hides_routed_non_energy_detail() -> None:
     visible = drop_placeholder_only_demand_detail_rows("industry", rows, template)
 
     assert visible["common_flow_label"].tolist() == ["14 Industry sector"]
+
+
+def test_other_sector_placeholder_hides_other_demand_parent_detail_card() -> None:
+    template = filter_template_for_leap_demand_coverage(
+        _load_template(),
+        pd.DataFrame([{
+            "component_branch": "Other sector",
+            "detailed_branches": "Other sector",
+            "representation_status": "placeholder_only_retained",
+        }]),
+    )
+    rows = pd.DataFrame([
+        {"common_flow_code": "16", "common_flow_label": "16 Other demand"},
+        {"common_flow_code": "16.03", "common_flow_label": "16.03 Agriculture"},
+    ])
+
+    assert drop_placeholder_only_demand_detail_rows("others", rows, template).empty
+
+
+def test_active_electricity_and_chp_interim_branches_hide_power_detail() -> None:
+    template = _load_template()
+    template["_power_interim_placeholder_branches"] = [
+        "Electricity interim",
+        "CHP interim",
+    ]
+    rows = pd.DataFrame([
+        {"common_flow_code": "09.01-09.02", "common_flow_label": "Power sector"},
+        {"common_flow_code": "09.01.01,09.02.01", "common_flow_label": "Electricity plants"},
+        {"common_flow_code": "09.01.02.02,09.02.02.02", "common_flow_label": "Gas CHP"},
+        {"common_flow_code": "10.01.01", "common_flow_label": "Electricity own use"},
+    ])
+
+    visible = drop_placeholder_only_demand_detail_rows("power", rows, template)
+
+    assert visible["common_flow_label"].tolist() == ["Electricity own use"]
 
 
 def test_all_demand_other_sector_placeholder_is_routed_before_industry_non_energy_section() -> None:

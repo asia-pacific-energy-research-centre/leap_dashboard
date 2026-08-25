@@ -995,6 +995,13 @@ page and top-level aggregate chart, but suppresses that component's generated
 by-product/by-flow detail cards, line-detail cards, and any section-navigation
 chip that would lead only to those suppressed cards.
 
+Some source rows use the broad parent code as a detail-card key (for example
+`15 Transport`, `16 Other demand`, or `09.01-09.02 Power sector`). When every
+configured placeholder component for that page is active, that parent detail
+card is suppressed as well; when a compound parent has only placeholder child
+rows available, it is likewise suppressed. The independently built overview
+remains, and a mixed page keeps any parent that still has visible real detail.
+
 Suppression follows the component's active Common ESTO prefix set after page
 routing, rather than assuming that a component and its chart use the same
 page. The combined **Other sector** placeholder owns `16.03`, `16.04`,
@@ -1015,7 +1022,9 @@ does not allocate or otherwise manipulate partial placeholder/detail overlap.
 
 Regression coverage proves that the Other sector placeholder hides routed
 Non-energy (`17`) detail while retaining Industry (`14`), and that non-road and
-International transport placeholders do not suppress unaffected detail.
+International transport placeholders do not suppress unaffected detail. It
+also covers all-placeholder Transport and Other-demand parent cards and the
+combined Electricity/CHP Power parent while retaining `10.x` Power detail.
 
 ### History
 
