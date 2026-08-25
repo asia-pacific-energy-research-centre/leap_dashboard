@@ -985,16 +985,42 @@ aggregate; multi-flow sections remain eligible for flow charts.
 
 ## DASH-034: LEAP demand representation is current-run presentation metadata
 
-**Status:** Implemented; production all-economy verification pending.
+**Status:** Implemented and verified.
 
 The dashboard consumes mappings-owned, run-specific LEAP demand
 representation status rather than inferring placeholder use from static
-configuration. A placeholder status adds notices and preserves the special
-combined international-transport presentation where applicable. It never
-removes ordinary Common ESTO pages or categories, changes the hierarchy
-frontier, fabricates detailed values, or treats an absent representation as
-zero. Partial placeholder/detail overlap remains an upstream audit warning;
-the dashboard does not allocate or otherwise manipulate its values.
+configuration. A `placeholder_only_retained` status means LEAP supplied a
+broad boundary but not its detailed branch. The dashboard keeps an available
+page and top-level aggregate chart, but suppresses that component's generated
+by-product/by-flow detail cards, line-detail cards, and any section-navigation
+chip that would lead only to those suppressed cards.
+
+Suppression follows the component's active Common ESTO prefix set after page
+routing, rather than assuming that a component and its chart use the same
+page. The combined **Other sector** placeholder owns `16.03`, `16.04`,
+`16.05`, and `17`; standalone `17` is routed to the Industry page's
+**Non-energy use** section. An active Other sector placeholder therefore
+suppresses only its routed `17` detail there, not genuine Industry (`14`)
+charts. The same component-scoped rule means an International transport
+placeholder (`04-05`) cannot hide unrelated Supply detail.
+
+`partial_detail_placeholder_retained` is warning-only: available detail stays
+visible. When a detailed representation replaces a placeholder, the detail
+cards and navigation return automatically. The rule never removes ordinary
+Common ESTO pages or categories, changes the hierarchy frontier, fabricates
+detailed values, or treats an absent representation as zero. The dashboard
+does not allocate or otherwise manipulate partial placeholder/detail overlap.
+
+### Validation
+
+Regression coverage proves that the Other sector placeholder hides routed
+Non-energy (`17`) detail while retaining Industry (`14`), and that non-road and
+International transport placeholders do not suppress unaffected detail.
+
+### History
+
+- 2026-08-25: Applied placeholder-only suppression after routing to fix the
+  Other sector / Non-energy cross-page case.
 
 ## DASH-024: Refining publishes the inclusive boundary and ordinary charts omit difference diagnostics
 

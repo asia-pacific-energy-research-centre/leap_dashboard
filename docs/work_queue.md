@@ -16,11 +16,6 @@
   International transport chip when a dashboard has only the combined bunker
   boundary, rather than separate 04 and 05 rows.
 
-- **DASHQ-066 — cross-page placeholder suppression — complete.** The active
-  placeholder set is applied after dashboard routing. In particular, an Other
-  sector placeholder suppresses its code-17 Non-energy detail cards and their
-  empty Industry navigation chip, while retaining unrelated Industry charts.
-
 - **DASHQ-061 — non-additive hierarchy fallback and reconciliation warning.**
   Dashboard aggregate frontiers now retain an observed parent when its published
   child frontier is non-additive for the same source/product series. If an
@@ -44,35 +39,6 @@
   should still be described as two versions, but it need not remain exactly
   twice a standard dashboard run because the trace-only work removes some of
   the second render's presentation cost.
-
-The dashboard now reads the mappings-owned
-`leap_demand_representation_status.csv` artifact generated from the current
-LEAP balance exports. Placeholder status controls warning text and selective
-presentation: demand placeholders hide only their represented detail, and
-interim Power branches hide only their matching Power detail. Ordinary
-unaffected categories and page-level summaries continue to render from
-available Common ESTO facts and the existing source-safe hierarchy frontier.
-Missing representations remain unavailable rather than zero; partial detail
-remains warning-only and no dashboard allocation is allowed.
-
-### Placeholder display contract
-
-`placeholder_only_retained` means LEAP supplied only a broad boundary, not a
-detailed branch. The dashboard therefore keeps any available page and
-top-level aggregate chart, but hides generated detail for that component's
-Common ESTO prefixes: by-product/by-flow cards, line-detail cards and a
-section-navigation chip that would otherwise lead only to suppressed cards.
-When the status becomes `partial_detail_placeholder_retained` or a detailed
-representation, the available detail remains visible; it is not hidden by this
-rule.
-
-The prefix set belongs to the active LEAP component, then follows the chart
-after dashboard routing. This matters for the combined **Other sector**
-placeholder: it owns `16.03`, `16.04`, `16.05` and `17`, while standalone `17`
-is displayed as **Non-energy use** on the Industry page. Its placeholder hence
-suppresses spurious non-energy detail there, without suppressing real Industry
-(`14`) charts. The same component-scoped rule prevents an International
-transport (`04-05`) placeholder from removing unrelated Supply detail.
 
 **Snapshot date:** 2026-07-28
 
