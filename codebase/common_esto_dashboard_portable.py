@@ -92,7 +92,90 @@ OPTIONAL_DASHBOARD_INPUTS = {
     "power_interim_audit_path": "Mapping-chain interim power fallback audit",
     "source_to_common_map_path": "LEAP/9th native-source to Common ESTO map",
     "esto_to_common_map_path": "ESTO component to Common ESTO map",
+    "missing_branch_exceptions_path": "Known missing LEAP branch exception ledger",
+    "relationships_path": "LEAP-to-Common ESTO mapping relationships",
+    "esto_vintage_issue": "Selected ESTO release issue (for example 2026)",
 }
+
+
+def _normalise_coverage_key(value: object) -> str:
+    """Compare mapping labels without depending on slash or case conventions."""
+    return " ".join(
+        str(value or "").replace("\\", "/").replace("_", " ").split()
+    ).casefold()
+
+
+def _enabled(value: object) -> bool:
+    return str(value or "").strip().casefold() in {"1", "true", "t", "yes", "y", "on"}
+
+
+def _nonzero(value: object) -> bool:
+    numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    return bool(pd.notna(numeric) and float(numeric) != 0.0)
+
+
+def load_known_missing_branch_notes(
+    *,
+    exception_path: Path | str | None,
+    relationships_path: Path | str | None,
+    economy: object,
+    esto_vintage_issue: object = "",
+) -> dict[tuple[str, str], list[str]]:
+    """Map eligible per-economy missing LEAP branches to Common ESTO chart keys."""
+    workbook = Path(exception_path) if exception_path else None
+    relationships_file = Path(relationships_path) if relationships_path else None
+    if not workbook or not workbook.is_file() or not relationships_file or not relationships_file.is_file():
+        return {}
+    rows = pd.read_excel(workbook, sheet_name="branch_exceptions", dtype=object).fillna("")
+    relationships = pd.read_csv(relationships_file, low_memory=False).fillna("")
+    required = {"enabled", "branch_path", "economies_that_need_it"}
+    relationship_columns = {"source_system", "source_sector_path", "source_fuel", "target_flow", "target_product"}
+    if not required.issubset(rows.columns) or not relationship_columns.issubset(relationships.columns):
+        return {}
+    issue = str(esto_vintage_issue or "").strip()
+    esto_column = f"esto_{issue}_last_year_signed_pj_all_economies"
+    economy_key = str(economy or "").replace("_", "").strip().upper()
+    notes: dict[tuple[str, str], list[str]] = {}
+    leap_relationships = relationships[relationships["source_system"].astype(str).str.upper().eq("LEAP")]
+    for row in rows.itertuples(index=False):
+        item = row._asdict()
+        if not _enabled(item.get("enabled")):
+            continue
+        economies = {
+            value.strip().replace("_", "").upper()
+            for value in str(item.get("economies_that_need_it", "")).split("|")
+            if value.strip()
+        }
+        if economy_key not in economies:
+            continue
+        ninth_nonzero = _nonzero(item.get("ninth_reference_average_pj_per_year_all_economies"))
+        esto_nonzero = esto_column in rows.columns and _nonzero(item.get(esto_column))
+        if not (ninth_nonzero or esto_nonzero):
+            continue
+        branch_path = str(item.get("branch_path", "")).strip()
+        parts = [part.strip() for part in branch_path.replace("/", "\\").split("\\") if part.strip()]
+        if len(parts) < 2:
+            continue
+        if parts[0].casefold() == "demand":
+            parts = parts[1:]
+        source_sector, source_fuel = "/".join(parts[:-1]), parts[-1]
+        matched = leap_relationships[
+            leap_relationships["source_sector_path"].map(_normalise_coverage_key).eq(_normalise_coverage_key(source_sector))
+            & leap_relationships["source_fuel"].map(_normalise_coverage_key).eq(_normalise_coverage_key(source_fuel))
+        ]
+        sources = []
+        if esto_nonzero:
+            sources.append(f"ESTO {issue}")
+        if ninth_nonzero:
+            sources.append("Ninth Reference")
+        note = (
+            f"Known coverage gap: LEAP has no '{' > '.join(parts)}' branch for this economy; "
+            f"{' and '.join(sources)} is non-zero."
+        )
+        for match in matched[["target_flow", "target_product"]].drop_duplicates().itertuples(index=False):
+            key = (_normalise_coverage_key(match.target_flow), _normalise_coverage_key(match.target_product))
+            notes.setdefault(key, []).append(note)
+    return {key: list(dict.fromkeys(values)) for key, values in notes.items()}
 
 
 def normalize_dashboard_economy_key(economy: object) -> str:
@@ -220,6 +303,9 @@ def render_common_esto_dashboard(
     power_interim_audit_path: Path | str | None = None,
     source_to_common_map_path: Path | str | None = None,
     esto_to_common_map_path: Path | str | None = None,
+    missing_branch_exceptions_path: Path | str | None = None,
+    relationships_path: Path | str | None = None,
+    esto_vintage_issue: str = "",
     comparison_scope: str = "esto_leap_ninth",
     wide_file_scope: str = "esto_leap_ninth",
     min_year: int | None = 2010,
@@ -295,6 +381,16 @@ def render_common_esto_dashboard(
         raw_df["economy"].astype(str).str.replace("_", "", regex=False).str.strip()
     )
     raw_df = enrich_with_component_metadata(raw_df, Path(common_rows_path))
+    coverage_notes = load_known_missing_branch_notes(
+        exception_path=missing_branch_exceptions_path,
+        relationships_path=relationships_path,
+        economy=economy,
+        esto_vintage_issue=esto_vintage_issue,
+    )
+    raw_df["known_missing_branch_notes"] = [
+        "\n".join(coverage_notes.get((_normalise_coverage_key(flow), _normalise_coverage_key(product)), []))
+        for flow, product in zip(raw_df["common_flow_label"], raw_df["common_product_label"])
+    ]
 
     configured_base_year = int(template.get("chart_generation", {}).get("base_year", 2022))
     economy_raw_df = raw_df[raw_df["economy"].astype(str).eq(economy_key)]

@@ -17,6 +17,7 @@ from codebase.common_esto_dashboard_portable import (
     render_common_esto_dashboard_variants,
 )
 from codebase.common_esto_dashboard_renderer import (
+    _chart_cards_html,
     load_code_colors,
     set_code_colors_path,
 )
@@ -79,7 +80,87 @@ def test_optional_inputs_are_declared() -> None:
         "power_interim_audit_path",
         "source_to_common_map_path",
         "esto_to_common_map_path",
+        "missing_branch_exceptions_path",
+        "relationships_path",
+        "esto_vintage_issue",
     }
+
+
+def test_known_missing_branch_notes_are_economy_vintage_and_enabled_scoped(
+    tmp_path: Path,
+) -> None:
+    exceptions = pd.DataFrame([
+        {
+            "enabled": True,
+            "branch_path": "Demand\\Other loss and own use\\Coal mines\\BKB and PB",
+            "economies_that_need_it": "05_PRC",
+            "esto_2026_last_year_signed_pj_all_economies": -1.0,
+            "esto_2025_last_year_signed_pj_all_economies": 0.0,
+            "ninth_reference_average_pj_per_year_all_economies": 0.0,
+        },
+        {
+            "enabled": False,
+            "branch_path": "Demand\\Other loss and own use\\Coal mines\\Anthracite",
+            "economies_that_need_it": "05_PRC",
+            "esto_2026_last_year_signed_pj_all_economies": -2.0,
+            "ninth_reference_average_pj_per_year_all_economies": 0.0,
+        },
+        {
+            "enabled": True,
+            "branch_path": "Demand\\Other loss and own use\\Coal mines\\Lignite",
+            "economies_that_need_it": "20_USA",
+            "esto_2026_last_year_signed_pj_all_economies": -3.0,
+            "ninth_reference_average_pj_per_year_all_economies": 0.0,
+        },
+    ])
+    exception_path = tmp_path / "exceptions.xlsx"
+    exceptions.to_excel(exception_path, sheet_name="branch_exceptions", index=False)
+    relationships_path = tmp_path / "relationships.csv"
+    pd.DataFrame([
+        {
+            "source_system": "LEAP",
+            "source_sector_path": "Other loss and own use/Coal mines",
+            "source_fuel": "BKB and PB",
+            "target_flow": "10.01.06 Coal mines",
+            "target_product": "02.08 BKB/PB",
+        },
+        {
+            "source_system": "LEAP",
+            "source_sector_path": "Other loss and own use/Coal mines",
+            "source_fuel": "Anthracite",
+            "target_flow": "10.01.06 Coal mines",
+            "target_product": "01.04 Anthracite",
+        },
+    ]).to_csv(relationships_path, index=False)
+
+    notes = portable.load_known_missing_branch_notes(
+        exception_path=exception_path,
+        relationships_path=relationships_path,
+        economy="05_PRC",
+        esto_vintage_issue="2026",
+    )
+
+    assert set(notes) == {("10.01.06 coal mines", "02.08 bkb/pb")}
+    assert "ESTO 2026 is non-zero" in notes[("10.01.06 coal mines", "02.08 bkb/pb")][0]
+    assert portable.load_known_missing_branch_notes(
+        exception_path=exception_path,
+        relationships_path=relationships_path,
+        economy="20_USA",
+        esto_vintage_issue="2026",
+    ) == {}
+
+
+def test_chart_card_renders_a_compact_missing_branch_disclosure() -> None:
+    note = "Known coverage gap: LEAP has no 'Coal mines > BKB and PB' branch for this economy; ESTO 2026 is non-zero."
+
+    html = _chart_cards_html(
+        [{"chart_key": "test", "title": "BKB/PB", "known_missing_branch_notes": note}],
+        "Coal mines",
+    )
+
+    assert '<details class="coverage-gap-note">' in html
+    assert "<summary>Known coverage gap</summary>" in html
+    assert "LEAP has no &#x27;Coal mines &gt; BKB and PB&#x27; branch" in html
 
 
 def test_configured_comparison_scopes_use_maintained_selector() -> None:

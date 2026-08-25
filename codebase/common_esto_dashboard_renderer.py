@@ -3591,6 +3591,10 @@ a:hover { text-decoration: underline; }
 .dashboard-grid.expand-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
 .dashboard-grid.expand-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
 .chart-card { margin:0;padding:10px;border:1px solid #d0d7de;border-radius:8px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,0.05); }
+.coverage-gap-note { margin:7px 0 3px;color:#8a5a00;font-size:12px;line-height:1.35; }
+.coverage-gap-note summary { cursor:pointer; width:max-content; max-width:100%; }
+.coverage-gap-note summary::marker { color:#b7791f; }
+.coverage-gap-note div { margin-top:4px; }
 .chart-caption { font-weight:600;margin-bottom:4px; }
 .meta-subline { margin-top:-4px;margin-bottom:8px;color:#4b5563;font-size:12px; }
 .area-data-note { margin:-3px 0 8px 0;color:#64748b;font-size:11px;line-height:1.3;font-style:italic; }
@@ -4414,11 +4418,24 @@ def _chart_cards_html(rows: list[dict], subline: str) -> str:
             if row.get("chart_type") == "stacked_area"
             else ""
         )
+        coverage_notes = [
+            note.strip()
+            for note in str(row.get("known_missing_branch_notes", "")).splitlines()
+            if note.strip()
+        ]
+        coverage_note = (
+            '<details class="coverage-gap-note"><summary>Known coverage gap</summary><div>'
+            + "<br>".join(escape(note) for note in coverage_notes)
+            + "</div></details>"
+            if coverage_notes
+            else ""
+        )
         cards.append(
             f'<figure class="chart-card" data-guide-id="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
             f'<figcaption class="chart-caption">{product_name}</figcaption>'
             f'<div class="meta-subline">{escape(subline)}</div>'
             f'{area_note}'
+            f'{coverage_note}'
             f'<div class="chart-load-state" data-loaded="false">Chart queued</div>'
             f'<div data-chart-key="{key}" class="lazy-chart-plot is-unloaded" role="img" aria-label="{product_name}"></div>'
             f'</figure>'
@@ -6491,6 +6508,14 @@ def _line_chart_manifest_and_rows(
             "section_label": section_label,
             "flow_group_label": str(flow_label),
             "datasets": chart_dataset_tokens_from_figure(chart_figure),
+            "known_missing_branch_notes": "\n".join(
+                dict.fromkeys(
+                    note.strip()
+                    for value in pair_rows.get("known_missing_branch_notes", pd.Series(dtype=object))
+                    for note in str(value).splitlines()
+                    if note.strip()
+                )
+            ),
             **metrics,
         })
     return charts, chart_rows, manifest_rows
