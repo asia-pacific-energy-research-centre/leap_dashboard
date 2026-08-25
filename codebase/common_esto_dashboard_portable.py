@@ -238,8 +238,10 @@ def render_common_esto_dashboard(
     """Render the Common ESTO dashboard for one economy from explicit inputs.
 
     ``representation_status_df`` is optional current-run upstream presentation
-    metadata. It controls placeholder notices only; common facts still control
-    category and page rendering.
+    metadata. It controls placeholder notices and suppresses false detail cards
+    for placeholder-only component prefixes after routing; Common ESTO facts
+    still control page-level aggregate and category rendering. Partial detail
+    remains visible with a warning.
 
     ``source_to_common_map_path`` and ``esto_to_common_map_path`` are optional
     provenance inputs for the guide's native-category table. When omitted, the

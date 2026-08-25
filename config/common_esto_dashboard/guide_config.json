@@ -181,7 +181,7 @@
             ["Products", "Coal, oil products, gas, electricity, heat, renewables, hydrogen and other reported industrial carriers", "Every supported subsector-product pair can create a detail chart, making this one of the densest pages."],
             ["Hierarchy", "Sector parents, subsector parents and detailed children can all be available as alternative views", "Do not sum parent and child charts together."],
             ["Non-energy use", "17 Non-energy use and its supported products", "Included in TFC but excluded from TFEC and combustion emissions; do not combine it with the temporary 16.03-16.05,17 Other-demand placeholder."],
-            ["Aggregate-only LEAP", "Some economies currently expose only the broad LEAP Industry placeholder", "The broad chart can contain LEAP while detailed charts contain only ESTO or Ninth; the dataset filter makes that coverage difference visible."]
+            ["Aggregate-only LEAP", "Some economies currently expose only a broad LEAP placeholder", "The dashboard keeps the broad aggregate boundary but hides detail cards and their empty section link for that placeholder. Those cards return when the detailed LEAP branch is available."]
           ]
         }
       }
@@ -227,7 +227,7 @@
           "rows": [
             ["Flows", "Agriculture (16.03), fishing (16.04) and non-specified other demand (16.05)", "These are domestic final-demand flows, not a catch-all for every unassigned row."],
             ["Products", "Electricity, oil products, gas, coal, renewables and other reported fuels", "Available products depend strongly on economy and source detail."],
-            ["Combined placeholder", "16.03-16.05,17 Other sector including non-energy", "LEAP currently reports this boundary inseparably for some economies. It is routed here temporarily and must not be interpreted as a detailed sector split."],
+            ["Combined placeholder", "16.03-16.05,17 Other sector including non-energy", "LEAP currently reports this boundary inseparably for some economies. It is routed here temporarily, shown only as a broad boundary, and must not be interpreted as a detailed sector split."],
             ["Relationship to Non-energy", "Exact standalone 17 appears in Industry's Non-energy use section", "Do not add exact 17 to the combined placeholder; they overlap."]
           ]
         }

@@ -1136,12 +1136,14 @@ def filter_template_for_leap_demand_coverage(
     template: dict,
     representation_status_df: pd.DataFrame | None = None,
 ) -> dict:
-    """Attach current-run placeholder metadata without hiding ordinary pages.
+    """Attach current-run representation metadata without hiding ordinary pages.
 
     The upstream representation-status artifact records what the current LEAP
-    export supplied.  It controls notices only: available Common ESTO facts
-    still determine which chart categories render.  ``always_skip_page_keys``
-    remains the sole explicit structural page suppression mechanism.
+    export supplied.  It preserves available Common ESTO facts and page-level
+    aggregates; the renderer later uses a ``placeholder_only_retained`` status
+    to suppress only the false detail cards for that component.  Partial
+    detail remains visible with a warning.  ``always_skip_page_keys`` remains
+    the sole explicit structural page suppression mechanism.
     """
     coverage_config = template.get("leap_demand_sector_coverage", {})
     if not coverage_config.get("enabled", False):
