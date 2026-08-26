@@ -213,19 +213,34 @@ def series_label(row: pd.Series, series_labels: dict[str, str]) -> str:
 
 
 def scenario_toggle_tag(source_system: object, scenario: object) -> str:
-    """Classify a series for the REF/TGT dashboard toggle.
+    """Return a stable scenario key for traces controlled by the dashboard picker.
 
-    ESTO historical rows are tagged "esto" and always stay visible; LEAP/9th
-    rows are tagged "ref" or "tgt" so the client-side toggle can show/hide
-    them. Anything else falls back to "esto" (always visible) rather than
-    silently disappearing under either toggle state.
+    ESTO is historical context and is always visible.  LEAP is the authority
+    for the dashboard-level scenario list; Ninth-edition traces use the same
+    key convention so they follow the corresponding LEAP scenario where one
+    exists.  This deliberately does not assume scenarios are named Reference
+    and Target.
     """
-    scenario_text = str(scenario or "").strip().casefold()
-    if scenario_text == "reference":
-        return "ref"
-    if scenario_text == "target":
-        return "tgt"
-    return "esto"
+    source_key = str(source_system or "").strip().upper()
+    scenario_text = str(scenario or "").strip()
+    if source_key not in {"LEAP", "NINTH"} or not scenario_text:
+        return "esto"
+    return "scenario:" + scenario_text.casefold()
+
+
+def available_primary_scenarios(
+    df: pd.DataFrame,
+    primary_source: str = "LEAP",
+    preferred_scenario: str = "Target",
+) -> list[str]:
+    """Return supplied primary-source scenarios in deterministic display order."""
+    if df.empty or "source_system" not in df.columns or "scenario" not in df.columns:
+        return []
+    source_mask = df["source_system"].astype(str).str.casefold().eq(primary_source.casefold())
+    values = [str(value).strip() for value in df.loc[source_mask, "scenario"].dropna()]
+    unique = list(dict.fromkeys(value for value in values if value))
+    preferred_key = preferred_scenario.casefold()
+    return sorted(unique, key=lambda value: (value.casefold() != preferred_key, value.casefold()))
 
 
 def trace_meta_entry(
@@ -240,6 +255,7 @@ def trace_meta_entry(
     return {
         "source_system": str(source_system).strip().upper(),
         "tag": scenario_toggle_tag(source_system, scenario),
+        "scenario": str(scenario or "").strip(),
         "metric": metric,
         "active_visible": active_visible,
     }
@@ -2613,10 +2629,9 @@ def build_area_chart(
     from base_year onward. If a segment's dataset has no rows for this flow,
     that segment is left blank rather than falling back to another dataset.
 
-    Two full stacks are built - one per primary scenario (Reference/Target) -
-    each embedding the same ESTO pre-base-year segment, tagged "ref"/"tgt" so
-    only one is visible at a time and the client-side REF/TGT toggle can swap
-    between them.
+    One full stack is built for every supplied primary-source scenario, each
+    embedding the same ESTO pre-base-year segment. The page-level chooser
+    selects which scenario stack is visible.
     """
     chart_df = _non_overlapping_common_row_frontier(area_spec_rows(df, area_spec))
     if "flow" in group_col:
@@ -2636,9 +2651,18 @@ def build_area_chart(
     # Use the union of nonzero ESTO-history and LEAP-projection categories.
     # Historical-only fuels must remain in the pre-base stack so its envelope
     # reconciles to the ESTO total line; they naturally end at the base year.
+    primary_scenarios = available_primary_scenarios(
+        chart_df, primary_source, default_scenario
+    )
+    if primary_scenarios and default_scenario.casefold() not in {
+        scenario.casefold() for scenario in primary_scenarios
+    }:
+        default_scenario = primary_scenarios[0]
     projected_rows = chart_df[
         (chart_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
-        & (chart_df["scenario"].astype(str).str.casefold().isin({"reference", "target"}))
+        & (chart_df["scenario"].astype(str).str.casefold().isin(
+            {scenario.casefold() for scenario in primary_scenarios}
+        ))
         & (chart_df["year"] > base_year)
     ].copy()
     projected_rows["_gross_value"] = pd.to_numeric(
@@ -2657,7 +2681,7 @@ def build_area_chart(
 
     fig = go.Figure()
     trace_meta: list[dict] = []
-    for scenario_name in ("Reference", "Target"):
+    for scenario_name in primary_scenarios:
         post_base_df = chart_df[
             (chart_df["source_system"].astype(str).str.casefold() == primary_source.casefold())
             & (chart_df["scenario"].astype(str).str.casefold() == scenario_name.casefold())
@@ -3619,6 +3643,7 @@ a:hover { text-decoration: underline; }
 }
 .scenario-toggle-btn + .scenario-toggle-btn { border-left:1px solid #c5ccd3; }
 .scenario-toggle-btn.active { background:#1f6feb;color:#fff;font-weight:700; }
+.scenario-toggle-select { max-width:210px;padding:5px 28px 5px 8px;border:1px solid #c5ccd3;border-radius:6px;background:#fff;color:#0b3d5c;font:inherit;font-size:12px; }
 .category-basis-switcher { display:flex;align-items:center;gap:6px;font-size:12px;color:#4b5563;white-space:nowrap; }
 .category-basis-switcher span { font-weight:600; }
 .category-basis-switcher select { max-width:210px;padding:5px 28px 5px 8px;border:1px solid #c5ccd3;border-radius:6px;background:#fff;color:#111;font:inherit; }
@@ -3705,47 +3730,51 @@ _HEADER_TOGGLE_JS = """
 _SCENARIO_TOGGLE_HTML = """
 <div class="scenario-toggle" role="group" aria-label="Scenario">
   <span>Scenario</span>
-  <div class="scenario-toggle-buttons">
-    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="ref">Reference</button>
-    <button type="button" class="scenario-toggle-btn" data-scenario-toggle="tgt">Target</button>
-  </div>
+  <select class="scenario-toggle-select" data-scenario-toggle aria-label="LEAP scenario"></select>
 </div>
 """
 
 _SCENARIO_TOGGLE_JS = """
 (function() {
-  var key = 'common-esto-scenario-mode';
-  var availableLeapTags = [];
+  // Scope persisted state to this archive/economy. A Reference choice from a
+  // different downloaded archive must never hide a Target-only dashboard.
+  var key = 'common-esto-scenario-mode:' + window.location.pathname;
+  var availableLeapScenarios = [];
   try {
     var charts = window.COMMON_ESTO_CHART_BUNDLE_DATA.charts || {};
     Object.keys(charts).forEach(function(chartKey) {
       var meta = charts[chartKey].layout && charts[chartKey].layout.meta;
       (meta && meta.trace_meta || []).forEach(function(entry) {
-        if (entry.source_system === 'LEAP' && (entry.tag === 'ref' || entry.tag === 'tgt')
-            && availableLeapTags.indexOf(entry.tag) === -1) {
-          availableLeapTags.push(entry.tag);
+        if (entry.source_system === 'LEAP' && entry.tag && entry.tag.indexOf('scenario:') === 0
+            && !availableLeapScenarios.some(function(item) { return item.tag === entry.tag; })) {
+          availableLeapScenarios.push({tag: entry.tag, label: entry.scenario || entry.tag.slice(9)});
         }
       });
     });
   } catch (e) {}
+  availableLeapScenarios.sort(function(left, right) {
+    var leftTarget = left.label.toLowerCase() === 'target';
+    var rightTarget = right.label.toLowerCase() === 'target';
+    return leftTarget === rightTarget ? left.label.localeCompare(right.label) : (leftTarget ? -1 : 1);
+  });
   var getMode = function() {
     try {
       var stored = window.localStorage.getItem(key);
-      if ((stored === 'ref' || stored === 'tgt')
-          && (!availableLeapTags.length || availableLeapTags.indexOf(stored) !== -1)) return stored;
+      if (availableLeapScenarios.some(function(item) { return item.tag === stored; })) return stored;
     } catch (e) {}
-    return availableLeapTags.indexOf('tgt') !== -1 ? 'tgt' : 'ref';
+    return availableLeapScenarios.length ? availableLeapScenarios[0].tag : '';
   };
   var setMode = function(mode) {
     try { window.localStorage.setItem(key, mode); } catch (e) {}
   };
 
-  // Traces are tagged "esto" (always shown), or "ref"/"tgt" (LEAP/9th),
+  // Traces are tagged "esto" (always shown), or with the supplied LEAP/Ninth
+  // scenario key,
   // with an independent optional "metric" dimension used only by the
   // TFC/TFEC sector chart's own Plotly dropdown. See scenario_toggle_tag /
   // trace_meta_entry in common_esto_dashboard_renderer.py.
   var computeVisible = function(entry, scenarioMode, metricMode) {
-    var scenarioOk = entry.tag === 'esto' || entry.tag === scenarioMode;
+    var scenarioOk = entry.tag === 'esto' || !scenarioMode || entry.tag === scenarioMode;
     var metricOk = !entry.metric || entry.metric === 'both' || entry.metric === metricMode;
     return (scenarioOk && metricOk) ? entry.active_visible : false;
   };
@@ -3762,20 +3791,22 @@ _SCENARIO_TOGGLE_JS = """
 
   var syncButtons = function() {
     var mode = getMode();
-    document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
-      btn.hidden = availableLeapTags.length > 0
-        && availableLeapTags.indexOf(btn.dataset.scenarioToggle) === -1;
-      btn.classList.toggle('active', btn.dataset.scenarioToggle === mode);
+    document.querySelectorAll('[data-scenario-toggle]').forEach(function(select) {
+      select.innerHTML = '';
+      availableLeapScenarios.forEach(function(item) {
+        var option = new Option(item.label, item.tag, false, item.tag === mode);
+        select.add(option);
+      });
     });
     document.querySelectorAll('.scenario-toggle').forEach(function(group) {
-      group.hidden = availableLeapTags.length === 1;
+      group.hidden = availableLeapScenarios.length <= 1;
     });
   };
   syncButtons();
 
-  document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      setMode(btn.dataset.scenarioToggle);
+  document.querySelectorAll('[data-scenario-toggle]').forEach(function(select) {
+    select.addEventListener('change', function() {
+      setMode(select.value);
       syncButtons();
       document.querySelectorAll('.lazy-chart-plot[data-rendered="true"]').forEach(function(plot) {
         window.applyScenarioMode(plot);
@@ -5470,6 +5501,10 @@ def _build_td_sector_chart(
         # side may contain only the parent row.
         return _non_overlapping_flow_rows(_non_overlapping_common_row_frontier(rows))
 
+    scenarios = available_primary_scenarios(demand_df, primary_source, primary_scenario) or [primary_scenario]
+    if scenarios and primary_scenario.casefold() not in {scenario.casefold() for scenario in scenarios}:
+        primary_scenario = scenarios[0]
+
     # Use the detailed source available for each scenario. LEAP is preferred,
     # but some economies only have aggregate LEAP demand and therefore need
     # the 9th-edition detail as the projection fallback.
@@ -5479,7 +5514,7 @@ def _build_td_sector_chart(
         .sum().abs().sort_values(ascending=False).reset_index()
     )
 
-    for scenario_name in ("Reference", "Target"):
+    for scenario_name in scenarios:
         scenario_df = stack_source(scenario_name)
         is_default = scenario_name.casefold() == primary_scenario.casefold()
         if scenario_df.empty or sector_order.empty:
@@ -5644,15 +5679,18 @@ def _build_td_fuel_chart(
         )
         return _non_overlapping_flow_rows(_non_overlapping_common_row_frontier(rows))
 
+    scenarios = available_primary_scenarios(demand_df, primary_source, primary_scenario) or [primary_scenario]
+    if scenarios and primary_scenario.casefold() not in {scenario.casefold() for scenario in scenarios}:
+        primary_scenario = scenarios[0]
     # Product stacking order is computed from the default scenario and reused
-    # for both scenarios so switching REF/TGT does not reshuffle the layers.
+    # for all scenarios so switching does not reshuffle the layers.
     default_rows = stack_source(primary_scenario)
     product_totals = (
         default_rows.groupby("common_product_label")["value"].sum().abs()
         .sort_values(ascending=False).index.tolist()
     )
 
-    for scenario_name in ("Reference", "Target"):
+    for scenario_name in scenarios:
         scenario_df = stack_source(scenario_name)
         is_default = scenario_name.casefold() == primary_scenario.casefold()
         if scenario_df.empty or not product_totals:
@@ -5803,7 +5841,10 @@ def _build_supply_stack_chart(
             .sort_values(ascending=False).index.tolist()
         )
 
-    for scenario_name in ("Reference", "Target"):
+    scenarios = available_primary_scenarios(supply_detail_df, primary_source, primary_scenario) or [primary_scenario]
+    if scenarios and primary_scenario.casefold() not in {scenario.casefold() for scenario in scenarios}:
+        primary_scenario = scenarios[0]
+    for scenario_name in scenarios:
         scenario_df, stack_source_name = stack_source(scenario_name)
         is_default = scenario_name.casefold() == primary_scenario.casefold()
         if scenario_df.empty or not stack_source_name:

@@ -816,6 +816,7 @@ def _stacked_emissions_chart(
     """Stack emissions by *group_column* for one source, over comparison totals."""
     renderer = _renderer()
     apply_chart_chrome = renderer.apply_chart_chrome
+    available_primary_scenarios = renderer.available_primary_scenarios
     scenario_toggle_tag = renderer.scenario_toggle_tag
     series_label_from_values = renderer.series_label_from_values
     stacked_area_dataset_note = renderer.stacked_area_dataset_note
@@ -844,8 +845,11 @@ def _stacked_emissions_chart(
         )
         return rows
 
-    # Stacking order comes from the default scenario and is reused for both, so
-    # switching REF/TGT does not reshuffle the layers.
+    scenarios = available_primary_scenarios(emissions_df, primary_source, primary_scenario)
+    if scenarios and primary_scenario.casefold() not in {scenario.casefold() for scenario in scenarios}:
+        primary_scenario = scenarios[0]
+    # Stacking order comes from the default scenario and is reused for all, so
+    # switching scenarios does not reshuffle the layers.
     order = (
         stack_rows(primary_scenario)
         .groupby(group_column)[EMISSIONS_COLUMN]
@@ -854,7 +858,7 @@ def _stacked_emissions_chart(
         .sort_values(ascending=False)
         .index.tolist()
     )
-    for scenario_name in ("Reference", "Target"):
+    for scenario_name in scenarios:
         scenario_df = stack_rows(scenario_name)
         if scenario_df.empty or not order:
             continue

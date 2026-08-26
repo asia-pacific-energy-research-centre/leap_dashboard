@@ -28,6 +28,7 @@ from codebase.common_esto_dashboard_output_layout import build_output_layout, pu
 from codebase.common_esto_dashboard_portable import dashboard_base_year_from_leap_data
 from codebase.common_esto_dashboard_renderer import (
     _PAGE_CSS,
+    _SCENARIO_TOGGLE_JS,
     _split_non_energy_sector_for_total_demand,
     _build_td_sector_chart,
     _build_td_fuel_chart,
@@ -36,6 +37,7 @@ from codebase.common_esto_dashboard_renderer import (
     active_power_interim_flow_prefixes,
     aggregate_only_demand_page_active,
     apply_chart_chrome,
+    available_primary_scenarios,
     assert_unique_line_trace_x,
     assign_pages,
     assign_bespoke_overview_rows,
@@ -83,6 +85,7 @@ from codebase.common_esto_dashboard_renderer import (
     _jump_nav_html,
     _line_sections_html,
     overview_navigation_root_code,
+    scenario_toggle_tag,
 )
 
 
@@ -102,6 +105,55 @@ def test_dashboard_base_year_uses_configured_fallback_without_leap_rows() -> Non
     })
 
     assert dashboard_base_year_from_leap_data(comparison_df, 2022) == 2022
+
+
+def test_dashboard_scenarios_are_derived_from_supplied_leap_data() -> None:
+    rows = pd.DataFrame({
+        "source_system": ["ESTO", "LEAP", "LEAP", "LEAP", "NINTH"],
+        "scenario": ["historical", "Pathway B", "Target", "Pathway A", "Target"],
+    })
+
+    assert available_primary_scenarios(rows) == ["Target", "Pathway A", "Pathway B"]
+    assert available_primary_scenarios(rows[rows["scenario"].eq("Target")]) == ["Target"]
+
+
+def test_dashboard_trace_tags_preserve_arbitrary_scenario_names() -> None:
+    assert scenario_toggle_tag("ESTO", "historical") == "esto"
+    assert scenario_toggle_tag("LEAP", "Target") == "scenario:target"
+    assert scenario_toggle_tag("LEAP", "Pathway B") == "scenario:pathway b"
+    assert scenario_toggle_tag("NINTH", "Pathway B") == "scenario:pathway b"
+
+
+def test_area_chart_contains_every_supplied_leap_scenario() -> None:
+    rows = pd.DataFrame([
+        {
+            "source_system": source, "scenario": scenario, "year": year,
+            "common_flow_label": "14 Industry", "common_product_label": "17 Electricity",
+            "value": value,
+        }
+        for source, scenario, year, value in [
+            ("ESTO", "historical", 2022, 8.0),
+            ("LEAP", "Target", 2023, 10.0),
+            ("LEAP", "Reference", 2023, 9.0),
+            ("LEAP", "Pathway B", 2023, 11.0),
+        ]
+    ])
+    figure = build_area_chart(
+        rows,
+        {"aggregate_flow_label": "14 Industry", "source_flow_labels": ["14 Industry"]},
+        {},
+        {"chart_generation": {"comparison_source_system": "ESTO", "base_year": 2022}},
+    )
+
+    tags = {entry["tag"] for entry in figure.layout.meta["trace_meta"]}
+    assert {"scenario:target", "scenario:reference", "scenario:pathway b"} <= tags
+
+
+def test_scenario_chooser_is_dynamic_and_archive_scoped() -> None:
+    assert 'window.location.pathname' in _SCENARIO_TOGGLE_JS
+    assert 'availableLeapScenarios.length <= 1' in _SCENARIO_TOGGLE_JS
+    assert 'new Option(item.label, item.tag' in _SCENARIO_TOGGLE_JS
+    assert 'data-scenario-toggle="ref"' not in _SCENARIO_TOGGLE_JS
 
 
 def test_frontier_prefers_observed_inclusive_parent_boundary() -> None:
@@ -713,7 +765,9 @@ def test_sector_stack_does_not_add_a_synthetic_tfc_remainder() -> None:
     )
 
     stack_traces = [trace for trace in figure.data if getattr(trace, "stackgroup", None)]
-    assert len(stack_traces) == 2
+    # With no supplied LEAP scenario, the renderer retains one ESTO-only
+    # historical stack rather than manufacturing Reference and Target copies.
+    assert len(stack_traces) == 1
     assert {tuple(trace.y) for trace in stack_traces} == {(40.0,)}
     assert "does not reconcile" in figure.layout.meta["stacked_area_note"]
     assert "no balancing remainder is added" in figure.layout.meta["stacked_area_note"]
@@ -946,7 +1000,7 @@ def test_dataset_membership_is_retained_on_cards_without_header_filter(
 
     html = (layout["dashboards"] / "industry.html").read_text(encoding="utf-8")
     cards = re.findall(
-        r'<figure class="chart-card"[^>]*data-datasets="([^"]*)"[^>]*>.*?'
+        r'<figure[^>]*class="chart-card"[^>]*data-datasets="([^"]*)"[^>]*>.*?'
         r'<figcaption class="chart-caption">(.*?)</figcaption>',
         html,
         flags=re.DOTALL,
@@ -3027,8 +3081,8 @@ def test_area_chart_preserves_gross_signs_before_category_aggregation(
         if trace.stackgroup and trace.visible is True
     ]
     assert [trace.stackgroup for trace in visible_areas] == [
-        "scenario_tgt_pos",
-        "scenario_tgt_neg",
+        "scenario_scenario:target_pos",
+        "scenario_scenario:target_neg",
     ]
     assert [list(trace.y) for trace in visible_areas] == [
         [100.0, 120.0],
