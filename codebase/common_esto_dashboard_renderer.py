@@ -3715,12 +3715,26 @@ _SCENARIO_TOGGLE_HTML = """
 _SCENARIO_TOGGLE_JS = """
 (function() {
   var key = 'common-esto-scenario-mode';
+  var availableLeapTags = [];
+  try {
+    var charts = window.COMMON_ESTO_CHART_BUNDLE_DATA.charts || {};
+    Object.keys(charts).forEach(function(chartKey) {
+      var meta = charts[chartKey].layout && charts[chartKey].layout.meta;
+      (meta && meta.trace_meta || []).forEach(function(entry) {
+        if (entry.source_system === 'LEAP' && (entry.tag === 'ref' || entry.tag === 'tgt')
+            && availableLeapTags.indexOf(entry.tag) === -1) {
+          availableLeapTags.push(entry.tag);
+        }
+      });
+    });
+  } catch (e) {}
   var getMode = function() {
     try {
       var stored = window.localStorage.getItem(key);
-      if (stored === 'ref' || stored === 'tgt') return stored;
+      if ((stored === 'ref' || stored === 'tgt')
+          && (!availableLeapTags.length || availableLeapTags.indexOf(stored) !== -1)) return stored;
     } catch (e) {}
-    return 'tgt';
+    return availableLeapTags.indexOf('tgt') !== -1 ? 'tgt' : 'ref';
   };
   var setMode = function(mode) {
     try { window.localStorage.setItem(key, mode); } catch (e) {}
@@ -3741,21 +3755,6 @@ _SCENARIO_TOGGLE_JS = """
     var meta = plot.layout.meta && plot.layout.meta.trace_meta;
     if (!meta || !meta.length) return;
     var scenarioMode = getMode();
-    // A downloaded dashboard can contain only one LEAP scenario. Do not let a
-    // browser-wide saved preference hide that scenario just because the user
-    // last viewed a different archive. Ninth/ESTO traces are deliberately not
-    // considered here: the selected LEAP export is the scenario authority.
-    var leapTags = meta
-      .filter(function(entry) { return entry.source_system === 'LEAP'; })
-      .map(function(entry) { return entry.tag; })
-      .filter(function(tag, index, values) {
-        return (tag === 'ref' || tag === 'tgt') && values.indexOf(tag) === index;
-      });
-    if (leapTags.length && leapTags.indexOf(scenarioMode) === -1) {
-      scenarioMode = leapTags.indexOf('tgt') !== -1 ? 'tgt' : 'ref';
-      setMode(scenarioMode);
-      syncButtons();
-    }
     var metricMode = plot._metricMode || 'tfc';
     var visible = meta.map(function(entry) { return computeVisible(entry, scenarioMode, metricMode); });
     window.Plotly.restyle(plot, {visible: visible});
@@ -3764,7 +3763,12 @@ _SCENARIO_TOGGLE_JS = """
   var syncButtons = function() {
     var mode = getMode();
     document.querySelectorAll('[data-scenario-toggle]').forEach(function(btn) {
+      btn.hidden = availableLeapTags.length > 0
+        && availableLeapTags.indexOf(btn.dataset.scenarioToggle) === -1;
       btn.classList.toggle('active', btn.dataset.scenarioToggle === mode);
+    });
+    document.querySelectorAll('.scenario-toggle').forEach(function(group) {
+      group.hidden = availableLeapTags.length === 1;
     });
   };
   syncButtons();
@@ -5130,9 +5134,9 @@ def write_dashboard_page(
   {guide["dialog_html"]}
   <script>{_HEADER_TOGGLE_JS}</script>
   <script>{_DASHBOARD_SWITCHER_JS}</script>
-  <script>{_SCENARIO_TOGGLE_JS}</script>
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script src="../chart_bundles/{escape(bundle_js_name)}"></script>
+  <script>{_SCENARIO_TOGGLE_JS}</script>
   <script>{_LAZY_LOAD_JS}</script>
   <script>{_DATASET_FILTER_JS}</script>
   <script>{guide["script"]}</script>
