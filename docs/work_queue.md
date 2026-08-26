@@ -2,6 +2,14 @@
 
 ## Current-run LEAP demand representation status — implemented and verified
 
+- **DASHQ-066 — PRC Power loss ownership and Power-only aggregate label.**
+  Complete 2026-08-26. Product-aware special routing sends only `10.02`
+  Electricity and Heat to Power in both configured comparison scopes; every
+  other `10.02` product remains on Other transformation. Power calls its flow-10
+  area card **Power-related losses and own use** without globally renaming the
+  Common hierarchy. Guides and DASH-035 document the separate `10.01.01` and
+  `10.02` numerical boundaries. Focused routing and label tests are included.
+
 - **DASHQ-064 — interim Power detail suppression.** Active entries in the
   upstream fallback audit now suppress only the matching Power detail cards:
   Electricity interim suppresses electricity-plant cards, CHP interim

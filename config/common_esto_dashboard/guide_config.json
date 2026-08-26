@@ -7,9 +7,9 @@
     "industry": "Use Industry to review industrial energy demand by subsector and fuel, with particular attention to large changes and differences between sources.",
     "transport": "Use Transport to review road and non-road energy demand within the economy, including fuel switching and the effect of the detailed transport model on LEAP results. International aviation and marine bunkers are not included here; review them on Supply.",
     "others": "Use Other demand to review agriculture, fishing, non-specified demand and aggregate-only demand that has not yet been replaced by detailed LEAP branches.",
-    "power": "Use Power to review electricity and heat generation, fuel inputs and outputs. LEAP's power transformation modules do not measure power-sector own use or losses within the transformation process. These are represented separately, so the charts on this page let you analyse power-sector own use and losses alongside the transformation results.",
+    "power": "Use Power to review electricity and heat generation, fuel inputs and outputs, related own use, and electricity/heat transmission and distribution losses. These loss and own-use rows remain separate from the 10.01.01 plant-own-use balance and must not be added together as if they were one flow.",
     "refining": "Use Refining to review refinery inputs, petroleum-product outputs and refinery own use together. In LEAP, refinery own use is measured in the Auxiliary Fuel Use branch of the refining transformation module, so it can be shown separately from the transformation inputs. Review the inputs and own use together when assessing the full refinery process.",
-    "other_transformation": "Use Other transformation to review four distinct parts of the energy balance: Other transformation (including own use), Transfers, Transmission and distribution losses, and Other energy-sector own use. These sections describe different kinds of flows and should not be added together without checking their signs and boundaries.",
+    "other_transformation": "Use Other transformation to review four distinct parts of the energy balance: Other transformation (including own use), Transfers, residual non-electricity/non-heat transmission and distribution losses, and Other energy-sector own use. These sections describe different kinds of flows and should not be added together without checking their signs and boundaries.",
     "supply": "Use Supply to review how production, trade and transformation outputs meet the economy's fuel requirements, including international marine and aviation transport. Bunker fuels are shown here because they are supplied by the economy and deducted before domestic energy use is calculated.",
     "emissions": "Use Emissions to review the emissions implied by energy demand. Read the page note carefully where aggregate-only demand prevents a detailed sector split.",
     "transport_leap_vs_ninth": "This diagnostic page provides a focused LEAP-versus-9th view of transport detail. Use it alongside, not instead of, the main three-source Transport page.",
@@ -95,13 +95,14 @@
         "id": "power-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Power",
-        "copy": "Power covers electricity and heat transformation, combining the plant boundaries needed to compare sources that organise producers and technologies differently. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "copy": "Power covers electricity and heat transformation, related plant own use, and the electricity and heat rows of transmission and distribution losses. The 10.01.01 own-use flow and 10.02 losses remain separate numerical boundaries. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
         "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Power page contents",
           "headers": ["Area", "Generally included", "Important quirk"],
           "rows": [
             ["Flows", "Electricity plants, CHP plants and heat plants under 09.01 and 09.02, plus related power-sector own use", "The specific Power roots take ownership before the broader Other transformation root."],
+            ["Transmission and distribution losses", "Only flow 10.02 Electricity and Heat products", "These normally negative delivery losses are a separate section; other 10.02 products remain on Other transformation."],
             ["Input products", "Coal, gas, oil, renewables, waste and other fuels used by plants", "Transformation inputs are normally negative."],
             ["Output products", "Electricity and heat", "Outputs are normally positive and should be reviewed with their matching inputs."],
             ["Shared plant boundary", "Main-activity and autoproducer categories may be combined by plant type", "LEAP and the 9th do not align with ESTO at every producer or technology split, so the combined category is often the honest comparison level."]
@@ -134,7 +135,7 @@
         "id": "other-transformation-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Other transformation",
-        "copy": "This page brings together four sections that do not belong on Power or Refining. Other transformation (including own use) covers processes such as gas processing and coal transformation. Transfers records movement between fuel or product categories. Transmission and distribution losses records energy lost while it is delivered. Other energy-sector own use records energy consumed by energy industries while they operate. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "copy": "This page brings together four residual sections outside Power and Refining. Other transformation (including own use) covers processes such as gas processing and coal transformation. Transfers records movement between fuel or product categories. Transmission and distribution losses retains products other than electricity and heat, whose 10.02 rows are owned by Power. Other energy-sector own use records energy consumed by energy industries while they operate. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
         "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Other transformation page contents",
@@ -142,7 +143,7 @@
           "rows": [
             ["Other transformation (including own use)", "Gas processing, coal transformation, liquefaction/regasification and other conversion processes outside Power and Refining", "Inputs are normally negative and outputs positive. For rows labelled including own use, the associated 10.01.xx own-use energy is included in the chart's transformation input."],
             ["Transfers", "Flow 08 movements between fuel or product categories", "Review these as transformation processes with signed inputs, outputs and an implied process efficiency. LEAP splits them into three modules for modelling, but the dashboard aggregates them for comparison."],
-            ["Transmission and distribution losses", "Energy lost while electricity, heat, gas or another carrier is transmitted and distributed", "Electricity losses will eventually be measured through a transformation module. Other product losses are currently modelled under Demand\\Other loss and own use."],
+            ["Transmission and distribution losses", "Gas and every other non-electricity/non-heat carrier lost while transmitted and distributed", "Electricity and heat 10.02 rows are shown on Power. These retained rows are normally negative and are currently modelled under Demand\\Other loss and own use."],
             ["Other energy-sector own use", "Auxiliary fuel use for other transformation modules where it was not possible or practical to track that use inside the module", "These normally negative values are modelled under Demand\\Other loss and own use."],
             ["Gas works quirk", "09.06.01 Gas works plants (including own use)", "LEAP does not expose 10.01.02 gas-works own use separately, so that standalone row is suppressed just like refinery own use."],
             ["Products", "The input and output fuels appropriate to each conversion process", "Read the flow label first: the same product can be an input in one process and an output in another."]
@@ -161,7 +162,7 @@
             ["Other transformation (including own use)", "Inputs are normally negative and outputs positive. Where a comparison row says including own use, energy from the associated 10.01.xx own-use sector is included in the transformation input shown in these charts. This is necessary because Auxiliary Fuel Use for these LEAP transformation modules cannot be separated from their feedstock inputs."],
             ["Other energy-sector own use", "These normally negative values represent auxiliary fuel use for other transformation modules where it was not possible or practical to track that use inside the module. In LEAP they are modelled under Demand\\Other loss and own use, rather than as transformation inputs or final demand."],
             ["Transfers", "For dashboard review, treat these like transformation processes. Compare their signed inputs and outputs and the process efficiency implied by the balance. They have no associated own use. LEAP splits transfers into three modules for modelling practicality, but outside LEAP the results are normally aggregated so they can be compared with other datasets."],
-            ["Transmission and distribution losses", "These values are normally negative. Electricity transmission and distribution losses will eventually be measured through a transformation module. Losses for the other products shown here are currently modelled under Demand\\Other loss and own use."]
+            ["Transmission and distribution losses", "These values are normally negative. This section retains only non-electricity/non-heat 10.02 products; the electricity and heat rows are shown separately on Power. The retained products are currently modelled under Demand\\Other loss and own use."]
           ]
         }
       }

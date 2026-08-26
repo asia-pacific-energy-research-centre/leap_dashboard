@@ -1167,12 +1167,18 @@ def test_losses_and_own_use_area_cards_use_parent_hierarchy_labels() -> None:
     )
 
     specs = pick_area_specs(page_df, template)
+    power_specs = pick_area_specs(page_df, template, page_key="power")
     labels_by_prefix = {
         str(spec["aggregate_flow_prefix"]): str(spec["aggregate_flow_label"])
         for spec in specs
     }
+    power_labels_by_prefix = {
+        str(spec["aggregate_flow_prefix"]): str(spec["aggregate_flow_label"])
+        for spec in power_specs
+    }
 
     assert labels_by_prefix["10"] == "10 Losses and own use"
+    assert power_labels_by_prefix["10"] == "Power-related losses and own use"
     assert labels_by_prefix["10.01"] == "10.01 Own use"
 
 
@@ -1343,6 +1349,49 @@ def test_most_specific_page_root_owns_nested_transformation_categories() -> None
     assert assigned["_page_key"].tolist() == ["power", "refining", "other_transformation"]
     assert assigned["_routing_status"].tolist() == ["page_root", "page_root", "page_root"]
     assert assigned["_page_rule_priority"].tolist() == ["root:09.01", "root:09.07", "root:09"]
+
+
+def test_td_losses_route_electricity_and_heat_only_to_power_in_every_scope() -> None:
+    template = _load_template()
+    rows = pd.DataFrame(
+        [
+            {
+                "comparison_scope": scope,
+                "common_flow_code": "10.02",
+                "common_flow_label": "10.02 Transmission and distribution losses",
+                "common_product_code": product_code,
+                "common_product_label": product_label,
+            }
+            for scope in ["esto_extended_leap", "esto_extended_leap_ninth"]
+            for product_code, product_label in [
+                ("17", "17 Electricity"),
+                ("18", "18 Heat"),
+                ("08.01", "08.01 Natural gas"),
+            ]
+        ]
+    )
+
+    assigned = assign_pages(
+        rows,
+        template["sector_pages"],
+        template["routing_special_cases"],
+    )
+
+    power = assigned[assigned["common_product_code"].isin(["17", "18"])]
+    residual = assigned[assigned["common_product_code"].eq("08.01")]
+    assert set(power["comparison_scope"]) == {
+        "esto_extended_leap",
+        "esto_extended_leap_ninth",
+    }
+    assert set(power["_page_key"]) == {"power"}
+    assert set(power["_section_label"]) == {
+        "Transmission and distribution losses"
+    }
+    assert set(power["_routing_special_case"]) == {
+        "electricity_heat_td_losses_to_power"
+    }
+    assert set(residual["_page_key"]) == {"other_transformation"}
+    assert set(residual["_routing_status"]) == {"page_root"}
 
 
 def test_combined_placeholder_is_special_but_exact_17_routes_to_industry_section() -> None:

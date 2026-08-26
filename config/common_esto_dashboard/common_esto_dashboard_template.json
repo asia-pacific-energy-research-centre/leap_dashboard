@@ -39,6 +39,11 @@
       "10.01": "10.01 Own use",
       "15.01": "15.01,15.03-15.06 Transport non-road"
     },
+    "area_chart_flow_labels_by_page": {
+      "power": {
+        "10": "Power-related losses and own use"
+      }
+    },
     "synthetic_intermediate_flow_labels": {
       "09.06": "09.06 Gas processing plants (including own use)",
       "09.06.02": "09.06.02 Liquefaction/regasification plants (including own use)",
@@ -67,6 +72,21 @@
     "_note": "The Overview keeps transformation, residual own use, losses and transfers separate. Multi-flow summaries group by flow; single-flow summaries fall back to product, matching the Refining overview rule. Transformation detail stays disaggregated and is labelled as inclusive of auxiliary-fuel own use. Residual own-use rows already absorbed into an upstream inclusive Common ESTO boundary are excluded using upstream component and non-expanding-rollup contributor metadata, not a dashboard mapping list."
   },
   "routing_special_cases": [
+    {
+      "case_id": "electricity_heat_td_losses_to_power",
+      "enabled": true,
+      "match": {
+        "common_flow_code_exact": "10.02",
+        "common_product_code_exact_values": ["17", "18"]
+      },
+      "action": "route",
+      "page_key": "power",
+      "page_label": "Power",
+      "section_key": "transmission_distribution_losses",
+      "section_label": "Transmission and distribution losses",
+      "temporary": false,
+      "reason": "Electricity and heat transmission/distribution losses belong with their Power generation and own-use boundary; all other 10.02 products remain on Other transformation."
+    },
     {
       "case_id": "transfers_to_other_transformation",
       "enabled": true,

@@ -744,6 +744,16 @@ def _routing_special_case_mask(df: pd.DataFrame, special_case: dict) -> pd.Serie
         has_selector = True
         mask = mask & text_columns_mask(df, LABEL_MATCH_COLUMNS, keywords)
 
+    exact_product_codes = match.get("common_product_code_exact_values", []) or []
+    if exact_product_codes:
+        has_selector = True
+        wanted_product_codes = {
+            canonical_code(value) for value in exact_product_codes if canonical_code(value)
+        }
+        mask = mask & df.get(
+            "common_product_code", pd.Series("", index=df.index)
+        ).map(canonical_code).isin(wanted_product_codes)
+
     return mask if has_selector else pd.Series(False, index=df.index)
 
 
@@ -2279,7 +2289,11 @@ def _leaf_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
     ].drop(columns=["_leaf_row_number"])
 
 
-def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, object]]:
+def pick_area_specs(
+    page_df: pd.DataFrame,
+    template: dict,
+    page_key: str = "",
+) -> list[dict[str, object]]:
     """Choose aggregate area charts from the flow hierarchy."""
     nodes = get_existing_flow_nodes(page_df)
     if nodes.empty:
@@ -2289,6 +2303,12 @@ def pick_area_specs(page_df: pd.DataFrame, template: dict) -> list[dict[str, obj
         str(code): str(label)
         for code, label in chart_config.get("area_chart_flow_labels", {}).items()
     }
+    page_area_labels = chart_config.get("area_chart_flow_labels_by_page", {}).get(
+        str(page_key), {}
+    )
+    area_chart_flow_labels.update(
+        {str(code): str(label) for code, label in page_area_labels.items()}
+    )
     deep_min_depth = int(chart_config.get("deep_chain_min_depth", 3))
     max_depth = int(nodes["depth"].max())
     level_count = 2 if max_depth >= deep_min_depth else 1
@@ -7119,7 +7139,7 @@ def render_dashboard(
             []
             if page_key == other_transformation_page_key
             and other_transformation_config.get("hide_generic_overview", False)
-            else pick_area_specs(page_df, template)
+            else pick_area_specs(page_df, template, page_key=page_key)
         )
         page_flow_labels = {
             str(value).strip()

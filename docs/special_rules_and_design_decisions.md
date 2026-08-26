@@ -1334,6 +1334,38 @@ unabsorbed own-use row remains available.
 - 2026-08-16: P3-01 approved detailed coexistence in mapping outputs and one
   inclusive frontier in ordinary dashboard comparisons.
 
+## DASH-035: Power owns electricity and heat transmission/distribution losses
+
+**Status:** Confirmed and implemented  
+**Owner:** leap_dashboard  
+**Type:** Presentation routing and page boundary  
+**Affected areas:** Power; Other transformation; area-card labels; guides
+
+### Current rule
+
+Route only Common flow `10.02 Transmission and distribution losses` products
+`17 Electricity` and `18 Heat` to a separate **Transmission and distribution
+losses** section on Power. Keep every other `10.02` product on Other
+transformation. The routing consumes existing Common flow/product identities;
+it does not allocate, disaggregate, or duplicate a source row.
+
+Keep `10.01.01 Electricity, CHP and heat plants` own use and `10.02` losses as
+separate numerical boundaries. The Power-only parent area card is labelled
+**Power-related losses and own use** so its presentation scope is clear without
+globally renaming the Common flow-10 hierarchy.
+
+### Validation
+
+Focused routing coverage checks both configured comparison scopes, electricity,
+heat, and a retained natural-gas loss row. The page-assignment audit must show
+each source row on exactly one page.
+
+### History
+
+- 2026-08-26: Adopted after PRC evidence showed material ESTO, LEAP, and Ninth
+  electricity/heat `10.02` rows on Other transformation despite their Power
+  review ownership.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
