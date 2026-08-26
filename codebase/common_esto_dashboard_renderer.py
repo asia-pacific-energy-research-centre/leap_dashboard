@@ -3741,6 +3741,21 @@ _SCENARIO_TOGGLE_JS = """
     var meta = plot.layout.meta && plot.layout.meta.trace_meta;
     if (!meta || !meta.length) return;
     var scenarioMode = getMode();
+    // A downloaded dashboard can contain only one LEAP scenario. Do not let a
+    // browser-wide saved preference hide that scenario just because the user
+    // last viewed a different archive. Ninth/ESTO traces are deliberately not
+    // considered here: the selected LEAP export is the scenario authority.
+    var leapTags = meta
+      .filter(function(entry) { return entry.source_system === 'LEAP'; })
+      .map(function(entry) { return entry.tag; })
+      .filter(function(tag, index, values) {
+        return (tag === 'ref' || tag === 'tgt') && values.indexOf(tag) === index;
+      });
+    if (leapTags.length && leapTags.indexOf(scenarioMode) === -1) {
+      scenarioMode = leapTags.indexOf('tgt') !== -1 ? 'tgt' : 'ref';
+      setMode(scenarioMode);
+      syncButtons();
+    }
     var metricMode = plot._metricMode || 'tfc';
     var visible = meta.map(function(entry) { return computeVisible(entry, scenarioMode, metricMode); });
     window.Plotly.restyle(plot, {visible: visible});
