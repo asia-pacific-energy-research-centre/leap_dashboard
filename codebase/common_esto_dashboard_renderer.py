@@ -6262,17 +6262,19 @@ def build_total_demand_page(
     transformation_df = pd.DataFrame()
     transformation_flow_df = pd.DataFrame()
     if transformation_config.get("enabled", False):
-        transformation_df = select_transformation_overview_rows(
-            assigned_df,
-            transformation_config,
-            template.get("other_transformation_page", {}),
-        )
+        # The source top-level 09 rows are not a consistent comparison
+        # boundary: LEAP's Total transformation sector can differ from the
+        # equivalent 9th Outlook total even when their common leaf flows
+        # agree. Use the shared leaf frontier for every overview view and
+        # total, rather than using top-level parents for the net lines/fuels
+        # and leaves only for the by-flow areas.
         transformation_flow_df = select_transformation_overview_rows(
             assigned_df,
             transformation_config,
             template.get("other_transformation_page", {}),
             prefer_leaf_flows=True,
         )
+        transformation_df = transformation_flow_df
     charts: dict[str, go.Figure] = {}
     chart_rows: list[dict] = []
     manifest_rows: list[dict] = []

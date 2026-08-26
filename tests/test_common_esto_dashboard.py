@@ -2397,6 +2397,55 @@ def test_transformation_overview_leaf_frontier_replaces_parent_flow() -> None:
     assert "09" not in selected_codes
 
 
+def test_transformation_overview_leaf_frontier_avoids_mismatched_source_parents() -> None:
+    """Overview totals must not compare non-equivalent published 09 parents."""
+    common = {
+        "comparison_scope": "esto_extended_leap_ninth",
+        "economy": "01_AUS",
+        "scenario": "Target",
+        "year": 2060,
+        "common_product_code": "08.01",
+        "common_product_label": "08.01 Natural gas",
+        "is_non_expanding_rollup": False,
+    }
+    rows = pd.DataFrame([
+        {
+            **common,
+            "source_system": source_system,
+            "common_flow_code": "09",
+            "common_flow_label": "09 Total transformation sector (including own use)",
+            "value": parent_value,
+        }
+        for source_system, parent_value in [("LEAP", 2000.0), ("NINTH", -300.0)]
+    ] + [
+        {
+            **common,
+            "source_system": source_system,
+            "common_flow_code": flow_code,
+            "common_flow_label": flow_label,
+            "value": value,
+        }
+        for source_system in ("LEAP", "NINTH")
+        for flow_code, flow_label, value in [
+            ("09.06.02", "09.06.02 Liquefaction/regasification plants", -200.0),
+            ("09.13.01", "09.13.01 Electrolysers", -1700.0),
+        ]
+    ])
+
+    selected = select_transformation_overview_rows(
+        rows,
+        {"flow_code_prefixes": ["09", "08", "10.01", "10.02"]},
+        {"enabled": True, "append_inclusive_transformation_label": True},
+        prefer_leaf_flows=True,
+    )
+
+    assert set(selected["common_flow_code"]) == {"09.06.02", "09.13.01"}
+    assert selected.groupby("source_system")["value"].sum().to_dict() == {
+        "LEAP": -1900.0,
+        "NINTH": -1900.0,
+    }
+
+
 def test_transformation_leaf_frontier_does_not_treat_broad_rollup_as_terminal() -> None:
     common = {
         "comparison_scope": "esto_leap_ninth",
