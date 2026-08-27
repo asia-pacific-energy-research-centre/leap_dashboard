@@ -58,7 +58,7 @@
         "id": "supply-page-scope",
         "target": "[data-guide-id='chart-card']",
         "title": "What appears on Supply",
-        "copy": "Supply is organised by the balance flows that add energy to, or remove energy from, the economy. International marine and aviation transport is included because bunker fuel is supplied by the economy but then removed from domestic supply and domestic demand. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets.",
+        "copy": "Supply is organised by the balance flows that add energy to, or remove energy from, the economy. International marine and aviation transport is included because bunker fuel is supplied by the economy but then removed from domestic supply and domestic demand. The table shows each Common flow and fuel on this page beside the native categories mapped into it for the participating datasets. A combination is shown only when the selected economy has a value for that flow-and-fuel combination; if its values are all zero, it may be absent from the table even though the mapping exists. For example, AUS has a maintained mapping for ESTO 02 Imports × 01.03 Sub-bituminous coal, but its values are zero, so that combination is not displayed as a separate row.",
         "dynamic_content": "page_mapping_table",
         "table": {
           "caption": "Supply page contents",
