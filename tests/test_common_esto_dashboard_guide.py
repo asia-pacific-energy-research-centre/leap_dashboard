@@ -52,7 +52,7 @@ def test_chart_guide_adds_only_the_current_pages_review_content() -> None:
     power_script = build_guide_fragments("chart", "power", "Power")["script"]
     emissions_script = build_guide_fragments("chart", "emissions", "Emissions")["script"]
 
-    assert "do not measure power-sector own use or losses" in power_script
+    assert "The 10.01.01 own-use flow and 10.02 losses remain separate numerical boundaries" in power_script
     assert "Review the conversion story" not in power_script
     assert "Power review sequence" not in power_script
     assert "These emissions are derived" not in power_script
@@ -102,7 +102,7 @@ def test_other_transformation_guide_explains_leap_modelling_boundaries() -> None
     assert "Demand\\Other loss and own use" in rows["Other energy-sector own use"]
     assert "three modules" in rows["Transfers"]
     assert "no associated own use" in rows["Transfers"]
-    assert "Electricity transmission and distribution losses" in rows[
+    assert "the electricity and heat rows are shown separately on Power" in rows[
         "Transmission and distribution losses"
     ]
 
