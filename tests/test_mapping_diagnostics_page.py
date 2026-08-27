@@ -598,6 +598,11 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     pd.DataFrame([{ "leap_flow": "Industry", "leap_product": "Gas", "qa_status": "review" }]).to_csv(common_root / "qa_nonzero_unmapped_leap_branches.csv", index=False)
     pd.DataFrame([{ "leap_sector_name_full_path": "Industry", "raw_leap_fuel_name": "Gas", "presence_status": "ESTO only" }]).to_csv(maintenance_root / "leap_source_presence_conflicts.csv", index=False)
     pd.DataFrame([{ "coverage_status": "UNMAPPED", "mapping_status": "UNMAPPED" }]).to_csv(coverage_root / "all_demand_aggregated_coverage_gaps.csv", index=False)
+    (common_root / "source_to_common_esto_map.csv").write_text(
+        "source_flow,source_product,common_flow_label,common_product_label\n"
+        "02 Imports,01.03 Sub-bituminous coal,02 Imports,01.03 Sub-bituminous coal\n",
+        encoding="utf-8",
+    )
 
     layout = {"dashboards": tmp_path / "dashboard", "supporting": tmp_path / "supporting"}
     for path in layout.values():
@@ -637,6 +642,8 @@ def test_mapping_diagnostics_page_renders_tree_and_coverage_tables(tmp_path: Pat
     assert "Caution: treat this section as provisional." in html
     assert "until the detailed LEAP sectors are fully imported into the main LEAP areas" in html
     assert "Imported LEAP category recognition" in html
+    assert 'href="../supporting_files/source_to_common_esto_map.csv" download' in html
+    assert (layout["supporting"] / "source_to_common_esto_map.csv").is_file()
     assert "A category is marked for review here when a non-zero LEAP flow/product pair" in html
     assert "Prepare reviewed source exception" not in html
     assert "download-exception-candidate" not in html

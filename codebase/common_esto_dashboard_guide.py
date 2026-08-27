@@ -39,6 +39,8 @@ GUIDE_CSS = """
 .dashboard-guide-kicker { margin-top:15px;color:#e7672a;font-size:10px;font-weight:850;letter-spacing:.14em; }
 .dashboard-guide-title { margin:5px 0 8px;font-size:23px;line-height:1.18; }
 .dashboard-guide-copy { margin:0;color:#475569;font-size:15px;line-height:1.58;white-space:pre-line; }
+.dashboard-guide-links { display:flex;flex-wrap:wrap;gap:8px;margin-top:10px; }
+.dashboard-guide-links a { color:#1b5e9a;font-size:13px;font-weight:700; }
 .dashboard-guide-image { display:block;width:100%;max-height:58vh;margin-top:14px;object-fit:contain;border:1px solid #cbd8e7;border-radius:6px;background:#f8fafc; }
 .dashboard-guide-gallery { display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;margin-top:14px; }
 .dashboard-guide-gallery figure { min-width:0;margin:0; }
@@ -77,6 +79,7 @@ GUIDE_DIALOG_HTML = """
   <div id="dashboard-guide-kicker" class="dashboard-guide-kicker"></div>
   <h2 id="dashboard-guide-title" class="dashboard-guide-title"></h2>
   <p id="dashboard-guide-copy" class="dashboard-guide-copy"></p>
+  <div id="dashboard-guide-links" class="dashboard-guide-links" hidden></div>
   <img id="dashboard-guide-image" class="dashboard-guide-image" alt="" hidden>
   <div id="dashboard-guide-gallery" class="dashboard-guide-gallery" hidden aria-label="Guide screenshots">
     <button id="dashboard-guide-gallery-previous" type="button" aria-label="Previous screenshot">&larr;</button>
@@ -220,9 +223,19 @@ def _resolved_steps(
             step[field] = str(step[field]).format(**replacements)
         if (
             step.get("dynamic_content") == "page_mapping_table"
-            and context.get("page_mapping_table")
         ):
-            step["table"] = context["page_mapping_table"]
+            step["copy"] += (
+                " A combination is shown only when the selected economy has a value "
+                "for that flow-and-fuel combination; if its values are all zero, it "
+                "may be absent from the table even though the mapping exists."
+            )
+            step["links"] = [{
+                "label": "Download the complete native-to-Common mapping (CSV)",
+                "href": "../../diagnostics/supporting_files/source_to_common_esto_map.csv",
+                "download": True,
+            }]
+            if context.get("page_mapping_table"):
+                step["table"] = context["page_mapping_table"]
         resolved.append(step)
     return resolved
 
@@ -247,6 +260,7 @@ def _guide_js(steps: list[dict], guide_label: str) -> str:
   var galleryIndex = 0;
   var title = get('#dashboard-guide-title');
   var copy = get('#dashboard-guide-copy');
+  var links = get('#dashboard-guide-links');
   var image = get('#dashboard-guide-image');
   var gallery = get('#dashboard-guide-gallery');
   var galleryImages = get('#dashboard-guide-gallery-images');
@@ -321,6 +335,15 @@ def _guide_js(steps: list[dict], guide_label: str) -> str:
     get('#dashboard-guide-total').textContent = String(steps.length);
     title.textContent = step.title;
     copy.textContent = step.copy;
+    links.replaceChildren();
+    links.hidden = !(step.links || []).length;
+    (step.links || []).forEach(function(link) {{
+      var anchor = document.createElement('a');
+      anchor.href = link.href || '#';
+      anchor.textContent = link.label || link.href || 'Open link';
+      if (link.download) anchor.setAttribute('download', '');
+      links.appendChild(anchor);
+    }});
     image.hidden = !step.image;
     if (step.image) {{ image.src = step.image; image.alt = step.image_alt || step.title; }} else {{ image.removeAttribute('src'); image.alt = ''; }}
     galleryItems = step.gallery || [];
@@ -328,7 +351,7 @@ def _guide_js(steps: list[dict], guide_label: str) -> str:
     gallery.hidden = !galleryItems.length;
     if (galleryItems.length) renderGallery(); else {{ galleryImages.replaceChildren(); galleryCaption.textContent = ''; }}
     renderTable(step.table);
-    dialog.classList.toggle('guide-has-rich-content', Boolean(step.image || galleryItems.length || step.table));
+    dialog.classList.toggle('guide-has-rich-content', Boolean(step.image || galleryItems.length || step.table || (step.links || []).length));
     back.style.visibility = current === 0 ? 'hidden' : 'visible';
     next.innerHTML = current === steps.length - 1 ? 'Done <span aria-hidden="true">✓</span>' : 'Next <span aria-hidden="true">→</span>';
     if (target) {{

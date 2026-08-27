@@ -52,6 +52,15 @@ def publish_to_docs(layout: dict[str, Path], docs_root: Path) -> dict[str, int]:
         (layout["dashboards"],    docs_root / economy / "dashboards",    ["*.html"], ["*.html"]),
         (layout["chart_bundles"], docs_root / economy / "chart_bundles", ["*.js"], ["*.js", "*.json"]),
     ]
+    if economy == "diagnostics":
+        copy_specs.append(
+            (
+                layout["supporting"],
+                docs_root / economy / "supporting_files",
+                ["source_to_common_esto_map.csv"],
+                ["source_to_common_esto_map.csv"],
+            )
+        )
     counts: dict[str, int] = {}
     for src_dir, dst_dir, copy_patterns, cleanup_patterns in copy_specs:
         dst_dir.mkdir(parents=True, exist_ok=True)

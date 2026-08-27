@@ -21,6 +21,8 @@ def test_guide_config_is_valid_and_page_copy_is_resolved() -> None:
     assert 'id="dashboard-guide-launch"' in fragments["launch_button_html"]
     assert 'role="dialog"' in fragments["dialog_html"]
     assert ".dashboard-guide-highlight" in fragments["css"]
+    assert "Download the complete native-to-Common mapping (CSV)" in fragments["script"]
+    assert "even though the mapping exists" in fragments["script"]
 
 
 def test_industry_purpose_warns_about_possible_mapping_errors() -> None:
