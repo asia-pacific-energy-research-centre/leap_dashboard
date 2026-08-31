@@ -2164,19 +2164,19 @@ def test_non_road_placeholder_keeps_road_detail_charts() -> None:
     )
     rows = pd.DataFrame([
         {"common_flow_code": "15", "common_flow_label": "15 Transport sector"},
-        {"common_flow_code": "15.01", "common_flow_label": "15.01 Road transport"},
-        {"common_flow_code": "15.02", "common_flow_label": "15.02 Rail transport"},
-        {"common_flow_code": "15.03", "common_flow_label": "15.03 Domestic navigation"},
+        {"common_flow_code": "15.01", "common_flow_label": "15.01 Domestic air transport"},
+        {"common_flow_code": "15.02", "common_flow_label": "15.02 Road"},
+        {"common_flow_code": "15.03", "common_flow_label": "15.03 Rail"},
     ])
 
     visible = drop_placeholder_only_demand_detail_rows("transport", rows, template)
 
     assert visible["common_flow_label"].tolist() == [
         "15 Transport sector",
-        "15.01 Road transport",
+        "15.02 Road",
     ]
     assert placeholder_only_demand_flow_prefixes("transport", template) == [
-        "15.02", "15.03", "15.04", "15.05", "15.06",
+        "15.01", "15.03", "15.04", "15.05", "15.06",
     ]
 
 
@@ -4421,6 +4421,108 @@ def test_section_aggregate_suppresses_chart_with_only_pre_base_year_projection()
     assert chart_rows == []
     assert len(manifest_rows) == 2
     assert all(row["suppressed"] for row in manifest_rows)
+
+
+def test_road_technology_section_uses_authoritative_parent_totals() -> None:
+    rows = pd.DataFrame(
+        [
+            {
+                "comparison_scope": "esto_extended_leap_ninth",
+                "economy": "01_AUS",
+                "source_system": source,
+                "scenario": scenario,
+                "year": year,
+                "common_flow_code": flow_code,
+                "common_flow_label": flow_label,
+                "common_product_code": "07.01",
+                "common_product_label": "07.01 Motor gasoline",
+                "is_non_expanding_rollup": is_rollup,
+                "_section_label": "Transport",
+                "value": value,
+            }
+            for source, scenario, year, flow_code, flow_label, is_rollup, value in [
+                ("ESTO", "historical", 2022, "15.02", "15.02 Road", True, 100.0),
+                ("LEAP", "Target", 2022, "15.02", "15.02 Road", True, 98.0),
+                ("NINTH", "Target", 2022, "15.02", "15.02 Road", True, 102.0),
+                ("ESTO", "historical", 2022, "15.02.01.01", "15.02.01.01 BEV", False, 20.0),
+                ("ESTO", "historical", 2022, "15.02.01.02", "15.02.01.02 ICE", False, 40.0),
+                ("LEAP", "Target", 2022, "15.02.01.01", "15.02.01.01 BEV", False, 30.0),
+                ("LEAP", "Target", 2022, "15.02.01.02", "15.02.01.02 ICE", False, 50.0),
+                ("LEAP", "Target", 2023, "15.02.01.01", "15.02.01.01 BEV", False, 35.0),
+                ("LEAP", "Target", 2023, "15.02.01.02", "15.02.01.02 ICE", False, 55.0),
+                ("NINTH", "Target", 2022, "15.02.01.01", "15.02.01.01 BEV", False, 25.0),
+                ("NINTH", "Target", 2022, "15.02.01.02", "15.02.01.02 ICE", False, 45.0),
+            ]
+        ]
+    )
+    template = {
+        "chart_generation": {
+            "primary_area_source_system": "LEAP",
+            "primary_area_scenario": "Target",
+            "comparison_source_system": "ESTO",
+            "ninth_source_system": "NINTH",
+            "base_year": 2022,
+            "suppression_threshold": 0.0,
+            "authoritative_section_total_overlays": [
+                {
+                    "page_key": "transport",
+                    "section_label": "Transport",
+                    "parent_flow_prefix": "15.02",
+                    "group_by": "flow",
+                    "title": "15.02 Road — detailed model by technology",
+                }
+            ],
+        }
+    }
+
+    charts, chart_rows, manifest_rows = _build_section_aggregate_charts(
+        rows,
+        page_key="transport",
+        page_label="Transport",
+        parent_flow_labels={"15.02 Road"},
+        template=template,
+        series_labels={
+            "ESTO|historical": "ESTO Historical",
+            "LEAP|Target": "LEAP Target",
+            "NINTH|Target": "9th Target",
+        },
+    )
+
+    assert list(charts) == ["chart__area__section__transport__transport__flow"]
+    assert len(chart_rows) == 1
+    assert chart_rows[0]["title"] == "15.02 Road — detailed model by technology"
+    assert len(manifest_rows) == 1
+    figure = next(iter(charts.values()))
+    trace_by_name = {trace.name: trace for trace in figure.data}
+    assert list(trace_by_name["ESTO Historical total"].y) == [100.0]
+    assert list(trace_by_name["ESTO Historical technology coverage"].y) == [60.0]
+    assert list(trace_by_name["LEAP Target total"].y) == [98.0]
+    assert list(trace_by_name["LEAP Target technology coverage"].y) == [80.0]
+    assert list(trace_by_name["9th Target total"].y) == [102.0]
+    assert list(trace_by_name["9th Target technology coverage"].y) == [70.0]
+    assert "coverage gap" in figure.layout.meta["stacked_area_note"].casefold()
+
+
+def test_transport_placeholder_prefixes_keep_road_and_non_road_distinct() -> None:
+    template_path = (
+        REPO_ROOT
+        / "config"
+        / "common_esto_dashboard"
+        / "common_esto_dashboard_template.json"
+    )
+    template = json.loads(template_path.read_text(encoding="utf-8"))
+    prefixes = template["leap_demand_sector_coverage"][
+        "placeholder_component_flow_prefixes"
+    ]
+
+    assert prefixes["Road"] == ["15.02"]
+    assert prefixes["Transport non road"] == [
+        "15.01",
+        "15.03",
+        "15.04",
+        "15.05",
+        "15.06",
+    ]
 
 
 def test_esto_extended_scopes_disable_magnitude_suppression() -> None:

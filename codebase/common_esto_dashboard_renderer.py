@@ -2571,7 +2571,11 @@ def _apply_total_series_chrome(fig: go.Figure) -> None:
         if trace_line is not None:
             trace_line.color = color
             trace_line.width = max(float(trace_line.width or 0), 2.25)
-            trace_line.dash = style["dash"]
+            trace_line.dash = (
+                "dot"
+                if "technology coverage" in trace_name.casefold()
+                else style["dash"]
+            )
         if getattr(trace, "marker", None) is not None:
             trace.marker.color = color
             if hasattr(trace.marker, "size"):
@@ -2753,10 +2757,87 @@ def build_area_chart(
                 for _ in range(trace_count)
             )
 
-    total_df = (
+    coverage_total_df = (
         chart_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum().sort_values(["source_system", "scenario", "year"])
     )
-    for (source_system, scenario), group in total_df.groupby(["source_system", "scenario"], dropna=False):
+    authoritative_labels_by_source = area_spec.get(
+        "authoritative_total_flow_labels_by_system"
+    ) or {}
+    authoritative_total_df = pd.DataFrame()
+    if authoritative_labels_by_source:
+        authoritative_rows = area_spec_rows(
+            df,
+            {
+                "source_flow_labels": [],
+                "source_flow_labels_by_system": authoritative_labels_by_source,
+            },
+        )
+        if not authoritative_rows.empty:
+            authoritative_rows = _non_overlapping_flow_rows(
+                _non_overlapping_common_row_frontier(authoritative_rows)
+            )
+            authoritative_total_df = (
+                authoritative_rows.groupby(
+                    ["source_system", "scenario", "year"], as_index=False
+                )["value"]
+                .sum()
+                .sort_values(["source_system", "scenario", "year"])
+            )
+
+    if authoritative_total_df.empty:
+        displayed_total_df = coverage_total_df.copy()
+    else:
+        total_keys = ["source_system", "scenario"]
+        authoritative_series = {
+            tuple(key if isinstance(key, tuple) else (key,))
+            for key, _ in authoritative_total_df.groupby(total_keys, dropna=False)
+        }
+        fallback_parts = [authoritative_total_df]
+        for key, group in coverage_total_df.groupby(total_keys, dropna=False):
+            normalized_key = tuple(key if isinstance(key, tuple) else (key,))
+            if normalized_key not in authoritative_series:
+                fallback_parts.append(group)
+        displayed_total_df = pd.concat(fallback_parts, ignore_index=True)
+
+        coverage_with_parent = coverage_total_df.merge(
+            authoritative_total_df.rename(columns={"value": "authoritative_value"}),
+            on=["source_system", "scenario", "year"],
+            how="inner",
+        )
+        for (source_system, scenario), group in coverage_with_parent.groupby(
+            ["source_system", "scenario"], dropna=False
+        ):
+            if str(source_system).casefold() != comparison_source.casefold():
+                group = group[group["year"] >= base_year]
+            if group.empty:
+                continue
+            label = series_label_from_values(source_system, scenario, series_labels)
+            group = group.copy()
+            group["coverage_gap"] = group["authoritative_value"] - group["value"]
+            fig.add_trace(
+                go.Scatter(
+                    x=group["year"],
+                    y=group["value"],
+                    mode="lines+markers",
+                    name=f"{label} technology coverage",
+                    line={"dash": "dot", "width": 1.5},
+                    customdata=group[["authoritative_value", "coverage_gap"]].to_numpy(),
+                    hovertemplate=(
+                        "%{x}<br>Visible technology coverage: %{y:,.2f}"
+                        + chart_unit
+                        + "<br>Authoritative total: %{customdata[0]:,.2f}"
+                        + chart_unit
+                        + "<br>Coverage gap: %{customdata[1]:,.2f}"
+                        + chart_unit
+                        + "<extra>"
+                        + escape(label)
+                        + "</extra>"
+                    ),
+                )
+            )
+            trace_meta.append(trace_meta_entry(source_system, scenario, True))
+
+    for (source_system, scenario), group in displayed_total_df.groupby(["source_system", "scenario"], dropna=False):
         # Every dataset gets an explicit signed-sum total line, including ones
         # already drawn as stacked area colors above (ESTO, primary LEAP
         # scenario): when a group's components have mixed signs, the stack is
@@ -2778,6 +2859,15 @@ def build_area_chart(
                 mode="lines+markers",
                 name=f"{label} total",
                 line={"dash": "dash"},
+                hovertemplate=(
+                    "%{x}<br>Authoritative total: %{y:,.2f}"
+                    + chart_unit
+                    + "<extra>"
+                    + escape(label)
+                    + "</extra>"
+                    if not authoritative_total_df.empty
+                    else None
+                ),
             )
         )
         trace_meta.append(trace_meta_entry(source_system, scenario, True))
@@ -2793,6 +2883,12 @@ def build_area_chart(
             "trace_meta": trace_meta,
             "stacked_area_note": chart_note_with_lng_coverage(
                 (
+                    f"Stacked areas: {dataset_display_name(comparison_source)} historical through "
+                    f"{base_year}; {dataset_display_name(primary_source)} projection after {base_year}. "
+                    "Dashed lines are authoritative parent totals; dotted coverage lines sum only "
+                    "the visible detailed technologies, and the difference is the coverage gap."
+                    if not authoritative_total_df.empty
+                    else
                     f"Stacked areas: {dataset_display_name(comparison_source)} historical through "
                     f"{base_year}; {dataset_display_name(primary_source)} projection after {base_year}."
                 ),
@@ -2833,6 +2929,12 @@ def _build_section_aggregate_charts(
     base_year = int(chart_config.get("base_year", 2023))
     ninth_source = str(chart_config.get("ninth_source_system", "NINTH"))
     suppression_threshold = effective_chart_suppression_threshold(template, page_df)
+    authoritative_overlay_configs = [
+        item
+        for item in chart_config.get("authoritative_section_total_overlays", [])
+        if str(item.get("page_key", "")).strip() == page_key
+    ]
+    flow_nodes = get_existing_flow_nodes(page_df)
 
     flow_section = non_parent_df.groupby("common_flow_label")["_section_label"].agg(lambda s: s.mode().iloc[0])
     section_flows: dict[str, list[str]] = {}
@@ -2871,6 +2973,15 @@ def _build_section_aggregate_charts(
         )
 
     for section_label in ordered_sections:
+        section_overlay = next(
+            (
+                item
+                for item in authoritative_overlay_configs
+                if str(item.get("section_label", "")).strip().casefold()
+                == section_label.casefold()
+            ),
+            None,
+        )
         overview_summary = overview_summaries.get(section_label.casefold())
         if is_other_transformation_page and overview_summaries and not overview_summary:
             continue
@@ -2882,6 +2993,17 @@ def _build_section_aggregate_charts(
             "aggregate_flow_label": section_label,
             "source_flow_labels": flow_labels,
         }
+        if section_overlay:
+            parent_prefix = str(
+                section_overlay.get("parent_flow_prefix", "")
+            ).strip()
+            labels_by_source = frontier_flow_labels(
+                flow_nodes,
+                parent_prefix,
+                code_depth(parent_prefix),
+            )
+            if labels_by_source:
+                area_spec["authoritative_total_flow_labels_by_system"] = labels_by_source
         area_df = page_df[page_df["common_flow_label"].isin(flow_labels)]
         effective_flow_rows = _non_overlapping_flow_rows(
             _non_overlapping_common_row_frontier(area_df)
@@ -2898,6 +3020,12 @@ def _build_section_aggregate_charts(
             ("common_product_label", "product", "Aggregate by product", section_label, "All products"),
             ("common_flow_label", "flow", "Aggregate by flow", "All flows", section_label),
         ):
+            if section_overlay:
+                configured_group = str(
+                    section_overlay.get("group_by", "flow")
+                ).strip().casefold()
+                if group_noun != configured_group:
+                    continue
             if overview_summary and group_noun != overview_group_by:
                 continue
             chart_key = f"chart__area__section__{safe_slug(page_key)}__{safe_slug(section_label)}__{group_noun}"
@@ -2934,12 +3062,21 @@ def _build_section_aggregate_charts(
             if not figure.data:
                 manifest_rows[-1]["suppressed"] = True
                 continue
+            configured_title = (
+                str(section_overlay.get("title", "")).strip()
+                if section_overlay
+                else ""
+            )
+            if configured_title:
+                figure.update_layout(
+                    title=title_with_sign_note(configured_title, area_df)
+                )
             charts[chart_key] = figure
             chart_rows.append({
                 "chart_key": chart_key,
                 "chart_type": "stacked_area",
-                "title": f"{title_prefix}: {section_label}",
-                "product_label": f"{title_prefix}: {section_label}",
+                "title": configured_title or f"{title_prefix}: {section_label}",
+                "product_label": configured_title or f"{title_prefix}: {section_label}",
                 "section_label": "Overview" if overview_summary else section_label,
                 "navigation_root_label": section_label if overview_summary else "",
                 "navigation_root_section_label": section_label if overview_summary else "",

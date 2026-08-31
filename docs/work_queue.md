@@ -2,6 +2,18 @@
 
 ## Current-run LEAP demand representation status — implemented and verified
 
+- **DASHQ-067 — authoritative Road totals over detailed technology coverage.**
+  Complete 2026-08-29. The `15.02 Road — detailed model by technology`
+  chart keeps the technology stack, overlays the authoritative `15.02 Road`
+  totals for ESTO, LEAP and Ninth, and labels the partial detailed sum as
+  technology coverage rather than as a Road total. The configured Road section
+  suppresses its redundant product summary. The same correction fixed the
+  reversed placeholder prefixes so Road is `15.02` and non-road is
+  `15.01,15.03-15.06`. Verification: 163 focused dashboard tests passed; the
+  detailed AUS render reports 2022 authoritative totals of 1055.28 PJ (ESTO)
+  and 1053.26 PJ (LEAP), versus visible technology coverage of 680.56 PJ and
+  1017.59 PJ respectively.
+
 - **DASHQ-066 — PRC Power loss ownership and Power-only aggregate label.**
   Complete 2026-08-26. Product-aware special routing sends only `10.02`
   Electricity and Heat to Power in both configured comparison scopes; every
