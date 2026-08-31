@@ -377,8 +377,8 @@ Detailed Supply already presents separate `04 International marine bunkers`
 and `05 International aviation bunkers` product cards. A combined `04-05`
 Overview repeats information those two cards provide. The renderer now omits
 all combined `04-05` Overview cards when both separate child product cards are
-present. Placeholder candidates still receive the combined product/flow
-fallback when the separate children are unavailable.
+present. Placeholder candidates receive exactly one combined product fallback
+when the separate children are unavailable; a second by-flow copy is omitted.
 
 ## AUS-CONSIST-017 — Non-road allocation and Power detail source audit
 

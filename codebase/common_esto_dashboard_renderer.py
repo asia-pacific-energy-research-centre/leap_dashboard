@@ -2671,45 +2671,6 @@ def add_supply_bunker_overview_specs(
     if not existing_product:
         specs.append(base_spec)
 
-    detail_rows = pd.concat(
-        [flow_boundary_candidate_rows(page_df, value) for value in detail_boundaries],
-        ignore_index=True,
-    ) if detail_boundaries else page_df.iloc[0:0].copy()
-    detail_rows = _non_overlapping_flow_rows(
-        _non_overlapping_common_row_frontier(detail_rows)
-    )
-    minimum_children = int(
-        (template.get("aggregate_chart_policy", {}) or {}).get(
-            "minimum_nonzero_child_flows", 2
-        )
-    )
-    nonzero_children = sum(
-        _has_nonzero_values(child_rows["value"])
-        for _flow_label, child_rows in detail_rows.groupby(
-            "common_flow_label", dropna=False
-        )
-    ) if not detail_rows.empty else 0
-    has_flow = any(
-        code_candidate_text(spec.get("aggregate_flow_prefix", ""))
-        == code_candidate_text(boundary)
-        and str(spec.get("overview_variant", "")) == "by_flow"
-        for spec in specs
-    )
-    if (
-        nonzero_children >= minimum_children
-        and not has_flow
-    ):
-        specs.append({
-            **base_spec,
-            "overview_variant": "by_flow",
-            "group_col": "common_flow_label",
-            "preferred_detail_flow_boundaries": detail_boundaries,
-            "detail_coverage_residual_label": (
-                "Unallocated within international transport bunkers"
-            ),
-            "title_prefix": "Aggregate by flow",
-            "chart_caption": f"{label} — by flow",
-        })
     return specs
 
 

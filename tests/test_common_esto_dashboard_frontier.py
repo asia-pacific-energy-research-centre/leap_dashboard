@@ -713,7 +713,7 @@ def test_generic_placeholder_overview_drops_uninformative_by_flow_companion() ->
     ]
 
 
-def test_supply_bunker_overview_keeps_combined_total_and_marine_aviation_flow() -> None:
+def test_supply_bunker_overview_keeps_one_combined_fallback() -> None:
     template = {
         "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
         "supply_page": {
@@ -749,14 +749,8 @@ def test_supply_bunker_overview_keeps_combined_total_and_marine_aviation_flow() 
     )
 
     assert [spec.get("overview_variant", "by_product") for spec in specs] == [
-        "by_product", "by_flow"
+        "by_product"
     ]
-    resolved = renderer.resolved_area_chart_rows(
-        rows,
-        specs[1],
-        group_col="common_flow_label",
-    )
-    assert set(resolved["common_flow_code"]) == {"04-05", "04", "05"}
 
 
 def test_supply_bunker_overview_omits_combined_total_when_children_have_cards() -> None:
