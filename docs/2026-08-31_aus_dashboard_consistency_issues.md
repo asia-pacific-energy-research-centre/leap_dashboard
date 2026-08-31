@@ -374,14 +374,11 @@ bunkers remain separate negative withdrawals at -99.303004 PJ in 2022 and
 ## AUS-CONSIST-016 — Supply repeats the combined bunker card
 
 Detailed Supply already presents separate `04 International marine bunkers`
-and `05 International aviation bunkers` product cards. Adding both a combined
-`04-05` product card and a combined by-flow card repeated the same marine versus
-aviation information. The renderer now keeps one combined product total and
-suppresses the combined by-flow companion when both separate child product
-cards are present. Placeholder candidates still receive the combined by-flow
-fallback when the separate children are unavailable. The regenerated detailed
-AUS candidate has 521 charts and exactly one `04-05 International transport
-(bunkers)` Overview card.
+and `05 International aviation bunkers` product cards. A combined `04-05`
+Overview repeats information those two cards provide. The renderer now omits
+all combined `04-05` Overview cards when both separate child product cards are
+present. Placeholder candidates still receive the combined product/flow
+fallback when the separate children are unavailable.
 
 ## AUS-CONSIST-017 — Non-road allocation and Power detail source audit
 

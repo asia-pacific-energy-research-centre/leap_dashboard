@@ -2601,7 +2601,7 @@ def add_supply_bunker_overview_specs(
     area_specs: list[dict[str, object]],
     template: dict,
 ) -> list[dict[str, object]]:
-    """Keep one bunker total and add its split only when children are absent."""
+    """Use separate bunker children when available, otherwise keep the total."""
     supply_config = template.get("supply_page", {}) or {}
     configured_page_key = str(supply_config.get("page_key", "supply")).strip()
     bunker_config = supply_config.get("bunker_overview", {}) or {}
@@ -2615,11 +2615,33 @@ def add_supply_bunker_overview_specs(
     label = str(bunker_config.get("label", "")).strip()
     if not boundary or not label:
         return list(area_specs)
+    specs = list(area_specs)
+    detail_boundaries = [
+        str(value).strip()
+        for value in bunker_config.get("preferred_detail_flow_boundaries", [])
+        if str(value).strip()
+    ]
+    separate_child_products = all(
+        any(
+            code_candidate_text(spec.get("aggregate_flow_prefix", ""))
+            == code_candidate_text(detail_boundary)
+            and str(spec.get("overview_variant", "by_product")) == "by_product"
+            for spec in specs
+        )
+        for detail_boundary in detail_boundaries
+    ) if detail_boundaries else False
+    if separate_child_products:
+        return [
+            spec
+            for spec in specs
+            if code_candidate_text(spec.get("aggregate_flow_prefix", ""))
+            != code_candidate_text(boundary)
+        ]
+
     rows = flow_boundary_candidate_rows(page_df, boundary)
     if rows.empty:
-        return list(area_specs)
+        return specs
 
-    specs = list(area_specs)
     labels_by_source = {
         str(source): sorted(
             source_rows["common_flow_label"].dropna().astype(str).unique()
@@ -2649,11 +2671,6 @@ def add_supply_bunker_overview_specs(
     if not existing_product:
         specs.append(base_spec)
 
-    detail_boundaries = [
-        str(value).strip()
-        for value in bunker_config.get("preferred_detail_flow_boundaries", [])
-        if str(value).strip()
-    ]
     detail_rows = pd.concat(
         [flow_boundary_candidate_rows(page_df, value) for value in detail_boundaries],
         ignore_index=True,
@@ -2678,19 +2695,9 @@ def add_supply_bunker_overview_specs(
         and str(spec.get("overview_variant", "")) == "by_flow"
         for spec in specs
     )
-    separate_child_products = all(
-        any(
-            code_candidate_text(spec.get("aggregate_flow_prefix", ""))
-            == code_candidate_text(detail_boundary)
-            and str(spec.get("overview_variant", "by_product")) == "by_product"
-            for spec in specs
-        )
-        for detail_boundary in detail_boundaries
-    ) if detail_boundaries else False
     if (
         nonzero_children >= minimum_children
         and not has_flow
-        and not separate_child_products
     ):
         specs.append({
             **base_spec,

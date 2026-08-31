@@ -759,7 +759,7 @@ def test_supply_bunker_overview_keeps_combined_total_and_marine_aviation_flow() 
     assert set(resolved["common_flow_code"]) == {"04-05", "04", "05"}
 
 
-def test_supply_bunker_overview_omits_redundant_flow_when_children_have_cards() -> None:
+def test_supply_bunker_overview_omits_combined_total_when_children_have_cards() -> None:
     template = {
         "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
         "supply_page": {
@@ -798,9 +798,7 @@ def test_supply_bunker_overview_omits_redundant_flow_when_children_have_cards() 
         "supply", rows, existing, template
     )
 
-    assert [spec.get("aggregate_flow_prefix") for spec in specs] == [
-        "04", "05", "04-05"
-    ]
+    assert [spec.get("aggregate_flow_prefix") for spec in specs] == ["04", "05"]
     assert all(spec.get("overview_variant") != "by_flow" for spec in specs)
 
 
