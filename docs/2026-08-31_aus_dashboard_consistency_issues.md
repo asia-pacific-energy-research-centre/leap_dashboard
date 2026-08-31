@@ -359,14 +359,14 @@ Extended Buildings data. The corrected upstream artifact restores the 2022
 parent and selected-child identity to 781.606486 PJ, matching LEAP. The
 dashboard does not rescale the data or invent missing source children.
 
-## AUS-CONSIST-015 — Fresh detailed source retains two allocation discontinuities
+## AUS-CONSIST-015 — Detailed source allocation continuity
 
-The corrected artifact fixes the whole-Buildings boundary and international
-bunker identities. It still assigns all LEAP Services to `16.01.99`: the LEAP
-`16.01.01 Datacentres` child is absent, and Services rises from 305.755577 PJ
-in 2022 to 523.203917 PJ in 2023 while Residential moves in the opposite
-direction. The whole-Buildings total remains smooth. Detailed Transport
-non-road also differs at the boundary: ESTO Extended is 216.679815 PJ in 2022
-and LEAP is 185.311632 PJ. These are source-fixture allocation questions, not
-renderer residuals; the upstream rebuild must either correct them or document
-why they are intentional before release.
+The final source-authoritative fixture fixes the whole-Buildings boundary,
+international bunker identities and internal allocation continuity. Services
+moves from 305.755578 PJ in 2022 to 310.026122 PJ in 2023; Datacentres appears
+at 10.458753 PJ in 2023 and remains separate from the `16.01.99` remainder.
+The Buildings parent moves smoothly from 781.606486 PJ to 791.524737 PJ.
+Detailed Transport non-road is 216.679872 PJ in 2022, matching ESTO Extended
+216.679815 PJ within fixture precision, and 236.401763 PJ in 2023. Combined
+bunkers remain separate negative withdrawals at -99.303004 PJ in 2022 and
+-249.595326 PJ in 2023.
