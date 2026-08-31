@@ -2628,7 +2628,8 @@ def test_common_esto_dashboard_keeps_international_transport_on_supply_without_s
     assert "04 International marine bunkers" in supply_flows
     assert "05 International aviation bunkers" in supply_flows
     assert "04-05 International transport (bunkers)" in supply_flows
-    assert "04-05 International transport (bunkers) — by flow" in supply_html
+    assert "04-05 International transport (bunkers) — by flow" not in supply_html
+    assert supply_html.count(">04-05 International transport (bunkers)<") == 1
 
     assignments = pd.read_csv(layout["supporting"] / "page_assignment_summary.csv")
     assert "international_transport" not in set(assignments["page_key"])

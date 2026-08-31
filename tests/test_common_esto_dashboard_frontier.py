@@ -759,6 +759,51 @@ def test_supply_bunker_overview_keeps_combined_total_and_marine_aviation_flow() 
     assert set(resolved["common_flow_code"]) == {"04-05", "04", "05"}
 
 
+def test_supply_bunker_overview_omits_redundant_flow_when_children_have_cards() -> None:
+    template = {
+        "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
+        "supply_page": {
+            "page_key": "supply",
+            "bunker_overview": {
+                "enabled": True,
+                "flow_boundary": "04-05",
+                "label": "04-05 International transport (bunkers)",
+                "preferred_detail_flow_boundaries": ["04", "05"],
+            },
+        },
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("LEAP", "Target", 2030, "04-05", "07.08", -30.0),
+            "common_flow_label": "04-05 International transport (bunkers)",
+            "common_product_label": "07.08 Fuel oil",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2030, "04", "07.08", -12.0),
+            "common_flow_label": "04 International marine bunkers",
+            "common_product_label": "07.08 Fuel oil",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2030, "05", "07.07", -18.0),
+            "common_flow_label": "05 International aviation bunkers",
+            "common_product_label": "07.07 Gas/diesel oil",
+        },
+    ])
+    existing = [
+        {"aggregate_flow_prefix": "04", "aggregate_flow_label": "04 Marine"},
+        {"aggregate_flow_prefix": "05", "aggregate_flow_label": "05 Aviation"},
+    ]
+
+    specs = renderer.add_supply_bunker_overview_specs(
+        "supply", rows, existing, template
+    )
+
+    assert [spec.get("aggregate_flow_prefix") for spec in specs] == [
+        "04", "05", "04-05"
+    ]
+    assert all(spec.get("overview_variant") != "by_flow" for spec in specs)
+
+
 def test_supply_bunker_children_are_always_displayed_as_withdrawals() -> None:
     rows = pd.DataFrame([
         _area_product_row("ESTO_EXTENDED", "historical", 2022, "04", "07.08", 5.0),

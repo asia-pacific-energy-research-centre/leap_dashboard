@@ -370,3 +370,31 @@ Detailed Transport non-road is 216.679872 PJ in 2022, matching ESTO Extended
 216.679815 PJ within fixture precision, and 236.401763 PJ in 2023. Combined
 bunkers remain separate negative withdrawals at -99.303004 PJ in 2022 and
 -249.595326 PJ in 2023.
+
+## AUS-CONSIST-016 — Supply repeats the combined bunker card
+
+Detailed Supply already presents separate `04 International marine bunkers`
+and `05 International aviation bunkers` product cards. Adding both a combined
+`04-05` product card and a combined by-flow card repeated the same marine versus
+aviation information. The renderer now keeps one combined product total and
+suppresses the combined by-flow companion when both separate child product
+cards are present. Placeholder candidates still receive the combined by-flow
+fallback when the separate children are unavailable. The regenerated detailed
+AUS candidate has 521 charts and exactly one `04-05 International transport
+(bunkers)` Overview card.
+
+## AUS-CONSIST-017 — Non-road allocation and Power detail source audit
+
+The final detailed comparison fact reconciles Transport non-road at the base
+year: ESTO Extended is 216.679815 PJ and LEAP is 216.679872 PJ in 2022. LEAP
+then reaches 236.401763 PJ in 2023 while the Ninth target reaches 287.415053
+PJ, so the visible post-base-year gap is not an area-stack arithmetic error.
+The upstream allocation and dummy-data assumptions are under source-owner
+review before any dashboard-side adjustment is considered.
+
+Power currently has no technology-level LEAP rows under the Electricity and
+CHP plant branches in the supplied comparison fact. Its fallback audit records
+`Electricity interim` and `CHP interim` as `interim_only_retained`, so the
+PLACEHOLDER labels are accurate for this artifact. The source-owner review
+will determine whether detailed branches exist in the original export, can be
+generated from reviewed dummy inputs, or must remain explicitly provisional.

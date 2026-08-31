@@ -2601,7 +2601,7 @@ def add_supply_bunker_overview_specs(
     area_specs: list[dict[str, object]],
     template: dict,
 ) -> list[dict[str, object]]:
-    """Keep the authoritative bunker total beside its marine/aviation split."""
+    """Keep one bunker total and add its split only when children are absent."""
     supply_config = template.get("supply_page", {}) or {}
     configured_page_key = str(supply_config.get("page_key", "supply")).strip()
     bunker_config = supply_config.get("bunker_overview", {}) or {}
@@ -2678,7 +2678,20 @@ def add_supply_bunker_overview_specs(
         and str(spec.get("overview_variant", "")) == "by_flow"
         for spec in specs
     )
-    if nonzero_children >= minimum_children and not has_flow:
+    separate_child_products = all(
+        any(
+            code_candidate_text(spec.get("aggregate_flow_prefix", ""))
+            == code_candidate_text(detail_boundary)
+            and str(spec.get("overview_variant", "by_product")) == "by_product"
+            for spec in specs
+        )
+        for detail_boundary in detail_boundaries
+    ) if detail_boundaries else False
+    if (
+        nonzero_children >= minimum_children
+        and not has_flow
+        and not separate_child_products
+    ):
         specs.append({
             **base_spec,
             "overview_variant": "by_flow",
