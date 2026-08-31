@@ -2805,6 +2805,28 @@ def test_overview_html_keeps_chart_pairs_together_and_spaces_singletons() -> Non
     assert 'class="overview-grid-spacer"' not in overview_html
 
 
+def test_overview_html_deduplicates_same_owner_and_variant() -> None:
+    rows = [
+        {
+            "chart_key": "chart__area__04__international_transport",
+            "title": "04-05 International transport (bunkers)",
+        },
+        {
+            "chart_key": "chart__area__04_05__international_transport",
+            "title": "04-05 International transport (bunkers)",
+        },
+        {
+            "chart_key": "chart__area__04_05__international_transport__by_flow",
+            "title": "04-05 International transport (bunkers) — by flow",
+        },
+    ]
+
+    html = _area_charts_html(rows, "Supply")
+
+    assert html.count(">04-05 International transport (bunkers)</figcaption>") == 1
+    assert html.count(">04-05 International transport (bunkers) — by flow</figcaption>") == 1
+
+
 def test_placeholder_transport_keeps_road_singleton_before_nonroad_pair() -> None:
     template = _load_template()
     transport = next(

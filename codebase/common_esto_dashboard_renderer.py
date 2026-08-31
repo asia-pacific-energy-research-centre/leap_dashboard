@@ -6922,11 +6922,27 @@ def _area_charts_html(
             if owner_key in seen_pair_keys:
                 continue
             seen_pair_keys.add(owner_key)
-            owner_rows = [
+            owner_candidates = [
                 candidate
                 for candidate in group_rows
                 if pair_key(candidate) == owner_key
             ]
+            owner_rows: list[dict] = []
+            seen_variants: set[str] = set()
+            for candidate in owner_candidates:
+                candidate_title = str(candidate.get("title", "")).casefold()
+                candidate_key = str(candidate.get("chart_key", "")).casefold()
+                variant = (
+                    "flow"
+                    if "by flow" in candidate_title
+                    or candidate_key.endswith("__by_flow")
+                    or candidate_key.endswith("__flow")
+                    else "product"
+                )
+                if variant in seen_variants:
+                    continue
+                seen_variants.add(variant)
+                owner_rows.append(candidate)
             paired_rows.extend(owner_rows)
             if (
                 reserve_unpaired_column
