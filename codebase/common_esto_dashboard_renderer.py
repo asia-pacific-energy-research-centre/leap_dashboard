@@ -1528,6 +1528,7 @@ def immediate_child_flow_rows(
     rows: pd.DataFrame,
     nodes: pd.DataFrame,
     parent_prefix: str,
+    child_label_overrides: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Label a parent's selected frontier by its immediate child flow.
 
@@ -1542,6 +1543,7 @@ def immediate_child_flow_rows(
 
     target_level = code_depth(parent_prefix) + 1
     child_labels: dict[str, str] = {}
+    label_overrides = child_label_overrides or {}
     for child_code in sorted(
         {
             code_prefix(str(code), target_level)
@@ -1550,7 +1552,9 @@ def immediate_child_flow_rows(
             and str(code).startswith(parent_prefix + ".")
         }
     ):
-        label = node_label_for_prefix(nodes, child_code)
+        label = str(label_overrides.get(child_code, "")).strip()
+        if not label:
+            label = node_label_for_prefix(nodes, child_code)
         child_labels[child_code] = label or child_code
 
     out = rows.copy()
@@ -1568,6 +1572,54 @@ def immediate_child_flow_rows(
         out["_child_flow_code"].map(child_labels).fillna(out["_child_flow_code"])
     )
     return out
+
+
+def resolved_immediate_child_flow_rows(
+    page_df: pd.DataFrame,
+    nodes: pd.DataFrame,
+    parent_prefix: str,
+    area_spec: dict[str, object],
+) -> pd.DataFrame:
+    """Return one non-overlapping row frontier labelled by immediate child."""
+    boundary_rows = area_spec_rows(page_df, area_spec)
+    child_rows = immediate_child_flow_rows(
+        boundary_rows,
+        nodes,
+        parent_prefix,
+    )
+    if child_rows.empty:
+        return child_rows
+    return resolved_area_chart_rows(
+        child_rows,
+        area_spec,
+        group_col="_child_flow_label",
+    )
+
+
+def nonzero_immediate_child_flow_count(
+    page_df: pd.DataFrame,
+    nodes: pd.DataFrame,
+    parent_prefix: str,
+    area_spec: dict[str, object],
+) -> int:
+    """Count immediate children carrying data in any displayed surface."""
+    child_frontier = resolved_immediate_child_flow_rows(
+        page_df,
+        nodes,
+        parent_prefix,
+        area_spec,
+    )
+    if child_frontier.empty:
+        return 0
+    if "value" not in child_frontier.columns:
+        return int(child_frontier["_child_flow_label"].nunique(dropna=True))
+    return sum(
+        _has_nonzero_values(child_rows["value"])
+        for _label, child_rows in child_frontier.groupby(
+            "_child_flow_label",
+            dropna=False,
+        )
+    )
 
 
 def area_spec_rows(df: pd.DataFrame, area_spec: dict[str, object]) -> pd.DataFrame:
@@ -2113,19 +2165,11 @@ def add_power_sector_overview_specs(
     area_specs: list[dict[str, object]],
     template: dict,
 ) -> list[dict[str, object]]:
-    """Replace partial Power roots with one complete page-level boundary."""
+    """Publish paired, power-scoped aggregates at the top of Power."""
     config = template.get("power_page", {}) or {}
     overview = config.get("overview", {}) or {}
     configured_page_key = str(config.get("page_key", "power")).strip()
     if page_key != configured_page_key or not bool(overview.get("enabled", False)):
-        return list(area_specs)
-
-    boundary = str(overview.get("flow_boundary", "")).strip()
-    label = str(overview.get("label", "Power sector")).strip()
-    if not boundary or not label:
-        return list(area_specs)
-    rows = flow_boundary_candidate_rows(page_df, boundary)
-    if rows.empty:
         return list(area_specs)
 
     replaced = {
@@ -2138,39 +2182,79 @@ def add_power_sector_overview_specs(
         for spec in area_specs
         if code_candidate_text(spec.get("aggregate_flow_prefix", "")) not in replaced
     ]
-    labels_by_source = {
-        str(source): sorted(
-            source_rows["common_flow_label"].dropna().astype(str).unique()
+    configured_aggregates = overview.get("aggregates", []) or []
+    minimum_nonzero_children = int(
+        (template.get("aggregate_chart_policy", {}) or {}).get(
+            "minimum_nonzero_child_flows", 2
         )
-        for source, source_rows in rows.groupby("source_system", dropna=False)
-    }
-    source_labels = sorted({
-        source_label
-        for source_values in labels_by_source.values()
-        for source_label in source_values
-    })
-    note = str(overview.get("stacked_area_note", "")).strip()
-    grouping_titles = overview.get("grouping_titles", {}) or {}
-    for group_noun, group_col, title_prefix in (
-        ("product", "common_product_label", "Aggregate by product"),
-        ("flow", "common_flow_label", "Aggregate by flow"),
-    ):
-        specs.append({
-            "area_level": code_depth(boundary),
+    )
+    nodes = get_existing_flow_nodes(page_df)
+    for aggregate in configured_aggregates:
+        boundary = str(aggregate.get("flow_boundary", "")).strip()
+        label = str(aggregate.get("label", "")).strip()
+        child_parent = str(
+            aggregate.get("child_flow_parent_prefix", code_candidate_text(boundary))
+        ).strip()
+        if not boundary or not label or not child_parent:
+            continue
+        rows = flow_boundary_candidate_rows(page_df, boundary)
+        if rows.empty:
+            continue
+        labels_by_source = {
+            str(source): sorted(
+                source_rows["common_flow_label"].dropna().astype(str).unique()
+            )
+            for source, source_rows in rows.groupby("source_system", dropna=False)
+        }
+        source_labels = sorted({
+            source_label
+            for source_values in labels_by_source.values()
+            for source_label in source_values
+        })
+        base_spec = {
+            "area_level": code_depth(child_parent),
             "aggregate_flow_prefix": boundary,
             "aggregate_flow_label": label,
             "source_flow_labels": source_labels,
             "source_flow_labels_by_system": labels_by_source,
             "explicit_flow_boundary": True,
-            "overview_variant": f"power_by_{group_noun}",
-            "group_col": group_col,
-            "title_prefix": title_prefix,
-            "chart_caption": str(
-                grouping_titles.get(group_noun, f"{label} — by {group_noun}")
-            ).strip(),
-            "stacked_area_note_suffix": note,
-            "skip_product_overview_ownership": True,
-        })
+            "immediate_child_flow_labels": {
+                str(code).strip(): str(child_label).strip()
+                for code, child_label in (
+                    aggregate.get("child_flow_labels", {}) or {}
+                ).items()
+                if str(code).strip() and str(child_label).strip()
+            },
+        }
+        if nonzero_immediate_child_flow_count(
+            page_df,
+            nodes,
+            child_parent,
+            base_spec,
+        ) < minimum_nonzero_children:
+            continue
+        note = str(aggregate.get("stacked_area_note", "")).strip()
+        grouping_titles = aggregate.get("grouping_titles", {}) or {}
+        for group_noun, group_col, title_prefix in (
+            ("product", "common_product_label", "Aggregate by product"),
+            ("flow", "_child_flow_label", "Aggregate by flow"),
+        ):
+            specs.append({
+                **base_spec,
+                "overview_variant": f"power_{safe_slug(label)}_by_{group_noun}",
+                "group_col": group_col,
+                "immediate_child_flow_parent_prefix": (
+                    child_parent if group_noun == "flow" else ""
+                ),
+                "title_prefix": title_prefix,
+                "chart_caption": str(
+                    grouping_titles.get(
+                        group_noun, f"{label} — by {group_noun}"
+                    )
+                ).strip(),
+                "stacked_area_note_suffix": note,
+                "skip_product_overview_ownership": True,
+            })
     return specs
 
 
@@ -3271,6 +3355,17 @@ def pick_area_specs(
     level_count = 2 if max_depth >= deep_min_depth else 1
     level_count = int(chart_config.get("top_levels_for_deep_chains", level_count)) if max_depth >= deep_min_depth else int(chart_config.get("top_levels_for_other_chains", level_count))
     max_area_charts = int(chart_config.get("max_area_charts_per_page", 30))
+    aggregate_policy = template.get("aggregate_chart_policy", {}) or {}
+    minimum_nonzero_children = int(
+        aggregate_policy.get("minimum_nonzero_child_flows", 2)
+    )
+    always_show_codes = {
+        code_candidate_text(value)
+        for value in (
+            aggregate_policy.get("always_show_flow_codes_by_page", {}) or {}
+        ).get(str(page_key), [])
+        if code_candidate_text(value)
+    }
 
     specs: list[dict[str, object]] = []
     used_group_keys: set[tuple[int, str]] = set()
@@ -3303,15 +3398,33 @@ def pick_area_specs(
                 label = preferred_collapsed_flow_label(nodes, labels_by_source)
             if not label:
                 label = node_label_for_prefix(nodes, prefix)
-            specs.append(
-                {
-                    "area_level": level,
-                    "aggregate_flow_prefix": prefix,
-                    "aggregate_flow_label": label,
-                    "source_flow_labels": labels,
-                    "source_flow_labels_by_system": labels_by_source,
-                }
+            base_spec = {
+                "area_level": level,
+                "aggregate_flow_prefix": prefix,
+                "aggregate_flow_label": label,
+                "source_flow_labels": labels,
+                "source_flow_labels_by_system": labels_by_source,
+            }
+            child_count = nonzero_immediate_child_flow_count(
+                page_df,
+                nodes,
+                prefix,
+                base_spec,
             )
+            always_show = prefix in always_show_codes
+            if child_count < minimum_nonzero_children and not always_show:
+                used_group_keys.add(group_key)
+                continue
+            specs.append(base_spec)
+            if child_count >= minimum_nonzero_children:
+                specs.append({
+                    **base_spec,
+                    "overview_variant": "by_flow",
+                    "group_col": "_child_flow_label",
+                    "immediate_child_flow_parent_prefix": prefix,
+                    "title_prefix": "Aggregate by flow",
+                    "chart_caption": f"{label} — by flow",
+                })
             used_group_keys.add(group_key)
             used_label_sets.add(label_set)
             if len(specs) >= max_area_charts:
@@ -4344,6 +4457,37 @@ def _build_section_aggregate_charts(
         effective_flow_count = effective_flow_rows["common_flow_label"].nunique(
             dropna=True
         )
+        explicitly_retained = bool(
+            overview_summary
+            or required_boundary
+            or section_override.get("always_show", False)
+            or section_label in {
+                str(value).strip()
+                for value in (
+                    (template.get("aggregate_chart_policy", {}) or {}).get(
+                        "always_show_section_labels_by_page", {}
+                    ) or {}
+                ).get(page_key, [])
+                if str(value).strip()
+            }
+        )
+        minimum_nonzero_children = int(
+            (template.get("aggregate_chart_policy", {}) or {}).get(
+                "minimum_nonzero_child_flows", 2
+            )
+        )
+        nonzero_flow_count = sum(
+            _has_nonzero_values(flow_rows["value"])
+            for _flow_label, flow_rows in effective_flow_rows.groupby(
+                "common_flow_label",
+                dropna=False,
+            )
+        )
+        if (
+            nonzero_flow_count < minimum_nonzero_children
+            and not explicitly_retained
+        ):
+            continue
         overview_group_by = ""
         if overview_summary:
             overview_group_by = str(overview_summary["group_by"])
@@ -4504,6 +4648,23 @@ def _build_flow_group_aggregate_charts(
             }
         )
     }
+    power_overview = (
+        (template.get("power_page", {}) or {}).get("overview", {}) or {}
+    )
+    if page_key == str(
+        (template.get("power_page", {}) or {}).get("page_key", "power")
+    ).strip():
+        configured_flow_overview_boundaries.update(
+            str(item.get(
+                "child_flow_parent_prefix",
+                code_candidate_text(item.get("flow_boundary", "")),
+            )).strip()
+            for item in power_overview.get("aggregates", []) or []
+            if str(item.get(
+                "child_flow_parent_prefix",
+                code_candidate_text(item.get("flow_boundary", "")),
+            )).strip()
+        )
 
     page_df = page_df.copy()
     if "component_flow_name" in page_df.columns:
@@ -4554,6 +4715,8 @@ def _build_flow_group_aggregate_charts(
         # total because Power and Refining own more-specific branches.
         if code_depth(parent_prefix) == 1:
             continue
+        if parent_prefix in configured_flow_overview_boundaries:
+            continue
         descendants = flow_nodes[
             flow_nodes["canonical_code"].astype(str).str.startswith(parent_prefix + ".")
         ]
@@ -4590,6 +4753,30 @@ def _build_flow_group_aggregate_charts(
         if len(section_labels) != 1:
             continue
         section_label = section_labels[0]
+        child_page_df = immediate_child_flow_rows(
+            page_df,
+            flow_nodes,
+            parent_prefix,
+        )
+        child_frontier = resolved_area_chart_rows(
+            child_page_df,
+            area_spec,
+            group_col="_child_flow_label",
+        )
+        minimum_nonzero_children = int(
+            (template.get("aggregate_chart_policy", {}) or {}).get(
+                "minimum_nonzero_child_flows", 2
+            )
+        )
+        nonzero_child_count = sum(
+            _has_nonzero_values(child_rows["value"])
+            for _child_label, child_rows in child_frontier.groupby(
+                "_child_flow_label",
+                dropna=False,
+            )
+        )
+        if nonzero_child_count < minimum_nonzero_children:
+            continue
         exact_parent_nodes = flow_nodes[
             (flow_nodes["canonical_code"].astype(str) == parent_prefix)
             & flow_nodes["common_flow_label"].astype(str).isin(parent_flow_labels)
@@ -4665,34 +4852,17 @@ def _build_flow_group_aggregate_charts(
             **metrics,
         })
 
-        if parent_prefix in configured_flow_overview_boundaries:
-            continue
-
         child_area_spec = {
             "aggregate_flow_prefix": "",
             "aggregate_flow_label": parent_label,
             "source_flow_labels": source_flow_labels,
             "source_flow_labels_by_system": labels_by_source,
         }
-        child_page_df = immediate_child_flow_rows(
-            page_df,
-            flow_nodes,
-            parent_prefix,
-        )
         child_frontier = resolved_area_chart_rows(
             child_page_df,
             child_area_spec,
             group_col="_child_flow_label",
         )
-        nonzero_child_count = sum(
-            _has_nonzero_values(child_rows["value"])
-            for _child_label, child_rows in child_frontier.groupby(
-                "_child_flow_label",
-                dropna=False,
-            )
-        )
-        if nonzero_child_count < 2:
-            continue
 
         flow_chart_key = (
             f"chart__area__flowgroup_parent__{safe_slug(page_key)}__"
@@ -4766,15 +4936,30 @@ def _build_flow_group_aggregate_charts(
         flow_df = page_df[page_df["common_flow_label"].astype(str) == flow_label]
         if flow_df.empty:
             continue
+        minimum_nonzero_children = int(
+            (template.get("aggregate_chart_policy", {}) or {}).get(
+                "minimum_nonzero_child_flows", 2
+            )
+        )
+        nonzero_subflow_count = sum(
+            _has_nonzero_values(subflow_rows["value"])
+            for _subflow_label, subflow_rows in flow_df.groupby(
+                "_subflow_label",
+                dropna=False,
+            )
+        )
+        if nonzero_subflow_count < minimum_nonzero_children:
+            continue
         area_spec = {
             "aggregate_flow_prefix": "",
             "aggregate_flow_label": flow_label,
             "source_flow_labels": [flow_label],
             "source_flow_labels_by_system": equivalent_flow_labels_by_source(page_df, flow_label),
         }
-        group_specs = [("common_product_label", "product", "Aggregate by product", flow_label, "All products")]
-        if flow_df["_subflow_label"].nunique(dropna=True) > 1:
-            group_specs.append(("_subflow_label", "subflow", "Aggregate by sub-flow", flow_label, "All sub-flows"))
+        group_specs = [
+            ("common_product_label", "product", "Aggregate by product", flow_label, "All products"),
+            ("_subflow_label", "subflow", "Aggregate by sub-flow", flow_label, "All sub-flows"),
+        ]
         for group_col, group_noun, title_prefix, manifest_flow, manifest_product in group_specs:
             chart_key = f"chart__area__flowgroup__{safe_slug(page_key)}__{safe_slug(flow_label)}__{group_noun}"
             metrics = compute_ranking_metrics(flow_df, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
@@ -9136,13 +9321,26 @@ def render_dashboard(
                 **area_spec,
                 "aggregate_flow_label": display_aggregate_label,
             }
+            chart_page_df = page_df
+            immediate_child_parent = str(
+                area_spec.get("immediate_child_flow_parent_prefix", "")
+            ).strip()
+            if immediate_child_parent:
+                chart_page_df = immediate_child_flow_rows(
+                    area_spec_rows(page_df, display_area_spec),
+                    get_existing_flow_nodes(page_df),
+                    immediate_child_parent,
+                    dict(
+                        area_spec.get("immediate_child_flow_labels", {}) or {}
+                    ),
+                )
             if page_key == "transport" and source_root_code == "15":
                 display_area_spec["use_demand_coverage_frontier"] = True
             chart_key = f"chart__area__{safe_slug(area_spec['aggregate_flow_prefix'])}__{safe_slug(source_aggregate_label)}"
             if overview_variant != "by_product":
                 chart_key = f"{chart_key}__{safe_slug(overview_variant)}"
             area_df = resolved_area_chart_rows(
-                page_df,
+                chart_page_df,
                 display_area_spec,
                 group_col=group_col,
             )
@@ -9171,7 +9369,7 @@ def render_dashboard(
             if suppressed:
                 continue
             figure = build_area_chart(
-                page_df,
+                chart_page_df,
                 display_area_spec,
                 series_labels,
                 template,

@@ -1088,6 +1088,74 @@ def _passenger_road_hierarchy_rows(second_child_value: float) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def test_top_two_hierarchy_levels_emit_only_qualifying_pairs() -> None:
+    rows = []
+    for flow, label, value in (
+        ("15", "15 Transport sector", 60.0),
+        ("15.01", "15.01 Transport non-road", 10.0),
+        ("15.02", "15.02 Road", 50.0),
+        ("15.02.01", "15.02.01 Freight road", 20.0),
+        ("15.02.02", "15.02.02 Passenger road", 30.0),
+    ):
+        row = _area_product_row(
+            "LEAP", "Target", 2030, flow, "07.01", value
+        )
+        row.update({
+            "common_flow_label": label,
+            "common_product_label": "07.01 Motor gasoline",
+        })
+        rows.append(row)
+    specs = renderer.pick_area_specs(
+        pd.DataFrame(rows),
+        {
+            "chart_generation": {
+                "deep_chain_min_depth": 3,
+                "top_levels_for_deep_chains": 2,
+                "max_area_charts_per_page": 30,
+            },
+            "aggregate_chart_policy": {
+                "minimum_nonzero_child_flows": 2,
+            },
+        },
+        page_key="transport",
+    )
+
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == [
+        "15", "15", "15.02", "15.02"
+    ]
+    assert [spec.get("group_col", "common_product_label") for spec in specs] == [
+        "common_product_label", "_child_flow_label",
+        "common_product_label", "_child_flow_label",
+    ]
+
+
+def test_explicit_leaf_aggregate_exception_keeps_product_summary_only() -> None:
+    row = _area_product_row(
+        "LEAP", "Target", 2030, "17", "07.12-07.17", 5.0
+    )
+    row.update({
+        "common_flow_label": "17 Non-energy use",
+        "common_product_label": "07.12-07.17 Petroleum products",
+    })
+    specs = renderer.pick_area_specs(
+        pd.DataFrame([row]),
+        {
+            "chart_generation": {},
+            "aggregate_chart_policy": {
+                "minimum_nonzero_child_flows": 2,
+                "always_show_flow_codes_by_page": {"industry": ["17"]},
+            },
+        },
+        page_key="industry",
+    )
+
+    assert len(specs) == 1
+    assert specs[0]["aggregate_flow_prefix"] == "17"
+    assert specs[0].get("group_col", "common_product_label") == (
+        "common_product_label"
+    )
+
+
 def test_parent_product_summary_adds_flow_companion_for_two_nonzero_children() -> None:
     """Passenger road gains a child-flow view without losing its fuel view."""
     rows = _passenger_road_hierarchy_rows(second_child_value=20.0)
@@ -1130,7 +1198,7 @@ def test_parent_product_summary_adds_flow_companion_for_two_nonzero_children() -
 
 
 def test_parent_product_summary_omits_flow_companion_for_one_nonzero_child() -> None:
-    """A zero-only sibling does not create a redundant by-flow chart."""
+    """A zero-only sibling suppresses the whole redundant aggregate pair."""
     rows = _passenger_road_hierarchy_rows(second_child_value=0.0)
     template = {
         "chart_generation": {
@@ -1156,7 +1224,7 @@ def test_parent_product_summary_omits_flow_companion_for_one_nonzero_child() -> 
         row for row in chart_rows
         if row.get("flow_group_label") == "15.02.02 Passenger road"
     ]
-    assert [row["content_kind"] for row in parent_rows] == ["by_product"]
+    assert parent_rows == []
 
 
 def test_parent_flow_companion_defers_to_configured_flow_overview() -> None:
@@ -1194,7 +1262,7 @@ def test_parent_flow_companion_defers_to_configured_flow_overview() -> None:
         row for row in chart_rows
         if row.get("flow_group_label") == "15.02.02 Passenger road"
     ]
-    assert [row["content_kind"] for row in parent_rows] == ["by_product"]
+    assert parent_rows == []
 
 
 def test_power_navigation_marks_only_active_interim_rollup_owners() -> None:
@@ -1276,20 +1344,43 @@ def test_power_navigation_marks_only_active_interim_rollup_owners() -> None:
     assert 'data-placeholder="false">Gas CHP (all producers)' in html
 
 
-def test_power_overview_combines_placeholders_and_residual_power_rows() -> None:
-    """The Overview owns one complete boundary now and after placeholder handoff."""
+def test_power_overview_publishes_qualifying_first_two_level_pairs() -> None:
+    """Power shows generation, flow-10 and own-use pairs without a 10.02 pair."""
     template = {
+        "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
         "power_page": {
             "page_key": "power",
             "overview": {
                 "enabled": True,
-                "flow_boundary": "09.01-09.02,10.01.01,10.01.13",
-                "label": "Power sector",
-                "replace_overview_flow_codes": ["09", "10"],
-                "grouping_titles": {
-                    "product": "Power sector — by product",
-                    "flow": "Power sector — by flow",
-                },
+                "replace_overview_flow_codes": [
+                    "09", "09.01", "10", "10.01", "10.02"
+                ],
+                "aggregates": [
+                    {
+                        "flow_boundary": "09.01-09.02",
+                        "child_flow_parent_prefix": "09.01",
+                        "label": "09.01-09.02 Power generation",
+                    },
+                    {
+                        "flow_boundary": "10.01,10.02",
+                        "child_flow_parent_prefix": "10",
+                        "label": "Power-related losses and own use",
+                        "child_flow_labels": {
+                            "10.01": "10.01 Own use",
+                            "10.02": "10.02 Transmission and distribution losses",
+                        },
+                    },
+                    {
+                        "flow_boundary": "10.01",
+                        "child_flow_parent_prefix": "10.01",
+                        "label": "10.01 Own use",
+                    },
+                    {
+                        "flow_boundary": "10.02",
+                        "child_flow_parent_prefix": "10.02",
+                        "label": "10.02 Transmission and distribution losses",
+                    },
+                ],
             },
         },
     }
@@ -1330,6 +1421,11 @@ def test_power_overview_combines_placeholders_and_residual_power_rows() -> None:
             "common_flow_label": "10.01.13 Pump storage plants",
             "common_product_label": "17 Electricity",
         },
+        {
+            **_area_product_row("LEAP", "Target", 2030, "10.02", "17", -3.0),
+            "common_flow_label": "10.02 Transmission and distribution losses",
+            "common_product_label": "17 Electricity",
+        },
     ])
     generic_specs = [
         {
@@ -1348,38 +1444,50 @@ def test_power_overview_combines_placeholders_and_residual_power_rows() -> None:
         "power", rows, generic_specs, template
     )
 
-    assert [spec["overview_variant"] for spec in specs] == [
-        "power_by_product",
-        "power_by_flow",
-    ]
+    assert len(specs) == 6
+    assert {
+        spec["aggregate_flow_label"] for spec in specs
+    } == {
+        "09.01-09.02 Power generation",
+        "Power-related losses and own use",
+        "10.01 Own use",
+    }
+    assert all(
+        sum(
+            spec["aggregate_flow_label"] == label
+            for spec in specs
+        ) == 2
+        for label in {
+            "09.01-09.02 Power generation",
+            "Power-related losses and own use",
+            "10.01 Own use",
+        }
+    )
+    assert not any(
+        spec["aggregate_flow_label"].startswith("10.02")
+        for spec in specs
+    )
+    losses_flow_spec = next(
+        spec for spec in specs
+        if spec["aggregate_flow_label"] == "Power-related losses and own use"
+        and spec["group_col"] == "_child_flow_label"
+    )
+    child_rows = renderer.immediate_child_flow_rows(
+        renderer.area_spec_rows(rows, losses_flow_spec),
+        renderer.get_existing_flow_nodes(rows),
+        "10",
+        losses_flow_spec["immediate_child_flow_labels"],
+    )
     resolved = renderer.resolved_area_chart_rows(
-        rows,
-        specs[0],
-        group_col="common_product_label",
+        child_rows,
+        losses_flow_spec,
+        group_col="_child_flow_label",
     )
-    assert set(resolved["common_flow_code"]) == {
-        "09.01-09.02",
-        "10.01.01",
-        "10.01.13",
+    assert set(resolved["_child_flow_label"]) == {
+        "10.01 Own use",
+        "10.02 Transmission and distribution losses",
     }
-    assert resolved["value"].sum() == 93.0
-
-    detailed_rows = rows[~rows["common_flow_code"].eq("09.01-09.02")].copy()
-    detailed_spec = renderer.add_power_sector_overview_specs(
-        "power", detailed_rows, generic_specs, template
-    )[0]
-    detailed = renderer.resolved_area_chart_rows(
-        detailed_rows,
-        detailed_spec,
-        group_col="common_product_label",
-    )
-    assert set(detailed["common_flow_code"]) == {
-        "09.01.01",
-        "09.01.02",
-        "10.01.01",
-        "10.01.13",
-    }
-    assert detailed["value"].sum() == 93.0
+    assert resolved["value"].sum() == -10.0
 
 
 def test_power_residual_section_has_clear_name_and_no_duplicate_summary() -> None:

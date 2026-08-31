@@ -56,6 +56,7 @@ from codebase.common_esto_dashboard_renderer import (
     drop_placeholder_only_demand_detail_rows,
     placeholder_only_demand_flow_prefixes,
     frontier_flow_labels,
+    get_existing_flow_nodes,
     guide_page_context,
     guide_page_mapping_table,
     guide_placeholder_status,
@@ -64,6 +65,7 @@ from codebase.common_esto_dashboard_renderer import (
     set_code_colors_path,
     page_placeholder_note,
     pick_area_specs,
+    preferred_collapsed_flow_label,
     power_interim_flow_is_active,
     prepare_other_transformation_page_rows,
     render_dashboard,
@@ -966,6 +968,9 @@ def test_dataset_membership_is_retained_on_cards_without_header_filter(
     template["total_demand_page"] = {"enabled": False}
     template["emissions_page"] = {"enabled": False}
     template["scope_specific_pages"] = {"enabled": False}
+    template["aggregate_chart_policy"]["always_show_flow_codes_by_page"][
+        "industry"
+    ].append("14")
     rows = pd.DataFrame([
         {
             "comparison_scope": "esto_leap_ninth", "source_system": "LEAP",
@@ -1185,7 +1190,7 @@ def test_losses_and_own_use_area_cards_use_parent_hierarchy_labels() -> None:
 
     assert labels_by_prefix["10"] == "10 Losses and own use"
     assert power_labels_by_prefix["10"] == "Power-related losses and own use"
-    assert labels_by_prefix["10.01"] == "10.01 Own use"
+    assert "10.01" not in labels_by_prefix
 
 
 def test_single_boundary_overview_prefers_including_own_use_label() -> None:
@@ -1210,18 +1215,23 @@ def test_single_boundary_overview_prefers_including_own_use_label() -> None:
         ]
     )
 
-    specs = pick_area_specs(page_df, template)
-    refining_overview = next(
-        spec for spec in specs if spec["aggregate_flow_prefix"] == "09"
+    nodes = get_existing_flow_nodes(page_df)
+    labels_by_source = frontier_flow_labels(nodes, "09", 2)
+    refining_label = preferred_collapsed_flow_label(
+        nodes,
+        labels_by_source,
     )
 
-    assert refining_overview["aggregate_flow_label"] == (
+    assert refining_label == (
         "09.07 Oil refineries (including own use)"
     )
 
 
 def test_multi_boundary_overview_does_not_inherit_one_child_label() -> None:
     template = _load_template()
+    template["aggregate_chart_policy"]["always_show_flow_codes_by_page"][
+        "transport"
+    ] = ["15"]
     page_df = pd.DataFrame(
         [
             {
@@ -2702,6 +2712,9 @@ def test_supply_uses_combined_bunker_boundary_while_placeholder_is_active(
 
 def test_common_esto_dashboard_switcher_uses_current_dashboard_label(tmp_path: Path) -> None:
     template = _load_template()
+    template["aggregate_chart_policy"]["always_show_flow_codes_by_page"][
+        "transport"
+    ] = ["15"]
     series_config = _load_series_config()
     df = apply_sign_semantics(_build_common_esto_rows(), template["sign_semantics"])
     main_df = df[df["comparison_scope"] == "leap_vs_esto_vs_ninth"].copy()
@@ -4276,15 +4289,7 @@ def test_mixed_depth_transformation_total_is_its_own_overview_frontier() -> None
             }
         },
     )
-    total_spec = next(
-        spec for spec in specs if spec["aggregate_flow_prefix"] == "09"
-    )
-
-    assert total_spec["source_flow_labels_by_system"] == {
-        "ESTO": [broad_label],
-        "LEAP": [broad_label],
-        "NINTH": [broad_label],
-    }
+    assert specs == []
 
 
 def test_incomplete_transport_non_road_overview_keeps_precise_label() -> None:
@@ -4386,7 +4391,7 @@ def test_compound_buildings_range_does_not_create_an_incomplete_prefix_card() ->
         },
     )
 
-    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["16", "16.02"]
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["16", "16"]
     assert specs[0]["source_flow_labels_by_system"] == {
         "ESTO": ["16.01-16.02 Buildings", "16.02 Residential"],
         "LEAP": ["16.01-16.02 Buildings"],
@@ -4429,8 +4434,7 @@ def test_section_aggregate_suppresses_chart_with_only_pre_base_year_projection()
 
     assert charts == {}
     assert chart_rows == []
-    assert len(manifest_rows) == 2
-    assert all(row["suppressed"] for row in manifest_rows)
+    assert manifest_rows == []
 
 
 def test_road_technology_section_uses_authoritative_parent_totals() -> None:
@@ -4586,7 +4590,13 @@ def test_section_aggregate_suppresses_redundant_single_flow_chart() -> None:
             "ninth_source_system": "NINTH",
             "base_year": 2022,
             "suppression_threshold": 1.0,
-        }
+        },
+        "aggregate_chart_policy": {
+            "minimum_nonzero_child_flows": 2,
+            "always_show_section_labels_by_page": {
+                "refining": ["Refining"],
+            },
+        },
     }
 
     charts, chart_rows, manifest_rows = _build_section_aggregate_charts(
