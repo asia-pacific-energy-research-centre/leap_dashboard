@@ -1121,6 +1121,143 @@ def test_other_demand_flow_overview_keeps_ninth_compound_agriculture_rollup() ->
     assert resolved["value"].sum() == pytest.approx(212.5)
 
 
+def test_other_demand_chart_collapses_compound_when_history_proves_one_child() -> None:
+    """A projected compound may use the sole matching observed child label."""
+    spec = {
+        "aggregate_flow_prefix": "16.03-16.05",
+        "aggregate_flow_label": "16.03-16.05 Other sector",
+        "source_flow_labels": [
+            "16.03 Agriculture",
+            "16.03-16.04 Agriculture and fishing",
+        ],
+        "collapse_compound_to_historical_child": {
+            "16.03-16.04": ["16.03", "16.04"],
+        },
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03", "17", 20.0
+            ),
+            "common_flow_label": "16.03 Agriculture",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03-16.04", "17", 20.0
+            ),
+            "common_flow_label": "16.03-16.04 Agriculture and fishing",
+            "common_product_label": "17 Electricity",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2023, "16.03-16.04", "17", 21.0
+            ),
+            "common_flow_label": "16.03-16.04 Agriculture and fishing",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+
+    resolved = renderer.collapse_compound_projection_to_historical_child(
+        rows,
+        rows,
+        spec,
+        comparison_source="ESTO_EXTENDED",
+        base_year=2022,
+    )
+
+    projected = resolved[resolved["year"].eq(2023)]
+    assert projected["common_flow_code"].tolist() == ["16.03"]
+    assert projected["common_flow_label"].tolist() == ["16.03 Agriculture"]
+
+
+def test_other_demand_chart_keeps_compound_when_child_does_not_reconcile() -> None:
+    """A material historical residual prevents a projected compound relabel."""
+    source_rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03", "17", 18.0
+            ),
+            "common_flow_label": "16.03 Agriculture",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03-16.04", "17", 20.0
+            ),
+            "common_flow_label": "16.03-16.04 Agriculture and fishing",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2023, "16.03-16.04", "17", 21.0
+            ),
+            "common_flow_label": "16.03-16.04 Agriculture and fishing",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+    resolved = renderer.collapse_compound_projection_to_historical_child(
+        source_rows,
+        source_rows,
+        {
+            "collapse_compound_to_historical_child": {
+                "16.03-16.04": ["16.03", "16.04"],
+            },
+        },
+        comparison_source="ESTO_EXTENDED",
+        base_year=2022,
+    )
+
+    projected = resolved[resolved["year"].eq(2023)]
+    assert projected["common_flow_code"].tolist() == ["16.03-16.04"]
+
+
+def test_other_demand_chart_uses_economy_verified_child_after_page_pruning() -> None:
+    """A documented economy rule survives removal of the exact child rows."""
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03", "17", 20.0
+            ),
+            "economy": "01_AUS",
+            "common_flow_label": "16.03 Agriculture",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2023, "16.03-16.05", "17", 21.0
+            ),
+            "economy": "01_AUS",
+            "common_flow_label": "16.03-16.04 Agriculture and fishing",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+    resolved = renderer.collapse_compound_projection_to_historical_child(
+        rows,
+        rows,
+        {
+            "collapse_compound_to_historical_child": {
+                "16.03-16.04": ["16.03", "16.04"],
+            },
+            "verified_compound_child_by_economy": {
+                "01AUS": {
+                    "16.03-16.04": {
+                        "code": "16.03",
+                        "label": "16.03 Agriculture",
+                    },
+                },
+            },
+        },
+        comparison_source="ESTO_EXTENDED",
+        base_year=2022,
+    )
+
+    projected = resolved[resolved["year"].eq(2023)]
+    assert projected["common_flow_code"].tolist() == ["16.03"]
+    assert projected["common_flow_label"].tolist() == ["16.03 Agriculture"]
+
+
 def test_other_demand_by_flow_labels_parent_gap_as_unallocated() -> None:
     """Incomplete child coverage is not attributed without source evidence."""
     template = {

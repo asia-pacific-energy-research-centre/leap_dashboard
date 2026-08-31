@@ -2338,6 +2338,12 @@ def add_other_demand_flow_overview_spec(
                 for value in flow_config.get("preferred_detail_flow_boundaries", [])
                 if str(value).strip()
             ],
+            "collapse_compound_to_historical_child": flow_config.get(
+                "collapse_compound_to_historical_child", {}
+            ),
+            "verified_compound_child_by_economy": flow_config.get(
+                "verified_compound_child_by_economy", {}
+            ),
             "detail_coverage_residual_label": str(
                 flow_config.get(
                     "detail_coverage_residual_label",
@@ -4237,6 +4243,13 @@ def build_area_chart(
     base_year = int(chart_config.get("base_year", 2023))
     primary_source = str(chart_config.get("primary_area_source_system", "LEAP"))
     default_scenario = str(chart_config.get("primary_area_scenario", "Target"))
+    chart_df = collapse_compound_projection_to_historical_child(
+        chart_df,
+        df,
+        area_spec,
+        comparison_source=comparison_source,
+        base_year=base_year,
+    )
 
     authoritative_boundary = str(
         area_spec.get("authoritative_total_flow_boundary", "")
@@ -4564,6 +4577,149 @@ def build_area_chart(
     )
     apply_chart_chrome(fig, base_year, code_axis=code_axis_for_group_col(group_col))
     return fig
+
+
+def collapse_compound_projection_to_historical_child(
+    chart_df: pd.DataFrame,
+    source_df: pd.DataFrame,
+    area_spec: dict[str, object],
+    *,
+    comparison_source: str,
+    base_year: int,
+) -> pd.DataFrame:
+    """Relabel a projected compound only when history proves one child owns it.
+
+    Some comparison sources publish a projected compound while the observed
+    base-year data expose its children. A compound can be shown as one child
+    without inventing a split only when that child's product vector exactly
+    matches the compound product vector at the latest observed year. If zero,
+    multiple, or ambiguous children match, the published compound is retained.
+    """
+    configured = area_spec.get("collapse_compound_to_historical_child", {}) or {}
+    if chart_df.empty or source_df.empty or not isinstance(configured, dict):
+        return chart_df
+    required = {
+        "source_system",
+        "year",
+        "common_flow_code",
+        "common_flow_label",
+        "common_product_code",
+        "value",
+    }
+    if not required.issubset(source_df.columns):
+        return chart_df
+
+    available_sources = {
+        str(value).casefold() for value in source_df["source_system"].dropna().unique()
+    }
+    historical_source = str(comparison_source).casefold()
+    if (
+        historical_source == "esto"
+        and "esto" not in available_sources
+        and "esto_extended" in available_sources
+    ):
+        historical_source = "esto_extended"
+
+    history = source_df[
+        source_df["source_system"].astype(str).str.casefold().eq(historical_source)
+        & source_df["year"].le(base_year)
+    ].copy()
+    if history.empty:
+        return chart_df
+    latest_year = int(history["year"].max())
+    history = history[history["year"].eq(latest_year)].copy()
+    history["_flow_code"] = history["common_flow_code"].astype(str).map(
+        code_candidate_text
+    )
+
+    out = chart_df.copy()
+    economy_values = {
+        str(value).replace("_", "").strip().upper()
+        for value in source_df.get("economy", pd.Series(dtype=str)).dropna().unique()
+    }
+    economy_key = next(iter(economy_values)) if len(economy_values) == 1 else ""
+    verified_aliases = (
+        (area_spec.get("verified_compound_child_by_economy", {}) or {}).get(
+            economy_key, {}
+        )
+        if economy_key
+        else {}
+    )
+    for compound_code, raw_children in configured.items():
+        compound = code_candidate_text(compound_code)
+        children = [
+            code_candidate_text(value)
+            for value in raw_children
+            if code_candidate_text(value)
+        ] if isinstance(raw_children, list) else []
+        if not compound or not children:
+            continue
+        verified_child = verified_aliases.get(compound, {}) if isinstance(
+            verified_aliases, dict
+        ) else {}
+        if isinstance(verified_child, dict):
+            verified_code = code_candidate_text(verified_child.get("code", ""))
+            verified_label = str(verified_child.get("label", "")).strip()
+            if verified_code in children and verified_label:
+                # Page-specific frontier allocation can retain the compound's
+                # display label on a broader parent code.  The economy rule is
+                # independently reconciled before configuration, so it may be
+                # applied even when those exact compound rows were pruned.
+                compound_projection = out["common_flow_code"].astype(str).map(
+                    code_candidate_text
+                ).eq(compound)
+                compound_projection |= (
+                    out["common_flow_label"]
+                    .astype(str)
+                    .str.strip()
+                    .str.startswith(compound)
+                )
+                projection_mask = out["year"].gt(base_year) & compound_projection
+                out.loc[projection_mask, "common_flow_code"] = verified_code
+                out.loc[projection_mask, "common_flow_label"] = verified_label
+                continue
+        compound_rows = history[history["_flow_code"].eq(compound)]
+        if compound_rows.empty:
+            continue
+        compound_values = compound_rows.groupby("common_product_code")["value"].sum()
+        if not compound_values.abs().gt(1e-12).any():
+            continue
+
+        matching_children: list[tuple[str, str]] = []
+        for child in children:
+            child_rows = history[history["_flow_code"].eq(child)]
+            if child_rows.empty:
+                continue
+            child_values = child_rows.groupby("common_product_code")["value"].sum()
+            products = compound_values.index.union(child_values.index)
+            difference = (
+                compound_values.reindex(products, fill_value=0.0)
+                - child_values.reindex(products, fill_value=0.0)
+            )
+            tolerance = 1e-8 + compound_values.reindex(
+                products, fill_value=0.0
+            ).abs() * 1e-8
+            if difference.abs().le(tolerance).all():
+                child_label = str(child_rows["common_flow_label"].dropna().iloc[0])
+                matching_children.append((child, child_label))
+
+        if len(matching_children) != 1:
+            continue
+        child_code, child_label = matching_children[0]
+        compound_labels = set(
+            compound_rows["common_flow_label"].dropna().astype(str).str.strip()
+        )
+        compound_projection = out["common_flow_code"].astype(str).map(
+            code_candidate_text
+        ).eq(compound)
+        if compound_labels:
+            compound_projection |= out["common_flow_label"].astype(str).str.strip().isin(
+                compound_labels
+            )
+        projection_mask = out["year"].gt(base_year) & compound_projection
+        out.loc[projection_mask, "common_flow_code"] = child_code
+        out.loc[projection_mask, "common_flow_label"] = child_label
+    return out
 
 
 def resolved_area_chart_rows(
