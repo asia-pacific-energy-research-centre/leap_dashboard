@@ -389,12 +389,19 @@ The final detailed comparison fact reconciles Transport non-road at the base
 year: ESTO Extended is 216.679815 PJ and LEAP is 216.679872 PJ in 2022. LEAP
 then reaches 236.401763 PJ in 2023 while the Ninth target reaches 287.415053
 PJ, so the visible post-base-year gap is not an area-stack arithmetic error.
-The upstream allocation and dummy-data assumptions are under source-owner
-review before any dashboard-side adjustment is considered.
+The source audit found that the underlying 2023 placeholder is 287.414718 PJ,
+but the dummy allocation generator subtracts 51.012955 PJ using positive
+international values even though International transport already has its own
+separate placeholder/component. The source fix must retain the whole non-road
+placeholder, allocate it only across domestic non-road leaves, zero nested
+international leaves and keep bunkers once in their separate signed component.
 
 Power currently has no technology-level LEAP rows under the Electricity and
-CHP plant branches in the supplied comparison fact. Its fallback audit records
-`Electricity interim` and `CHP interim` as `interim_only_retained`, so the
-PLACEHOLDER labels are accurate for this artifact. The source-owner review
-will determine whether detailed branches exist in the original export, can be
-generated from reviewed dummy inputs, or must remain explicitly provisional.
+CHP plant branches in either the original detailed dummy workbook or the final
+workbook. Both contain only `Electricity interim/Electricity interim` and `CHP
+interim/CHP interim`; the fallback audit records them as
+`interim_only_retained`. The PLACEHOLDER labels are therefore accurate for
+this artifact. Detailed CHP mappings exist, but detailed Electricity process
+mappings are not yet reviewed and the prior balance parser supported only one
+transformation-child level. The source owner is extending that fixture path;
+the dashboard must not relabel interim data as observed detail.
