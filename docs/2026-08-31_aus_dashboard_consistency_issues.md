@@ -1,6 +1,7 @@
 # Australia dashboard consistency review — 2026-08-31
 
-**Status:** Recorded; investigation in progress; no corrective changes yet
+**Status:** Renderer corrections implemented and locally verified; two upstream
+source-data corrections remain outside the dashboard renderer
 
 **Reviewed artifacts**
 
@@ -41,6 +42,11 @@ until the source rows and chart bundle have been reconciled.
   technology.
 - The by-flow stack and authoritative total reconcile for ESTO, LEAP and Ninth.
 
+**Finding / action (2026-08-31):** The compound row is the mapped CHP connected
+component, but its internal reconciliation label leaked into presentation.
+Power Overview now supplies explicit public labels for Electricity plants, CHP
+plants and Heat plants. A regression test protects those labels.
+
 ## AUS-CONSIST-002 — Other-demand detail cards show only one side of 2022
 
 **Affected charts:** `16.03-16.04 Agriculture and fishing — by product` and
@@ -68,6 +74,12 @@ until the source rows and chart bundle have been reconciled.
 - A placeholder aggregate is never presented as if it were a detailed child.
 - No ESTO, LEAP or Ninth value is duplicated between the aggregate and child
   cards.
+
+**Finding / action (2026-08-31):** ESTO owns the broad historical comparison
+row while LEAP/Ninth own a different projected rollup, so the renderer was
+publishing two source-specific facts as incomplete detail owners. Exact
+`16.03-16.04` and `16.03-16.05` comparison rollups are now owned only by the
+continuous Overview; genuine children such as `16.03` and `16.05` remain.
 
 ## AUS-CONSIST-003 — Transport flow charts jump at the base year
 
@@ -98,6 +110,16 @@ and `15.01,15.03-15.06 Transport non-road`, detailed artifact.
 - Non-road receives a by-flow chart when at least two immediate child flows are
   nonzero; otherwise the absence is explicit and tested.
 
+**Finding / action (2026-08-31):** The LEAP frontier contained both the stale
+compound non-road rollup and published `15.01`, `15.03`-`15.06` children. The
+Transport selector kept the rollup and later re-added the children. Published
+children now replace that rollup and qualify for a paired non-road by-flow
+chart. In the detailed AUS render, the 2022 LEAP non-road handoff changed from
+216.68 PJ to 185.31 PJ and now matches ESTO; total Transport by-product and
+by-flow both equal 1,239.15 PJ for LEAP and ESTO. The Ninth 2022 total remains
+1,270.52 PJ because its own published non-road rows total 216.68 PJ; that is a
+source comparison difference, not a remaining parent/child duplication.
+
 ## AUS-CONSIST-004 — Aggregate card ordering breaks product/flow pairs
 
 **Affected page:** Industry and non-energy, detailed artifact.
@@ -120,6 +142,10 @@ and `15.01,15.03-15.06 Transport non-road`, detailed artifact.
 - Paired cards remain side by side at desktop width.
 - Single-card owners render with a deliberate blank sibling cell and do not
   disturb navigation order.
+
+**Finding / action (2026-08-31):** Overview HTML now groups cards by aggregate
+owner before laying out the two-column grid. A single owner receives a desktop
+spacer, which disappears in the one-column responsive layout.
 
 ## AUS-CONSIST-005 — Buildings base-year step is too large
 
@@ -148,6 +174,13 @@ on Energy balance overview totals.
   precise diagnostic note; do not force artificial equality.
 - Energy balance overview must use the same corrected Buildings owner rows.
 
+**Finding (2026-08-31):** The top-level chart is not double-counting a displayed
+stack. The mapped inputs themselves disagree at the 2022 handoff: ESTO is
+570.795 PJ and LEAP/Ninth are about 781.607 PJ after the dashboard's normal
+measure and subtotal filters. This must be reconciled in the upstream
+Buildings calibration/mapping input. The renderer deliberately continues to
+show the gap rather than scale one source to another.
+
 ## AUS-CONSIST-006 — International bunker mapping/sign mismatch
 
 **Affected charts:** `04 International marine bunkers` and
@@ -174,6 +207,13 @@ on Energy balance overview totals.
 - Raw source identity, mapped flow and sign transformation are covered by a
   regression test for both bunker types.
 
+**Finding (2026-08-31):** Marine and aviation are not cross-mapped in Ninth.
+The raw Ninth rows are correctly negative. The ESTO-Extended mapping-chain
+artifact instead carries small positive LEAP-like rows for both flows, even
+though original ESTO has negative bunker observations. The correction belongs
+in ESTO-Extended exact-row/source selection and sign preservation upstream;
+the dashboard must not negate selected sources ad hoc.
+
 ## Cross-cutting consistency gates
 
 Before another dashboard candidate is accepted:
@@ -190,4 +230,3 @@ Before another dashboard candidate is accepted:
    emitted as layout groups rather than a flat sequence.
 6. Run source-level reconciliation tables before visual QA; screenshots alone
    are not sufficient evidence of a fix.
-

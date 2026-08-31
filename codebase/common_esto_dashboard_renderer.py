@@ -2193,6 +2193,56 @@ def add_active_placeholder_area_specs(
             "source_flow_labels_by_system": labels_by_source,
             "explicit_flow_boundary": True,
         })
+        detail_boundaries = [
+            str(value).strip()
+            for value in (
+                coverage.get("placeholder_component_flow_prefixes", {}) or {}
+            ).get(component, [])
+            if str(value).strip()
+        ]
+        detail_parts = [
+            resolved_flow_boundary_rows(page_df, detail_boundary)
+            for detail_boundary in detail_boundaries
+        ]
+        detail_rows = pd.concat(
+            [part for part in detail_parts if not part.empty],
+            ignore_index=True,
+        ) if any(not part.empty for part in detail_parts) else page_df.iloc[0:0].copy()
+        detail_rows = _non_overlapping_flow_rows(
+            _non_overlapping_common_row_frontier(detail_rows)
+        )
+        minimum_children = int(
+            (template.get("aggregate_chart_policy", {}) or {}).get(
+                "minimum_nonzero_child_flows", 2
+            )
+        )
+        nonzero_children = sum(
+            _has_nonzero_values(child_rows["value"])
+            for _label, child_rows in detail_rows.groupby(
+                "common_flow_label", dropna=False
+            )
+        ) if not detail_rows.empty else 0
+        if nonzero_children >= minimum_children:
+            specs[-1]["preferred_detail_flow_boundaries"] = detail_boundaries
+            specs[-1]["prefer_published_detail_over_parent_total"] = True
+            specs.append({
+                "area_level": code_depth(flow_code),
+                "aggregate_flow_prefix": flow_code,
+                "aggregate_flow_label": str(section["label"]),
+                "source_flow_labels": labels,
+                "source_flow_labels_by_system": labels_by_source,
+                "explicit_flow_boundary": True,
+                "overview_variant": "by_flow",
+                "group_col": "common_flow_label",
+                "preferred_detail_flow_boundaries": detail_boundaries,
+                "prefer_published_detail_over_parent_total": True,
+                "detail_coverage_residual_label": (
+                    f"Unallocated within {section['label']}"
+                ),
+                "title_prefix": "Aggregate by flow",
+                "chart_caption": f"{section['label']} — by flow",
+                "skip_product_overview_ownership": True,
+            })
         existing_boundaries.add(boundary)
     return specs
 
@@ -2676,6 +2726,37 @@ def drop_overview_owned_detail_rows(
     return detail_page_df.loc[
         ~detail_page_df[owner_column].isin(owned_ids)
     ].copy()
+
+
+def drop_configured_redundant_detail_rows(
+    page_key: str,
+    detail_page_df: pd.DataFrame,
+    template: dict,
+) -> pd.DataFrame:
+    """Remove configured comparison rollups already explained by Overview.
+
+    This is intentionally exact-code and page-specific. It prevents a broad
+    ESTO historical row and a different LEAP/NINTH projection row from being
+    published as two apparently incomplete detail sections, while preserving
+    genuine children such as 16.03 Agriculture and 16.05 Non-specified others.
+    """
+    config = template.get("other_demand_page", {}) or {}
+    configured_page_key = str(config.get("page_key", "others")).strip()
+    if (
+        page_key != configured_page_key
+        or detail_page_df.empty
+        or "common_flow_code" not in detail_page_df.columns
+    ):
+        return detail_page_df.copy()
+    suppressed_codes = {
+        code_candidate_text(value)
+        for value in config.get("suppress_redundant_detail_flow_codes", [])
+        if code_candidate_text(value)
+    }
+    if not suppressed_codes:
+        return detail_page_df.copy()
+    exact_codes = detail_page_df["common_flow_code"].map(code_candidate_text)
+    return detail_page_df.loc[~exact_codes.isin(suppressed_codes)].copy()
 
 
 def area_spec_is_placeholder_only_demand_child(
@@ -3164,8 +3245,18 @@ def _coverage_selected_demand_frontier(df: pd.DataFrame) -> pd.DataFrame:
         lambda code: code_candidate_text(code) == "15.01,15.03-15.06"
     )
     leap_rows = work["source_system"].astype(str).str.casefold().eq("leap")
+    explicit_nonroad = codes.map(
+        lambda code: any(
+            code_matches_prefix(code, prefix)
+            for prefix in ("15.01", "15.03", "15.04", "15.05", "15.06")
+        )
+    )
     transport = leap_rows & (
-        codes.eq("15") | codes.eq("15.02") | codes.str.startswith("15.02.") | nonroad
+        codes.eq("15")
+        | codes.eq("15.02")
+        | codes.str.startswith("15.02.")
+        | nonroad
+        | explicit_nonroad
     )
     group_columns = [
         column for column in
@@ -3181,9 +3272,28 @@ def _coverage_selected_demand_frontier(df: pd.DataFrame) -> pd.DataFrame:
             group_nonroad = group["common_flow_code"].astype(str).map(
                 lambda code: code_candidate_text(code) == "15.01,15.03-15.06"
             )
+            group_explicit_nonroad = group_codes.map(
+                lambda code: any(
+                    code_matches_prefix(code, prefix)
+                    for prefix in ("15.01", "15.03", "15.04", "15.05", "15.06")
+                )
+            )
             selected = group.loc[group_codes.eq("15")]
             if selected.empty:
-                selected = group.loc[group_codes.eq("15.02") | group_nonroad]
+                road_selected = group.loc[group_codes.eq("15.02")]
+                explicit_rows = group.loc[
+                    group_explicit_nonroad & ~group_nonroad
+                ].copy()
+                if not explicit_rows.empty:
+                    nonroad_selected = _non_overlapping_flow_rows(
+                        _non_overlapping_common_row_frontier(explicit_rows)
+                    )
+                else:
+                    nonroad_selected = group.loc[group_nonroad]
+                selected = pd.concat(
+                    [road_selected, nonroad_selected],
+                    ignore_index=False,
+                )
             if selected.empty:
                 continue
             resolved_row_numbers.update(group["_demand_frontier_row"].astype(int))
@@ -4282,10 +4392,16 @@ def resolved_area_chart_rows(
                 coverage["_detail_residual"] = (
                     coverage["_parent_total"] - coverage["_detail_total"]
                 )
-                residual_contexts = coverage[
-                    coverage["_parent_total"].notna()
-                    & coverage["_detail_residual"].abs().gt(tolerance)
-                ][[*context_columns, "_detail_residual"]]
+                residual_contexts = coverage.iloc[0:0][
+                    [*context_columns, "_detail_residual"]
+                ]
+                if not bool(
+                    area_spec.get("prefer_published_detail_over_parent_total", False)
+                ):
+                    residual_contexts = coverage[
+                        coverage["_parent_total"].notna()
+                        & coverage["_detail_residual"].abs().gt(tolerance)
+                    ][[*context_columns, "_detail_residual"]]
                 residual_rows = chart_df.iloc[0:0].copy()
                 if not residual_contexts.empty:
                     residual_templates = (
@@ -5686,6 +5802,7 @@ a:hover { text-decoration: underline; }
   align-items:start;
 }
 .dashboard-grid.overview-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+.overview-grid-spacer { min-height:1px; }
 .dashboard-grid.expand-1 { grid-template-columns:minmax(0, 1fr); }
 .dashboard-grid.expand-2 { grid-template-columns:repeat(2, minmax(0, 1fr)); }
 .dashboard-grid.expand-3 { grid-template-columns:repeat(3, minmax(0, 1fr)); }
@@ -5708,6 +5825,7 @@ a:hover { text-decoration: underline; }
 .subsection-heading { margin:14px 0 6px 12px;font-size:15px;font-weight:600;color:#4c1d70;padding-left:8px;border-left:3px solid #c69af0; }
 @media (max-width: 900px) {
   .dashboard-grid, .dashboard-grid.overview-grid { grid-template-columns:minmax(0, 1fr); }
+  .overview-grid-spacer { display:none; }
   .dashboard-updated { display:block;margin:4px 0 0 0;padding:0;border-left:0;white-space:normal; }
 }
 @media (max-width: 600px) {
@@ -6490,21 +6608,54 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
             row for row in area_rows
             if str(row.get("overview_group", "Overview")) == group_label
         ]
+        def pair_key(row: dict) -> str:
+            chart_key = str(row.get("chart_key", ""))
+            if chart_key.endswith("__by_flow"):
+                return chart_key[:-len("__by_flow")]
+            if chart_key.startswith("chart__area__section__"):
+                for suffix in ("__product", "__flow"):
+                    if chart_key.endswith(suffix):
+                        return chart_key[:-len(suffix)]
+            return chart_key
+
+        paired_rows: list[dict | None] = []
+        seen_pair_keys: set[str] = set()
+        for row in group_rows:
+            owner_key = pair_key(row)
+            if owner_key in seen_pair_keys:
+                continue
+            seen_pair_keys.add(owner_key)
+            owner_rows = [
+                candidate
+                for candidate in group_rows
+                if pair_key(candidate) == owner_key
+            ]
+            paired_rows.extend(owner_rows)
+            if len(owner_rows) == 1 and len(group_rows) > 1:
+                paired_rows.append(None)
         grid_class = (
             "dashboard-grid overview-grid"
-            if len(group_rows) > 1
+            if len(paired_rows) > 1
             else "dashboard-grid expand-1"
         )
         cards = []
-        for i, row in enumerate(group_rows):
+        anchored_roots: set[str] = set()
+        for i, row in enumerate(paired_rows):
+            if row is None:
+                cards.append(
+                    '<div class="overview-grid-spacer" aria-hidden="true"></div>'
+                )
+                continue
             caption = escape(str(row.get("title", "")))
             key = escape(row["chart_key"])
             navigation_root_label = str(row.get("navigation_root_label") or "").strip()
             figure_id = (
                 f' id="{escape(_overview_navigation_anchor(page_label, navigation_root_label))}"'
-                if navigation_root_label
+                if navigation_root_label and navigation_root_label not in anchored_roots
                 else ""
             )
+            if navigation_root_label:
+                anchored_roots.add(navigation_root_label)
             cards.append(
                 f'<figure{figure_id} class="chart-card" data-guide-id="chart-card" data-default-order="{i}" data-total-abs="{row.get("total_abs_value",0):.4f}" data-abs-diff="{row.get("abs_diff",0):.4f}" data-pct-diff="{row.get("pct_diff",0):.6f}" data-datasets="{escape(str(row.get("datasets", "")))}">'
                 f'<figcaption class="chart-caption">{caption}</figcaption>'
@@ -9804,6 +9955,11 @@ def render_dashboard(
         detail_page_df = drop_overview_owned_detail_rows(
             detail_page_df,
             product_overview_rows,
+        )
+        detail_page_df = drop_configured_redundant_detail_rows(
+            page_key,
+            detail_page_df,
+            template,
         )
         flow_nodes = get_existing_flow_nodes(detail_page_df)
         all_canonical = set(flow_nodes["canonical_code"].astype(str))

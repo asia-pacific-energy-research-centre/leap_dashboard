@@ -85,6 +85,7 @@ from codebase.common_esto_dashboard_renderer import (
     _leaf_flow_rows,
     _flow_subtree_is_page_complete,
     _jump_nav_html,
+    _area_charts_html,
     _line_sections_html,
     overview_navigation_root_code,
     scenario_toggle_tag,
@@ -2738,6 +2739,33 @@ def test_common_esto_dashboard_switcher_uses_current_dashboard_label(tmp_path: P
     )
     assert overview_figure["layout"]["legend"]["y"] == -0.20
     assert overview_figure["layout"]["margin"]["b"] == 160
+
+
+def test_power_generation_overview_uses_public_child_labels() -> None:
+    template = _load_template()
+    generation = template["power_page"]["overview"]["aggregates"][0]
+
+    assert generation["child_flow_labels"] == {
+        "09.01.01": "09.01.01,09.02.01 Electricity plants",
+        "09.01.02": "09.01.02,09.02.02 CHP plants",
+        "09.01.03": "09.01.03,09.02.03 Heat plants",
+    }
+
+
+def test_overview_html_keeps_chart_pairs_together_and_spaces_singletons() -> None:
+    rows = [
+        {"chart_key": "chart__area__14__industry", "title": "14 Industry sector"},
+        {"chart_key": "chart__area__14__industry__by_flow", "title": "14 Industry sector — by flow"},
+        {"chart_key": "chart__area__17__non_energy", "title": "17 Non-energy use"},
+        {"chart_key": "chart__area__14_03__manufacturing", "title": "14.03 Manufacturing"},
+        {"chart_key": "chart__area__14_03__manufacturing__by_flow", "title": "14.03 Manufacturing — by flow"},
+    ]
+
+    html = _area_charts_html(rows, "Industry and non-energy")
+
+    assert html.count('class="overview-grid-spacer"') == 1
+    assert html.index("17 Non-energy use") < html.index("14.03 Manufacturing")
+    assert html.index("14 Industry sector — by flow") < html.index("17 Non-energy use")
 
 
 def test_common_esto_dashboard_shows_updated_label(tmp_path: Path) -> None:

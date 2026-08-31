@@ -248,6 +248,29 @@ def test_placeholder_overview_ownership_prevents_duplicate_ninth_detail_cards() 
     assert set(remaining_detail["source_system"]) == {"NINTH"}
 
 
+def test_other_demand_suppresses_only_redundant_comparison_rollups() -> None:
+    rows = pd.DataFrame([
+        _area_product_row("ESTO_EXTENDED", "historical", 2022, "16.03-16.05", "17", 30.0),
+        _area_product_row("LEAP", "Target", 2023, "16.03-16.04", "17", 20.0),
+        _area_product_row("LEAP", "Target", 2023, "16.03", "17", 12.0),
+        _area_product_row("LEAP", "Target", 2023, "16.05", "17", 8.0),
+    ])
+    template = {
+        "other_demand_page": {
+            "page_key": "others",
+            "suppress_redundant_detail_flow_codes": [
+                "16.03-16.04", "16.03-16.05"
+            ],
+        }
+    }
+
+    remaining = renderer.drop_configured_redundant_detail_rows(
+        "others", rows, template
+    )
+
+    assert set(remaining["common_flow_code"]) == {"16.03", "16.05"}
+
+
 def test_overview_product_roots_include_placeholder_and_configured_peer() -> None:
     """Industry and exact non-energy use share one Overview/product treatment."""
     template = {
@@ -562,8 +585,16 @@ def test_transport_nonroad_overview_remains_after_placeholder_is_replaced() -> N
     )
 
     assert [spec["aggregate_flow_prefix"] for spec in specs] == [
-        "15.01,15.03-15.06"
+        "15.01,15.03-15.06",
+        "15.01,15.03-15.06",
     ]
+    assert [spec.get("overview_variant", "by_product") for spec in specs] == [
+        "by_product", "by_flow"
+    ]
+    assert all(
+        spec["prefer_published_detail_over_parent_total"] is True
+        for spec in specs
+    )
     assert set(renderer.area_spec_rows(rows, specs[0])["common_flow_code"]) == {
         "15.03",
         "15.04",
@@ -1638,6 +1669,27 @@ def test_mixed_transport_frontier_stops_at_road_before_technology_detail() -> No
         "15.02", "15.01,15.03-15.06"
     }
     assert selected["value"].sum() == 125.0
+
+
+def test_mixed_transport_frontier_replaces_nonroad_rollup_with_published_children() -> None:
+    """A detailed non-road branch replaces, rather than supplements, its rollup."""
+    rows = pd.DataFrame([
+        _demand_frontier_row("LEAP", "15.02", 100.0),
+        _demand_frontier_row("LEAP", "15.01,15.03-15.06", 30.0),
+        _demand_frontier_row("LEAP", "15.01", 10.0),
+        _demand_frontier_row("LEAP", "15.03", 8.0),
+        _demand_frontier_row("LEAP", "15.04", 6.0),
+        _demand_frontier_row("LEAP", "15.05", 4.0),
+        _demand_frontier_row("LEAP", "15.06", 2.0),
+    ])
+
+    selected = renderer._coverage_selected_demand_frontier(rows)
+
+    assert set(selected["common_flow_code"]) == {
+        "15.02", "15.01", "15.03", "15.04", "15.05", "15.06"
+    }
+    assert "15.01,15.03-15.06" not in set(selected["common_flow_code"])
+    assert selected["value"].sum() == 130.0
 
 
 def test_true_transport_parent_remains_authoritative() -> None:

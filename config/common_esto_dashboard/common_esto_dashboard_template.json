@@ -391,6 +391,7 @@
   "other_demand_page": {
     "page_key": "others",
     "suppress_generic_overview_flow_codes": ["16"],
+    "suppress_redundant_detail_flow_codes": ["16.03-16.04", "16.03-16.05"],
     "by_flow_overview": {
       "enabled": true,
       "flow_boundary": "16.03-16.05",
@@ -400,7 +401,7 @@
       "chart_caption": "Other demand — by flow",
       "stacked_area_note": "The historical areas show the activities included in Other demand. After 2022, one combined area means detailed LEAP activity data is not yet available; it is replaced automatically when that detail is published."
     },
-    "_note": "Both Other-demand Overview charts always use exact boundary 16.03-16.05; broad flow 16 is suppressed because it also contains sectors presented on the Buildings page. The by-flow source frontier uses the deepest published 16.03, 16.04 and 16.05 children. Any remaining parent/detail difference is shown conservatively as unallocated rather than assigned to a specific child. A source/year with no child detail retains the 16.03-16.05 parent, including the active LEAP placeholder."
+    "_note": "Both Other-demand Overview charts always use exact boundary 16.03-16.05; broad flow 16 is suppressed because it also contains sectors presented on the Buildings page. The by-flow source frontier uses the deepest published 16.03, 16.04 and 16.05 children. Any remaining parent/detail difference is shown conservatively as unallocated rather than assigned to a specific child. A source/year with no child detail retains the 16.03-16.05 parent, including the active LEAP placeholder. Source-specific comparison rollups 16.03-16.04 and 16.03-16.05 are already owned by the continuous Overview and are not repeated below as misleading historical-only or projection-only detail sections."
   },
   "power_page": {
     "page_key": "power",
@@ -412,6 +413,11 @@
           "flow_boundary": "09.01-09.02",
           "child_flow_parent_prefix": "09.01",
           "label": "09.01-09.02 Power generation",
+          "child_flow_labels": {
+            "09.01.01": "09.01.01,09.02.01 Electricity plants",
+            "09.01.02": "09.01.02,09.02.02 CHP plants",
+            "09.01.03": "09.01.03,09.02.03 Heat plants"
+          },
           "grouping_titles": {
             "product": "09.01-09.02 Power generation — by product",
             "flow": "09.01-09.02 Power generation — by flow"
