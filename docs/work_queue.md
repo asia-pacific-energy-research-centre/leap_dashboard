@@ -1,5 +1,15 @@
 # LEAP dashboard work queue and handover plan
 
+## Australia consistency review — investigation in progress
+
+- **DASHQ-069 — reconcile six cross-page regressions before the next candidate.**
+  The complete issue ledger, affected artifacts, open hypotheses and acceptance
+  criteria are recorded in
+  [`2026-08-31_aus_dashboard_consistency_issues.md`](2026-08-31_aus_dashboard_consistency_issues.md).
+  Do not apply chart-specific visual patches until the shared row-frontier,
+  aggregate-ownership, base-year continuity and sign checks identify the source
+  of each discrepancy.
+
 ## Current-run LEAP demand representation status — implemented and verified
 
 - **DASHQ-068 — connect configured Overview boundaries to page rendering.**
