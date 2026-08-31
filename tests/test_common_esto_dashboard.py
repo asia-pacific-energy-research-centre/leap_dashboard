@@ -748,7 +748,7 @@ def test_energy_balance_demand_totals_exclude_leap_international_transport() -> 
         assert list(total_trace.y) == [100.0]
 
 
-def test_sector_stack_does_not_add_a_synthetic_tfc_remainder() -> None:
+def test_sector_stack_uses_displayed_boundary_without_synthetic_remainder() -> None:
     demand_rows = pd.DataFrame([{
         "_page_key": "industry", "_page_label": "Industry",
         "common_flow_code": "14", "common_flow_label": "14 Industry",
@@ -769,8 +769,14 @@ def test_sector_stack_does_not_add_a_synthetic_tfc_remainder() -> None:
     # historical stack rather than manufacturing Reference and Target copies.
     assert len(stack_traces) == 1
     assert {tuple(trace.y) for trace in stack_traces} == {(40.0,)}
-    assert "does not reconcile" in figure.layout.meta["stacked_area_note"]
-    assert "no balancing remainder is added" in figure.layout.meta["stacked_area_note"]
+    total_trace = next(
+        trace for trace in figure.data
+        if trace.name == "ESTO|historical (Domestic TFC)"
+    )
+    # Mixed-coverage dashboards compare the total line to the exact frontier
+    # displayed in the stack. They do not add an invented remainder to make a
+    # broader raw parent appear to reconcile.
+    assert list(total_trace.y) == [40.0]
 
 
 def test_sector_stack_retains_published_non_energy_without_inventing_leap_values() -> None:
@@ -1487,13 +1493,13 @@ def test_jump_navigation_uses_flow_levels_not_parent_or_leaf_status() -> None:
     assert html.count('<div class="jump-nav-row" data-level="1"') == 1
     assert html.count('<div class="jump-nav-row" data-level="2"') == 1
     assert html.count('<div class="jump-nav-row" data-level="3"') == 1
-    assert 'data-level="1" data-hierarchy-depth="1">09.06 Gas processing plants</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">09.12 Non-specified transformation</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">10.01.06 Coal mines</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">10.01.12 Oil and gas extraction</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">09.06.02 Liquefaction/regasification plants</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">09.06.01 Gas works plants</a>' in html
-    assert 'data-level="3" data-hierarchy-depth="3">09.06.02.01 Liquefaction</a>' in html
+    assert 'data-level="1" data-hierarchy-depth="1" data-placeholder="false">09.06 Gas processing plants</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">09.12 Non-specified transformation</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">10.01.06 Coal mines</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">10.01.12 Oil and gas extraction</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">09.06.02 Liquefaction/regasification plants</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">09.06.01 Gas works plants</a>' in html
+    assert 'data-level="3" data-hierarchy-depth="3" data-placeholder="false">09.06.02.01 Liquefaction</a>' in html
     assert '>Other transformation (including own use)</a>' not in html
     assert '>Other energy-sector own use</a>' not in html
     assert html.index('data-hierarchy-depth="1"') < html.index('data-hierarchy-depth="2"')
@@ -1539,10 +1545,10 @@ def test_jump_navigation_replaces_page_name_with_buildings_tree_nodes() -> None:
     html = _jump_nav_html("Buildings", line_section_tree(rows))
 
     assert '>Buildings</a>' not in html
-    assert 'data-level="1" data-hierarchy-depth="1">16.01-16.02 Buildings</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">16.02 Residential</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">16.01.99 Commercial and public services unallocated</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">16.01.01 Datacentres</a>' in html
+    assert 'data-level="1" data-hierarchy-depth="1" data-placeholder="false">16.01-16.02 Buildings</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">16.02 Residential</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">16.01.99 Commercial and public services unallocated</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">16.01.01 Datacentres</a>' in html
 
 
 def test_jump_navigation_restores_real_industry_overview_parent() -> None:
@@ -1561,12 +1567,12 @@ def test_jump_navigation_restores_real_industry_overview_parent() -> None:
     html = _jump_nav_html("Industry", line_section_tree(rows, roots))
 
     assert 'href="#overview-industry__14_industry_sector"' in html
-    assert 'data-level="1" data-hierarchy-depth="1">14 Industry sector</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">14.01 Mining and quarrying</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">14.02 Construction</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">14.03 Manufacturing</a>' in html
-    assert 'data-level="3" data-hierarchy-depth="3">14.03.01 Iron and steel</a>' in html
-    assert 'data-level="3" data-hierarchy-depth="3">14.03.11 Non-specified industry</a>' in html
+    assert 'data-level="1" data-hierarchy-depth="1" data-placeholder="false">14 Industry sector</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">14.01 Mining and quarrying</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">14.02 Construction</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">14.03 Manufacturing</a>' in html
+    assert 'data-level="3" data-hierarchy-depth="3" data-placeholder="false">14.03.01 Iron and steel</a>' in html
+    assert 'data-level="3" data-hierarchy-depth="3" data-placeholder="false">14.03.11 Non-specified industry</a>' in html
 
 
 def test_flow_subtree_root_requires_all_descendants_to_share_page() -> None:
@@ -1610,12 +1616,12 @@ def test_page_defined_overview_aggregates_parent_renderer_sections() -> None:
 
     html = _jump_nav_html("Other transformation", line_section_tree(rows, roots))
 
-    assert 'data-level="1" data-hierarchy-depth="1">Other transformation (including own use)</a>' in html
-    assert 'data-level="1" data-hierarchy-depth="1">Other energy-sector own use</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">09.06 Gas processing plants (including own use)</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">09.12 Non-specified transformation (including own use)</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">10.01.06 Coal mines</a>' in html
-    assert 'data-level="3" data-hierarchy-depth="3">09.06.01 Gas works plants (including own use)</a>' in html
+    assert 'data-level="1" data-hierarchy-depth="1" data-placeholder="false">Other transformation (including own use)</a>' in html
+    assert 'data-level="1" data-hierarchy-depth="1" data-placeholder="false">Other energy-sector own use</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">09.06 Gas processing plants (including own use)</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">09.12 Non-specified transformation (including own use)</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">10.01.06 Coal mines</a>' in html
+    assert 'data-level="3" data-hierarchy-depth="3" data-placeholder="false">09.06.01 Gas works plants (including own use)</a>' in html
     assert 'href="#sec-other_transformation__other_energy_sector_own_use"' in html
     assert 'href="#sec-other_transformation__other_energy_sector_own_use__10_01_06_coal_mines"' not in html
 
@@ -1632,9 +1638,9 @@ def test_jump_navigation_preserves_compound_rollup_containment() -> None:
 
     html = _jump_nav_html("International transport", line_section_tree(rows))
 
-    assert 'data-level="1" data-hierarchy-depth="1">04-05 International transport (bunkers)</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">04 International marine bunkers</a>' in html
-    assert 'data-level="2" data-hierarchy-depth="2">05 International aviation bunkers</a>' in html
+    assert 'data-level="1" data-hierarchy-depth="1" data-placeholder="false">04-05 International transport (bunkers)</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">04 International marine bunkers</a>' in html
+    assert 'data-level="2" data-hierarchy-depth="2" data-placeholder="false">05 International aviation bunkers</a>' in html
 
 
 def test_compound_supply_overview_uses_its_full_boundary_for_navigation() -> None:
@@ -1734,7 +1740,7 @@ def test_single_visible_flow_is_a_level_one_aggregate() -> None:
 
     html = _jump_nav_html("Other transformation", line_section_tree(rows))
 
-    assert 'data-level="1" data-hierarchy-depth="1">08 Transfers</a>' in html
+    assert 'data-level="1" data-hierarchy-depth="1" data-placeholder="false">08 Transfers</a>' in html
 
 
 def test_aggregate_only_domestic_demand_pages_remain_visible() -> None:
@@ -2229,8 +2235,8 @@ def test_international_placeholder_keeps_unaffected_supply_detail_charts() -> No
     ]
 
 
-def test_other_sector_placeholder_hides_routed_non_energy_detail() -> None:
-    """Code 17 renders under Industry but is covered by Other sector's placeholder."""
+def test_other_sector_placeholder_does_not_consume_non_energy_detail() -> None:
+    """Other demand and flow 17 are separately owned dashboard boundaries."""
     template = filter_template_for_leap_demand_coverage(
         _load_template(),
         pd.DataFrame([{
@@ -2246,7 +2252,10 @@ def test_other_sector_placeholder_hides_routed_non_energy_detail() -> None:
 
     visible = drop_placeholder_only_demand_detail_rows("industry", rows, template)
 
-    assert visible["common_flow_label"].tolist() == ["14 Industry sector"]
+    assert visible["common_flow_label"].tolist() == [
+        "14 Industry sector",
+        "17 Non-energy use",
+    ]
 
 
 def test_other_sector_placeholder_hides_other_demand_parent_detail_card() -> None:
@@ -2681,8 +2690,9 @@ def test_supply_uses_combined_bunker_boundary_while_placeholder_is_active(
 
     supply_html = (layout["dashboards"] / "supply.html").read_text(encoding="utf-8")
     assert (
-        'class="jump-chip" data-level="1" data-hierarchy-depth="1">'
-        '04-05 International transport (bunkers)</a>'
+            'class="jump-chip" data-level="1" data-hierarchy-depth="1" data-placeholder="true">'
+            '04-05 International transport<span class="jump-placeholder-label">'
+            'Placeholder</span></a>'
     ) in supply_html
     assert (
         "cannot be viewed separately until the placeholder demand sector is replaced"

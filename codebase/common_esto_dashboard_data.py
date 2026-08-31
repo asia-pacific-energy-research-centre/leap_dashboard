@@ -1158,14 +1158,16 @@ def filter_template_for_leap_demand_coverage(
         "placeholder_only_retained",
         "partial_detail_placeholder_retained",
     }
+    tracked_statuses = {*placeholder_statuses, "no_data_unavailable"}
     active_components: list[dict[str, object]] = []
     if representation_status_df is not None and not representation_status_df.empty:
         active_components = representation_status_df.loc[
-            representation_status_df["representation_status"].astype(str).isin(placeholder_statuses),
+            representation_status_df["representation_status"].astype(str).isin(tracked_statuses),
             ["component_branch", "detailed_branches", "representation_status"],
         ].drop_duplicates().to_dict("records")
     aggregate_only_page_branches: dict[str, list[str]] = {}
     placeholder_only_page_branches: dict[str, list[str]] = {}
+    unavailable_page_branches: dict[str, list[str]] = {}
     for page_key, branches in page_branches.items():
         page_branches_casefold = {str(branch).casefold() for branch in branches}
         components = []
@@ -1181,10 +1183,15 @@ def filter_template_for_leap_demand_coverage(
                 or detailed.intersection(page_branches_casefold)
             ):
                 components.append(component)
-        if components:
+        placeholder_components = [
+            component
+            for component in components
+            if str(component["representation_status"]).strip() in placeholder_statuses
+        ]
+        if placeholder_components:
             aggregate_only_page_branches[str(page_key)] = sorted({
                 str(component["component_branch"]).strip()
-                for component in components
+                for component in placeholder_components
             })
         placeholder_only_components = [
             str(component["component_branch"]).strip()
@@ -1196,8 +1203,19 @@ def filter_template_for_leap_demand_coverage(
             placeholder_only_page_branches[str(page_key)] = sorted(
                 set(placeholder_only_components)
             )
+        unavailable_components = [
+            str(component["component_branch"]).strip()
+            for component in components
+            if str(component["representation_status"]).strip()
+            == "no_data_unavailable"
+        ]
+        if unavailable_components:
+            unavailable_page_branches[str(page_key)] = sorted(
+                set(unavailable_components)
+            )
     coverage_config["_aggregate_only_page_branches"] = aggregate_only_page_branches
     coverage_config["_placeholder_only_page_branches"] = placeholder_only_page_branches
+    coverage_config["_unavailable_page_branches"] = unavailable_page_branches
     if always_skip:
         coverage_config["_hidden_page_keys"] = sorted(always_skip)
     out["leap_demand_sector_coverage"] = coverage_config

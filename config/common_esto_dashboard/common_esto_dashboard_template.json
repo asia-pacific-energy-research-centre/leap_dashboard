@@ -288,7 +288,7 @@
     "demand_page_keys": ["industry", "transport", "buildings", "others"],
     "supply_codes": ["01", "02", "03", "04-05"],
     "tfec_enabled": false,
-    "tfec_status": "Temporarily disabled because non-energy use cannot yet be separated from aggregated Other-sector LEAP demand.",
+    "tfec_status": "Enabled only when the source publishes a distinct non-energy-use branch; combined Other/non-energy placeholders are not allocated.",
     "transformation_composition": {
       "enabled": true,
       "flow_code_prefixes": ["09", "08", "10.01", "10.02"]
@@ -331,10 +331,31 @@
     "show_aggregate_only_page_keys": ["supply", "industry", "transport", "buildings", "others"],
     "page_leap_branches": {
       "supply": ["International transport"],
-      "industry": ["Industry"],
+      "industry": ["Industry", "Non Energy Use"],
       "transport": ["Passenger road", "Freight road", "Transport non road"],
       "buildings": ["Buildings"],
       "others": ["Other sector"]
+    },
+    "overview_product_flow_prefixes_by_page": {
+      "industry": ["17"]
+    },
+    "placeholder_component_product_sections": {
+      "International transport": {"flow_code": "04-05", "label": "04-05 International transport"},
+      "Industry": {"flow_code": "14", "label": "14 Industry sector"},
+      "Road": {"flow_code": "15.02", "label": "15.02 Road"},
+      "Transport non road": {"flow_code": "15.01,15.03-15.06", "label": "15.01,15.03-15.06 Transport non-road"},
+      "Buildings": {"flow_code": "16.01-16.02", "label": "16 Buildings"},
+      "Other sector": {"flow_code": "16.03-16.05", "label": "16.03-16.05 Other sector"},
+      "Non Energy Use": {"flow_code": "17", "label": "17 Non-energy use"}
+    },
+    "placeholder_overview_components_by_page": {
+      "transport": ["Road", "Transport non road"],
+      "others": ["Other sector"]
+    },
+    "placeholder_overview_replacements_by_page": {
+      "others": [
+        {"component": "Other sector", "replace_flow_codes": ["16"]}
+      ]
     },
     "placeholder_component_flow_prefixes": {
       "International transport": ["04-05"],
@@ -342,11 +363,12 @@
       "Road": ["15.02"],
       "Transport non road": ["15.01", "15.03", "15.04", "15.05", "15.06"],
       "Buildings": ["16.01", "16.02"],
-      "Other sector": ["16.03", "16.04", "16.05", "17"]
+      "Other sector": ["16.03", "16.04", "16.05"],
+      "Non Energy Use": ["17"]
     },
     "page_placeholder_components": {
       "supply": ["International transport"],
-      "industry": ["Industry"],
+      "industry": ["Industry", "Non Energy Use"],
       "transport": ["Road", "Transport non road"],
       "buildings": ["Buildings"],
       "others": ["Other sector"]
@@ -354,6 +376,64 @@
     "always_skip_page_keys": [],
     "require_primary_source_page_keys": [],
     "_note": "page_leap_branches maps each domestic demand page_key to its LEAP source branches. The dashboard workflow resolves aggregate-only sectors from leap_mappings/config/all_demand_aggregated_components.json. A placeholder_only_retained component keeps its broad aggregate boundary but suppresses its by-product/by-flow detail cards and their otherwise-empty section navigation after routing; those cards return when the detailed LEAP branch replaces the placeholder. When every page_placeholder_components entry is placeholder-only, suppress that page's parent detail code too while preserving its overview. International transport is a signed supply deduction and is routed to Supply, not domestic demand. Exact flow 17 is presented in the Industry page's Non-energy use section; the combined Other sector including non-energy placeholder remains routed to Other demand by its explicit routing special case, so its active prefix set must also suppress routed 17 detail on Industry."
+  },
+  "other_demand_page": {
+    "page_key": "others",
+    "suppress_generic_overview_flow_codes": ["16"],
+    "by_flow_overview": {
+      "enabled": true,
+      "flow_boundary": "16.03-16.05",
+      "label": "16.03-16.05 Other sector",
+      "preferred_detail_flow_boundaries": ["16.03", "16.04", "16.05"],
+      "detail_coverage_residual_label": "Unallocated within 16.03-16.05 Other demand",
+      "chart_caption": "Other demand — by flow",
+      "stacked_area_note": "The historical areas show the activities included in Other demand. After 2022, one combined area means detailed LEAP activity data is not yet available; it is replaced automatically when that detail is published."
+    },
+    "_note": "Both Other-demand Overview charts always use exact boundary 16.03-16.05; broad flow 16 is suppressed because it also contains sectors presented on the Buildings page. The by-flow source frontier uses the deepest published 16.03, 16.04 and 16.05 children. Any remaining parent/detail difference is shown conservatively as unallocated rather than assigned to a specific child. A source/year with no child detail retains the 16.03-16.05 parent, including the active LEAP placeholder."
+  },
+  "power_page": {
+    "page_key": "power",
+    "overview": {
+      "enabled": true,
+      "flow_boundary": "09.01-09.02,10.01.01,10.01.13",
+      "label": "Power sector",
+      "replace_overview_flow_codes": ["09", "10"],
+      "grouping_titles": {
+        "product": "Power sector — by product",
+        "flow": "Power sector — by flow"
+      },
+      "stacked_area_note": "This is the complete Power-page boundary: electricity and heat generation, transformation inputs and outputs, and directly related own use and storage. Interim plant placeholders contribute until detailed LEAP plant branches replace them; the aggregation updates automatically when that happens."
+    },
+    "_note": "The Overview owns the complete configured Power boundary rather than presenting the residual own-use section as if it were the whole sector. Source-specific hierarchy resolution uses the retained 09.01-09.02 roll-up where published and its detailed plant rows otherwise, then adds the separate 10.01.01 and 10.01.13 rows without overlap."
+  },
+  "placeholder_navigation": {
+    "power": {
+      "interim_branch_owners": [
+        {"interim_branch": "Electricity interim", "flow_code": "09.01.01,09.02.01", "label": "09.01.01,09.02.01 Electricity plants"},
+        {"interim_branch": "CHP interim", "flow_code": "09.01.02,09.02.02", "label": "09.01.02,09.02.02 CHP plants"},
+        {"interim_branch": "Heat plant interim", "flow_code": "09.01.03,09.02.03", "label": "09.01.03,09.02.03 Heat plants"}
+      ]
+    },
+    "_note": "Demand placeholder navigation is driven by the current-run representation audit and placeholder_component_product_sections. Power status comes from the source-branch fallback audit. Each retained interim branch maps to one explicit Common ESTO plant roll-up; fuel-specific CHP children and 10.01.01 own use are not placeholder identities. A configured owner is shown only when its interim branch is retained and mapped comparison rows exist."
+  },
+  "section_aggregate_overrides": {
+    "transport": {
+      "Transport": {
+        "required_flow_boundary": "15.02",
+        "include_groupings": ["flow"],
+        "grouping_titles": {
+          "flow": "15.02 Road — detailed model by technology"
+        },
+        "navigation_owner": "15.02 Road",
+        "section_label": "15.02 Road — by product"
+      }
+    },
+    "power": {
+      "Power-sector own use and storage": {
+        "hide_aggregate": true
+      }
+    },
+    "_note": "A section override applies only when every displayed row is inside required_flow_boundary. The Transport override removes the redundant generic by-product section summary once Road is detailed, keeps its technology/flow summary, relabels it as Road detail, and places it first inside the existing Road-owned by-product section. This produces one Road navigation chip and one destination. If detailed non-road rows later join the section, the boundary guard disables this Road-only presentation automatically. The Power override hides only the misleading residual own-use/storage section summary because the complete Power-sector aggregation is owned by Overview; its useful detailed cards remain below."
   },
   "power_interim_branch_flow_prefixes": {
     "Electricity interim": ["09.01.01", "09.02.01"],

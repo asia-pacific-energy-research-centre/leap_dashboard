@@ -228,7 +228,7 @@
           "rows": [
             ["Flows", "Agriculture (16.03), fishing (16.04) and non-specified other demand (16.05)", "These are domestic final-demand flows, not a catch-all for every unassigned row."],
             ["Products", "Electricity, oil products, gas, coal, renewables and other reported fuels", "Available products depend strongly on economy and source detail."],
-            ["Combined placeholder", "16.03-16.05,17 Other sector including non-energy", "LEAP currently reports this boundary inseparably for some economies. It is routed here temporarily, shown only as a broad boundary, and must not be interpreted as a detailed sector split."],
+            ["Compatibility placeholder", "Other demand and non-energy are merged in some LEAP exports", "The dashboard separates them using the 9th Outlook breakdown, keeps the combined LEAP total unchanged, and marks the split as estimated."],
             ["Relationship to Non-energy", "Exact standalone 17 appears in Industry's Non-energy use section", "Do not add exact 17 to the combined placeholder; they overlap."]
           ]
         }
@@ -237,7 +237,7 @@
         "id": "other-demand-review",
         "target": "[data-guide-id='chart-card']",
         "title": "Treat aggregate-only demand as a boundary, not detail",
-        "copy": "Other demand covers agriculture, fishing and non-specified demand. For economies still using the All demand aggregated LEAP placeholder, a combined Other-sector/non-energy row may appear here until detailed branches replace it. Do not infer a sector or non-energy split that the model does not provide."
+        "copy": "Other demand covers agriculture, fishing and non-specified demand. Where a LEAP template temporarily combines Other demand with non-energy use, the dashboard uses the 9th Outlook breakdown to put each part on its correct page without changing the combined LEAP total. The displayed split is estimated until separate LEAP branches are available."
       }
     ],
     "emissions": [
