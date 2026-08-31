@@ -474,6 +474,58 @@ def test_placeholder_components_create_separate_owned_product_boundaries() -> No
     }
 
 
+def test_transport_nonroad_placeholder_is_connected_to_overview_pipeline() -> None:
+    """The rendered Overview includes sector, Road, and compound non-road."""
+    template = {
+        "leap_demand_sector_coverage": {
+            "_aggregate_only_page_branches": {
+                "transport": ["Road", "Transport non road"],
+            },
+            "placeholder_component_product_sections": {
+                "Road": {"flow_code": "15.02", "label": "15.02 Road"},
+                "Transport non road": {
+                    "flow_code": "15.01,15.03-15.06",
+                    "label": "15.01,15.03-15.06 Transport non-road",
+                },
+            },
+            "placeholder_overview_components_by_page": {
+                "transport": ["Road", "Transport non road"],
+            },
+        }
+    }
+    rows = pd.DataFrame([
+        _area_product_row("LEAP", "Target", 2030, "15", "07.01", 87.0),
+        _area_product_row("LEAP", "Target", 2030, "15.02", "07.01", 80.0),
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030, "15.01,15.03-15.06", "07.01", 7.0
+            ),
+            "common_flow_label": "15.01,15.03-15.06 Transport non-road",
+            "is_non_expanding_rollup": True,
+        },
+    ])
+    generic_specs = [
+        {
+            "aggregate_flow_prefix": "15",
+            "aggregate_flow_label": "15 Transport sector",
+        },
+        {
+            "aggregate_flow_prefix": "15.02",
+            "aggregate_flow_label": "15.02 Road",
+        },
+    ]
+
+    specs = renderer.prepare_area_specs_for_page(
+        "transport", rows, generic_specs, template
+    )
+
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == [
+        "15",
+        "15.02",
+        "15.01,15.03-15.06",
+    ]
+
+
 def test_other_demand_placeholder_replaces_broad_16_overview() -> None:
     """Other demand compares exact 16.03-16.05, never NINTH parent 16."""
     template = {
@@ -601,6 +653,61 @@ def test_other_demand_exact_overview_does_not_depend_on_placeholder_status() -> 
     ]
     product_spec = next(
         spec for spec in specs if spec.get("overview_variant", "by_product") == "by_product"
+    )
+    resolved = renderer.resolved_area_chart_rows(rows, product_spec)
+    assert resolved["value"].sum() == pytest.approx(100.7)
+    assert not resolved["common_flow_code"].eq("16").any()
+
+
+def test_exact_other_demand_boundary_is_connected_to_overview_pipeline() -> None:
+    """The rendered Overview cannot retain broad flow 16 or its non-energy."""
+    template = {
+        "other_demand_page": {
+            "page_key": "others",
+            "suppress_generic_overview_flow_codes": ["16"],
+            "by_flow_overview": {
+                "enabled": True,
+                "flow_boundary": "16.03-16.05",
+                "label": "16.03-16.05 Other sector",
+            },
+        },
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("NINTH", "Target", 2042, "16", "17", 890.4),
+            "common_flow_label": "16 Other sector",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "NINTH", "Target", 2042, "16.03-16.04", "17", 99.4
+            ),
+            "common_flow_label": "16.03-16.04 Agriculture and fishing",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row("NINTH", "Target", 2042, "16.05", "17", 1.3),
+            "common_flow_label": "16.05 Non-specified others",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+    generic_specs = [{
+        "aggregate_flow_prefix": "16",
+        "aggregate_flow_label": "16 Other sector",
+        "source_flow_labels": ["16 Other sector"],
+    }]
+
+    specs = renderer.prepare_area_specs_for_page(
+        "others", rows, generic_specs, template
+    )
+
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == [
+        "16.03-16.05",
+        "16.03-16.05",
+    ]
+    product_spec = next(
+        spec for spec in specs
+        if spec.get("overview_variant", "by_product") == "by_product"
     )
     resolved = renderer.resolved_area_chart_rows(rows, product_spec)
     assert resolved["value"].sum() == pytest.approx(100.7)

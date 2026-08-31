@@ -2174,6 +2174,26 @@ def add_power_sector_overview_specs(
     return specs
 
 
+def prepare_area_specs_for_page(
+    page_key: str,
+    page_df: pd.DataFrame,
+    area_specs: list[dict[str, object]],
+    template: dict,
+) -> list[dict[str, object]]:
+    """Apply configured Overview ownership after generic hierarchy discovery.
+
+    The generic picker cannot discover compound boundaries such as Transport
+    non-road, and broad hierarchy roots such as flow 16 are not always the
+    dashboard page boundary. Keep these page-specific decisions together so
+    the configured placeholder, Other-demand, and Power Overview treatments
+    are part of the rendering pipeline rather than unused helper functions.
+    """
+    specs = replace_active_placeholder_area_specs(page_key, area_specs, template)
+    specs = add_active_placeholder_area_specs(page_key, page_df, specs, template)
+    specs = add_other_demand_flow_overview_spec(page_key, page_df, specs, template)
+    return add_power_sector_overview_specs(page_key, page_df, specs, template)
+
+
 def prepare_power_page_rows(page_df: pd.DataFrame) -> pd.DataFrame:
     """Give Power generation and residual own-use rows honest section names."""
     out = page_df.copy()
@@ -9062,6 +9082,12 @@ def render_dashboard(
             if page_key == other_transformation_page_key
             and other_transformation_config.get("hide_generic_overview", False)
             else pick_area_specs(page_df, template, page_key=page_key)
+        )
+        area_specs = prepare_area_specs_for_page(
+            page_key,
+            page_df,
+            area_specs,
+            template,
         )
         page_flow_labels = {
             str(value).strip()

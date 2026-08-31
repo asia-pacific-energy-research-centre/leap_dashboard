@@ -2,6 +2,19 @@
 
 ## Current-run LEAP demand representation status — implemented and verified
 
+- **DASHQ-068 — connect configured Overview boundaries to page rendering.**
+  Complete 2026-08-31. The final page renderer now applies the existing
+  configured Overview ownership after generic hierarchy discovery. Transport
+  therefore renders `15 Transport sector`, `15.02 Road`, and the compound
+  `15.01,15.03-15.06 Transport non-road` placeholder in Overview. Other demand
+  replaces broad flow 16 with exact `16.03-16.05` product and flow views, so
+  its 9th Outlook line cannot include Buildings or non-energy demand. The same
+  integration also activates the configured complete Power Overview. Focused
+  integration tests and an AUS render from the saved comparison parquet verify
+  the three Transport cards and two exact Other-demand cards; at 2042 the
+  corrected 9th Target Other-demand total is 100.683 PJ rather than the broad
+  roughly 890 PJ line.
+
 - **DASHQ-067 — authoritative Road totals over detailed technology coverage.**
   Complete 2026-08-29. The `15.02 Road — detailed model by technology`
   chart keeps the technology stack, overlays the authoritative `15.02 Road`
