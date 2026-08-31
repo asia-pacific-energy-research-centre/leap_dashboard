@@ -2767,6 +2767,18 @@ def test_overview_html_keeps_chart_pairs_together_and_spaces_singletons() -> Non
     assert html.index("17 Non-energy use") < html.index("14.03 Manufacturing")
     assert html.index("14 Industry sector — by flow") < html.index("17 Non-energy use")
 
+    power_html = _area_charts_html([
+        {
+            "chart_key": "chart__area__09__power__power_generation_by_product",
+            "title": "09.01-09.02 Power generation — by product",
+        },
+        {
+            "chart_key": "chart__area__09__power__power_generation_by_flow",
+            "title": "09.01-09.02 Power generation — by flow",
+        },
+    ], "Power")
+    assert 'class="overview-grid-spacer"' not in power_html
+
 
 def test_common_esto_dashboard_shows_updated_label(tmp_path: Path) -> None:
     template = _load_template()

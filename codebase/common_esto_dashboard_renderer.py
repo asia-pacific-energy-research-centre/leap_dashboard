@@ -6609,6 +6609,21 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
             if str(row.get("overview_group", "Overview")) == group_label
         ]
         def pair_key(row: dict) -> str:
+            title = str(row.get("title", "")).strip()
+            title_owner = re.sub(
+                r"\s+—\s+by\s+(?:product|flow)$",
+                "",
+                title,
+                flags=re.IGNORECASE,
+            )
+            title_owner = re.sub(
+                r"^Aggregate by (?:product|flow):\s*",
+                "",
+                title_owner,
+                flags=re.IGNORECASE,
+            )
+            if title_owner:
+                return f"title:{title_owner.casefold()}"
             chart_key = str(row.get("chart_key", ""))
             if chart_key.endswith("__by_flow"):
                 return chart_key[:-len("__by_flow")]
