@@ -675,6 +675,122 @@ def test_other_demand_placeholder_replaces_broad_16_overview() -> None:
     assert not resolved["common_flow_code"].eq("16").any()
 
 
+def test_generic_placeholder_overview_drops_uninformative_by_flow_companion() -> None:
+    template = {
+        "leap_demand_sector_coverage": {
+            "_aggregate_only_page_branches": {"industry": ["Industry"]},
+            "_placeholder_only_page_branches": {"industry": ["Industry"]},
+            "placeholder_component_product_sections": {
+                "Industry": {"flow_code": "14", "label": "14 Industry sector"}
+            },
+            "placeholder_component_flow_prefixes": {"Industry": ["14"]},
+            "placeholder_overview_components_by_page": {},
+        },
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("LEAP", "Target", 2030, "14", "17", 20.0),
+            "common_flow_label": "14 Industry sector",
+            "common_product_label": "17 Electricity",
+        }
+    ])
+    specs = renderer.prepare_area_specs_for_page(
+        "industry",
+        rows,
+        [
+            {"aggregate_flow_prefix": "14", "aggregate_flow_label": "14 Industry sector"},
+            {
+                "aggregate_flow_prefix": "14",
+                "aggregate_flow_label": "14 Industry sector",
+                "overview_variant": "by_flow",
+            },
+        ],
+        template,
+    )
+
+    assert [spec.get("overview_variant", "by_product") for spec in specs] == [
+        "by_product"
+    ]
+
+
+def test_supply_bunker_overview_keeps_combined_total_and_marine_aviation_flow() -> None:
+    template = {
+        "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
+        "supply_page": {
+            "page_key": "supply",
+            "bunker_overview": {
+                "enabled": True,
+                "flow_boundary": "04-05",
+                "label": "04-05 International transport (bunkers)",
+                "preferred_detail_flow_boundaries": ["04", "05"],
+            },
+        },
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("LEAP", "Target", 2030, "04-05", "07.08", -30.0),
+            "common_flow_label": "04-05 International transport (bunkers)",
+            "common_product_label": "07.08 Fuel oil",
+        },
+        {
+            **_area_product_row("NINTH", "Target", 2030, "04", "07.08", -12.0),
+            "common_flow_label": "04 International marine bunkers",
+            "common_product_label": "07.08 Fuel oil",
+        },
+        {
+            **_area_product_row("NINTH", "Target", 2030, "05", "07.07", -18.0),
+            "common_flow_label": "05 International aviation bunkers",
+            "common_product_label": "07.07 Gas/diesel oil",
+        },
+    ])
+
+    specs = renderer.add_supply_bunker_overview_specs(
+        "supply", rows, [], template
+    )
+
+    assert [spec.get("overview_variant", "by_product") for spec in specs] == [
+        "by_product", "by_flow"
+    ]
+    resolved = renderer.resolved_area_chart_rows(
+        rows,
+        specs[1],
+        group_col="common_flow_label",
+    )
+    assert set(resolved["common_flow_code"]) == {"04-05", "04", "05"}
+
+
+def test_supply_bunker_children_are_always_displayed_as_withdrawals() -> None:
+    rows = pd.DataFrame([
+        _area_product_row("ESTO_EXTENDED", "historical", 2022, "04", "07.08", 5.0),
+        _area_product_row("LEAP", "Target", 2023, "04", "07.08", 6.0),
+        _area_product_row("NINTH", "Target", 2023, "05", "07.06", -20.0),
+        _area_product_row("LEAP", "Target", 2023, "01", "07.01", 100.0),
+    ])
+
+    fixed = renderer.normalize_supply_bunker_withdrawal_signs(
+        "supply",
+        rows,
+        {
+            "supply_page": {
+                "page_key": "supply",
+                "normalize_bunker_withdrawal_signs": True,
+                "bunker_child_flow_codes": ["04", "05"],
+            }
+        },
+    )
+
+    assert fixed.loc[fixed["common_flow_code"].eq("04"), "value"].tolist() == [
+        -5.0,
+        -6.0,
+    ]
+    assert fixed.loc[fixed["common_flow_code"].eq("05"), "value"].tolist() == [
+        -20.0
+    ]
+    assert fixed.loc[fixed["common_flow_code"].eq("01"), "value"].tolist() == [
+        100.0
+    ]
+
+
 def test_other_demand_exact_overview_does_not_depend_on_placeholder_status() -> None:
     """Broad flow 16 never becomes the Other-demand comparison boundary."""
     template = {
@@ -913,6 +1029,53 @@ def test_other_demand_by_flow_overview_uses_real_leap_detail_when_available() ->
 
     assert set(resolved["common_flow_code"]) == {"16.03-16.04", "16.05"}
     assert resolved["value"].sum() == 30.0
+
+
+def test_other_demand_flow_overview_keeps_ninth_compound_agriculture_rollup() -> None:
+    """The preferred frontier must not drop 16.03-16.04 from Ninth."""
+    template = {
+        "other_demand_page": {
+            "page_key": "others",
+            "by_flow_overview": {
+                "enabled": True,
+                "flow_boundary": "16.03-16.05",
+                "label": "16.03-16.05 Other sector",
+                "preferred_detail_flow_boundaries": [
+                    "16.03-16.04", "16.03", "16.04", "16.05"
+                ],
+            },
+        },
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "NINTH", "Target", 2030, "16.03-16.04", "17", 210.0
+            ),
+            "common_flow_label": "16.03-16.04 Agriculture and fishing",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row("NINTH", "Target", 2030, "16.05", "17", 2.5),
+            "common_flow_label": "16.05 Non-specified others",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+
+    spec = next(
+        spec
+        for spec in renderer.add_other_demand_flow_overview_spec(
+            "others", rows, [], template
+        )
+        if spec.get("overview_variant") == "by_flow"
+    )
+    resolved = renderer.resolved_area_chart_rows(
+        rows,
+        spec,
+        group_col="common_flow_label",
+    )
+
+    assert set(resolved["common_flow_code"]) == {"16.03-16.04", "16.05"}
+    assert resolved["value"].sum() == pytest.approx(212.5)
 
 
 def test_other_demand_by_flow_labels_parent_gap_as_unallocated() -> None:

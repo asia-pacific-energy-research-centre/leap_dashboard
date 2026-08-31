@@ -2285,32 +2285,24 @@ def add_other_demand_flow_overview_spec(
         for source_labels in labels_by_source.values()
         for source_label in source_labels
     })
-    specs = list(area_specs)
     exact_boundary = code_candidate_text(boundary)
-    has_product_overview = any(
-        str(spec.get("overview_variant", "by_product")).strip() == "by_product"
-        and code_candidate_text(spec.get("aggregate_flow_prefix", ""))
-        == exact_boundary
-        for spec in specs
-    )
-    if not has_product_overview:
-        specs.append({
-            "area_level": code_depth(boundary),
-            "aggregate_flow_prefix": boundary,
-            "aggregate_flow_label": label,
-            "source_flow_labels": labels,
-            "source_flow_labels_by_system": labels_by_source,
-            "explicit_flow_boundary": True,
-        })
-
-    has_flow_overview = any(
-        str(spec.get("overview_variant", "")).strip() == "by_flow"
-        and code_candidate_text(spec.get("aggregate_flow_prefix", ""))
-        == exact_boundary
-        for spec in specs
-    )
-    if has_flow_overview:
-        return specs
+    # This boundary has a page-specific source frontier. Replace any generic
+    # or placeholder-generated version so its narrower child list cannot drop
+    # a published combined child such as NINTH 16.03-16.04.
+    specs = [
+        spec
+        for spec in area_specs
+        if code_candidate_text(spec.get("aggregate_flow_prefix", ""))
+        != exact_boundary
+    ]
+    specs.append({
+        "area_level": code_depth(boundary),
+        "aggregate_flow_prefix": boundary,
+        "aggregate_flow_label": label,
+        "source_flow_labels": labels,
+        "source_flow_labels_by_system": labels_by_source,
+        "explicit_flow_boundary": True,
+    })
     specs.append({
             "area_level": code_depth(boundary),
             "aggregate_flow_prefix": boundary,
@@ -2448,6 +2440,138 @@ def add_power_sector_overview_specs(
     return specs
 
 
+def normalize_supply_bunker_withdrawal_signs(
+    page_key: str,
+    page_df: pd.DataFrame,
+    template: dict,
+) -> pd.DataFrame:
+    """Display detailed international bunkers as domestic-supply deductions.
+
+    Some detailed ESTO Extended and LEAP exports publish flows 04 and 05 as
+    positive supplied quantities even though the Common energy-balance
+    convention defines bunkers as negative withdrawals. The combined 04-05
+    rollup already carries the correct sign. Normalize only the separate
+    Supply-page children, leaving the comparison fact and every other page
+    untouched.
+    """
+    config = template.get("supply_page", {}) or {}
+    if page_key != str(config.get("page_key", "supply")).strip() or not bool(
+        config.get("normalize_bunker_withdrawal_signs", False)
+    ):
+        return page_df
+    codes = {
+        code_candidate_text(value)
+        for value in config.get("bunker_child_flow_codes", ["04", "05"])
+        if code_candidate_text(value)
+    }
+    if not codes or "common_flow_code" not in page_df.columns:
+        return page_df
+    out = page_df.copy()
+    mask = out["common_flow_code"].astype(str).map(code_candidate_text).isin(codes)
+    out.loc[mask, "value"] = -pd.to_numeric(
+        out.loc[mask, "value"], errors="coerce"
+    ).abs()
+    return out
+
+
+def add_supply_bunker_overview_specs(
+    page_key: str,
+    page_df: pd.DataFrame,
+    area_specs: list[dict[str, object]],
+    template: dict,
+) -> list[dict[str, object]]:
+    """Keep the authoritative bunker total beside its marine/aviation split."""
+    supply_config = template.get("supply_page", {}) or {}
+    configured_page_key = str(supply_config.get("page_key", "supply")).strip()
+    bunker_config = supply_config.get("bunker_overview", {}) or {}
+    if (
+        page_key != configured_page_key
+        or not bool(bunker_config.get("enabled", False))
+    ):
+        return list(area_specs)
+
+    boundary = str(bunker_config.get("flow_boundary", "")).strip()
+    label = str(bunker_config.get("label", "")).strip()
+    if not boundary or not label:
+        return list(area_specs)
+    rows = flow_boundary_candidate_rows(page_df, boundary)
+    if rows.empty:
+        return list(area_specs)
+
+    specs = list(area_specs)
+    labels_by_source = {
+        str(source): sorted(
+            source_rows["common_flow_label"].dropna().astype(str).unique()
+        )
+        for source, source_rows in rows.groupby("source_system", dropna=False)
+    }
+    source_labels = sorted({
+        source_label
+        for labels in labels_by_source.values()
+        for source_label in labels
+    })
+    existing_product = any(
+        code_candidate_text(spec.get("aggregate_flow_prefix", ""))
+        == code_candidate_text(boundary)
+        and str(spec.get("overview_variant", "by_product")) == "by_product"
+        for spec in specs
+    )
+    base_spec = {
+        "area_level": code_depth(boundary),
+        "aggregate_flow_prefix": boundary,
+        "aggregate_flow_label": label,
+        "source_flow_labels": source_labels,
+        "source_flow_labels_by_system": labels_by_source,
+        "explicit_flow_boundary": True,
+        "skip_product_overview_ownership": True,
+    }
+    if not existing_product:
+        specs.append(base_spec)
+
+    detail_boundaries = [
+        str(value).strip()
+        for value in bunker_config.get("preferred_detail_flow_boundaries", [])
+        if str(value).strip()
+    ]
+    detail_rows = pd.concat(
+        [flow_boundary_candidate_rows(page_df, value) for value in detail_boundaries],
+        ignore_index=True,
+    ) if detail_boundaries else page_df.iloc[0:0].copy()
+    detail_rows = _non_overlapping_flow_rows(
+        _non_overlapping_common_row_frontier(detail_rows)
+    )
+    minimum_children = int(
+        (template.get("aggregate_chart_policy", {}) or {}).get(
+            "minimum_nonzero_child_flows", 2
+        )
+    )
+    nonzero_children = sum(
+        _has_nonzero_values(child_rows["value"])
+        for _flow_label, child_rows in detail_rows.groupby(
+            "common_flow_label", dropna=False
+        )
+    ) if not detail_rows.empty else 0
+    has_flow = any(
+        code_candidate_text(spec.get("aggregate_flow_prefix", ""))
+        == code_candidate_text(boundary)
+        and str(spec.get("overview_variant", "")) == "by_flow"
+        for spec in specs
+    )
+    if nonzero_children >= minimum_children and not has_flow:
+        specs.append({
+            **base_spec,
+            "overview_variant": "by_flow",
+            "group_col": "common_flow_label",
+            "preferred_detail_flow_boundaries": detail_boundaries,
+            "detail_coverage_residual_label": (
+                "Unallocated within international transport bunkers"
+            ),
+            "title_prefix": "Aggregate by flow",
+            "chart_caption": f"{label} — by flow",
+        })
+    return specs
+
+
 def prepare_area_specs_for_page(
     page_key: str,
     page_df: pd.DataFrame,
@@ -2462,9 +2586,22 @@ def prepare_area_specs_for_page(
     the configured placeholder, Other-demand, and Power Overview treatments
     are part of the rendering pipeline rather than unused helper functions.
     """
-    specs = replace_active_placeholder_area_specs(page_key, area_specs, template)
-    specs = add_active_placeholder_area_specs(page_key, page_df, specs, template)
+    specs = [
+        spec
+        for spec in area_specs
+        if not (
+            str(spec.get("overview_variant", "")).strip() == "by_flow"
+            and not bool(spec.get("explicit_flow_boundary"))
+            and flow_boundary_is_active_demand_placeholder(
+                str(spec.get("aggregate_flow_prefix", "")),
+                template,
+            )
+        )
+    ]
+    specs = replace_active_placeholder_area_specs(page_key, specs, template)
     specs = add_other_demand_flow_overview_spec(page_key, page_df, specs, template)
+    specs = add_active_placeholder_area_specs(page_key, page_df, specs, template)
+    specs = add_supply_bunker_overview_specs(page_key, page_df, specs, template)
     return add_power_sector_overview_specs(page_key, page_df, specs, template)
 
 
@@ -4723,6 +4860,7 @@ def _build_section_aggregate_charts(
             .get(page_key, {})
             .get(section_label, {})
         ) or {}
+        section_overview_owner = bool(section_override.get("overview", False))
         if bool(section_override.get("hide_aggregate", False)):
             continue
         required_boundary = str(
@@ -4811,10 +4949,17 @@ def _build_section_aggregate_charts(
         ):
             continue
         overview_group_by = ""
+        overview_groupings: set[str] = set()
         if overview_summary:
             overview_group_by = str(overview_summary["group_by"])
             if overview_group_by == "flow_or_product":
                 overview_group_by = "flow" if effective_flow_count > 1 else "product"
+            if overview_group_by == "both_if_multiple":
+                overview_groupings = {"product"}
+                if nonzero_flow_count >= minimum_nonzero_children:
+                    overview_groupings.add("flow")
+            else:
+                overview_groupings = {overview_group_by}
         for group_col, group_noun, title_prefix, manifest_flow, manifest_product in (
             ("common_product_label", "product", "Aggregate by product", section_label, "All products"),
             ("common_flow_label", "flow", "Aggregate by flow", "All flows", section_label),
@@ -4827,7 +4972,7 @@ def _build_section_aggregate_charts(
                 ).strip().casefold()
                 if group_noun != configured_group:
                     continue
-            if overview_summary and group_noun != overview_group_by:
+            if overview_summary and group_noun not in overview_groupings:
                 continue
             chart_key = f"chart__area__section__{safe_slug(page_key)}__{safe_slug(section_label)}__{group_noun}"
             metrics = compute_ranking_metrics(area_df, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
@@ -4841,7 +4986,7 @@ def _build_section_aggregate_charts(
                 "page_label": page_label,
                 "section_label": (
                     "Overview"
-                    if overview_summary
+                    if overview_summary or section_overview_owner
                     else target_section_label or section_label
                 ),
                 "chart_type": "stacked_area",
@@ -4897,11 +5042,19 @@ def _build_section_aggregate_charts(
                 "product_label": display_title,
                 "section_label": (
                     "Overview"
-                    if overview_summary
+                    if overview_summary or section_overview_owner
                     else target_section_label or section_label
                 ),
-                "navigation_root_label": section_label if overview_summary else "",
-                "navigation_root_section_label": section_label if overview_summary else "",
+                "navigation_root_label": (
+                    section_label
+                    if overview_summary or section_overview_owner
+                    else ""
+                ),
+                "navigation_root_section_label": (
+                    section_label
+                    if overview_summary or section_overview_owner
+                    else ""
+                ),
                 "flow_group_label": navigation_owner,
                 "content_kind": (
                     "technology_overview"
@@ -6592,7 +6745,12 @@ def stacked_area_note_from_figure(figure: go.Figure) -> str:
     return ""
 
 
-def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
+def _area_charts_html(
+    area_rows: list[dict],
+    page_label: str,
+    *,
+    reserve_unpaired_column: bool = True,
+) -> str:
     """Build HTML for the page-level overview (area) charts."""
     if not area_rows:
         return ""
@@ -6646,7 +6804,11 @@ def _area_charts_html(area_rows: list[dict], page_label: str) -> str:
                 if pair_key(candidate) == owner_key
             ]
             paired_rows.extend(owner_rows)
-            if len(owner_rows) == 1 and len(group_rows) > 1:
+            if (
+                reserve_unpaired_column
+                and len(owner_rows) == 1
+                and len(group_rows) > 1
+            ):
                 paired_rows.append(None)
         grid_class = (
             "dashboard-grid overview-grid"
@@ -7401,7 +7563,13 @@ def write_dashboard_page(
     dataset_filter_html = _dataset_filter_html(page_datasets, current_comparison_scope)
     jump_nav = _jump_nav_html(page_label, section_tree)
     note_html = f'<div class="visible-note">{escape(page_note)}</div>' if page_note else ""
-    overview_html = _area_charts_html(area_rows, page_label)
+    overview_html = _area_charts_html(
+        area_rows,
+        page_label,
+        reserve_unpaired_column=bool(
+            page_config.get("reserve_unpaired_overview_column", True)
+        ),
+    )
     sections_html = _line_sections_html(line_rows, page_label)
     economy_ctx = f"Economy: <strong>{escape(economy_label)}</strong>" if economy_label else ""
     if economy_ctx and dashboard_updated_label:
@@ -8822,7 +8990,11 @@ def build_total_demand_page(
     write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
     if write_page:
         write_dashboard_page(
-            {"page_key": "total_demand", "page_label": page_label},
+            {
+                **config,
+                "page_key": "total_demand",
+                "page_label": page_label,
+            },
             chart_rows=chart_rows,
             bundle_js_name=bundle_name.replace(".json", ".js"),
             output_path=layout["dashboards"] / page_file_name("total_demand"),
@@ -9529,6 +9701,11 @@ def render_dashboard(
             page_df = assigned_df[assigned_df["_page_key"].apply(safe_slug) == page_key].copy()
         if page_df.empty:
             continue
+        page_df = normalize_supply_bunker_withdrawal_signs(
+            page_key,
+            page_df,
+            template,
+        )
 
         detail_component_specs = demand_detail_component_specs_for_page(
             template,
@@ -10103,8 +10280,16 @@ def render_dashboard(
         write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
         page_file = page_file_name(page_key)
         if not trace_only:
+            render_page_config = {
+                **page_rule,
+                **(secondary_page or {}),
+                "page_key": page_key,
+                "page_label": page_label,
+            }
+            if aggregate_only_demand_page_active(page_key, template):
+                render_page_config["reserve_unpaired_overview_column"] = False
             write_dashboard_page(
-                {"page_key": page_key, "page_label": page_label},
+                render_page_config,
                 chart_rows=chart_rows,
                 bundle_js_name=bundle_name.replace(".json", ".js"),
                 output_path=layout["dashboards"] / page_file,

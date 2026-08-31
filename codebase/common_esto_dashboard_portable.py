@@ -342,14 +342,20 @@ def render_common_esto_dashboard(
         template,
         representation_status_df,
     )
+    resolved_power_interim_audit_path = (
+        Path(power_interim_audit_path)
+        if power_interim_audit_path is not None
+        else Path(comparison_data_path).resolve().parent
+        / "leap_source_branch_fallback_audit.csv"
+    )
     template["_power_interim_placeholder_branches"] = (
         load_active_power_interim_branches(
-            Path(power_interim_audit_path),
+            resolved_power_interim_audit_path,
             economy_key,
             min_year=min_year,
             max_year=max_year,
         )
-        if power_interim_audit_path is not None
+        if resolved_power_interim_audit_path.exists()
         else []
     )
     template["_active_comparison_scope"] = comparison_scope

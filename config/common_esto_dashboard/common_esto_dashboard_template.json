@@ -78,10 +78,10 @@
     "append_inclusive_transformation_label": true,
     "standalone_own_use_flow_codes": ["10.01.06", "10.01.12", "10.01.17"],
     "overview_summaries": [
-      {"section_label": "Other transformation (including own use)", "group_by": "flow_or_product"},
-      {"section_label": "Other energy-sector own use", "group_by": "flow_or_product"},
-      {"section_label": "Transmission and distribution losses", "group_by": "product"},
-      {"section_label": "Transfers", "group_by": "product"}
+      {"section_label": "Other transformation (including own use)", "group_by": "both_if_multiple"},
+      {"section_label": "Other energy-sector own use", "group_by": "both_if_multiple"},
+      {"section_label": "Transmission and distribution losses", "group_by": "both_if_multiple"},
+      {"section_label": "Transfers", "group_by": "both_if_multiple"}
     ],
     "section_labels": {
       "transformation": "Other transformation (including own use)",
@@ -146,6 +146,7 @@
     {
       "page_key": "supply",
       "page_label": "Supply",
+      "reserve_unpaired_overview_column": false,
       "priority": 10,
       "flow_code_prefixes": [
         "01",
@@ -295,6 +296,7 @@
   "total_demand_page": {
     "enabled": true,
     "page_label": "Energy balance overview",
+    "reserve_unpaired_overview_column": false,
     "overview_flow_codes": ["07", "12"],
     "demand_page_keys": ["industry", "transport", "buildings", "others"],
     "supply_codes": ["01", "02", "03", "04-05"],
@@ -316,6 +318,14 @@
   "supply_page": {
     "page_key": "supply",
     "exclude_flow_codes": ["04-05"],
+    "normalize_bunker_withdrawal_signs": true,
+    "bunker_child_flow_codes": ["04", "05"],
+    "bunker_overview": {
+      "enabled": true,
+      "flow_boundary": "04-05",
+      "label": "04-05 International transport (bunkers)",
+      "preferred_detail_flow_boundaries": ["04", "05"]
+    },
     "base_year_bar_flow_codes": ["06", "11"],
     "base_year_bar_comparison_scope": "esto_leap",
     "base_year_bar_scope_label": "ESTO and LEAP only",
@@ -326,6 +336,7 @@
     "enabled": true,
     "page_key": "emissions",
     "page_label": "Emissions",
+    "reserve_unpaired_overview_column": false,
     "factor_sets_config_path": "config/common_esto_dashboard/emissions_factor_sets.json",
     "factor_set_key": "",
     "demand_page_keys": ["industry", "transport", "buildings", "others"],
@@ -396,7 +407,7 @@
       "enabled": true,
       "flow_boundary": "16.03-16.05",
       "label": "16.03-16.05 Other sector",
-      "preferred_detail_flow_boundaries": ["16.03", "16.04", "16.05"],
+      "preferred_detail_flow_boundaries": ["16.03-16.04", "16.03", "16.04", "16.05"],
       "detail_coverage_residual_label": "Unallocated within 16.03-16.05 Other demand",
       "chart_caption": "Other demand — by flow",
       "stacked_area_note": "The historical areas show the activities included in Other demand. After 2022, one combined area means detailed LEAP activity data is not yet available; it is replaced automatically when that detail is published."
@@ -476,6 +487,13 @@
     "power": {
       "Power-sector own use and storage": {
         "hide_aggregate": true
+      }
+    },
+    "refining": {
+      "Refining": {
+        "always_show": true,
+        "overview": true,
+        "include_groupings": ["product"]
       }
     },
     "_note": "A section override with required_flow_boundary filters its aggregate to that boundary. The Transport override removes the redundant generic by-product section summary once Road is detailed, keeps its technology/flow summary strictly within 15.02, relabels it as Road detail, and places it first inside the existing Road-owned by-product section. This produces one Road navigation chip and one destination while non-road remains owned by its separate overview. The Power override hides only the misleading residual own-use/storage section summary because the complete Power-sector aggregation is owned by Overview; its useful detailed cards remain below."

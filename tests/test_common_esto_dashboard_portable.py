@@ -483,3 +483,25 @@ def test_power_interim_audit_adds_placeholder_note(tmp_path: Path) -> None:
     assert result["power_interim_placeholder_branches"] == ["Electricity interim"]
     power_html = Path(str(result["dashboard_index"])).with_name("power.html")
     assert "LEAP placeholder in use" in power_html.read_text(encoding="utf-8")
+
+
+def test_power_interim_audit_is_discovered_beside_comparison_data(
+    tmp_path: Path,
+) -> None:
+    comparison_path = tmp_path / COMPARISON_FIXTURE.name
+    comparison_path.write_bytes(COMPARISON_FIXTURE.read_bytes())
+    pd.DataFrame(
+        [{
+            "economy": "20_USA",
+            "year": 2025,
+            "status": "interim_only_retained",
+            "interim_branch": "CHP interim",
+        }]
+    ).to_csv(
+        tmp_path / "leap_source_branch_fallback_audit.csv",
+        index=False,
+    )
+
+    result = _render(tmp_path, comparison_data_path=comparison_path)
+
+    assert result["power_interim_placeholder_branches"] == ["CHP interim"]

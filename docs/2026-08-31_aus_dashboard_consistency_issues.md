@@ -207,12 +207,16 @@ show the gap rather than scale one source to another.
 - Raw source identity, mapped flow and sign transformation are covered by a
   regression test for both bunker types.
 
-**Finding (2026-08-31):** Marine and aviation are not cross-mapped in Ninth.
-The raw Ninth rows are correctly negative. The ESTO-Extended mapping-chain
-artifact instead carries small positive LEAP-like rows for both flows, even
-though original ESTO has negative bunker observations. The correction belongs
-in ESTO-Extended exact-row/source selection and sign preservation upstream;
-the dashboard must not negate selected sources ad hoc.
+**Finding / action (2026-08-31):** Marine and aviation are not cross-mapped in
+Ninth. The raw Ninth rows are correctly negative. The ESTO-Extended
+mapping-chain artifact instead carries small positive LEAP-like rows for both
+flows, even though original ESTO has negative bunker observations. The
+comparison fact is preserved for auditability, while the Supply presentation
+now applies the Common balance semantic to exact child flows 04 and 05:
+international bunkers are always shown as negative domestic-supply
+withdrawals. A regression test proves positive source magnitudes become
+negative while already-negative values and unrelated supply flows retain
+their meaning. Upstream ESTO-Extended exact-row provenance still needs repair.
 
 ## Cross-cutting consistency gates
 
@@ -230,3 +234,98 @@ Before another dashboard candidate is accepted:
    emitted as layout groups rather than a flat sequence.
 6. Run source-level reconciliation tables before visual QA; screenshots alone
    are not sufficient evidence of a fix.
+
+## AUS-CONSIST-007 — Page and placeholder exceptions to paired-card spacing
+
+**Observed**
+
+- Energy balance overview and Emissions contain intentionally complementary
+  charts whose titles are not literal `by product` / `by flow` pairs, so the
+  generic singleton spacer separates charts that belong together.
+- Supply contains important balance summaries that normally have no meaningful
+  by-flow companion.
+- A placeholder-only Industry boundary emits a one-series by-flow chart even
+  though the LEAP placeholder publishes no activity detail.
+
+**Required rule**
+
+- Do not reserve missing-companion cells on Energy balance overview, Emissions
+  or Supply.
+- Do not generate generic by-flow companions for placeholder-only demand
+  boundaries. Explicitly designed placeholder views such as Other demand may
+  remain because they communicate observed history versus the published LEAP
+  aggregate.
+
+**Finding / action (2026-08-31):** The shared card renderer already supported
+this policy, but bespoke Energy-balance and Emissions builders discarded their
+full page configuration before writing HTML. Full page configuration now
+reaches the shared writer. Supply also opts out, and an active aggregate-only
+demand page automatically opts out so two meaningful placeholder product
+cards may share a row without fake companions.
+
+## AUS-CONSIST-008 — Other-demand Ninth flow frontier collapses after 2022
+
+The Other-demand product and flow views must use the same authoritative
+16.03-16.05 total for every source/year. Ninth child areas must not disappear
+merely because a LEAP placeholder becomes active. Diagnose source-specific
+frontier selection and retain an explicit Unallocated remainder when the
+published children do not add to the parent.
+
+**Finding / action (2026-08-31):** AUS Ninth publishes a combined
+`16.03-16.04 Agriculture and fishing` row rather than separate `16.03` and
+`16.04` rows. The placeholder-generated child list superseded the explicit
+Other-demand list and retained only tiny `16.05`. The page-specific
+`16.03-16.05` product/flow frontier now replaces any generic or placeholder
+version and explicitly accepts the combined child before considering separate
+children.
+
+## AUS-CONSIST-009 — Portable rendering omits the Power interim audit
+
+The placeholder candidate was rendered without passing
+`leap_source_branch_fallback_audit.csv`, so Electricity and CHP interim owners
+were not marked as placeholders and fuel-specific CHP detail leaked into the
+navigation. Portable rendering should discover the sibling audit beside the
+comparison artifact when no explicit path is supplied. Heat is shown as a
+placeholder only when the audit actually reports a retained Heat interim
+branch; absence or zero data must not invent one.
+
+**Finding / action (2026-08-31):** Portable rendering now discovers the sibling
+audit beside the comparison parquet. The AUS placeholder candidate reports
+and navigates only the retained Electricity and CHP interim owners; the former
+fuel-specific CHP navigation leak is gone. No Heat placeholder is shown
+because the supplied audit has no retained Heat interim row.
+
+## AUS-CONSIST-010 — Overview coverage for Other transformation and Refining
+
+- Other transformation's multi-flow summaries need both by-product and
+  by-flow views. A by-flow view remains inappropriate where the Common ESTO
+  boundary has only one published flow; such cases keep the by-product view.
+- Refining must have a prominent Overview aggregate even though it is one
+  Common flow. The current comparison fact combines refining and refinery own
+  use into `09.07 ... (including own use)`; a truthful split between those
+  components requires upstream contributor-level facts and must not be
+reconstructed from the combined row.
+
+**Finding / action (2026-08-31):** `Other transformation (including own use)`
+and `Other energy-sector own use` now receive paired product/flow cards because
+they each have multiple non-zero Common child flows. Transfers and
+Transmission/distribution losses retain product-only cards because the current
+fact has only one Common flow for each. Refining is promoted to a full-width
+Overview product aggregate. A refinery-versus-own-use flow split remains
+unavailable because both contributors are already collapsed into one Common
+row upstream.
+
+## AUS-CONSIST-011 — Detailed and placeholder bunker behavior diverges
+
+The combined placeholder bunker chart is internally comparable, while the
+detailed Supply chart exposes the upstream ESTO-Extended sign/source mismatch
+recorded in AUS-CONSIST-006. Dashboard logic must keep combined and separate
+navigation honest, but must not use the placeholder aggregate to conceal the
+bad detailed source rows.
+
+**Finding / action (2026-08-31):** Supply now has an explicit combined 04-05
+Overview product card plus a marine/aviation by-flow companion whenever both
+children are non-zero. Detailed candidates retain separate 04 and 05 sections;
+placeholder candidates retain their authoritative combined owner. Exact child
+charts use the signed-withdrawal presentation rule recorded in
+AUS-CONSIST-006.

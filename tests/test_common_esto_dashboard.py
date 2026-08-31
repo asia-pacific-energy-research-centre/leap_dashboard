@@ -2627,7 +2627,8 @@ def test_common_esto_dashboard_keeps_international_transport_on_supply_without_s
     supply_flows = set(manifest.loc[manifest["page_key"].eq("supply"), "common_flow_label"])
     assert "04 International marine bunkers" in supply_flows
     assert "05 International aviation bunkers" in supply_flows
-    assert "04-05 International transport (bunkers)" not in supply_flows
+    assert "04-05 International transport (bunkers)" in supply_flows
+    assert "04-05 International transport (bunkers) — by flow" in supply_html
 
     assignments = pd.read_csv(layout["supporting"] / "page_assignment_summary.csv")
     assert "international_transport" not in set(assignments["page_key"])
@@ -2752,6 +2753,19 @@ def test_power_generation_overview_uses_public_child_labels() -> None:
     }
 
 
+def test_other_transformation_overview_requests_pairs_only_for_real_flow_splits() -> None:
+    template = _load_template()
+    summaries = template["other_transformation_page"]["overview_summaries"]
+
+    assert {item["group_by"] for item in summaries} == {"both_if_multiple"}
+    refining = template["section_aggregate_overrides"]["refining"]["Refining"]
+    assert refining == {
+        "always_show": True,
+        "overview": True,
+        "include_groupings": ["product"],
+    }
+
+
 def test_overview_html_keeps_chart_pairs_together_and_spaces_singletons() -> None:
     rows = [
         {"chart_key": "chart__area__14__industry", "title": "14 Industry sector"},
@@ -2778,6 +2792,16 @@ def test_overview_html_keeps_chart_pairs_together_and_spaces_singletons() -> Non
         },
     ], "Power")
     assert 'class="overview-grid-spacer"' not in power_html
+
+    overview_html = _area_charts_html(
+        [
+            {"chart_key": "sector", "title": "Final energy demand by sector (TFC)"},
+            {"chart_key": "fuel", "title": "Final energy demand by fuel (TFC)"},
+        ],
+        "Energy balance overview",
+        reserve_unpaired_column=False,
+    )
+    assert 'class="overview-grid-spacer"' not in overview_html
 
 
 def test_common_esto_dashboard_shows_updated_label(tmp_path: Path) -> None:

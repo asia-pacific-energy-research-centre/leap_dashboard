@@ -1468,7 +1468,11 @@ def build_emissions_page(
     write_chart_bundle(charts, layout["chart_bundles"] / bundle_name)
     if write_page:
         write_dashboard_page(
-            {"page_key": page_key, "page_label": page_label},
+            {
+                **config,
+                "page_key": page_key,
+                "page_label": page_label,
+            },
             chart_rows=chart_rows,
             bundle_js_name=bundle_name.replace(".json", ".js"),
             output_path=layout["dashboards"] / f"{page_key}.html",
