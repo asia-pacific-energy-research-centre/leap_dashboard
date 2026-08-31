@@ -2804,6 +2804,35 @@ def test_overview_html_keeps_chart_pairs_together_and_spaces_singletons() -> Non
     assert 'class="overview-grid-spacer"' not in overview_html
 
 
+def test_placeholder_transport_keeps_road_singleton_before_nonroad_pair() -> None:
+    template = _load_template()
+    transport = next(
+        page for page in template["sector_pages"] if page["page_key"] == "transport"
+    )
+    rows = [
+        {"chart_key": "road", "title": "15.02 Road"},
+        {"chart_key": "nonroad", "title": "15.01,15.03-15.06 Transport non-road"},
+        {
+            "chart_key": "nonroad__by_flow",
+            "title": "15.01,15.03-15.06 Transport non-road — by flow",
+        },
+    ]
+
+    html = _area_charts_html(
+        rows,
+        "Transport",
+        reserve_unpaired_column=transport[
+            "reserve_unpaired_placeholder_overview_column"
+        ],
+    )
+
+    assert html.count('class="overview-grid-spacer"') == 1
+    assert html.index("15.02 Road") < html.index('class="overview-grid-spacer"')
+    assert html.index('class="overview-grid-spacer"') < html.index(
+        "15.01,15.03-15.06 Transport non-road"
+    )
+
+
 def test_common_esto_dashboard_shows_updated_label(tmp_path: Path) -> None:
     template = _load_template()
     series_config = _load_series_config()

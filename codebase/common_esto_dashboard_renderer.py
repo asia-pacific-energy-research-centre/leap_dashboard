@@ -1691,6 +1691,27 @@ def immediate_child_flow_rows(
     return out
 
 
+def configured_flow_group_rows(
+    rows: pd.DataFrame,
+    flow_groups: list[dict[str, object]],
+) -> pd.DataFrame:
+    """Collapse source-specific detail to configured comparison flow owners."""
+    if rows.empty or "common_flow_code" not in rows.columns:
+        return rows.iloc[0:0].copy()
+    out = rows.copy()
+    out["_configured_flow_group_label"] = ""
+    for group in flow_groups:
+        boundary = str(group.get("flow_boundary", "")).strip()
+        label = str(group.get("label", "")).strip()
+        if not boundary or not label:
+            continue
+        mask = out["common_flow_code"].apply(
+            lambda code: _code_expression_contains_expression(boundary, code)
+        )
+        out.loc[mask, "_configured_flow_group_label"] = label
+    return out.loc[out["_configured_flow_group_label"].ne("")].copy()
+
+
 def resolved_immediate_child_flow_rows(
     page_df: pd.DataFrame,
     nodes: pd.DataFrame,
@@ -2341,6 +2362,106 @@ def add_other_demand_flow_overview_spec(
     return specs
 
 
+def add_buildings_overview_specs(
+    page_key: str,
+    page_df: pd.DataFrame,
+    area_specs: list[dict[str, object]],
+    template: dict,
+) -> list[dict[str, object]]:
+    """Publish only the configured detailed Buildings hierarchy pairs."""
+    config = template.get("buildings_page", {}) or {}
+    overview = config.get("overview", {}) or {}
+    configured_page_key = str(config.get("page_key", "buildings")).strip()
+    if (
+        page_key != configured_page_key
+        or not bool(overview.get("enabled", False))
+        or aggregate_only_demand_page_active(page_key, template)
+    ):
+        return list(area_specs)
+
+    # This page has a deliberately small, user-owned hierarchy. Generic tree
+    # discovery can otherwise add broad flow 16 or repeat 16.01-16.02.
+    specs: list[dict[str, object]] = []
+    minimum_children = int(
+        (template.get("aggregate_chart_policy", {}) or {}).get(
+            "minimum_nonzero_child_flows", 2
+        )
+    )
+    for aggregate in overview.get("aggregates", []) or []:
+        boundary = str(aggregate.get("flow_boundary", "")).strip()
+        label = str(aggregate.get("label", "")).strip()
+        detail_boundaries = [
+            str(value).strip()
+            for value in aggregate.get("preferred_detail_flow_boundaries", [])
+            if str(value).strip()
+        ]
+        if not boundary or not label:
+            continue
+        rows = flow_boundary_candidate_rows(page_df, boundary)
+        if rows.empty:
+            continue
+        detail_parts = [
+            resolved_flow_boundary_rows(rows, detail_boundary)
+            for detail_boundary in detail_boundaries
+        ]
+        detail_rows = pd.concat(
+            [part for part in detail_parts if not part.empty],
+            ignore_index=True,
+        ) if any(not part.empty for part in detail_parts) else rows.iloc[0:0].copy()
+        detail_rows = _non_overlapping_flow_rows(
+            _non_overlapping_common_row_frontier(detail_rows)
+        )
+        nonzero_children = sum(
+            _has_nonzero_values(child_rows["value"])
+            for _child_label, child_rows in detail_rows.groupby(
+                "common_flow_label", dropna=False
+            )
+        ) if not detail_rows.empty else 0
+        if nonzero_children < minimum_children:
+            continue
+
+        labels_by_source = {
+            str(source): sorted(
+                source_rows["common_flow_label"].dropna().astype(str).unique()
+            )
+            for source, source_rows in rows.groupby("source_system", dropna=False)
+        }
+        source_labels = sorted({
+            source_label
+            for source_values in labels_by_source.values()
+            for source_label in source_values
+        })
+        base_spec = {
+            "area_level": code_depth(boundary),
+            "aggregate_flow_prefix": boundary,
+            "aggregate_flow_label": label,
+            "source_flow_labels": source_labels,
+            "source_flow_labels_by_system": labels_by_source,
+            "explicit_flow_boundary": True,
+            "preferred_detail_flow_boundaries": detail_boundaries,
+            "prefer_published_detail_over_parent_total": True,
+            "configured_flow_groups": list(aggregate.get("flow_groups", []) or []),
+            "skip_product_overview_ownership": True,
+        }
+        specs.extend([
+            {
+                **base_spec,
+                "overview_variant": f"buildings_{safe_slug(label)}_by_product",
+                "group_col": "common_product_label",
+                "title_prefix": "Aggregate by product",
+                "chart_caption": f"{label} — by product",
+            },
+            {
+                **base_spec,
+                "overview_variant": f"buildings_{safe_slug(label)}_by_flow",
+                "group_col": "_configured_flow_group_label",
+                "title_prefix": "Aggregate by flow",
+                "chart_caption": f"{label} — by flow",
+            },
+        ])
+    return specs
+
+
 def add_power_sector_overview_specs(
     page_key: str,
     page_df: pd.DataFrame,
@@ -2600,6 +2721,7 @@ def prepare_area_specs_for_page(
     ]
     specs = replace_active_placeholder_area_specs(page_key, specs, template)
     specs = add_other_demand_flow_overview_spec(page_key, page_df, specs, template)
+    specs = add_buildings_overview_specs(page_key, page_df, specs, template)
     specs = add_active_placeholder_area_specs(page_key, page_df, specs, template)
     specs = add_supply_bunker_overview_specs(page_key, page_df, specs, template)
     return add_power_sector_overview_specs(page_key, page_df, specs, template)
@@ -2877,13 +2999,18 @@ def drop_configured_redundant_detail_rows(
     published as two apparently incomplete detail sections, while preserving
     genuine children such as 16.03 Agriculture and 16.05 Non-specified others.
     """
-    config = template.get("other_demand_page", {}) or {}
-    configured_page_key = str(config.get("page_key", "others")).strip()
-    if (
-        page_key != configured_page_key
-        or detail_page_df.empty
-        or "common_flow_code" not in detail_page_df.columns
-    ):
+    if detail_page_df.empty or "common_flow_code" not in detail_page_df.columns:
+        return detail_page_df.copy()
+    other_config = template.get("other_demand_page", {}) or {}
+    buildings_config = template.get("buildings_page", {}) or {}
+    page_configs = {
+        str(other_config.get("page_key", "others")).strip(): other_config,
+        str(buildings_config.get("page_key", "buildings")).strip(): (
+            buildings_config.get("overview", {}) or {}
+        ),
+    }
+    config = page_configs.get(page_key, {})
+    if not config:
         return detail_page_df.copy()
     suppressed_codes = {
         code_candidate_text(value)
@@ -4481,7 +4608,16 @@ def resolved_area_chart_rows(
             [part for part in detail_parts if not part.empty],
             ignore_index=True,
         ) if any(not part.empty for part in detail_parts) else chart_df.iloc[0:0].copy()
-        detail_rows = _non_overlapping_flow_rows(detail_rows)
+        # A preferred compound boundary may resolve to the source's available
+        # simple child frontier. If that same child is also listed explicitly
+        # as the next fallback boundary, concatenation repeats the identical
+        # fact row. Remove only exact duplicates before choosing the structural
+        # frontier; distinct source rows and genuinely different common rows
+        # remain available to the normal overlap logic below.
+        detail_rows = detail_rows.drop_duplicates().reset_index(drop=True)
+        detail_rows = _non_overlapping_flow_rows(
+            _non_overlapping_common_row_frontier(detail_rows)
+        )
         if not detail_rows.empty:
             context_columns = [
                 column
@@ -9892,6 +10028,14 @@ def render_dashboard(
                         area_spec.get("immediate_child_flow_labels", {}) or {}
                     ),
                 )
+            configured_flow_groups = list(
+                area_spec.get("configured_flow_groups", []) or []
+            )
+            if configured_flow_groups and group_col == "_configured_flow_group_label":
+                chart_page_df = configured_flow_group_rows(
+                    area_spec_rows(page_df, display_area_spec),
+                    configured_flow_groups,
+                )
             if page_key == "transport" and source_root_code == "15":
                 display_area_spec["use_demand_coverage_frontier"] = True
             chart_key = f"chart__area__{safe_slug(area_spec['aggregate_flow_prefix'])}__{safe_slug(source_aggregate_label)}"
@@ -10287,7 +10431,11 @@ def render_dashboard(
                 "page_label": page_label,
             }
             if aggregate_only_demand_page_active(page_key, template):
-                render_page_config["reserve_unpaired_overview_column"] = False
+                render_page_config["reserve_unpaired_overview_column"] = bool(
+                    page_rule.get(
+                        "reserve_unpaired_placeholder_overview_column", False
+                    )
+                )
             write_dashboard_page(
                 render_page_config,
                 chart_rows=chart_rows,

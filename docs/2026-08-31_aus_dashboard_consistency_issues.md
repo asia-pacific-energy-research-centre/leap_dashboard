@@ -329,3 +329,44 @@ children are non-zero. Detailed candidates retain separate 04 and 05 sections;
 placeholder candidates retain their authoritative combined owner. Exact child
 charts use the signed-withdrawal presentation rule recorded in
 AUS-CONSIST-006.
+
+## AUS-CONSIST-012 — Placeholder Transport separates the non-road pair
+
+The placeholder-only spacing exception placed `15.02 Road` beside the
+non-road product card and moved the non-road by-flow companion to the next
+row. Transport is a deliberate exception: Road keeps an empty companion cell,
+then the non-road product and flow views remain together. Other placeholder
+demand pages continue to avoid unnecessary blank cells.
+
+## AUS-CONSIST-013 — Other-demand preferred boundaries overlap
+
+The configured preferred list contains the compound `16.03-16.04` boundary
+before its possible `16.03` and `16.04` alternatives. Concatenating each
+resolved boundary reintroduced the contained simple row after the compound
+frontier had already selected it. This doubled Agriculture, then created an
+equal negative `Unallocated` residual. The combined preferred rows must pass
+through the common-row frontier again before residual calculation. Product
+and flow captions also use one owner label so the detailed cards pair.
+
+## AUS-CONSIST-014 — Detailed Buildings uses the reviewed two-level hierarchy
+
+The detailed page must show exactly two aggregate pairs: `16.01-16.02
+Buildings` by product/flow, and `16.01 Commercial and public services` by
+product/flow. The first flow frontier is `16.01` plus `16.02`; the second is
+`16.01.01` plus `16.01.99`. Generic flow 16 and repeated parent summaries are
+suppressed. The first supplied mapping fact had only about 570.795 PJ of ESTO
+Extended Buildings data. The corrected upstream artifact restores the 2022
+parent and selected-child identity to 781.606486 PJ, matching LEAP. The
+dashboard does not rescale the data or invent missing source children.
+
+## AUS-CONSIST-015 — Fresh detailed source retains two allocation discontinuities
+
+The corrected artifact fixes the whole-Buildings boundary and international
+bunker identities. It still assigns all LEAP Services to `16.01.99`: the LEAP
+`16.01.01 Datacentres` child is absent, and Services rises from 305.755577 PJ
+in 2022 to 523.203917 PJ in 2023 while Residential moves in the opposite
+direction. The whole-Buildings total remains smooth. Detailed Transport
+non-road also differs at the boundary: ESTO Extended is 216.679815 PJ in 2022
+and LEAP is 185.311632 PJ. These are source-fixture allocation questions, not
+renderer residuals; the upstream rebuild must either correct them or document
+why they are intentional before release.

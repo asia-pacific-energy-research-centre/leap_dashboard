@@ -246,6 +246,7 @@
     {
       "page_key": "transport",
       "page_label": "Transport",
+      "reserve_unpaired_placeholder_overview_column": true,
       "priority": 70,
       "flow_code_prefixes": [
         "15"
@@ -409,10 +410,38 @@
       "label": "16.03-16.05 Other sector",
       "preferred_detail_flow_boundaries": ["16.03-16.04", "16.03", "16.04", "16.05"],
       "detail_coverage_residual_label": "Unallocated within 16.03-16.05 Other demand",
-      "chart_caption": "Other demand — by flow",
+      "chart_caption": "16.03-16.05 Other sector — by flow",
       "stacked_area_note": "The historical areas show the activities included in Other demand. After 2022, one combined area means detailed LEAP activity data is not yet available; it is replaced automatically when that detail is published."
     },
     "_note": "Both Other-demand Overview charts always use exact boundary 16.03-16.05; broad flow 16 is suppressed because it also contains sectors presented on the Buildings page. The by-flow source frontier uses the deepest published 16.03, 16.04 and 16.05 children. Any remaining parent/detail difference is shown conservatively as unallocated rather than assigned to a specific child. A source/year with no child detail retains the 16.03-16.05 parent, including the active LEAP placeholder. Source-specific comparison rollups 16.03-16.04 and 16.03-16.05 are already owned by the continuous Overview and are not repeated below as misleading historical-only or projection-only detail sections."
+  },
+  "buildings_page": {
+    "page_key": "buildings",
+    "overview": {
+      "enabled": true,
+      "suppress_redundant_detail_flow_codes": ["16.01", "16.01-16.02"],
+      "aggregates": [
+        {
+          "flow_boundary": "16.01-16.02",
+          "label": "16.01-16.02 Buildings",
+          "preferred_detail_flow_boundaries": ["16.01", "16.02"],
+          "flow_groups": [
+            {"flow_boundary": "16.01", "label": "16.01 Commercial and public services"},
+            {"flow_boundary": "16.02", "label": "16.02 Residential"}
+          ]
+        },
+        {
+          "flow_boundary": "16.01",
+          "label": "16.01 Commercial and public services",
+          "preferred_detail_flow_boundaries": ["16.01.01", "16.01.99"],
+          "flow_groups": [
+            {"flow_boundary": "16.01.01", "label": "16.01.01 Datacentres"},
+            {"flow_boundary": "16.01.99", "label": "16.01.99 Commercial and public services unallocated"}
+          ]
+        }
+      ]
+    },
+    "_note": "The detailed Buildings Overview is deliberately limited to the complete Buildings boundary and its Services branch. Each is shown by fuel and by immediate child flow. The full Buildings view uses Commercial/public services plus Residential; the Services view uses Datacentres plus the explicitly unallocated Commercial/public-services remainder. Broader flow 16 and duplicate detail summaries are not shown."
   },
   "power_page": {
     "page_key": "power",

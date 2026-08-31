@@ -1146,6 +1146,218 @@ def test_other_demand_by_flow_labels_parent_gap_as_unallocated() -> None:
     assert resolved["value"].sum() == 30.0
 
 
+def test_other_demand_by_flow_does_not_repeat_compound_and_child_frontiers() -> None:
+    """A preferred compound boundary owns its contained simple child rows."""
+    template = {
+        "other_demand_page": {
+            "page_key": "others",
+            "by_flow_overview": {
+                "enabled": True,
+                "flow_boundary": "16.03-16.05",
+                "label": "16.03-16.05 Other sector",
+                "preferred_detail_flow_boundaries": [
+                    "16.03-16.04", "16.03", "16.04", "16.05"
+                ],
+                "detail_coverage_residual_label": "Unallocated",
+            },
+        },
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03-16.05", "17", 30.0
+            ),
+            "common_flow_label": "16.03-16.05 Other sector",
+            "common_product_label": "17 Electricity",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03-16.04", "17", 20.0
+            ),
+            "common_flow_label": "16.03-16.04 Agriculture and fishing",
+            "common_product_label": "17 Electricity",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03", "17", 20.0
+            ),
+            "common_flow_label": "16.03 Agriculture",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.05", "17", 10.0
+            ),
+            "common_flow_label": "16.05 Non-specified others",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+
+    spec = next(
+        spec
+        for spec in renderer.add_other_demand_flow_overview_spec(
+            "others", rows, [], template
+        )
+        if spec.get("overview_variant") == "by_flow"
+    )
+    resolved = renderer.resolved_area_chart_rows(
+        rows, spec, group_col="common_flow_label"
+    )
+
+    assert set(resolved["common_flow_code"]) == {"16.03-16.04", "16.05"}
+    assert resolved["value"].sum() == pytest.approx(30.0)
+    assert not resolved["common_flow_label"].eq("Unallocated").any()
+
+
+def test_other_demand_by_flow_deduplicates_compound_fallback_child() -> None:
+    """A missing compound row must not select its fallback child twice."""
+    template = {
+        "other_demand_page": {
+            "page_key": "others",
+            "by_flow_overview": {
+                "enabled": True,
+                "flow_boundary": "16.03-16.05",
+                "label": "16.03-16.05 Other sector",
+                "preferred_detail_flow_boundaries": [
+                    "16.03-16.04", "16.03", "16.04", "16.05"
+                ],
+                "detail_coverage_residual_label": "Unallocated",
+            },
+        },
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03-16.05", "17", 30.0
+            ),
+            "common_flow_label": "16.03-16.05 Other sector",
+            "common_product_label": "17 Electricity",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03", "17", 20.0
+            ),
+            "common_flow_label": "16.03 Agriculture",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.05", "17", 5.0
+            ),
+            "common_flow_label": "16.05 Non-specified others",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+
+    spec = next(
+        spec
+        for spec in renderer.add_other_demand_flow_overview_spec(
+            "others", rows, [], template
+        )
+        if spec.get("overview_variant") == "by_flow"
+    )
+    resolved = renderer.resolved_area_chart_rows(
+        rows, spec, group_col="common_flow_label"
+    )
+
+    agriculture = resolved.loc[
+        resolved["common_flow_code"].eq("16.03"), "value"
+    ]
+    assert agriculture.tolist() == [20.0]
+    assert resolved.loc[resolved["common_flow_label"].eq("Unallocated"), "value"].tolist() == [5.0]
+    assert resolved["value"].sum() == pytest.approx(30.0)
+
+
+def test_detailed_buildings_overview_uses_only_two_configured_pairs() -> None:
+    template = {
+        "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
+        "buildings_page": {
+            "page_key": "buildings",
+            "overview": {
+                "enabled": True,
+                "aggregates": [
+                    {
+                        "flow_boundary": "16.01-16.02",
+                        "label": "16.01-16.02 Buildings",
+                        "preferred_detail_flow_boundaries": ["16.01", "16.02"],
+                        "flow_groups": [
+                            {"flow_boundary": "16.01", "label": "16.01 Services"},
+                            {"flow_boundary": "16.02", "label": "16.02 Residential"},
+                        ],
+                    },
+                    {
+                        "flow_boundary": "16.01",
+                        "label": "16.01 Commercial and public services",
+                        "preferred_detail_flow_boundaries": [
+                            "16.01.01", "16.01.99"
+                        ],
+                        "flow_groups": [
+                            {"flow_boundary": "16.01.01", "label": "16.01.01 Datacentres"},
+                            {"flow_boundary": "16.01.99", "label": "16.01.99 Unallocated"},
+                        ],
+                    },
+                ],
+            },
+        },
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("LEAP", "Target", 2023, code, "17", value),
+            "common_flow_label": label,
+            "common_product_label": "17 Electricity",
+        }
+        for code, label, value in [
+            ("16.01-16.02", "16.01-16.02 Buildings", 30.0),
+            ("16.01", "16.01 Commercial and public services", 20.0),
+            ("16.02", "16.02 Residential", 10.0),
+            ("16.01.01", "16.01.01 Datacentres", 5.0),
+            (
+                "16.01.99",
+                "16.01.99 Commercial and public services unallocated",
+                15.0,
+            ),
+        ]
+    ])
+    generic = [{
+        "aggregate_flow_prefix": "16",
+        "aggregate_flow_label": "16 Buildings",
+    }]
+
+    specs = renderer.add_buildings_overview_specs(
+        "buildings", rows, generic, template
+    )
+
+    assert [spec["chart_caption"] for spec in specs] == [
+        "16.01-16.02 Buildings — by product",
+        "16.01-16.02 Buildings — by flow",
+        "16.01 Commercial and public services — by product",
+        "16.01 Commercial and public services — by flow",
+    ]
+    whole_rows = renderer.configured_flow_group_rows(
+        rows, specs[1]["configured_flow_groups"]
+    )
+    whole_flow = renderer.resolved_area_chart_rows(
+        whole_rows, specs[1], group_col="_configured_flow_group_label"
+    )
+    assert set(whole_flow["_configured_flow_group_label"]) == {
+        "16.01 Services", "16.02 Residential"
+    }
+    assert whole_flow["value"].sum() == pytest.approx(30.0)
+    services_rows = renderer.configured_flow_group_rows(
+        rows, specs[3]["configured_flow_groups"]
+    )
+    services_flow = renderer.resolved_area_chart_rows(
+        services_rows, specs[3], group_col="_configured_flow_group_label"
+    )
+    assert set(services_flow["_configured_flow_group_label"]) == {
+        "16.01.01 Datacentres", "16.01.99 Unallocated"
+    }
+    assert services_flow["value"].sum() == pytest.approx(20.0)
+
+
 def test_detailed_road_section_keeps_only_technology_summary_under_road() -> None:
     """Detailed Road has one technology summary, owned by Road navigation."""
     rows = pd.DataFrame([
