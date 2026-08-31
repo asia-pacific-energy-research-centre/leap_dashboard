@@ -2601,7 +2601,7 @@ def add_supply_bunker_overview_specs(
     area_specs: list[dict[str, object]],
     template: dict,
 ) -> list[dict[str, object]]:
-    """Use separate bunker children when available, otherwise keep the total."""
+    """Show one combined placeholder card or separate detailed bunker cards."""
     supply_config = template.get("supply_page", {}) or {}
     configured_page_key = str(supply_config.get("page_key", "supply")).strip()
     bunker_config = supply_config.get("bunker_overview", {}) or {}
@@ -2615,63 +2615,70 @@ def add_supply_bunker_overview_specs(
     label = str(bunker_config.get("label", "")).strip()
     if not boundary or not label:
         return list(area_specs)
-    specs = list(area_specs)
-    detail_boundaries = [
-        str(value).strip()
-        for value in bunker_config.get("preferred_detail_flow_boundaries", [])
-        if str(value).strip()
+    boundary_code = code_candidate_text(boundary)
+    non_boundary_specs = [
+        spec
+        for spec in area_specs
+        if code_candidate_text(spec.get("aggregate_flow_prefix", ""))
+        != boundary_code
     ]
-    separate_child_products = all(
-        any(
-            code_candidate_text(spec.get("aggregate_flow_prefix", ""))
-            == code_candidate_text(detail_boundary)
-            and str(spec.get("overview_variant", "by_product")) == "by_product"
-            for spec in specs
-        )
-        for detail_boundary in detail_boundaries
-    ) if detail_boundaries else False
-    if separate_child_products:
-        return [
-            spec
-            for spec in specs
-            if code_candidate_text(spec.get("aggregate_flow_prefix", ""))
-            != code_candidate_text(boundary)
-        ]
-
-    rows = flow_boundary_candidate_rows(page_df, boundary)
-    if rows.empty:
-        return specs
-
-    labels_by_source = {
-        str(source): sorted(
-            source_rows["common_flow_label"].dropna().astype(str).unique()
-        )
-        for source, source_rows in rows.groupby("source_system", dropna=False)
+    detail_codes = {
+        code_candidate_text(value)
+        for value in bunker_config.get("preferred_detail_flow_boundaries", ["04", "05"])
+        if code_candidate_text(value)
     }
-    source_labels = sorted({
-        source_label
-        for labels in labels_by_source.values()
-        for source_label in labels
-    })
-    existing_product = any(
-        code_candidate_text(spec.get("aggregate_flow_prefix", ""))
-        == code_candidate_text(boundary)
-        and str(spec.get("overview_variant", "by_product")) == "by_product"
-        for spec in specs
+    leap_rows = page_df[
+        page_df["source_system"].astype(str).str.casefold().eq("leap")
+    ] if "source_system" in page_df.columns else page_df.iloc[0:0]
+    leap_flow_codes = {
+        code_candidate_text(value)
+        for value in leap_rows.get("common_flow_code", pd.Series(dtype=str))
+        if code_candidate_text(value)
+    }
+    combined_placeholder_active = (
+        boundary_code in leap_flow_codes
+        and not detail_codes.intersection(leap_flow_codes)
     )
-    base_spec = {
-        "area_level": code_depth(boundary),
-        "aggregate_flow_prefix": boundary,
-        "aggregate_flow_label": label,
-        "source_flow_labels": source_labels,
-        "source_flow_labels_by_system": labels_by_source,
-        "explicit_flow_boundary": True,
-        "skip_product_overview_ownership": True,
-    }
-    if not existing_product:
-        specs.append(base_spec)
+    if not (
+        uses_combined_international_transport_placeholder(template)
+        or combined_placeholder_active
+    ):
+        return non_boundary_specs
 
-    return specs
+    combined_product = next(
+        (
+            spec
+            for spec in area_specs
+            if code_candidate_text(spec.get("aggregate_flow_prefix", ""))
+            == boundary_code
+            and str(spec.get("overview_variant", "by_product")) == "by_product"
+        ),
+        None,
+    )
+    if combined_product is None:
+        rows = flow_boundary_candidate_rows(page_df, boundary)
+        if rows.empty:
+            return non_boundary_specs
+        labels_by_source = {
+            str(source): sorted(
+                source_rows["common_flow_label"].dropna().astype(str).unique()
+            )
+            for source, source_rows in rows.groupby("source_system", dropna=False)
+        }
+        combined_product = {
+            "area_level": code_depth(boundary),
+            "aggregate_flow_prefix": boundary,
+            "aggregate_flow_label": label,
+            "source_flow_labels": sorted({
+                source_label
+                for labels in labels_by_source.values()
+                for source_label in labels
+            }),
+            "source_flow_labels_by_system": labels_by_source,
+            "explicit_flow_boundary": True,
+            "skip_product_overview_ownership": True,
+        }
+    return [*non_boundary_specs, combined_product]
 
 
 def prepare_area_specs_for_page(

@@ -713,7 +713,7 @@ def test_generic_placeholder_overview_drops_uninformative_by_flow_companion() ->
     ]
 
 
-def test_supply_bunker_overview_keeps_one_combined_fallback() -> None:
+def test_supply_bunker_overview_keeps_one_combined_placeholder() -> None:
     template = {
         "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
         "supply_page": {
@@ -744,13 +744,18 @@ def test_supply_bunker_overview_keeps_one_combined_fallback() -> None:
         },
     ])
 
+    existing = [
+        {"aggregate_flow_prefix": "04-05"},
+        {"aggregate_flow_prefix": "04-05"},
+        {"aggregate_flow_prefix": "04-05", "overview_variant": "by_flow"},
+    ]
     specs = renderer.add_supply_bunker_overview_specs(
-        "supply", rows, [], template
+        "supply", rows, existing, template
     )
 
-    assert [spec.get("overview_variant", "by_product") for spec in specs] == [
-        "by_product"
-    ]
+    assert len(specs) == 1
+    assert specs[0]["aggregate_flow_prefix"] == "04-05"
+    assert specs[0].get("overview_variant", "by_product") == "by_product"
 
 
 def test_supply_bunker_overview_omits_combined_total_when_children_have_cards() -> None:
@@ -786,6 +791,7 @@ def test_supply_bunker_overview_omits_combined_total_when_children_have_cards() 
     existing = [
         {"aggregate_flow_prefix": "04", "aggregate_flow_label": "04 Marine"},
         {"aggregate_flow_prefix": "05", "aggregate_flow_label": "05 Aviation"},
+        {"aggregate_flow_prefix": "04-05", "aggregate_flow_label": "Combined"},
     ]
 
     specs = renderer.add_supply_bunker_overview_specs(
