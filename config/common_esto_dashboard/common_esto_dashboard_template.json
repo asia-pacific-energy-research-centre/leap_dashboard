@@ -472,7 +472,7 @@
         "hide_aggregate": true
       }
     },
-    "_note": "A section override applies only when every displayed row is inside required_flow_boundary. The Transport override removes the redundant generic by-product section summary once Road is detailed, keeps its technology/flow summary, relabels it as Road detail, and places it first inside the existing Road-owned by-product section. This produces one Road navigation chip and one destination. If detailed non-road rows later join the section, the boundary guard disables this Road-only presentation automatically. The Power override hides only the misleading residual own-use/storage section summary because the complete Power-sector aggregation is owned by Overview; its useful detailed cards remain below."
+    "_note": "A section override with required_flow_boundary filters its aggregate to that boundary. The Transport override removes the redundant generic by-product section summary once Road is detailed, keeps its technology/flow summary strictly within 15.02, relabels it as Road detail, and places it first inside the existing Road-owned by-product section. This produces one Road navigation chip and one destination while non-road remains owned by its separate overview. The Power override hides only the misleading residual own-use/storage section summary because the complete Power-sector aggregation is owned by Overview; its useful detailed cards remain below."
   },
   "power_interim_branch_flow_prefixes": {
     "Electricity interim": ["09.01.01", "09.02.01"],

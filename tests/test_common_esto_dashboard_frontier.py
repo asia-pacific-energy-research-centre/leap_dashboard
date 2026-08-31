@@ -526,6 +526,50 @@ def test_transport_nonroad_placeholder_is_connected_to_overview_pipeline() -> No
     ]
 
 
+def test_transport_nonroad_overview_remains_after_placeholder_is_replaced() -> None:
+    template = {
+        "leap_demand_sector_coverage": {
+            "placeholder_component_product_sections": {
+                "Transport non road": {
+                    "flow_code": "15.01,15.03-15.06",
+                    "label": "15.01,15.03-15.06 Transport non-road",
+                },
+            },
+            "placeholder_component_flow_prefixes": {
+                "Transport non road": ["15.01", "15.03", "15.04", "15.05", "15.06"],
+            },
+            "placeholder_overview_components_by_page": {
+                "transport": ["Transport non road"],
+            },
+            "page_placeholder_components": {
+                "transport": ["Transport non road"],
+            },
+        },
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("LEAP", "Target", 2030, "15.03", "07.07", 6.0),
+            "common_flow_label": "15.03 Rail",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2030, "15.04", "07.08", 4.0),
+            "common_flow_label": "15.04 Domestic navigation",
+        },
+    ])
+
+    specs = renderer.add_active_placeholder_area_specs(
+        "transport", rows, [], template
+    )
+
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == [
+        "15.01,15.03-15.06"
+    ]
+    assert set(renderer.area_spec_rows(rows, specs[0])["common_flow_code"]) == {
+        "15.03",
+        "15.04",
+    }
+
+
 def test_other_demand_placeholder_replaces_broad_16_overview() -> None:
     """Other demand compares exact 16.03-16.05, never NINTH parent 16."""
     template = {
@@ -1015,14 +1059,21 @@ def test_detailed_road_section_keeps_only_technology_summary_under_road() -> Non
     ) == 1
 
 
-def test_detailed_road_section_override_disables_for_mixed_transport() -> None:
-    """A future detailed non-road row prevents the Road-only override."""
+def test_detailed_road_section_override_remains_component_local() -> None:
+    """Detailed non-road rows do not leak into the Road-owned aggregate."""
     rows = pd.DataFrame([
         {
             **_area_product_row(
                 "LEAP", "Target", 2030, "15.02.01", "07.01", 12.0
             ),
             "common_flow_label": "15.02.01 Freight road",
+            "_section_label": "Transport",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030, "15.02.02", "07.01", 8.0
+            ),
+            "common_flow_label": "15.02.02 Passenger road",
             "_section_label": "Transport",
         },
         {
@@ -1063,10 +1114,15 @@ def test_detailed_road_section_override_disables_for_mixed_transport() -> None:
     )
 
     assert set(charts) == {
-        "chart__area__section__transport__transport__product",
         "chart__area__section__transport__transport__flow",
     }
-    assert not any(row.get("flow_group_label") for row in chart_rows)
+    assert all(
+        "rail" not in str(trace.name).casefold()
+        for trace in charts[
+            "chart__area__section__transport__transport__flow"
+        ].data
+    )
+    assert {row.get("flow_group_label") for row in chart_rows} == {"15.02 Road"}
 
 
 def _passenger_road_hierarchy_rows(second_child_value: float) -> pd.DataFrame:
@@ -1817,8 +1873,196 @@ def test_road_history_uses_leap_base_year_fuel_shares_not_equal_splits() -> None
         (2022, "15.02.02"): pytest.approx(90.0),
     }
     assert set(estimated["_historical_estimation_method"]) == {
-        "leap_base_year_fuel_share_of_esto_road_total"
+        "estimated_from_leap_base_year_share"
     }
+
+
+def test_detailed_demand_allocation_conserves_parent_and_preserves_zero_share() -> None:
+    rows = pd.DataFrame([
+        _area_product_row("ESTO_EXTENDED", "historical", 2021, "14", "07.01", 80.0),
+        _area_product_row("ESTO_EXTENDED", "historical", 2022, "14", "07.01", 100.0),
+        {
+            **_area_product_row("LEAP", "Target", 2022, "14.01", "07.01", 30.0),
+            "common_flow_label": "14.01 Iron and steel",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2022, "14.02", "07.01", 10.0),
+            "common_flow_label": "14.02 Chemicals",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2022, "14.03", "07.01", 0.0),
+            "common_flow_label": "14.03 Other industry",
+        },
+    ])
+
+    fixed = renderer.estimate_esto_demand_detail_from_leap_base_year_shares(
+        rows,
+        comparison_source="ESTO_EXTENDED",
+        primary_source="LEAP",
+        primary_scenario="Target",
+        base_year=2022,
+        component_specs=[{
+            "component": "Industry",
+            "flow_boundary": "14",
+            "flow_prefixes": ["14"],
+            "label": "14 Industry sector",
+        }],
+    )
+    estimated = fixed[
+        fixed["source_system"].eq("ESTO_EXTENDED")
+        & fixed["common_flow_code"].isin(["14.01", "14.02", "14.03"])
+    ]
+    values = estimated.set_index(["year", "common_flow_code"])["value"].to_dict()
+
+    assert values[(2021, "14.01")] == pytest.approx(60.0)
+    assert values[(2021, "14.02")] == pytest.approx(20.0)
+    assert values[(2021, "14.03")] == pytest.approx(0.0)
+    assert values[(2022, "14.01")] == pytest.approx(75.0)
+    assert values[(2022, "14.02")] == pytest.approx(25.0)
+    assert values[(2022, "14.03")] == pytest.approx(0.0)
+    assert estimated.groupby("year")["value"].sum().to_dict() == {
+        2021: pytest.approx(80.0),
+        2022: pytest.approx(100.0),
+    }
+    assert set(estimated["common_row_basis"]) == {
+        "estimated_from_leap_base_year_share"
+    }
+
+
+def test_detailed_demand_allocation_uses_deepest_nonoverlapping_flow_frontier() -> None:
+    rows = pd.DataFrame([
+        _area_product_row("ESTO_EXTENDED", "historical", 2022, "15.02", "07.01", 100.0),
+        {
+            **_area_product_row("LEAP", "Target", 2022, "15.02.01", "07.01", 100.0),
+            "common_flow_label": "15.02.01 Freight road",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2022, "15.02.01.01", "07.01", 25.0),
+            "common_flow_label": "15.02.01.01 Light vehicles",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2022, "15.02.01.02", "07.01", 75.0),
+            "common_flow_label": "15.02.01.02 Trucks",
+        },
+    ])
+
+    fixed = renderer.estimate_esto_road_detail_from_leap_base_year_shares(
+        rows,
+        comparison_source="ESTO_EXTENDED",
+        primary_source="LEAP",
+        primary_scenario="Target",
+        base_year=2022,
+    )
+    estimated = fixed[
+        fixed["source_system"].eq("ESTO_EXTENDED")
+        & fixed["common_flow_code"].astype(str).str.startswith("15.02.")
+    ]
+
+    assert estimated.set_index("common_flow_code")["value"].to_dict() == {
+        "15.02.01.01": pytest.approx(25.0),
+        "15.02.01.02": pytest.approx(75.0),
+    }
+
+
+def test_detailed_demand_allocation_uses_visible_unallocated_without_denominator() -> None:
+    rows = pd.DataFrame([
+        _area_product_row("ESTO_EXTENDED", "historical", 2022, "16.01-16.02", "07.01", 50.0),
+        {
+            **_area_product_row("LEAP", "Target", 2022, "16.01", "07.01", 0.0),
+            "common_flow_label": "16.01 Services",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2022, "16.02", "07.01", 0.0),
+            "common_flow_label": "16.02 Residential",
+        },
+    ])
+
+    fixed = renderer.estimate_esto_demand_detail_from_leap_base_year_shares(
+        rows,
+        comparison_source="ESTO_EXTENDED",
+        primary_source="LEAP",
+        primary_scenario="Target",
+        base_year=2022,
+        component_specs=[{
+            "component": "Buildings",
+            "flow_boundary": "16.01-16.02",
+            "flow_prefixes": ["16.01", "16.02"],
+            "label": "16 Buildings",
+        }],
+    )
+    unallocated = fixed[
+        fixed["source_system"].eq("ESTO_EXTENDED")
+        & fixed["common_flow_label"].eq("Unallocated within 16 Buildings")
+    ]
+
+    assert unallocated["value"].tolist() == [pytest.approx(50.0)]
+    assert unallocated["common_row_basis"].tolist() == [
+        "unallocated_no_leap_base_year_share"
+    ]
+    assert not fixed[
+        fixed["source_system"].eq("ESTO_EXTENDED")
+        & fixed["common_flow_code"].isin(["16.01", "16.02"])
+    ].shape[0]
+
+
+def test_detailed_demand_allocation_is_component_local_for_hybrid_upload() -> None:
+    rows = pd.DataFrame([
+        _area_product_row("ESTO_EXTENDED", "historical", 2022, "15.02", "07.01", 90.0),
+        _area_product_row("ESTO_EXTENDED", "historical", 2022, "15.01,15.03-15.06", "07.01", 20.0),
+        {
+            **_area_product_row("LEAP", "Target", 2022, "15.02.01", "07.01", 30.0),
+            "common_flow_label": "15.02.01 Freight road",
+        },
+        _area_product_row("LEAP", "Target", 2022, "15.01,15.03-15.06", "07.01", 20.0),
+    ])
+    specs = [
+        {"component": "Road", "flow_boundary": "15.02", "flow_prefixes": ["15.02"], "label": "15.02 Road"},
+        {"component": "Transport non road", "flow_boundary": "15.01,15.03-15.06", "flow_prefixes": ["15.01", "15.03", "15.04", "15.05", "15.06"], "label": "Transport non-road"},
+    ]
+
+    fixed = renderer.estimate_esto_demand_detail_from_leap_base_year_shares(
+        rows,
+        comparison_source="ESTO_EXTENDED",
+        primary_source="LEAP",
+        primary_scenario="Target",
+        base_year=2022,
+        component_specs=specs,
+    )
+
+    assert fixed[
+        fixed["source_system"].eq("ESTO_EXTENDED")
+        & fixed["common_flow_code"].eq("15.02.01")
+    ]["value"].tolist() == [pytest.approx(90.0)]
+    assert fixed[
+        fixed["source_system"].eq("ESTO_EXTENDED")
+        & fixed["common_flow_code"].eq("15.01,15.03-15.06")
+    ]["value"].tolist() == [pytest.approx(20.0)]
+    assert not fixed[
+        fixed["source_system"].eq("ESTO_EXTENDED")
+        & fixed["common_flow_label"].str.contains("Unallocated", na=False)
+    ].shape[0]
+
+
+def test_non_energy_is_not_configured_for_child_allocation() -> None:
+    template = {
+        "leap_demand_sector_coverage": {
+            "placeholder_component_product_sections": {
+                "Industry": {"flow_code": "14", "label": "Industry"},
+                "Non Energy Use": {"flow_code": "17", "label": "Non-energy use"},
+            },
+            "placeholder_component_flow_prefixes": {
+                "Industry": ["14"],
+                "Non Energy Use": ["17"],
+            },
+            "page_placeholder_components": {
+                "industry": ["Industry", "Non Energy Use"],
+            },
+        }
+    }
+
+    specs = renderer.demand_detail_component_specs_for_page(template, "industry")
+
+    assert [spec["component"] for spec in specs] == ["Industry"]
 
 
 def test_transport_area_can_use_hybrid_demand_frontier() -> None:

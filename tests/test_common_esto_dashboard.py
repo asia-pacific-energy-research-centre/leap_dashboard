@@ -4466,6 +4466,7 @@ def test_road_technology_section_uses_authoritative_parent_totals() -> None:
                 ("LEAP", "Target", 2023, "15.02.01.02", "15.02.01.02 ICE", False, 55.0),
                 ("NINTH", "Target", 2022, "15.02.01.01", "15.02.01.01 BEV", False, 25.0),
                 ("NINTH", "Target", 2022, "15.02.01.02", "15.02.01.02 ICE", False, 45.0),
+                ("LEAP", "Target", 2022, "15.01,15.03-15.06", "15.01,15.03-15.06 Transport non-road", True, 15.0),
             ]
         ]
     )
@@ -4489,8 +4490,14 @@ def test_road_technology_section_uses_authoritative_parent_totals() -> None:
         }
     }
 
+    detail_rows = rows.loc[
+        ~(
+            rows["source_system"].eq("ESTO")
+            & rows["common_flow_code"].astype(str).str.startswith("15.02.")
+        )
+    ].copy()
     charts, chart_rows, manifest_rows = _build_section_aggregate_charts(
-        rows,
+        detail_rows,
         page_key="transport",
         page_label="Transport",
         parent_flow_labels={"15.02 Road"},
@@ -4500,9 +4507,14 @@ def test_road_technology_section_uses_authoritative_parent_totals() -> None:
             "LEAP|Target": "LEAP Target",
             "NINTH|Target": "9th Target",
         },
+        authoritative_total_df=rows,
     )
 
     assert list(charts) == ["chart__area__section__transport__transport__flow"]
+    assert all(
+        "non-road" not in str(trace.name).casefold()
+        for trace in charts["chart__area__section__transport__transport__flow"].data
+    )
     assert len(chart_rows) == 1
     assert chart_rows[0]["title"] == "15.02 Road — detailed model by technology"
     assert len(manifest_rows) == 1
@@ -4619,6 +4631,98 @@ def test_section_aggregate_suppresses_redundant_single_flow_chart() -> None:
         "chart__area__section__refining__refining__product": False,
         "chart__area__section__refining__refining__flow": True,
     }
+
+
+def test_power_overview_ownership_suppresses_duplicate_section_aggregate() -> None:
+    rows = pd.DataFrame([
+        {
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2030,
+            "common_flow_code": flow_code,
+            "common_flow_label": flow_label,
+            "common_product_code": "17",
+            "common_product_label": "17 Electricity",
+            "_section_label": "Power generation and transformation",
+            "value": value,
+        }
+        for flow_code, flow_label, value in [
+            ("09.01.01", "09.01.01 Electricity plants", 100.0),
+            ("09.01.02", "09.01.02 CHP plants", 20.0),
+        ]
+    ])
+    template = {
+        "chart_generation": {
+            "primary_area_source_system": "LEAP",
+            "primary_area_scenario": "Target",
+            "comparison_source_system": "ESTO",
+            "ninth_source_system": "NINTH",
+            "base_year": 2022,
+        },
+        "power_page": {
+            "overview": {
+                "aggregates": [
+                    {"flow_boundary": "09.01-09.02"},
+                ],
+            },
+        },
+    }
+
+    charts, chart_rows, manifest_rows = _build_section_aggregate_charts(
+        rows,
+        page_key="power",
+        page_label="Power",
+        parent_flow_labels=set(),
+        template=template,
+        series_labels={},
+    )
+
+    assert charts == {}
+    assert chart_rows == []
+    assert manifest_rows == []
+
+
+def test_two_overview_roots_suppress_combined_duplicate_section_aggregate() -> None:
+    rows = pd.DataFrame([
+        {
+            "source_system": "LEAP",
+            "scenario": "Target",
+            "year": 2030,
+            "common_flow_code": flow_code,
+            "common_flow_label": flow_label,
+            "common_product_code": "17",
+            "common_product_label": "17 Electricity",
+            "_section_label": "Industry and non-energy",
+            "value": value,
+        }
+        for flow_code, flow_label, value in [
+            ("14", "14 Industry sector", 100.0),
+            ("14.03", "14.03 Manufacturing", 80.0),
+            ("17", "17 Non-energy use", 20.0),
+        ]
+    ])
+    template = {
+        "chart_generation": {
+            "primary_area_source_system": "LEAP",
+            "primary_area_scenario": "Target",
+            "comparison_source_system": "ESTO",
+            "ninth_source_system": "NINTH",
+            "base_year": 2022,
+        },
+    }
+
+    charts, chart_rows, manifest_rows = _build_section_aggregate_charts(
+        rows,
+        page_key="industry",
+        page_label="Industry and non-energy",
+        parent_flow_labels={"14 Industry sector", "17 Non-energy use"},
+        template=template,
+        series_labels={},
+    )
+
+    assert charts == {}
+    assert chart_rows == []
+    assert manifest_rows == []
 
 
 def test_other_transformation_section_summaries_are_promoted_to_overview() -> None:

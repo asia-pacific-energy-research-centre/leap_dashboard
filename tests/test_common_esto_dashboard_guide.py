@@ -171,11 +171,12 @@ def test_chart_guide_explains_the_overview_first_review_strategy() -> None:
 def test_chart_guide_explains_comparison_basis_and_esto_extended() -> None:
     script = build_guide_fragments("chart", "transport", "Transport")["script"]
 
-    assert "never divides a published aggregate using assumed shares" in script
-    assert "its allocation among children is unknown" in script
-    assert "ESTO Extended is a structural mapping basis" in script
-    assert "does not invent historical ESTO detail" in script
-    assert "LEAP + ESTO Extended can therefore show more detail" in script
+    assert "aggregate sources to a shared grain rather than guessing" in script
+    assert "one clearly labelled historical-context exception" in script
+    assert "using LEAP base-year shares for the same fuel" in script
+    assert "official ESTO parent total remains visible" in script
+    assert "an amount with no usable share is shown as Unallocated" in script
+    assert "Placeholder branches remain aggregate" in script
 
 
 def test_transport_purpose_excludes_international_transport_without_extra_card() -> None:
@@ -265,7 +266,7 @@ def test_index_guide_includes_the_recommended_review_route() -> None:
 
     assert "Recommended review route" in index_script
     assert "Mapping diagnostics" in index_script
-    assert "does not allocate coarse values" in index_script
+    assert "Clearly labelled historical detail may be estimated" in index_script
     assert "each routed flow is compared across every relevant product or fuel" in index_script
 
 

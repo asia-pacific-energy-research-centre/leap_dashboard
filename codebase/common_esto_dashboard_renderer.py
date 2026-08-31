@@ -462,7 +462,7 @@ LNG_CHILD_SOURCE_UNAVAILABLE_NOTE = (
 )
 ROAD_DETAIL_ESTIMATION_NOTE = (
     "Estimated historical detail: The historical breakdown shown here is an "
-    "approximation. The overall Road totals are official, but the detailed "
+    "approximation. The overall totals are official, but the detailed "
     "categories are estimated and should be used only as a guide."
 )
 OTHER_NONENERGY_ESTIMATION_NOTE = (
@@ -544,127 +544,244 @@ def estimate_esto_road_detail_from_leap_base_year_shares(
     base_year: int,
     road_boundary: str = "15.02",
 ) -> pd.DataFrame:
-    """Replace synthetic ESTO Road children with reconciled estimates.
+    """Compatibility wrapper for the configured Road detail allocation."""
+    return estimate_esto_demand_detail_from_leap_base_year_shares(
+        page_df,
+        comparison_source=comparison_source,
+        primary_source=primary_source,
+        primary_scenario=primary_scenario,
+        base_year=base_year,
+        component_specs=[{
+            "component": "Road",
+            "flow_boundary": road_boundary,
+            "flow_prefixes": [road_boundary],
+            "label": "15.02 Road",
+        }],
+    )
 
-    ESTO publishes the authoritative Road-by-fuel boundary but not LEAP's
-    vehicle/technology hierarchy.  Some prepared inputs contain equal-split
-    child rows that look exact despite having no observed child evidence.  For
-    every Road descendant present in LEAP, estimate its historical value as::
 
-        ESTO Road fuel total(year) * LEAP child share(base year, same fuel)
+def estimate_esto_demand_detail_from_leap_base_year_shares(
+    page_df: pd.DataFrame,
+    *,
+    comparison_source: str,
+    primary_source: str,
+    primary_scenario: str,
+    base_year: int,
+    component_specs: list[dict[str, object]],
+) -> pd.DataFrame:
+    """Estimate historical ESTO detail only where genuine LEAP detail exists.
 
-    The exact 15.02 rows are retained.  This makes every estimated hierarchy
-    level additive to the published ESTO Road fuel totals whenever LEAP covers
-    that level, and avoids implying that the child observations came from ESTO.
+    For each component and product, the exact ESTO parent remains untouched and
+    its historical total is distributed over the non-overlapping LEAP detail
+    present in the base year.  Shares are normalised over those detailed rows,
+    so the estimates conserve the ESTO parent exactly.  Explicit zero-share
+    rows stay zero.  If the detailed LEAP denominator is zero or absent, the
+    whole ESTO value is shown as ``Unallocated`` rather than being equal-split
+    or silently assigned to a named sector.
+
+    A component with only an aggregate LEAP row is not changed.  This makes the
+    transition safe for hybrid uploads where some placeholder branches have
+    been replaced and others have not.
     """
     required = {
         "source_system", "scenario", "year", "common_flow_code",
         "common_flow_label", "common_product_code", "common_product_label",
         "value",
     }
-    if page_df.empty or not required.issubset(page_df.columns):
+    if (
+        page_df.empty
+        or not component_specs
+        or not required.issubset(page_df.columns)
+    ):
         return page_df
 
     work = page_df.copy()
-    flow_text = work["common_flow_code"].astype(str).map(code_candidate_text)
-    is_exact_road = flow_text.eq(road_boundary)
-    is_road_descendant = flow_text.str.startswith(road_boundary + ".")
-    is_comparison = work["source_system"].astype(str).str.casefold().eq(
-        comparison_source.casefold()
-    )
-    is_primary_base = (
-        work["source_system"].astype(str).str.casefold().eq(primary_source.casefold())
-        & work["scenario"].astype(str).str.casefold().eq(primary_scenario.casefold())
-        & pd.to_numeric(work["year"], errors="coerce").eq(int(base_year))
-    )
+    for component_spec in component_specs:
+        boundary = str(component_spec.get("flow_boundary", "")).strip()
+        prefixes = [
+            str(value).strip()
+            for value in component_spec.get("flow_prefixes", [])
+            if str(value).strip()
+        ]
+        if not boundary or not prefixes:
+            continue
 
-    comparison_parent = work[is_comparison & is_exact_road].copy()
-    primary_parent = work[is_primary_base & is_exact_road].copy()
-    primary_detail = work[is_primary_base & is_road_descendant].copy()
-    if comparison_parent.empty or primary_parent.empty or primary_detail.empty:
-        return work
+        flow_text = work["common_flow_code"].astype(str).map(code_candidate_text)
+        is_exact_parent = flow_text.eq(boundary)
+        is_in_component = work["common_flow_code"].apply(
+            lambda value: code_expression_matches_any_prefix(value, prefixes)
+        )
+        is_descendant = is_in_component & ~is_exact_parent
+        is_comparison = work["source_system"].astype(str).str.casefold().eq(
+            comparison_source.casefold()
+        )
+        is_primary_base = (
+            work["source_system"].astype(str).str.casefold().eq(
+                primary_source.casefold()
+            )
+            & work["scenario"].astype(str).str.casefold().eq(
+                primary_scenario.casefold()
+            )
+            & pd.to_numeric(work["year"], errors="coerce").eq(int(base_year))
+        )
+        comparison_parent = work[is_comparison & is_exact_parent].copy()
+        primary_detail = work[is_primary_base & is_descendant].copy()
+        if comparison_parent.empty or primary_detail.empty:
+            continue
 
-    product_key = ["common_product_code", "common_product_label"]
-    parent_base = (
-        primary_parent.groupby(product_key, as_index=False, dropna=False)["value"]
-        .sum()
-        .rename(columns={"value": "_road_base_value"})
-    )
-    detail_key = [
-        "common_flow_code", "common_flow_label",
-        "common_product_code", "common_product_label",
-    ]
-    detail_base = (
-        primary_detail.groupby(detail_key, as_index=False, dropna=False)["value"]
-        .sum()
-        .merge(parent_base, on=product_key, how="left")
-    )
-    detail_base["_allocation_share"] = (
-        pd.to_numeric(detail_base["value"], errors="coerce")
-        / pd.to_numeric(detail_base["_road_base_value"], errors="coerce")
-    )
-    detail_base = detail_base[
-        detail_base["_road_base_value"].abs().gt(1e-12)
-        & detail_base["_allocation_share"].notna()
-    ].copy()
-    if detail_base.empty:
-        return work.loc[~(is_comparison & is_road_descendant)].copy()
+        # Parents and nested intermediate rows can coexist in the converted
+        # detail. Allocation is specifically for historical detail, so select
+        # the deepest non-overlapping LEAP flow frontier rather than the
+        # aggregate-first frontier used by total charts. This places the
+        # estimate on the same technology rows the detailed chart displays.
+        drop_parent_indices: set[object] = set()
+        for _, product_rows in primary_detail.groupby(
+            ["common_product_code", "common_product_label"],
+            dropna=False,
+            sort=False,
+        ):
+            codes_by_index = product_rows["common_flow_code"].to_dict()
+            for row_index, candidate_parent in codes_by_index.items():
+                if any(
+                    other_index != row_index
+                    and _code_expression_contains_expression(
+                        candidate_parent,
+                        candidate_child,
+                    )
+                    for other_index, candidate_child in codes_by_index.items()
+                ):
+                    drop_parent_indices.add(row_index)
+        if drop_parent_indices:
+            primary_detail = primary_detail.drop(index=list(drop_parent_indices))
+        if primary_detail.empty:
+            continue
 
-    # Preserve the LEAP descendant metadata used by routing and chart labels.
-    templates = (
-        primary_detail.sort_values(detail_key)
-        .drop_duplicates(detail_key, keep="first")
-        .drop(columns=["value", "year"], errors="ignore")
-    )
-    estimates = comparison_parent.merge(
-        detail_base[detail_key + ["_allocation_share"]],
-        on=product_key,
-        how="inner",
-        suffixes=("_parent", ""),
-    )
-    estimates = estimates.merge(
-        templates,
-        on=detail_key,
-        how="left",
-        suffixes=("_parent", ""),
-    )
-    estimates["value"] = (
-        pd.to_numeric(estimates["value"], errors="coerce")
-        * estimates["_allocation_share"]
-    )
+        detail_key = [
+            "common_flow_code", "common_flow_label",
+            "common_product_code", "common_product_label",
+        ]
+        detail_base = primary_detail.groupby(
+            detail_key, as_index=False, dropna=False
+        )["value"].sum()
+        detail_base["value"] = pd.to_numeric(
+            detail_base["value"], errors="coerce"
+        ).fillna(0.0)
+        templates = (
+            primary_detail.sort_values(detail_key)
+            .drop_duplicates(detail_key, keep="first")
+            .set_index(detail_key, drop=False)
+        )
 
-    # Start with the LEAP metadata columns, then restore the historical source
-    # identity and exact parent context.  This intentionally marks the rows as
-    # estimates rather than exact ESTO observations.
-    result_rows = pd.DataFrame(index=estimates.index, columns=work.columns)
-    for column in work.columns:
-        parent_column = f"{column}_parent"
-        if column in estimates.columns:
-            result_rows[column] = estimates[column]
-        elif parent_column in estimates.columns:
-            result_rows[column] = estimates[parent_column]
-    result_rows["source_system"] = comparison_source
-    result_rows["scenario"] = estimates.get(
-        "scenario_parent", estimates.get("scenario", "historical")
-    )
-    result_rows["year"] = pd.to_numeric(
-        estimates.get("year_parent", estimates.get("year")), errors="coerce"
-    ).astype("Int64")
-    result_rows["value"] = estimates["value"].to_numpy()
-    result_rows["common_flow_code"] = estimates["common_flow_code"].to_numpy()
-    result_rows["common_flow_label"] = estimates["common_flow_label"].to_numpy()
-    result_rows["common_product_code"] = estimates["common_product_code"].to_numpy()
-    result_rows["common_product_label"] = estimates["common_product_label"].to_numpy()
-    result_rows["_historical_estimation_method"] = (
-        "leap_base_year_fuel_share_of_esto_road_total"
-    )
-    if "common_row_basis" in result_rows.columns:
-        result_rows["common_row_basis"] = "estimated_from_leap_base_year_share"
-    if "is_exact_row" in result_rows.columns:
-        result_rows["is_exact_row"] = False
+        # Synthetic comparison descendants may have been inserted upstream.
+        # Once genuine LEAP detail exists, it is the structural owner and those
+        # rows are replaced with the clearly provenance-labelled allocation.
+        retained = work.loc[~(is_comparison & is_descendant)].copy()
+        result_rows: list[pd.Series] = []
+        for _, parent_row in comparison_parent.iterrows():
+            parent = parent_row.copy()
+            product_code = parent.get("common_product_code")
+            product_label = parent.get("common_product_label")
+            product_detail = detail_base[
+                detail_base["common_product_code"].eq(product_code)
+                & detail_base["common_product_label"].eq(product_label)
+            ].copy()
+            denominator = float(product_detail["value"].sum())
+            parent_value = float(pd.to_numeric(parent.get("value"), errors="coerce"))
 
-    retained = work.loc[~(is_comparison & is_road_descendant)].copy()
-    return pd.concat([retained, result_rows], ignore_index=True)
+            if abs(denominator) <= 1e-12:
+                unallocated = parent.copy()
+                unallocated["common_flow_code"] = f"{boundary}.999999"
+                component_label = str(
+                    component_spec.get("label", boundary)
+                ).strip()
+                unallocated["common_flow_label"] = (
+                    f"Unallocated within {component_label}"
+                )
+                unallocated["value"] = parent_value
+                unallocated["_historical_estimation_method"] = (
+                    "unallocated_no_leap_base_year_share"
+                )
+                unallocated["common_row_basis"] = (
+                    "unallocated_no_leap_base_year_share"
+                )
+                if "is_exact_row" in work.columns:
+                    unallocated["is_exact_row"] = False
+                result_rows.append(unallocated)
+                continue
+
+            product_detail["_allocation_share"] = (
+                product_detail["value"] / denominator
+            )
+            allocated_values = parent_value * product_detail["_allocation_share"]
+            # Put floating-point residue on the final nonzero-share row.  This
+            # keeps the exact parent identity without changing any zero share.
+            residue = parent_value - float(allocated_values.sum())
+            nonzero_positions = product_detail.index[
+                product_detail["_allocation_share"].abs().gt(1e-12)
+            ]
+            if len(nonzero_positions):
+                allocated_values.loc[nonzero_positions[-1]] += residue
+
+            for position, detail_row in product_detail.iterrows():
+                key = tuple(detail_row[column] for column in detail_key)
+                template_row = templates.loc[key]
+                if isinstance(template_row, pd.DataFrame):
+                    template_row = template_row.iloc[0]
+                estimate = parent.copy()
+                for column in work.columns:
+                    if column in template_row.index and column not in {
+                        "source_system", "scenario", "year", "value",
+                    }:
+                        estimate[column] = template_row[column]
+                estimate["source_system"] = comparison_source
+                estimate["scenario"] = parent.get("scenario", "historical")
+                estimate["year"] = parent.get("year")
+                estimate["value"] = float(allocated_values.loc[position])
+                estimate["_historical_estimation_method"] = (
+                    "estimated_from_leap_base_year_share"
+                )
+                estimate["common_row_basis"] = (
+                    "estimated_from_leap_base_year_share"
+                )
+                if "is_exact_row" in work.columns:
+                    estimate["is_exact_row"] = False
+                result_rows.append(estimate)
+
+        if result_rows:
+            work = pd.concat(
+                [retained, pd.DataFrame(result_rows)], ignore_index=True, sort=False
+            )
+        else:
+            work = retained
+
+    return work
+
+
+def demand_detail_component_specs_for_page(
+    template: dict,
+    page_key: str,
+) -> list[dict[str, object]]:
+    """Return configured demand-component boundaries owned by one page."""
+    coverage = template.get("leap_demand_sector_coverage", {})
+    sections = coverage.get("placeholder_component_product_sections", {})
+    prefixes = coverage.get("placeholder_component_flow_prefixes", {})
+    components = coverage.get("page_placeholder_components", {}).get(page_key, [])
+    specs: list[dict[str, object]] = []
+    for component in components:
+        section = sections.get(component, {})
+        boundary = str(section.get("flow_code", "")).strip()
+        component_prefixes = prefixes.get(component, [])
+        # Non-energy is an exact aggregate with no child hierarchy.  It remains
+        # a direct Demand/Non energy use/{FUELS} owner and needs no allocation.
+        if not boundary or component == "Non Energy Use":
+            continue
+        specs.append({
+            "component": component,
+            "flow_boundary": boundary,
+            "flow_prefixes": component_prefixes,
+            "label": str(section.get("label", boundary)).strip(),
+        })
+    return specs
 
 
 def _flow_subtree_is_page_complete(
@@ -2003,12 +2120,14 @@ def add_active_placeholder_area_specs(
     area_specs: list[dict[str, object]],
     template: dict,
 ) -> list[dict[str, object]]:
-    """Add missing Overview aggregates for active placeholder components.
+    """Add missing configured component Overview aggregates.
 
     The generic hierarchy picker discovers ordinary prefixes such as Road
     (15.02), but a deliberate compound boundary such as Transport non-road
     (15.01,15.03-15.06) is not a hierarchy prefix. Preserve generic Overview
-    charts and append only component owners that are otherwise absent.
+    charts and append configured component owners that are otherwise absent,
+    whether the current LEAP representation is an aggregate placeholder or
+    genuine detail below the same boundary.
     """
     coverage = template.get("leap_demand_sector_coverage", {}) or {}
     configured_components = {
@@ -2026,8 +2145,29 @@ def add_active_placeholder_area_specs(
         code_candidate_text(spec.get("aggregate_flow_prefix", ""))
         for spec in specs
     }
-    for section in active_placeholder_product_sections(page_key, template):
-        if section["component"] not in configured_components:
+    page_components = {
+        str(component).strip()
+        for component in (
+            coverage.get("page_placeholder_components", {}) or {}
+        ).get(page_key, [])
+        if str(component).strip()
+    }
+    if not page_components:
+        page_components = set(configured_components)
+    configured_sections = coverage.get(
+        "placeholder_component_product_sections", {}
+    ) or {}
+    for component in sorted(
+        configured_components.intersection(page_components),
+        key=str.casefold,
+    ):
+        section_config = configured_sections.get(component, {}) or {}
+        section = {
+            "component": component,
+            "flow_code": str(section_config.get("flow_code", "")).strip(),
+            "label": str(section_config.get("label", "")).strip(),
+        }
+        if not section["flow_code"] or not section["label"]:
             continue
         flow_code = str(section["flow_code"])
         boundary = code_candidate_text(flow_code)
@@ -3740,6 +3880,13 @@ def build_area_chart(
         area_spec.get("authoritative_total_flow_boundary", "")
     ).strip()
     authoritative_totals = pd.DataFrame()
+    coverage_total_df = (
+        chart_df.groupby(
+            ["source_system", "scenario", "year"], as_index=False
+        )["value"]
+        .sum()
+        .sort_values(["source_system", "scenario", "year"])
+    )
     coverage_residual_max = 0.0
     if authoritative_boundary:
         total_source_df = df if authoritative_total_df is None else authoritative_total_df
@@ -3891,9 +4038,6 @@ def build_area_chart(
                 for _ in range(trace_count)
             )
 
-    coverage_total_df = (
-        chart_df.groupby(["source_system", "scenario", "year"], as_index=False)["value"].sum().sort_values(["source_system", "scenario", "year"])
-    )
     authoritative_labels_by_source = area_spec.get(
         "authoritative_total_flow_labels_by_system"
     ) or {}
@@ -4037,8 +4181,9 @@ def build_area_chart(
         )
         if coverage_residual_max > 1e-9:
             stacked_area_note = (
-                f"{stacked_area_note} The visible unallocated-technology residual "
-                f"reconciles the stack to that boundary (maximum absolute residual "
+                f"{stacked_area_note} The visible technology coverage gap is shown as an "
+                f"unallocated-technology residual so the stack reconciles to that boundary "
+                f"(maximum absolute residual "
                 f"{coverage_residual_max:,.2f}{chart_unit})."
             )
 
@@ -4340,6 +4485,22 @@ def _build_section_aggregate_charts(
         if str(item.get("page_key", "")).strip() == page_key
     ]
     flow_nodes = get_existing_flow_nodes(page_df)
+    page_overview_config = (
+        template.get(f"{page_key}_page", {}).get("overview", {}) or {}
+    )
+    overview_owned_boundaries = [
+        str(item.get("flow_boundary", "")).strip()
+        for item in page_overview_config.get("aggregates", [])
+        if str(item.get("flow_boundary", "")).strip()
+    ]
+    overview_owned_boundaries.extend(
+        str(value).strip()
+        for value in page_df.loc[
+            page_df["common_flow_label"].isin(parent_flow_labels),
+            "common_flow_code",
+        ].dropna().unique()
+        if str(value).strip()
+    )
 
     flow_section = non_parent_df.groupby("common_flow_label")["_section_label"].agg(lambda s: s.mode().iloc[0])
     section_flows: dict[str, list[str]] = {}
@@ -4402,14 +4563,45 @@ def _build_section_aggregate_charts(
             parent_prefix = str(
                 section_overlay.get("parent_flow_prefix", "")
             ).strip()
-            labels_by_source = frontier_flow_labels(
-                flow_nodes,
-                parent_prefix,
-                code_depth(parent_prefix),
-            )
-            if labels_by_source:
-                area_spec["authoritative_total_flow_labels_by_system"] = labels_by_source
-        area_df = page_df[page_df["common_flow_label"].isin(flow_labels)]
+            if parent_prefix:
+                area_spec["authoritative_total_flow_boundary"] = parent_prefix
+        area_source_df = (
+            authoritative_total_df
+            if section_overlay and authoritative_total_df is not None
+            else page_df
+        )
+        area_df = area_source_df[
+            area_source_df["common_flow_label"].isin(flow_labels)
+        ]
+        observed_section_codes = area_df["common_flow_code"].dropna().astype(str)
+        explicitly_owned_section_labels = {
+            str(value).strip()
+            for value in (
+                (template.get("aggregate_chart_policy", {}) or {}).get(
+                    "always_show_section_labels_by_page", {}
+                ) or {}
+            ).get(page_key, [])
+            if str(value).strip()
+        }
+        overview_covers_section = (
+            not observed_section_codes.empty
+            and bool(overview_owned_boundaries)
+            and observed_section_codes.map(
+                lambda code: any(
+                    _code_expression_contains_expression(boundary, code)
+                    for boundary in overview_owned_boundaries
+                )
+            ).all()
+        )
+        if (
+            overview_covers_section
+            and not is_other_transformation_page
+            and not section_overlay
+            and section_label not in explicitly_owned_section_labels
+        ):
+            # The configured Overview is the single aggregate owner for this
+            # complete section.  Detailed line cards remain available below.
+            continue
         section_override = (
             (template.get("section_aggregate_overrides", {}) or {})
             .get(page_key, {})
@@ -4420,16 +4612,30 @@ def _build_section_aggregate_charts(
         required_boundary = str(
             section_override.get("required_flow_boundary", "")
         ).strip()
+        if not required_boundary and section_overlay:
+            required_boundary = str(
+                section_overlay.get("parent_flow_prefix", "")
+            ).strip()
         if required_boundary:
-            observed_codes = area_df["common_flow_code"].dropna().astype(str)
-            if observed_codes.empty or not observed_codes.map(
+            inside_required_boundary = area_df["common_flow_code"].map(
                 lambda code: _code_expression_contains_expression(
                     required_boundary,
                     code,
                 )
-            ).all():
+            )
+            if not inside_required_boundary.any():
                 section_override = {}
                 required_boundary = ""
+            else:
+                area_df = area_df[inside_required_boundary].copy()
+                flow_labels = sorted(
+                    area_df["common_flow_label"].dropna().astype(str).unique()
+                )
+                if section_overlay:
+                    area_spec["aggregate_flow_prefix"] = required_boundary
+                    area_spec["source_flow_labels"] = []
+                else:
+                    area_spec["source_flow_labels"] = flow_labels
         included_groupings = {
             str(value).strip().casefold()
             for value in section_override.get("include_groupings", [])
@@ -4535,13 +4741,17 @@ def _build_section_aggregate_charts(
             if suppressed:
                 continue
             figure = build_area_chart(
-                page_df,
+                area_df,
                 area_spec,
                 series_labels,
                 template,
                 group_col=group_col,
                 title_prefix=title_prefix,
-                authoritative_total_df=authoritative_total_df,
+                authoritative_total_df=(
+                    authoritative_total_df
+                    if authoritative_total_df is not None
+                    else page_df
+                ),
             )
             if not figure.data:
                 manifest_rows[-1]["suppressed"] = True
@@ -9154,13 +9364,18 @@ def render_dashboard(
         if page_df.empty:
             continue
 
-        if page_key == "transport":
-            page_df = estimate_esto_road_detail_from_leap_base_year_shares(
+        detail_component_specs = demand_detail_component_specs_for_page(
+            template,
+            page_key,
+        )
+        if detail_component_specs:
+            page_df = estimate_esto_demand_detail_from_leap_base_year_shares(
                 page_df,
                 comparison_source=comparison_source,
                 primary_source=primary_source,
                 primary_scenario=primary_scenario,
                 base_year=base_year,
+                component_specs=detail_component_specs,
             )
         if page_key == "power":
             page_df = prepare_power_page_rows(page_df)

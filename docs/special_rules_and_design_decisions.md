@@ -1366,6 +1366,49 @@ each source row on exactly one page.
   electricity/heat `10.02` rows on Other transformation despite their Power
   review ownership.
 
+## DASH-036: Estimated ESTO history below detailed demand aggregates
+
+**Status:** Implemented and locally verified; not deployed
+**Owner:** leap_dashboard
+**Type:** Historical comparison context and provenance
+**Affected areas:** detailed demand components; hybrid placeholder/detail uploads
+
+### Current rule
+
+An aggregate or placeholder LEAP branch remains the aggregate owner and is not
+expanded. When a component instead contains genuine detailed LEAP branches,
+the ordinary detail renderer owns those branches. For each product, historical
+ESTO detail below the component boundary is estimated from the authoritative
+ESTO parent total using the non-overlapping LEAP base-year child shares.
+
+The ESTO parent row is retained unchanged as the authoritative comparison line.
+Allocated children add back to that parent exactly for every product and year;
+an explicit zero-share child stays zero. No equal split is used. If the LEAP
+base-year denominator is missing or zero, the ESTO amount is shown as
+**Unallocated** rather than assigned to a named sector. Estimated rows carry
+`common_row_basis=estimated_from_leap_base_year_share`; unallocated rows carry
+`common_row_basis=unallocated_no_leap_base_year_share`. They are approximate
+historical context, not measured historical observations.
+
+The rule is applied component by component so detailed Road can coexist with a
+placeholder Transport non-road branch, for example. Non-energy use has no child
+hierarchy and remains the exact `17 Non-energy use` aggregate.
+
+### Validation
+
+Regression coverage must distinguish an explicit zero, a missing/zero share
+denominator, and rows removed by non-overlapping frontier resolution. Both a
+placeholder-only upload and a detailed/hybrid upload must pass the production
+render path. Generated bundles must retain ESTO history, LEAP and Ninth parent
+totals, exact aggregate conservation, visible provenance notes, and the correct
+placeholder-to-detail navigation transition.
+
+### History
+
+- 2026-08-31: Generalised the reviewed Road method to configured demand
+  components while retaining component-local placeholder ownership and an
+  explicit Unallocated fallback.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
