@@ -2571,6 +2571,45 @@ def test_detailed_demand_allocation_uses_deepest_nonoverlapping_flow_frontier() 
     }
 
 
+def test_detailed_demand_allocation_keeps_duplicate_deepest_rows() -> None:
+    """Duplicate source contexts do not make a leaf look like its own parent."""
+    rows = pd.DataFrame([
+        _area_product_row("ESTO_EXTENDED", "historical", 2022, "15.02", "07.01", 100.0),
+        {
+            **_area_product_row("LEAP", "Target", 2022, "15.02.01", "07.01", 100.0),
+            "common_flow_label": "15.02.01 Freight road",
+            "comparison_scope": "esto_extended_leap",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2022, "15.02.01", "07.01", 100.0),
+            "common_flow_label": "15.02.01 Freight road",
+            "comparison_scope": "esto_extended_leap_ninth",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2022, "15.02.02", "07.01", 100.0),
+            "common_flow_label": "15.02.02 Passenger road",
+            "comparison_scope": "esto_extended_leap",
+        },
+    ])
+
+    fixed = renderer.estimate_esto_road_detail_from_leap_base_year_shares(
+        rows,
+        comparison_source="ESTO_EXTENDED",
+        primary_source="LEAP",
+        primary_scenario="Target",
+        base_year=2022,
+    )
+    estimated = fixed[
+        fixed["source_system"].eq("ESTO_EXTENDED")
+        & fixed["common_flow_code"].isin(["15.02.01", "15.02.02"])
+    ]
+
+    assert estimated.groupby("common_flow_code")["value"].sum().to_dict() == {
+        "15.02.01": pytest.approx(200.0 / 3.0),
+        "15.02.02": pytest.approx(100.0 / 3.0),
+    }
+
+
 def test_detailed_demand_allocation_uses_visible_unallocated_without_denominator() -> None:
     rows = pd.DataFrame([
         _area_product_row("ESTO_EXTENDED", "historical", 2022, "16.01-16.02", "07.01", 50.0),

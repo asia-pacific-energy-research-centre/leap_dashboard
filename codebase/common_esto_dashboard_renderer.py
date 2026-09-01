@@ -644,6 +644,8 @@ def estimate_esto_demand_detail_from_leap_base_year_shares(
             for row_index, candidate_parent in codes_by_index.items():
                 if any(
                     other_index != row_index
+                    and code_candidate_text(candidate_parent)
+                    != code_candidate_text(candidate_child)
                     and _code_expression_contains_expression(
                         candidate_parent,
                         candidate_child,
