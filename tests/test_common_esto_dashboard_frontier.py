@@ -2413,10 +2413,18 @@ def test_power_plant_overview_can_promote_itself_to_navigation_root() -> None:
 
     assert len(specs) == 2
     assert all(spec["force_navigation_root"] for spec in specs)
-    roots = [{
-        "label": specs[0]["aggregate_flow_label"],
-        "target": "overview-power__09_01_01_09_02_01_electricity_plants",
-    }]
+    roots = [
+        {
+            "label": "09.01-09.02 Power",
+            "target": "overview-power__09_01_09_02_power",
+            "force_top_level": True,
+        },
+        {
+            "label": specs[0]["aggregate_flow_label"],
+            "target": "overview-power__09_01_01_09_02_01_electricity_plants",
+            "force_top_level": True,
+        },
+    ]
     tree = renderer.line_section_tree(
         [{
             "section_label": "Power generation and transformation",
@@ -2428,6 +2436,10 @@ def test_power_plant_overview_can_promote_itself_to_navigation_root() -> None:
     assert (
         'data-level="1" data-hierarchy-depth="1" data-placeholder="false">'
         '09.01.01,09.02.01 Electricity plants</a>'
+    ) in html
+    assert (
+        'data-level="1" data-hierarchy-depth="1" data-placeholder="false">'
+        '09.01-09.02 Power</a>'
     ) in html
 
 

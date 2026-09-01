@@ -7632,6 +7632,7 @@ avigation_roots``. A page-defined overview aggregate can also parent a
     }
     root_targets: dict[str, str] = {}
     section_root_labels: dict[str, str] = {}
+    forced_top_level_roots: set[str] = set()
     existing_groups = {group for groups in seen_sections.values() for group in groups}
     for root in navigation_roots or []:
         root_label = str(root.get("label") or "").strip()
@@ -7643,6 +7644,8 @@ avigation_roots``. A page-defined overview aggregate can also parent a
             continue
         if bool(root.get("placeholder")):
             placeholder_groups.add(root_label)
+        if bool(root.get("force_top_level")):
+            forced_top_level_roots.add(root_label)
         if section_hint in seen_sections:
             seen_sections[section_hint].insert(0, root_label)
             existing_groups.add(root_label)
@@ -7694,7 +7697,7 @@ avigation_roots``. A page-defined overview aggregate can also parent a
         code_by_group = dict(coded_groups)
         parent_by_group: dict[str, str] = {}
         for child_group, child_code in coded_groups:
-            if not child_code:
+            if not child_code or child_group in forced_top_level_roots:
                 continue
             candidates = [
                 (parent_group, parent_code)
@@ -7713,7 +7716,11 @@ avigation_roots``. A page-defined overview aggregate can also parent a
         section_root = section_root_labels.get(section_label, "")
         if section_root:
             for group, _code in coded_groups:
-                if group != section_root and group not in parent_by_group:
+                if (
+                    group != section_root
+                    and group not in parent_by_group
+                    and group not in forced_top_level_roots
+                ):
                     parent_by_group[group] = section_root
 
         groups_with_children = set(parent_by_group.values())
@@ -7722,6 +7729,9 @@ avigation_roots``. A page-defined overview aggregate can also parent a
         def visible_depth(group: str, visiting: set[str] | None = None) -> int:
             if group in depth_by_group:
                 return depth_by_group[group]
+            if group in forced_top_level_roots:
+                depth_by_group[group] = 1
+                return 1
             visiting = set(visiting or set())
             if group in visiting:
                 return 2
@@ -8216,6 +8226,7 @@ def write_dashboard_page(
             ),
             "section_label": str(row.get("navigation_root_section_label") or ""),
             "placeholder": bool(row.get("navigation_placeholder")),
+            "force_top_level": bool(row.get("navigation_force_top_level")),
         }
         for row in area_rows
         if str(row.get("navigation_root_label") or "").strip()
@@ -10678,11 +10689,15 @@ def render_dashboard(
                             source_aggregate_label,
                         )
                     ).strip()
-                    if (
+                    if bool(area_spec.get("force_navigation_root", False))
+                    or (
                         is_complete_page_root
-                        or bool(area_spec.get("force_navigation_root", False))
-                    ) and not is_product_overview_aggregate
+                        and not is_product_overview_aggregate
+                    )
                     else ""
+                ),
+                "navigation_force_top_level": bool(
+                    area_spec.get("force_navigation_root", False)
                 ),
                 "navigation_placeholder": bool(
                     area_spec.get("navigation_placeholder", False)
