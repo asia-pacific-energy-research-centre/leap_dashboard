@@ -408,7 +408,7 @@
       "enabled": true,
       "flow_boundary": "16.03-16.05",
       "label": "16.03-16.05 Other sector",
-      "preferred_detail_flow_boundaries": ["16.03-16.04", "16.03", "16.04", "16.05"],
+      "preferred_detail_flow_boundaries": ["16.03", "16.04", "16.05"],
       "collapse_compound_to_historical_child": {"16.03-16.04": ["16.03", "16.04"]},
       "verified_compound_child_by_economy": {"01AUS": {"16.03-16.04": {"code": "16.03", "label": "16.03 Agriculture"}}},
       "detail_coverage_residual_label": "Unallocated within 16.03-16.05 Other demand",

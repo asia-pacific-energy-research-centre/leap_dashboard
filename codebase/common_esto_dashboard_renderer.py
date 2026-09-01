@@ -10053,7 +10053,33 @@ def render_dashboard(
                 for value in supply_config.get("exclude_flow_codes", [])
                 if str(value).strip()
             }
-            if uses_combined_international_transport_placeholder(template):
+            bunker_config = supply_config.get("bunker_overview", {}) or {}
+            bunker_boundary = code_candidate_text(
+                bunker_config.get("flow_boundary", "04-05")
+            )
+            bunker_children = {
+                code_candidate_text(value)
+                for value in bunker_config.get(
+                    "preferred_detail_flow_boundaries", ["04", "05"]
+                )
+                if code_candidate_text(value)
+            }
+            leap_bunker_codes = {
+                code_candidate_text(value)
+                for value in page_df.loc[
+                    page_df["source_system"].astype(str).str.casefold().eq("leap"),
+                    "common_flow_code",
+                ]
+                if code_candidate_text(value)
+            }
+            combined_bunker_placeholder_active = (
+                bunker_boundary in leap_bunker_codes
+                and not bunker_children.intersection(leap_bunker_codes)
+            )
+            if (
+                uses_combined_international_transport_placeholder(template)
+                or combined_bunker_placeholder_active
+            ):
                 # The placeholder has one value at the 04-05 boundary. Keep that
                 # comparable parent and suppress its 04/05 children until LEAP
                 # supplies the separate Air and Shipping source branches.
