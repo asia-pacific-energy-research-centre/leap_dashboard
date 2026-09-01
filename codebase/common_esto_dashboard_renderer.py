@@ -5366,6 +5366,8 @@ def resolved_area_chart_rows(
     comparison must show the same published source rows as its parent area,
     rather than independently selecting or allocating sector detail.
     """
+    if bool(area_spec.get("rows_are_resolved_area_frontier", False)):
+        return df.copy()
     chart_df = area_spec_rows(df, area_spec)
     if area_spec.get("use_demand_coverage_frontier"):
         return _coverage_selected_demand_frontier(
@@ -10891,6 +10893,12 @@ def render_dashboard(
                             area_spec.get("immediate_child_flow_labels", {}) or {}
                         ),
                     )
+                    # The reconciliation helper has already resolved overlap
+                    # separately inside each immediate child.  Reapplying the
+                    # generic whole-boundary frontier here (and again inside
+                    # build_area_chart) would let a compound interim child
+                    # suppress its process siblings a second time.
+                    display_area_spec["rows_are_resolved_area_frontier"] = True
                 else:
                     chart_page_df = immediate_child_flow_rows(
                         area_spec_rows(page_df, display_area_spec),

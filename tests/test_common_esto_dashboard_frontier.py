@@ -2568,6 +2568,14 @@ def test_power_by_flow_keeps_siblings_of_compound_interim_child() -> None:
         "Others CHP (all producers)",
     }
     assert flow_rows["value"].sum() == 100.0
+    rerendered = renderer.resolved_area_chart_rows(
+        flow_rows,
+        {**spec, "rows_are_resolved_area_frontier": True},
+        group_col="_child_flow_label",
+    )
+    assert set(rerendered["_child_flow_label"]) == set(
+        flow_rows["_child_flow_label"]
+    )
 
 
 def test_power_by_flow_reconciles_uncoded_all_producer_processes() -> None:
