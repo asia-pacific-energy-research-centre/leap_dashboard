@@ -1766,9 +1766,71 @@ def resolved_immediate_child_flow_rows(
         parent_prefix,
         flow_boundary=str(area_spec.get("aggregate_flow_prefix", "")),
     )
+    process_rows = uncoded_power_process_child_rows(
+        page_df,
+        boundary_rows,
+        parent_prefix,
+    )
+    if not process_rows.empty:
+        child_rows = pd.concat(
+            [child_rows, process_rows],
+            ignore_index=True,
+            sort=False,
+        )
     if child_rows.empty:
         return child_rows
     return resolved_immediate_child_frontier(child_rows, area_spec)
+
+
+def uncoded_power_process_child_rows(
+    page_df: pd.DataFrame,
+    boundary_rows: pd.DataFrame,
+    parent_prefix: str,
+) -> pd.DataFrame:
+    """Attach uncoded all-producer processes to one Power plant family.
+
+    Some comparison scopes retain process rows with labels such as
+    ``Gas CHP (all producers)`` but a non-hierarchical flow code such as
+    ``Gas``.  The label contract still identifies the plant family exactly.
+    Use it only for level-three Electricity/CHP/Heat parents, and only for
+    rows outside the already coded boundary, so the adapter cannot duplicate
+    ordinary Common ESTO hierarchy rows or leak process detail into the
+    top-level Power aggregate.
+    """
+    if (
+        page_df.empty
+        or "common_flow_label" not in page_df.columns
+        or code_depth(parent_prefix) != 3
+    ):
+        return page_df.iloc[0:0].copy()
+
+    family_code = parent_prefix.split(".")[-1]
+    labels = page_df["common_flow_label"].astype(str).str.strip()
+    all_producers = labels.str.endswith(" (all producers)")
+    chp = labels.str.endswith(" CHP (all producers)")
+    heat = labels.str.endswith(" HP (all producers)")
+    if family_code == "01":
+        family_mask = all_producers & ~chp & ~heat
+    elif family_code == "02":
+        family_mask = chp
+    elif family_code == "03":
+        family_mask = heat
+    else:
+        return page_df.iloc[0:0].copy()
+
+    outside_boundary = ~page_df.index.isin(boundary_rows.index)
+    out = page_df.loc[family_mask & outside_boundary].copy()
+    if out.empty:
+        return out
+    process_labels = sorted(out["common_flow_label"].astype(str).unique())
+    synthetic_codes = {
+        label: f"{parent_prefix}.{900 + index}"
+        for index, label in enumerate(process_labels, start=1)
+    }
+    out["_child_flow_code"] = out["common_flow_label"].map(synthetic_codes)
+    out["_child_flow_label"] = out["common_flow_label"].astype(str)
+    out["common_flow_code"] = out["_child_flow_code"]
+    return out
 
 
 def resolved_immediate_child_frontier(
@@ -1832,6 +1894,17 @@ def reconciled_immediate_child_flow_rows(
         child_label_overrides,
         flow_boundary=str(area_spec.get("aggregate_flow_prefix", "")),
     )
+    process_rows = uncoded_power_process_child_rows(
+        page_df,
+        area_spec_rows(page_df, area_spec),
+        parent_prefix,
+    )
+    if not process_rows.empty:
+        detail = pd.concat(
+            [detail, process_rows],
+            ignore_index=True,
+            sort=False,
+        )
     detail = resolved_immediate_child_frontier(detail, area_spec)
     if authoritative.empty or "value" not in authoritative.columns:
         return detail

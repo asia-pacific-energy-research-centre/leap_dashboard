@@ -2570,6 +2570,56 @@ def test_power_by_flow_keeps_siblings_of_compound_interim_child() -> None:
     assert flow_rows["value"].sum() == 100.0
 
 
+def test_power_by_flow_reconciles_uncoded_all_producer_processes() -> None:
+    """Wide scopes can retain process labels without hierarchy flow codes."""
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030,
+                "09.01.02,09.02.02", "17", 100.0,
+            ),
+            "common_flow_label": "09.01.02,09.02.02 CHP plants",
+            "common_product_label": "17 Electricity",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030, "Gas", "17", 60.0,
+            ),
+            "common_flow_label": "Gas CHP (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030, "Others", "17", 40.0,
+            ),
+            "common_flow_label": "Others CHP (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+    spec = {
+        "aggregate_flow_prefix": "09.01.02,09.02.02",
+        "aggregate_flow_label": "09.01.02,09.02.02 CHP plants",
+        "explicit_flow_boundary": True,
+    }
+
+    flow_rows = renderer.reconciled_immediate_child_flow_rows(
+        rows,
+        renderer.get_existing_flow_nodes(rows),
+        "09.01.02",
+        spec,
+    )
+
+    assert set(flow_rows["_child_flow_label"]) == {
+        "Gas CHP (all producers)",
+        "Others CHP (all producers)",
+    }
+    assert flow_rows.groupby("_child_flow_label")["value"].sum().to_dict() == {
+        "Gas CHP (all producers)": 60.0,
+        "Others CHP (all producers)": 40.0,
+    }
+
+
 def test_power_own_use_navigation_stays_below_primary_owners() -> None:
     tree = renderer.line_section_tree(
         [{
