@@ -187,6 +187,9 @@
         "Electricity, CHP and heat plants",
         "Power sector"
       ],
+      "navigation_depth_overrides": {
+        "10.01.01 Electricity, CHP and heat plants": 2
+      },
       "rule_note": "Electricity and heat output, plus directly related power-sector own-use rows. The specific 09.01/09.02 roots take ownership ahead of the broader Other transformation root 09."
     },
     {

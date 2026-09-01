@@ -7597,6 +7597,7 @@ def _overview_navigation_anchor(page_label: str, flow_label: str) -> str:
 def line_section_tree(
     line_rows: list[dict],
     navigation_roots: list[dict[str, object]] | None = None,
+    navigation_depth_overrides: dict[str, int] | None = None,
 ) -> list[tuple[str, list[dict[str, object]]]]:
     """Return visible flow-tree nodes grouped by renderer section.
 
@@ -7684,6 +7685,11 @@ avigation_roots``. A page-defined overview aggregate can also parent a
         existing_groups.add(root_label)
         root_targets[root_label] = str(root.get("target") or "").strip()
 
+    depth_overrides = {
+        str(label).strip(): int(depth)
+        for label, depth in (navigation_depth_overrides or {}).items()
+        if str(label).strip() and int(depth) > 0
+    }
     hierarchy_tree: list[tuple[str, list[dict[str, object]]]] = []
     for section_label, groups in tree:
         coded_groups = [(group, code_candidate_text(group)) for group in groups]
@@ -7728,6 +7734,9 @@ avigation_roots``. A page-defined overview aggregate can also parent a
 
         def visible_depth(group: str, visiting: set[str] | None = None) -> int:
             if group in depth_by_group:
+                return depth_by_group[group]
+            if group in depth_overrides:
+                depth_by_group[group] = depth_overrides[group]
                 return depth_by_group[group]
             if group in forced_top_level_roots:
                 depth_by_group[group] = 1
@@ -8231,7 +8240,11 @@ def write_dashboard_page(
         for row in area_rows
         if str(row.get("navigation_root_label") or "").strip()
     ]
-    section_tree = line_section_tree(line_rows, navigation_roots)
+    section_tree = line_section_tree(
+        line_rows,
+        navigation_roots,
+        page_config.get("navigation_depth_overrides", {}),
+    )
 
     page_datasets: list[str] = [
         str(token).strip().upper()

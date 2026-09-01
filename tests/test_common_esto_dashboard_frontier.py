@@ -2443,6 +2443,22 @@ def test_power_plant_overview_can_promote_itself_to_navigation_root() -> None:
     ) in html
 
 
+def test_power_own_use_navigation_stays_below_primary_owners() -> None:
+    tree = renderer.line_section_tree(
+        [{
+            "section_label": "Power-sector own use and storage",
+            "flow_group_label": "10.01.01 Electricity, CHP and heat plants",
+        }],
+        navigation_depth_overrides={
+            "10.01.01 Electricity, CHP and heat plants": 2,
+        },
+    )
+
+    node = tree[0][1][0]
+    assert node["label"] == "10.01.01 Electricity, CHP and heat plants"
+    assert node["depth"] == 2
+
+
 def test_power_plant_overview_keeps_product_card_when_only_one_child_is_nonzero() -> None:
     template = {
         "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
