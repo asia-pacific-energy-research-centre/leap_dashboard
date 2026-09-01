@@ -2675,7 +2675,9 @@ def add_supply_bunker_overview_specs(
         for value in leap_rows.get("common_flow_code", pd.Series(dtype=str))
         if code_candidate_text(value)
     }
-    detailed_bunker_rows_active = bool(detail_codes.intersection(leap_flow_codes))
+    detailed_bunker_rows_active = bool(detail_codes) and detail_codes.issubset(
+        leap_flow_codes
+    )
     combined_placeholder_active = (
         boundary_code in leap_flow_codes
         and not detailed_bunker_rows_active
@@ -2741,7 +2743,10 @@ def add_supply_bunker_overview_specs(
         **combined_product,
         "force_navigation_root": True,
         "navigation_placeholder": True,
-        "navigation_root_label_override": label.replace(" (bunkers)", ""),
+        # Keep the overview owner and its per-product line section on one
+        # navigation node.  A shortened label makes the same 04-05 boundary
+        # look like two separate top-level sections.
+        "navigation_root_label_override": label,
     }
     return [*non_boundary_specs, combined_product]
 
