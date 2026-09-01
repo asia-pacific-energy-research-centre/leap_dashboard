@@ -2270,6 +2270,37 @@ def add_active_placeholder_area_specs(
     return specs
 
 
+def add_transport_overview_specs(
+    page_key: str,
+    area_specs: list[dict[str, object]],
+    template: dict,
+) -> list[dict[str, object]]:
+    """Attach the configured Transport frontier policy to its flow view."""
+    config = template.get("transport_page", {}) or {}
+    if page_key != str(config.get("page_key", "transport")).strip():
+        return list(area_specs)
+    flow_config = config.get("by_flow_overview", {}) or {}
+    boundary = code_candidate_text(flow_config.get("flow_boundary", ""))
+    collapse_policy = dict(
+        flow_config.get("collapse_compound_to_child", {}) or {}
+    )
+    if not boundary or not collapse_policy:
+        return list(area_specs)
+
+    specs = list(area_specs)
+    for spec in specs:
+        if (
+            code_candidate_text(spec.get("aggregate_flow_prefix", "")) == boundary
+            and str(spec.get("overview_variant", "")).strip() == "by_flow"
+        ):
+            spec["collapse_compound_to_historical_child"] = collapse_policy
+            spec["use_demand_coverage_frontier"] = True
+            spec["prefer_transport_detail_frontier"] = bool(
+                flow_config.get("prefer_detail_frontier", False)
+            )
+    return specs
+
+
 def add_other_demand_flow_overview_spec(
     page_key: str,
     page_df: pd.DataFrame,
@@ -2738,6 +2769,7 @@ def prepare_area_specs_for_page(
         )
     ]
     specs = replace_active_placeholder_area_specs(page_key, specs, template)
+    specs = add_transport_overview_specs(page_key, specs, template)
     specs = add_other_demand_flow_overview_spec(page_key, page_df, specs, template)
     specs = add_buildings_overview_specs(page_key, page_df, specs, template)
     specs = add_active_placeholder_area_specs(page_key, page_df, specs, template)
@@ -3460,7 +3492,11 @@ def _non_overlapping_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
     result["common_flow_label"] = result["common_flow_label"].map(replacements).fillna(result["common_flow_label"])
     return result.drop(columns=["_flow_code", "_flow_name", "_is_boundary_adjusted"])
 
-def _coverage_selected_demand_frontier(df: pd.DataFrame) -> pd.DataFrame:
+def _coverage_selected_demand_frontier(
+    df: pd.DataFrame,
+    *,
+    prefer_transport_detail: bool = False,
+) -> pd.DataFrame:
     """Return the additive demand frontier used by both areas and totals.
 
     Mixed LEAP exports can contain a generated flow-15 row that is actually a
@@ -3515,14 +3551,15 @@ def _coverage_selected_demand_frontier(df: pd.DataFrame) -> pd.DataFrame:
                 )
             ].copy()
 
-    # A detailed non-road export can retain its generated compound rollup
-    # alongside the five published children. Resolve that relationship over
-    # the complete source/year surface rather than product by product: the
-    # rollup and its children can use different Common product groupings even
-    # though their totals reconcile. Once the child frontier adds back to the
-    # compound total, discard the rollup so the Transport overview labels the
-    # same 15.01/15.03/... components as the dedicated non-road chart. If the
-    # children are incomplete, keep the compound boundary as the fallback.
+    # A detailed non-road export can retain its generated compound fallback
+    # alongside the five published children. The fallback is not necessarily
+    # additive: some mapped exports populate it with only Domestic air while
+    # still labelling it as the whole non-road range. Availability therefore
+    # decides the frontier. When at least two explicit children are populated
+    # anywhere on the source/scenario surface, discard the compound for the
+    # source/scenario/year surface, discard the compound for that year;
+    # otherwise keep the compound and discard partial detail. Resolving each
+    # year independently preserves an interim placeholder until detail arrives.
     nonroad_boundary = "15.01,15.03-15.06"
     nonroad_prefixes = ("15.01", "15.03", "15.04", "15.05", "15.06")
     compound_mask = work["common_flow_code"].astype(str).map(
@@ -3534,56 +3571,47 @@ def _coverage_selected_demand_frontier(df: pd.DataFrame) -> pd.DataFrame:
             for prefix in nonroad_prefixes
         )
     ) & ~compound_mask
-    nonroad_context = [
+    nonroad_surface = [
         column for column in
         ("comparison_scope", "economy", "source_system", "scenario", "year")
         if column in work.columns
     ]
-    reconciled_compound_rows: set[int] = set()
+    detailed_compound_rows: set[int] = set()
     fallback_child_rows: set[int] = set()
-    if compound_mask.any() and child_mask.any() and nonroad_context:
-        candidate_contexts = work.loc[
-            compound_mask, nonroad_context
+    if compound_mask.any() and child_mask.any() and nonroad_surface:
+        candidate_surfaces = work.loc[
+            compound_mask, nonroad_surface
         ].drop_duplicates()
-        for context_values in candidate_contexts.itertuples(index=False, name=None):
-            context_mask = pd.Series(True, index=work.index)
-            for column, value in zip(nonroad_context, context_values):
-                context_mask &= work[column].eq(value)
-            compound_rows = work.loc[context_mask & compound_mask]
-            child_rows = work.loc[context_mask & child_mask]
+        for surface_values in candidate_surfaces.itertuples(index=False, name=None):
+            surface_mask = pd.Series(True, index=work.index)
+            for column, value in zip(nonroad_surface, surface_values):
+                surface_mask &= work[column].eq(value)
+            compound_rows = work.loc[surface_mask & compound_mask]
+            child_rows = work.loc[surface_mask & child_mask]
             if compound_rows.empty or child_rows.empty:
                 continue
-            child_frontier = _non_overlapping_flow_rows(
-                _non_overlapping_common_row_frontier(child_rows)
-            )
-            child_codes = child_frontier["common_flow_code"].astype(str).map(
-                canonical_code
-            )
             nonzero_children = sum(
-                _has_nonzero_values(rows["value"])
-                for _code, rows in child_frontier.groupby(child_codes, sort=False)
+                _has_nonzero_values(
+                    child_rows.loc[
+                        child_rows["common_flow_code"].astype(str).map(
+                            lambda code: code_matches_prefix(
+                                canonical_code(code), prefix
+                            )
+                        ),
+                        "value",
+                    ]
+                )
+                for prefix in nonroad_prefixes
             )
             if nonzero_children < 2:
                 fallback_child_rows.update(
                     child_rows["_demand_frontier_row"].astype(int)
                 )
                 continue
-            compound_total = pd.to_numeric(
-                compound_rows["value"], errors="coerce"
-            ).sum()
-            child_total = pd.to_numeric(
-                child_frontier["value"], errors="coerce"
-            ).sum()
-            tolerance = 1e-8 + abs(compound_total) * 1e-8
-            if abs(compound_total - child_total) <= tolerance:
-                reconciled_compound_rows.update(
-                    compound_rows["_demand_frontier_row"].astype(int)
-                )
-            else:
-                fallback_child_rows.update(
-                    child_rows["_demand_frontier_row"].astype(int)
-                )
-        rows_to_drop = reconciled_compound_rows | fallback_child_rows
+            detailed_compound_rows.update(
+                compound_rows["_demand_frontier_row"].astype(int)
+            )
+        rows_to_drop = detailed_compound_rows | fallback_child_rows
         if rows_to_drop:
             work = work.loc[
                 ~work["_demand_frontier_row"].isin(rows_to_drop)
@@ -3621,6 +3649,36 @@ def _coverage_selected_demand_frontier(df: pd.DataFrame) -> pd.DataFrame:
     locked_row_numbers: set[int] = set()
     resolved_row_numbers: set[int] = set()
     transport_rows = work.loc[transport].copy()
+    transport_surface_columns = [
+        column for column in group_columns if column != "common_product_code"
+    ]
+    detailed_transport_surfaces: set[tuple[object, ...]] = set()
+    if prefer_transport_detail and transport_surface_columns:
+        detail_candidates = transport_rows.loc[
+            explicit_nonroad.loc[transport_rows.index]
+            & ~nonroad.loc[transport_rows.index]
+        ]
+        for surface_key, surface_rows in detail_candidates.groupby(
+            transport_surface_columns,
+            dropna=False,
+            sort=False,
+        ):
+            key = surface_key if isinstance(surface_key, tuple) else (surface_key,)
+            populated_children = sum(
+                _has_nonzero_values(
+                    surface_rows.loc[
+                        surface_rows["common_flow_code"].astype(str).map(
+                            lambda code: code_matches_prefix(
+                                canonical_code(code), prefix
+                            )
+                        ),
+                        "value",
+                    ]
+                )
+                for prefix in ("15.01", "15.03", "15.04", "15.05", "15.06")
+            )
+            if populated_children >= 2:
+                detailed_transport_surfaces.add(key)
     if not transport_rows.empty and group_columns:
         for _, group in transport_rows.groupby(group_columns, dropna=False, sort=False):
             group_codes = group["common_flow_code"].astype(str).map(canonical_code)
@@ -3633,12 +3691,18 @@ def _coverage_selected_demand_frontier(df: pd.DataFrame) -> pd.DataFrame:
                     for prefix in ("15.01", "15.03", "15.04", "15.05", "15.06")
                 )
             )
-            selected = group.loc[group_codes.eq("15")]
+            explicit_rows = group.loc[
+                group_explicit_nonroad & ~group_nonroad
+            ].copy()
+            surface_key = tuple(
+                group.iloc[0][column]
+                for column in transport_surface_columns
+            )
+            selected = group.iloc[0:0].copy()
+            if surface_key not in detailed_transport_surfaces:
+                selected = group.loc[group_codes.eq("15")]
             if selected.empty:
                 road_selected = group.loc[group_codes.eq("15.02")]
-                explicit_rows = group.loc[
-                    group_explicit_nonroad & ~group_nonroad
-                ].copy()
                 if not explicit_rows.empty:
                     nonroad_selected = _non_overlapping_flow_rows(
                         _non_overlapping_common_row_frontier(explicit_rows)
@@ -4347,6 +4411,11 @@ def build_area_chart(
         comparison_source=comparison_source,
         base_year=base_year,
     )
+    chart_df = synchronize_compound_grouping_labels(
+        chart_df,
+        area_spec,
+        group_col,
+    )
 
     authoritative_boundary = str(
         area_spec.get("authoritative_total_flow_boundary", "")
@@ -4742,6 +4811,24 @@ def collapse_compound_projection_to_historical_child(
         if economy_key
         else {}
     )
+
+    def preferred_child_label(
+        child_rows: pd.DataFrame,
+        child_code: str,
+        compound_code: str,
+    ) -> str:
+        labels = child_rows["common_flow_label"].dropna().astype(str).str.strip()
+        canonical_labels = labels[
+            labels.str.startswith(child_code)
+            & ~labels.str.startswith(compound_code)
+        ]
+        if not canonical_labels.empty:
+            return str(canonical_labels.iloc[0])
+        noncompound_labels = labels[~labels.str.startswith(compound_code)]
+        if not noncompound_labels.empty:
+            return str(noncompound_labels.iloc[0])
+        return str(labels.iloc[0]) if not labels.empty else child_code
+
     for compound_code, raw_children in configured.items():
         compound = code_candidate_text(compound_code)
         children = [
@@ -4751,6 +4838,93 @@ def collapse_compound_projection_to_historical_child(
         ] if isinstance(raw_children, list) else []
         if not compound or not children:
             continue
+        # Some mapped rows already carry the correct child code while retaining
+        # the generated compound label.  This is not an allocation decision:
+        # the code itself identifies the child, so restore that child's
+        # published label before testing any value-based alias.
+        output_codes = out["common_flow_code"].astype(str).map(
+            code_candidate_text
+        )
+        output_labels = out["common_flow_label"].astype(str).str.strip()
+        for child in children:
+            mislabeled_child = output_codes.eq(child) & output_labels.str.startswith(
+                compound
+            )
+            if not mislabeled_child.any():
+                continue
+            child_labels = (
+                source_df.loc[
+                    source_df["common_flow_code"].astype(str).map(
+                        code_candidate_text
+                    ).eq(child)
+                    & ~source_df["common_flow_label"].astype(str).str.strip().str.startswith(
+                        compound
+                    ),
+                    "common_flow_label",
+                ]
+                .dropna()
+                .astype(str)
+                .str.strip()
+            )
+            if child_labels.empty:
+                continue
+            child_label = child_labels.iloc[0]
+            out.loc[mislabeled_child, "common_flow_label"] = child_label
+
+        # A generated parent code can also carry the sole missing child while
+        # the other configured children are published explicitly. Resolve
+        # that identity by elimination only within one source/scenario/year;
+        # genuine combined placeholders (where several children are absent)
+        # remain combined.
+        surface_columns = [
+            column for column in (
+                "comparison_scope", "economy", "source_system", "scenario", "year"
+            )
+            if column in out.columns
+        ]
+        if surface_columns:
+            for _, surface_rows in out.groupby(
+                surface_columns,
+                dropna=False,
+                sort=False,
+            ):
+                surface_codes = surface_rows["common_flow_code"].astype(str).map(
+                    code_candidate_text
+                )
+                surface_labels = surface_rows["common_flow_label"].astype(str).str.strip()
+                compound_surface_mask = surface_codes.eq(compound) | surface_labels.str.startswith(
+                    compound
+                )
+                if not compound_surface_mask.any():
+                    continue
+                present_children = {
+                    child for child in children if surface_codes.eq(child).any()
+                }
+                missing_children = [
+                    child for child in children if child not in present_children
+                ]
+                if len(missing_children) != 1:
+                    continue
+                missing_child = missing_children[0]
+                child_labels = (
+                    source_df.loc[
+                        source_df["common_flow_code"].astype(str).map(
+                            code_candidate_text
+                        ).eq(missing_child)
+                        & ~source_df["common_flow_label"].astype(str).str.strip().str.startswith(
+                            compound
+                        ),
+                        "common_flow_label",
+                    ]
+                    .dropna()
+                    .astype(str)
+                    .str.strip()
+                )
+                if child_labels.empty:
+                    continue
+                row_indexes = surface_rows.index[compound_surface_mask]
+                out.loc[row_indexes, "common_flow_code"] = missing_child
+                out.loc[row_indexes, "common_flow_label"] = child_labels.iloc[0]
         verified_child = verified_aliases.get(compound, {}) if isinstance(
             verified_aliases, dict
         ) else {}
@@ -4775,6 +4949,67 @@ def collapse_compound_projection_to_historical_child(
                 out.loc[projection_mask, "common_flow_code"] = verified_code
                 out.loc[projection_mask, "common_flow_label"] = verified_label
                 continue
+        compound_out_mask = out["common_flow_code"].astype(str).map(
+            code_candidate_text
+        ).eq(compound)
+        compound_out_mask |= (
+            out["common_flow_label"].astype(str).str.strip().str.startswith(compound)
+        )
+        compound_labels = set(
+            out.loc[compound_out_mask, "common_flow_label"]
+            .dropna().astype(str).str.strip()
+        )
+        if compound_labels:
+            compound_out_mask |= out["common_flow_label"].astype(str).str.strip().isin(
+                compound_labels
+            )
+        compound_out = out.loc[compound_out_mask].copy()
+        comparison_keys = [
+            column for column in (
+                "comparison_scope", "economy", "source_system", "scenario",
+                "year", "common_product_code",
+            )
+            if column in out.columns and column in source_df.columns
+        ]
+        matching_rendered_children: list[tuple[str, str]] = []
+        if not compound_out.empty and comparison_keys:
+            compound_values = (
+                compound_out.groupby(comparison_keys, dropna=False, as_index=False)["value"]
+                .sum().rename(columns={"value": "compound_value"})
+            )
+            for child in children:
+                child_rows = source_df[
+                    source_df["common_flow_code"].astype(str).map(
+                        code_candidate_text
+                    ).eq(child)
+                ].copy()
+                if child_rows.empty:
+                    continue
+                child_values = (
+                    child_rows.groupby(comparison_keys, dropna=False, as_index=False)["value"]
+                    .sum().rename(columns={"value": "child_value"})
+                )
+                comparison = compound_values.merge(
+                    child_values, on=comparison_keys, how="outer", indicator=True
+                )
+                if comparison.empty or not comparison["_merge"].eq("both").all():
+                    continue
+                scale = comparison[["compound_value", "child_value"]].abs().max(axis=1)
+                if (
+                    (comparison["compound_value"] - comparison["child_value"]).abs()
+                    <= (1e-8 + scale * 1e-8)
+                ).all():
+                    child_label = preferred_child_label(
+                        child_rows,
+                        child,
+                        compound,
+                    )
+                    matching_rendered_children.append((child, child_label))
+        if len(matching_rendered_children) == 1:
+            child_code, child_label = matching_rendered_children[0]
+            out.loc[compound_out_mask, "common_flow_code"] = child_code
+            out.loc[compound_out_mask, "common_flow_label"] = child_label
+            continue
         compound_rows = history[history["_flow_code"].eq(compound)]
         if compound_rows.empty:
             continue
@@ -4797,7 +5032,11 @@ def collapse_compound_projection_to_historical_child(
                 products, fill_value=0.0
             ).abs() * 1e-8
             if difference.abs().le(tolerance).all():
-                child_label = str(child_rows["common_flow_label"].dropna().iloc[0])
+                child_label = preferred_child_label(
+                    child_rows,
+                    child,
+                    compound,
+                )
                 matching_children.append((child, child_label))
 
         if len(matching_children) != 1:
@@ -4819,6 +5058,38 @@ def collapse_compound_projection_to_historical_child(
     return out
 
 
+def synchronize_compound_grouping_labels(
+    chart_df: pd.DataFrame,
+    area_spec: dict[str, object],
+    group_col: str,
+) -> pd.DataFrame:
+    """Carry a corrected flow label into an immediate-child grouping label."""
+    if (
+        chart_df.empty
+        or group_col == "common_flow_label"
+        or group_col not in chart_df.columns
+        or "common_flow_label" not in chart_df.columns
+    ):
+        return chart_df
+    configured = area_spec.get("collapse_compound_to_historical_child", {}) or {}
+    if not isinstance(configured, dict):
+        return chart_df
+
+    out = chart_df.copy()
+    grouping_labels = out[group_col].astype(str).str.strip()
+    flow_labels = out["common_flow_label"].astype(str).str.strip()
+    for compound_code in configured:
+        compound = code_candidate_text(compound_code)
+        if not compound:
+            continue
+        corrected = grouping_labels.str.startswith(compound) & ~flow_labels.str.startswith(
+            compound
+        )
+        out.loc[corrected, group_col] = out.loc[corrected, "common_flow_label"]
+        grouping_labels = out[group_col].astype(str).str.strip()
+    return out
+
+
 def resolved_area_chart_rows(
     df: pd.DataFrame,
     area_spec: dict[str, object],
@@ -4833,7 +5104,12 @@ def resolved_area_chart_rows(
     """
     chart_df = area_spec_rows(df, area_spec)
     if area_spec.get("use_demand_coverage_frontier"):
-        return _coverage_selected_demand_frontier(chart_df)
+        return _coverage_selected_demand_frontier(
+            chart_df,
+            prefer_transport_detail=bool(
+                area_spec.get("prefer_transport_detail_frontier")
+            ),
+        )
     preferred_detail_boundaries = [
         str(value).strip()
         for value in area_spec.get("preferred_detail_flow_boundaries", [])
@@ -10329,8 +10605,6 @@ def render_dashboard(
                     area_spec_rows(page_df, display_area_spec),
                     configured_flow_groups,
                 )
-            if page_key == "transport" and source_root_code == "15":
-                display_area_spec["use_demand_coverage_frontier"] = True
             chart_key = f"chart__area__{safe_slug(area_spec['aggregate_flow_prefix'])}__{safe_slug(source_aggregate_label)}"
             if overview_variant != "by_product":
                 chart_key = f"{chart_key}__{safe_slug(overview_variant)}"

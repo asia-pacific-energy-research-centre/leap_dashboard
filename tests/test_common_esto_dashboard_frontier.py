@@ -1251,6 +1251,207 @@ def test_other_demand_chart_keeps_compound_when_child_does_not_reconcile() -> No
     assert projected["common_flow_code"].tolist() == ["16.03-16.04"]
 
 
+def test_compound_chart_label_uses_child_when_rendered_series_matches_child() -> None:
+    """An allocated residual uses the child label it exactly reproduces."""
+    source_rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "15.01", "17", 20.0
+            ),
+            "common_flow_label": "15.01 Domestic air transport",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2023, "15.01", "17", 21.0
+            ),
+            "common_flow_label": "15.01 Domestic air transport",
+        },
+    ])
+    chart_rows = source_rows.copy()
+    chart_rows["common_flow_label"] = (
+        "15.01,15.03-15.06 Transport non-road"
+    )
+
+    resolved = renderer.collapse_compound_projection_to_historical_child(
+        chart_rows,
+        source_rows,
+        {
+            "collapse_compound_to_historical_child": {
+                "15.01,15.03-15.06": [
+                    "15.01", "15.03", "15.04", "15.05", "15.06"
+                ],
+            },
+        },
+        comparison_source="ESTO_EXTENDED",
+        base_year=2022,
+    )
+
+    assert set(resolved["common_flow_code"]) == {"15.01"}
+    assert set(resolved["common_flow_label"]) == {
+        "15.01 Domestic air transport"
+    }
+
+
+def test_compound_chart_label_fills_sole_missing_child_per_source_year() -> None:
+    chart_rows = pd.DataFrame([
+        {
+            **_area_product_row("LEAP", "Target", 2023, "15", "07.05", 10.0),
+            "common_flow_label": "15.01,15.03-15.06 Transport non-road",
+        },
+        *[
+            {
+                **_area_product_row("LEAP", "Target", 2023, code, product, value),
+                "common_flow_label": label,
+            }
+            for code, label, product, value in (
+                ("15.03", "15.03 Rail", "17", 8.0),
+                ("15.04", "15.04 Domestic navigation", "07.08", 6.0),
+                ("15.05", "15.05 Pipeline transport", "08.01", 4.0),
+                ("15.06", "15.06 Non-specified transport", "07.07", 2.0),
+            )
+        ],
+    ])
+    source_rows = pd.concat([
+        chart_rows,
+        pd.DataFrame([{
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "15.01", "07.05", 9.0
+            ),
+            "common_flow_label": "15.01 Domestic air transport",
+        }]),
+    ], ignore_index=True)
+
+    resolved = renderer.collapse_compound_projection_to_historical_child(
+        chart_rows,
+        source_rows,
+        {
+            "collapse_compound_to_historical_child": {
+                "15.01,15.03-15.06": [
+                    "15.01", "15.03", "15.04", "15.05", "15.06"
+                ],
+            },
+        },
+        comparison_source="ESTO_EXTENDED",
+        base_year=2022,
+    )
+
+    assert "15.01,15.03-15.06 Transport non-road" not in set(
+        resolved["common_flow_label"]
+    )
+    assert "15.01 Domestic air transport" in set(resolved["common_flow_label"])
+
+
+def test_compound_alias_prefers_canonical_child_label_over_stale_duplicate() -> None:
+    canonical = "15.01 Domestic air transport"
+    stale = "15.01,15.03-15.06 Transport non-road"
+    chart_rows = pd.DataFrame([
+        {
+            **_area_product_row("ESTO_EXTENDED", "historical", 2022, "15.01", "07.05", 6.0),
+            "common_flow_label": canonical,
+        },
+        {
+            **_area_product_row("ESTO_EXTENDED", "historical", 2022, "15.01", "17", 4.0),
+            "common_flow_label": canonical,
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2023, "15.01", "07.05", 7.0),
+            "common_flow_label": canonical,
+        },
+    ])
+    source_rows = pd.concat([
+        chart_rows,
+        pd.DataFrame([
+            {
+                **_area_product_row("ESTO_EXTENDED", "historical", 2022, "15.01-15.06", "07.05", 6.0),
+                "common_flow_code": "15.01,15.03-15.06",
+                "common_flow_label": stale,
+            },
+            {
+                **_area_product_row("ESTO_EXTENDED", "historical", 2022, "15.01-15.06", "17", 4.0),
+                "common_flow_code": "15.01,15.03-15.06",
+                "common_flow_label": stale,
+            },
+        ]),
+    ], ignore_index=True)
+    # Reproduce a source where the first label seen on the child code is stale,
+    # while another product row retains the canonical published child label.
+    source_rows.loc[0, "common_flow_label"] = stale
+
+    resolved = renderer.collapse_compound_projection_to_historical_child(
+        chart_rows,
+        source_rows,
+        {
+            "collapse_compound_to_historical_child": {
+                "15.01,15.03-15.06": [
+                    "15.01", "15.03", "15.04", "15.05", "15.06"
+                ],
+            },
+        },
+        comparison_source="ESTO_EXTENDED",
+        base_year=2022,
+    )
+
+    assert set(resolved["common_flow_label"]) == {canonical}
+
+
+def test_corrected_compound_label_updates_immediate_child_grouping() -> None:
+    rows = pd.DataFrame([{
+        "common_flow_code": "15.01",
+        "common_flow_label": "15.01 Domestic air transport",
+        "_child_flow_label": "15.01,15.03-15.06 Transport non-road",
+        "value": 10.0,
+    }])
+
+    resolved = renderer.synchronize_compound_grouping_labels(
+        rows,
+        {
+            "collapse_compound_to_historical_child": {
+                "15.01,15.03-15.06": [
+                    "15.01", "15.03", "15.04", "15.05", "15.06"
+                ],
+            },
+        },
+        "_child_flow_label",
+    )
+
+    assert resolved["_child_flow_label"].tolist() == [
+        "15.01 Domestic air transport"
+    ]
+
+
+def test_transport_root_flow_overview_enables_nonroad_child_label_collapse() -> None:
+    specs = renderer.prepare_area_specs_for_page(
+        "transport",
+        pd.DataFrame(),
+        [{
+            "aggregate_flow_prefix": "15",
+            "overview_variant": "by_flow",
+        }],
+        {
+            "transport_page": {
+                "page_key": "transport",
+                "by_flow_overview": {
+                    "flow_boundary": "15",
+                    "prefer_detail_frontier": True,
+                    "collapse_compound_to_child": {
+                        "15.01,15.03-15.06": [
+                            "15.01", "15.03", "15.04", "15.05", "15.06"
+                        ],
+                    },
+                },
+            },
+        },
+    )
+
+    assert specs[0]["collapse_compound_to_historical_child"] == {
+        "15.01,15.03-15.06": [
+            "15.01", "15.03", "15.04", "15.05", "15.06"
+        ],
+    }
+    assert specs[0]["use_demand_coverage_frontier"] is True
+    assert specs[0]["prefer_transport_detail_frontier"] is True
+
+
 def test_other_demand_chart_uses_economy_verified_child_after_page_pruning() -> None:
     """A documented economy rule survives removal of the exact child rows."""
     rows = pd.DataFrame([
@@ -2364,7 +2565,7 @@ def test_transport_frontier_uses_reconciled_nonroad_children_across_products() -
     assert selected["value"].sum() == 130.0
 
 
-def test_transport_frontier_keeps_compound_when_children_do_not_reconcile() -> None:
+def test_transport_frontier_prefers_populated_children_to_mislabeled_compound() -> None:
     rows = pd.DataFrame([
         _demand_frontier_row(
             "LEAP", "15.01,15.03-15.06", 31.0, "07.04-07.05"
@@ -2378,9 +2579,53 @@ def test_transport_frontier_keeps_compound_when_children_do_not_reconcile() -> N
 
     selected = renderer._coverage_selected_demand_frontier(rows)
 
+    assert set(selected["common_flow_code"]) == {
+        "15.01", "15.03", "15.04", "15.05", "15.06"
+    }
+    assert selected["value"].sum() == 30.0
+
+
+def test_transport_frontier_keeps_compound_for_one_partial_child() -> None:
+    rows = pd.DataFrame([
+        _demand_frontier_row("LEAP", "15.01,15.03-15.06", 31.0),
+        _demand_frontier_row("LEAP", "15.01", 10.0),
+    ])
+
+    selected = renderer._coverage_selected_demand_frontier(rows)
+
     assert selected[["common_flow_code", "value"]].to_dict("records") == [
         {"common_flow_code": "15.01,15.03-15.06", "value": 31.0}
     ]
+
+
+def test_transport_frontier_switches_from_placeholder_to_detail_by_year() -> None:
+    rows = pd.DataFrame([
+        {
+            **_demand_frontier_row(
+                "LEAP", "15.01,15.03-15.06", 30.0
+            ),
+            "year": 2023,
+        },
+        {
+            **_demand_frontier_row(
+                "LEAP", "15.01,15.03-15.06", 31.0
+            ),
+            "year": 2024,
+        },
+        {**_demand_frontier_row("LEAP", "15.01", 11.0), "year": 2024},
+        {**_demand_frontier_row("LEAP", "15.03", 20.0), "year": 2024},
+    ])
+
+    selected = renderer._coverage_selected_demand_frontier(rows)
+
+    assert selected[selected["year"].eq(2023)][
+        ["common_flow_code", "value"]
+    ].to_dict("records") == [
+        {"common_flow_code": "15.01,15.03-15.06", "value": 30.0}
+    ]
+    assert set(selected.loc[
+        selected["year"].eq(2024), "common_flow_code"
+    ]) == {"15.01", "15.03"}
 
 
 def test_true_transport_parent_remains_authoritative() -> None:
@@ -2395,6 +2640,47 @@ def test_true_transport_parent_remains_authoritative() -> None:
     assert selected[["common_flow_code", "value"]].to_dict("records") == [
         {"common_flow_code": "15", "value": 125.0}
     ]
+
+
+def test_transport_flow_overview_prefers_children_over_authoritative_parent() -> None:
+    """The flow stack decomposes Transport while its total line stays authoritative."""
+    rows = pd.DataFrame([
+        _demand_frontier_row("NINTH", "15", 130.0),
+        _demand_frontier_row("NINTH", "15.02", 100.0),
+        _demand_frontier_row("NINTH", "15.01", 10.0),
+        _demand_frontier_row("NINTH", "15.03", 8.0),
+        _demand_frontier_row("NINTH", "15.04", 6.0),
+        _demand_frontier_row("NINTH", "15.05", 4.0),
+        _demand_frontier_row("NINTH", "15.06", 2.0),
+    ])
+
+    selected = renderer._coverage_selected_demand_frontier(
+        rows,
+        prefer_transport_detail=True,
+    )
+
+    assert set(selected["common_flow_code"]) == {
+        "15.02", "15.01", "15.03", "15.04", "15.05", "15.06"
+    }
+    assert selected["value"].sum() == 130.0
+
+
+def test_transport_flow_overview_detects_detail_across_products() -> None:
+    """Child availability is a yearly source decision, not a per-fuel decision."""
+    rows = pd.DataFrame([
+        _demand_frontier_row("NINTH", "15", 10.0, "07.05"),
+        _demand_frontier_row("NINTH", "15", 8.0, "07.07"),
+        _demand_frontier_row("NINTH", "15.01", 10.0, "07.05"),
+        _demand_frontier_row("NINTH", "15.03", 8.0, "07.07"),
+    ])
+
+    selected = renderer._coverage_selected_demand_frontier(
+        rows,
+        prefer_transport_detail=True,
+    )
+
+    assert set(selected["common_flow_code"]) == {"15.01", "15.03"}
+    assert selected["value"].sum() == 18.0
 
 
 def test_domestic_tfc_total_uses_the_displayed_hybrid_frontier() -> None:

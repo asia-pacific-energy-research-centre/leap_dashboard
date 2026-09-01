@@ -5,9 +5,11 @@
 - **DASHQ-072 — source-reconciled transport frontiers and overview routing.**
   Complete 2026-09-01. Transport overview charts replace the compound
   `15.01,15.03-15.06` non-road row with `15.01`, `15.03`, `15.04`, `15.05`
-  and `15.06` only when at least two children are nonzero and their
-  source/year/product surface reconciles to the compound total; otherwise the
-  compound remains the fallback. Supply now lets observed LEAP `04`/`05`
+  and `15.06` whenever at least two children are nonzero for that
+  source/scenario/year; otherwise the compound remains the fallback. Resolving
+  this per year preserves interim placeholder years before detail begins. The
+  rule also handles exports whose compound row is a mislabeled partial child
+  rather than an additive rollup. Supply now lets observed LEAP `04`/`05`
   detail override stale placeholder metadata, while combined-only bunker data
   still renders one `04-05` placeholder card. Configured electricity-, CHP-
   and heat-plant overview aggregates are promoted to orange Power navigation
