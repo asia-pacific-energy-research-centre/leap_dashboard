@@ -2529,6 +2529,9 @@ def add_power_sector_overview_specs(
             "source_flow_labels": source_labels,
             "source_flow_labels_by_system": labels_by_source,
             "explicit_flow_boundary": True,
+            "force_navigation_root": bool(
+                aggregate.get("navigation_root", False)
+            ),
             "immediate_child_flow_labels": {
                 str(code).strip(): str(child_label).strip()
                 for code, child_label in (
@@ -2637,13 +2640,17 @@ def add_supply_bunker_overview_specs(
         for value in leap_rows.get("common_flow_code", pd.Series(dtype=str))
         if code_candidate_text(value)
     }
+    detailed_bunker_rows_active = bool(detail_codes.intersection(leap_flow_codes))
     combined_placeholder_active = (
         boundary_code in leap_flow_codes
-        and not detail_codes.intersection(leap_flow_codes)
+        and not detailed_bunker_rows_active
     )
     use_combined_placeholder = (
-        uses_combined_international_transport_placeholder(template)
-        or combined_placeholder_active
+        combined_placeholder_active
+        or (
+            leap_rows.empty
+            and uses_combined_international_transport_placeholder(template)
+        )
     )
     excluded_codes = {boundary_code}
     if use_combined_placeholder:
@@ -2695,6 +2702,12 @@ def add_supply_bunker_overview_specs(
             "explicit_flow_boundary": True,
             "skip_product_overview_ownership": True,
         }
+    combined_product = {
+        **combined_product,
+        "force_navigation_root": True,
+        "navigation_placeholder": True,
+        "navigation_root_label_override": label.replace(" (bunkers)", ""),
+    }
     return [*non_boundary_specs, combined_product]
 
 
@@ -3502,6 +3515,80 @@ def _coverage_selected_demand_frontier(df: pd.DataFrame) -> pd.DataFrame:
                 )
             ].copy()
 
+    # A detailed non-road export can retain its generated compound rollup
+    # alongside the five published children. Resolve that relationship over
+    # the complete source/year surface rather than product by product: the
+    # rollup and its children can use different Common product groupings even
+    # though their totals reconcile. Once the child frontier adds back to the
+    # compound total, discard the rollup so the Transport overview labels the
+    # same 15.01/15.03/... components as the dedicated non-road chart. If the
+    # children are incomplete, keep the compound boundary as the fallback.
+    nonroad_boundary = "15.01,15.03-15.06"
+    nonroad_prefixes = ("15.01", "15.03", "15.04", "15.05", "15.06")
+    compound_mask = work["common_flow_code"].astype(str).map(
+        lambda code: code_candidate_text(code) == nonroad_boundary
+    )
+    child_mask = work["common_flow_code"].astype(str).map(
+        lambda code: any(
+            code_matches_prefix(canonical_code(code), prefix)
+            for prefix in nonroad_prefixes
+        )
+    ) & ~compound_mask
+    nonroad_context = [
+        column for column in
+        ("comparison_scope", "economy", "source_system", "scenario", "year")
+        if column in work.columns
+    ]
+    reconciled_compound_rows: set[int] = set()
+    fallback_child_rows: set[int] = set()
+    if compound_mask.any() and child_mask.any() and nonroad_context:
+        candidate_contexts = work.loc[
+            compound_mask, nonroad_context
+        ].drop_duplicates()
+        for context_values in candidate_contexts.itertuples(index=False, name=None):
+            context_mask = pd.Series(True, index=work.index)
+            for column, value in zip(nonroad_context, context_values):
+                context_mask &= work[column].eq(value)
+            compound_rows = work.loc[context_mask & compound_mask]
+            child_rows = work.loc[context_mask & child_mask]
+            if compound_rows.empty or child_rows.empty:
+                continue
+            child_frontier = _non_overlapping_flow_rows(
+                _non_overlapping_common_row_frontier(child_rows)
+            )
+            child_codes = child_frontier["common_flow_code"].astype(str).map(
+                canonical_code
+            )
+            nonzero_children = sum(
+                _has_nonzero_values(rows["value"])
+                for _code, rows in child_frontier.groupby(child_codes, sort=False)
+            )
+            if nonzero_children < 2:
+                fallback_child_rows.update(
+                    child_rows["_demand_frontier_row"].astype(int)
+                )
+                continue
+            compound_total = pd.to_numeric(
+                compound_rows["value"], errors="coerce"
+            ).sum()
+            child_total = pd.to_numeric(
+                child_frontier["value"], errors="coerce"
+            ).sum()
+            tolerance = 1e-8 + abs(compound_total) * 1e-8
+            if abs(compound_total - child_total) <= tolerance:
+                reconciled_compound_rows.update(
+                    compound_rows["_demand_frontier_row"].astype(int)
+                )
+            else:
+                fallback_child_rows.update(
+                    child_rows["_demand_frontier_row"].astype(int)
+                )
+        rows_to_drop = reconciled_compound_rows | fallback_child_rows
+        if rows_to_drop:
+            work = work.loc[
+                ~work["_demand_frontier_row"].isin(rows_to_drop)
+            ].copy()
+
     # Lock the published Transport boundary before applying the generic
     # hierarchy frontier. Detailed Road exports contain 15.02, its vehicle
     # classes, and its technologies at the same time. The generic selector is
@@ -3513,14 +3600,13 @@ def _coverage_selected_demand_frontier(df: pd.DataFrame) -> pd.DataFrame:
     nonroad = work["common_flow_code"].astype(str).map(
         lambda code: code_candidate_text(code) == "15.01,15.03-15.06"
     )
-    leap_rows = work["source_system"].astype(str).str.casefold().eq("leap")
     explicit_nonroad = codes.map(
         lambda code: any(
             code_matches_prefix(code, prefix)
             for prefix in ("15.01", "15.03", "15.04", "15.05", "15.06")
         )
     )
-    transport = leap_rows & (
+    transport = (
         codes.eq("15")
         | codes.eq("15.02")
         | codes.str.startswith("15.02.")
@@ -10308,9 +10394,20 @@ def render_dashboard(
                 "product_label": chart_caption,
                 "section_label": "Overview",
                 "navigation_root_label": (
-                    source_aggregate_label
-                    if is_complete_page_root and not is_product_overview_aggregate
+                    str(
+                        area_spec.get(
+                            "navigation_root_label_override",
+                            source_aggregate_label,
+                        )
+                    ).strip()
+                    if (
+                        is_complete_page_root
+                        or bool(area_spec.get("force_navigation_root", False))
+                    ) and not is_product_overview_aggregate
                     else ""
+                ),
+                "navigation_placeholder": bool(
+                    area_spec.get("navigation_placeholder", False)
                 ),
                 "datasets": chart_dataset_tokens_from_figure(figure),
                 "stacked_area_note": stacked_area_note_from_figure(figure),

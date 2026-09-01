@@ -804,6 +804,42 @@ def test_supply_bunker_overview_omits_combined_total_when_children_have_cards() 
     assert all(spec.get("overview_variant") != "by_flow" for spec in specs)
 
 
+def test_supply_bunker_detail_overrides_stale_placeholder_status() -> None:
+    """Observed LEAP 04/05 rows are stronger evidence than a stale audit flag."""
+    template = {
+        "leap_demand_sector_coverage": {
+            "_aggregate_only_page_branches": {
+                "supply": ["International transport"],
+            },
+        },
+        "supply_page": {
+            "page_key": "supply",
+            "bunker_overview": {
+                "enabled": True,
+                "flow_boundary": "04-05",
+                "label": "04-05 International transport (bunkers)",
+                "preferred_detail_flow_boundaries": ["04", "05"],
+            },
+        },
+    }
+    rows = pd.DataFrame([
+        _area_product_row("LEAP", "Target", 2030, "04-05", "07.08", -30.0),
+        _area_product_row("LEAP", "Target", 2030, "04", "07.08", -12.0),
+        _area_product_row("LEAP", "Target", 2030, "05", "07.07", -18.0),
+    ])
+    existing = [
+        {"aggregate_flow_prefix": "04", "aggregate_flow_label": "04 Marine"},
+        {"aggregate_flow_prefix": "05", "aggregate_flow_label": "05 Aviation"},
+        {"aggregate_flow_prefix": "04-05", "aggregate_flow_label": "Combined"},
+    ]
+
+    specs = renderer.add_supply_bunker_overview_specs(
+        "supply", rows, existing, template
+    )
+
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04", "05"]
+
+
 def test_supply_bunker_children_are_always_displayed_as_withdrawals() -> None:
     rows = pd.DataFrame([
         _area_product_row("ESTO_EXTENDED", "historical", 2022, "04", "07.08", 5.0),
@@ -2134,6 +2170,63 @@ def test_power_overview_publishes_qualifying_first_two_level_pairs() -> None:
     assert resolved["value"].sum() == -10.0
 
 
+def test_power_plant_overview_can_promote_itself_to_navigation_root() -> None:
+    template = {
+        "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
+        "power_page": {
+            "page_key": "power",
+            "overview": {
+                "enabled": True,
+                "aggregates": [{
+                    "flow_boundary": "09.01.01,09.02.01",
+                    "child_flow_parent_prefix": "09.01.01",
+                    "label": "09.01.01,09.02.01 Electricity plants",
+                    "navigation_root": True,
+                }],
+            },
+        },
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030, "09.01.01.01", "17", 60.0
+            ),
+            "common_flow_label": "Coal power (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030, "09.01.01.02", "17", 40.0
+            ),
+            "common_flow_label": "Gas power (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+
+    specs = renderer.add_power_sector_overview_specs(
+        "power", rows, [], template
+    )
+
+    assert len(specs) == 2
+    assert all(spec["force_navigation_root"] for spec in specs)
+    roots = [{
+        "label": specs[0]["aggregate_flow_label"],
+        "target": "overview-power__09_01_01_09_02_01_electricity_plants",
+    }]
+    tree = renderer.line_section_tree(
+        [{
+            "section_label": "Power generation and transformation",
+            "flow_group_label": "Coal power (all producers)",
+        }],
+        roots,
+    )
+    html = renderer._jump_nav_html("Power", tree)
+    assert (
+        'data-level="1" data-hierarchy-depth="1" data-placeholder="false">'
+        '09.01.01,09.02.01 Electricity plants</a>'
+    ) in html
+
+
 def test_power_residual_section_has_clear_name_and_no_duplicate_summary() -> None:
     rows = pd.DataFrame([
         {
@@ -2247,6 +2340,47 @@ def test_mixed_transport_frontier_replaces_nonroad_rollup_with_published_childre
     }
     assert "15.01,15.03-15.06" not in set(selected["common_flow_code"])
     assert selected["value"].sum() == 130.0
+
+
+def test_transport_frontier_uses_reconciled_nonroad_children_across_products() -> None:
+    """A compound rollup cannot survive merely because its product grain differs."""
+    rows = pd.DataFrame([
+        _demand_frontier_row("ESTO_EXTENDED", "15.02", 100.0),
+        _demand_frontier_row(
+            "ESTO_EXTENDED", "15.01,15.03-15.06", 30.0, "07.04-07.05"
+        ),
+        _demand_frontier_row("ESTO_EXTENDED", "15.01", 10.0, "07.05"),
+        _demand_frontier_row("ESTO_EXTENDED", "15.03", 8.0, "07.07"),
+        _demand_frontier_row("ESTO_EXTENDED", "15.04", 6.0, "07.08"),
+        _demand_frontier_row("ESTO_EXTENDED", "15.05", 4.0, "08.01"),
+        _demand_frontier_row("ESTO_EXTENDED", "15.06", 2.0, "17"),
+    ])
+
+    selected = renderer._coverage_selected_demand_frontier(rows)
+
+    assert set(selected["common_flow_code"]) == {
+        "15.02", "15.01", "15.03", "15.04", "15.05", "15.06"
+    }
+    assert selected["value"].sum() == 130.0
+
+
+def test_transport_frontier_keeps_compound_when_children_do_not_reconcile() -> None:
+    rows = pd.DataFrame([
+        _demand_frontier_row(
+            "LEAP", "15.01,15.03-15.06", 31.0, "07.04-07.05"
+        ),
+        _demand_frontier_row("LEAP", "15.01", 10.0, "07.05"),
+        _demand_frontier_row("LEAP", "15.03", 8.0, "07.07"),
+        _demand_frontier_row("LEAP", "15.04", 6.0, "07.08"),
+        _demand_frontier_row("LEAP", "15.05", 4.0, "08.01"),
+        _demand_frontier_row("LEAP", "15.06", 2.0, "17"),
+    ])
+
+    selected = renderer._coverage_selected_demand_frontier(rows)
+
+    assert selected[["common_flow_code", "value"]].to_dict("records") == [
+        {"common_flow_code": "15.01,15.03-15.06", "value": 31.0}
+    ]
 
 
 def test_true_transport_parent_remains_authoritative() -> None:

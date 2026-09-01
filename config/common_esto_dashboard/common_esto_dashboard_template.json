@@ -470,6 +470,7 @@
           "flow_boundary": "09.01.01,09.02.01",
           "child_flow_parent_prefix": "09.01.01",
           "label": "09.01.01,09.02.01 Electricity plants",
+          "navigation_root": true,
           "grouping_titles": {
             "product": "09.01.01,09.02.01 Electricity plants — by product",
             "flow": "09.01.01,09.02.01 Electricity plants — by flow"
@@ -479,6 +480,7 @@
           "flow_boundary": "09.01.02,09.02.02",
           "child_flow_parent_prefix": "09.01.02",
           "label": "09.01.02,09.02.02 CHP plants",
+          "navigation_root": true,
           "grouping_titles": {
             "product": "09.01.02,09.02.02 CHP plants — by product",
             "flow": "09.01.02,09.02.02 CHP plants — by flow"
@@ -488,6 +490,7 @@
           "flow_boundary": "09.01.03,09.02.03",
           "child_flow_parent_prefix": "09.01.03",
           "label": "09.01.03,09.02.03 Heat plants",
+          "navigation_root": true,
           "grouping_titles": {
             "product": "09.01.03,09.02.03 Heat plants — by product",
             "flow": "09.01.03,09.02.03 Heat plants — by flow"

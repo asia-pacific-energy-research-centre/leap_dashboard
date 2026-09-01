@@ -2,6 +2,17 @@
 
 ## Source-aware aggregate routing fixes — complete
 
+- **DASHQ-072 — source-reconciled transport frontiers and overview routing.**
+  Complete 2026-09-01. Transport overview charts replace the compound
+  `15.01,15.03-15.06` non-road row with `15.01`, `15.03`, `15.04`, `15.05`
+  and `15.06` only when at least two children are nonzero and their
+  source/year/product surface reconciles to the compound total; otherwise the
+  compound remains the fallback. Supply now lets observed LEAP `04`/`05`
+  detail override stale placeholder metadata, while combined-only bunker data
+  still renders one `04-05` placeholder card. Configured electricity-, CHP-
+  and heat-plant overview aggregates are promoted to orange Power navigation
+  roots when rendered. Verification: all 407 canonical tests pass.
+
 - **DASHQ-071 — conserve detailed Road stacks and select aggregate cards by
   available source detail.** Complete 2026-09-01. Road by-flow grouping now
   preserves distinct detailed leaves that share a display label, so its ESTO
