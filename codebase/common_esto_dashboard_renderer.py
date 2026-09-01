@@ -1711,10 +1711,23 @@ def immediate_child_flow_rows(
 
     out = rows.copy()
     out["_child_flow_code"] = out["common_flow_code"].map(normalized_child_code)
-    out["_child_flow_label"] = (
-        out["_child_flow_code"].map(child_labels).fillna(out["_child_flow_code"])
+    mapped_child_labels = out["_child_flow_code"].map(child_labels)
+    source_labels = (
+        out["common_flow_label"].astype(str).str.strip()
+        if "common_flow_label" in out.columns
+        else pd.Series("", index=out.index)
     )
-    out = out[out["_child_flow_label"].ne("")].copy()
+    fallback_child_labels = source_labels.where(
+        source_labels.ne(""),
+        out["_child_flow_code"],
+    )
+    out["_child_flow_label"] = mapped_child_labels.where(
+        mapped_child_labels.notna() & mapped_child_labels.astype(str).str.strip().ne(""),
+        fallback_child_labels,
+    )
+    out = out[
+        out["_child_flow_code"].ne("") & out["_child_flow_label"].ne("")
+    ].copy()
     return out
 
 
@@ -1755,11 +1768,39 @@ def resolved_immediate_child_flow_rows(
     )
     if child_rows.empty:
         return child_rows
-    return resolved_area_chart_rows(
-        child_rows,
-        area_spec,
-        group_col="_child_flow_label",
-    )
+    return resolved_immediate_child_frontier(child_rows, area_spec)
+
+
+def resolved_immediate_child_frontier(
+    child_rows: pd.DataFrame,
+    area_spec: dict[str, object],
+) -> pd.DataFrame:
+    """Resolve overlap inside each immediate child without dropping siblings.
+
+    Some Power comparison scopes encode an interim child with a compound code
+    that repeats the plant parent before naming the child, for example
+    ``09.01.02,09.02.02,09.01.02.01,09.02.02.01``. Once that row has been
+    normalized to child ``09.01.02.01``, it is a sibling of ``.02`` and ``.03``;
+    applying the generic hierarchy frontier to every child together would
+    mistake the repeated parent text for an authoritative parent and suppress
+    the other process children. Resolve descendants separately inside each
+    normalized child so sibling processes remain additive.
+    """
+    if child_rows.empty or "_child_flow_code" not in child_rows.columns:
+        return child_rows
+    parts = [
+        resolved_area_chart_rows(
+            child_group,
+            area_spec,
+            group_col="_child_flow_label",
+        )
+        for _child_code, child_group in child_rows.groupby(
+            "_child_flow_code",
+            dropna=False,
+            sort=False,
+        )
+    ]
+    return pd.concat(parts, ignore_index=True, sort=False) if parts else child_rows
 
 
 def reconciled_immediate_child_flow_rows(
@@ -1791,11 +1832,7 @@ def reconciled_immediate_child_flow_rows(
         child_label_overrides,
         flow_boundary=str(area_spec.get("aggregate_flow_prefix", "")),
     )
-    detail = resolved_area_chart_rows(
-        detail,
-        area_spec,
-        group_col="_child_flow_label",
-    )
+    detail = resolved_immediate_child_frontier(detail, area_spec)
     if authoritative.empty or "value" not in authoritative.columns:
         return detail
 

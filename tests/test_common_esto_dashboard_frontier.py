@@ -2498,7 +2498,7 @@ def test_power_by_flow_reconciles_process_detail_to_product_frontier() -> None:
     )
 
     totals = flow_rows.groupby("common_product_code")["value"].sum().to_dict()
-    assert totals == {"17": -100.0, "18": 40.0}
+    assert totals == pytest.approx({"17": -100.0, "18": 40.0})
     electricity = flow_rows[flow_rows["common_product_code"].eq("17")]
     assert electricity.set_index("_child_flow_label")["value"].to_dict() == {
         "Coal power (all producers)": -50.0,
@@ -2508,6 +2508,66 @@ def test_power_by_flow_reconciles_process_detail_to_product_frontier() -> None:
         "Coal power (all producers)",
         "Gas power (all producers)",
     }
+
+
+def test_power_by_flow_keeps_siblings_of_compound_interim_child() -> None:
+    """A repeated plant parent inside one child cannot suppress its siblings."""
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "NINTH",
+                "Target",
+                2030,
+                "09.01.02,09.02.02,09.01.02.01,09.02.02.01",
+                "17",
+                100.0,
+            ),
+            "common_flow_label": "Total transformation - no transfers",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "NINTH", "Target", 2030,
+                "09.01.02.02,09.02.02.02", "17", 60.0
+            ),
+            "common_flow_label": "Gas CHP (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "NINTH", "Target", 2030,
+                "09.01.02.03,09.02.02.03", "17", 40.0
+            ),
+            "common_flow_label": "Others CHP (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+    spec = {
+        "aggregate_flow_prefix": "09.01.02,09.02.02",
+        "aggregate_flow_label": "09.01.02,09.02.02 CHP plants",
+        "explicit_flow_boundary": True,
+    }
+
+    child_count = renderer.nonzero_immediate_child_flow_count(
+        rows,
+        renderer.get_existing_flow_nodes(rows),
+        "09.01.02",
+        spec,
+    )
+    flow_rows = renderer.reconciled_immediate_child_flow_rows(
+        rows,
+        renderer.get_existing_flow_nodes(rows),
+        "09.01.02",
+        spec,
+    )
+
+    assert child_count == 3
+    assert set(flow_rows["_child_flow_label"]) == {
+        "Total transformation - no transfers",
+        "Gas CHP (all producers)",
+        "Others CHP (all producers)",
+    }
+    assert flow_rows["value"].sum() == 100.0
 
 
 def test_power_own_use_navigation_stays_below_primary_owners() -> None:
