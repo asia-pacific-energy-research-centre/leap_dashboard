@@ -467,6 +467,33 @@
           "stacked_area_note": "Electricity, CHP and heat plant inputs and outputs are shown together. Interim plant placeholders contribute until detailed LEAP plant branches replace them."
         },
         {
+          "flow_boundary": "09.01.01,09.02.01",
+          "child_flow_parent_prefix": "09.01.01",
+          "label": "09.01.01,09.02.01 Electricity plants",
+          "grouping_titles": {
+            "product": "09.01.01,09.02.01 Electricity plants — by product",
+            "flow": "09.01.01,09.02.01 Electricity plants — by flow"
+          }
+        },
+        {
+          "flow_boundary": "09.01.02,09.02.02",
+          "child_flow_parent_prefix": "09.01.02",
+          "label": "09.01.02,09.02.02 CHP plants",
+          "grouping_titles": {
+            "product": "09.01.02,09.02.02 CHP plants — by product",
+            "flow": "09.01.02,09.02.02 CHP plants — by flow"
+          }
+        },
+        {
+          "flow_boundary": "09.01.03,09.02.03",
+          "child_flow_parent_prefix": "09.01.03",
+          "label": "09.01.03,09.02.03 Heat plants",
+          "grouping_titles": {
+            "product": "09.01.03,09.02.03 Heat plants — by product",
+            "flow": "09.01.03,09.02.03 Heat plants — by flow"
+          }
+        },
+        {
           "flow_boundary": "10.01,10.02",
           "child_flow_parent_prefix": "10",
           "label": "Power-related losses and own use",
