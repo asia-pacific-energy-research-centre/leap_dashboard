@@ -1648,6 +1648,7 @@ def immediate_child_flow_rows(
     nodes: pd.DataFrame,
     parent_prefix: str,
     child_label_overrides: dict[str, str] | None = None,
+    flow_boundary: str = "",
 ) -> pd.DataFrame:
     """Label a parent's selected frontier by its immediate child flow.
 
@@ -1660,15 +1661,47 @@ def immediate_child_flow_rows(
     if rows.empty or "common_flow_code" not in rows.columns:
         return rows.iloc[0:0].copy()
 
+    sibling_parents = [parent_prefix]
+    boundary_records = parse_code_expression(flow_boundary)
+    if boundary_records and parent_prefix == boundary_records[0].get("start", ""):
+        sibling_parents = []
+        for record in boundary_records:
+            sibling_parents.extend(
+                value
+                for value in (record.get("start", ""), record.get("end", ""))
+                if value
+            )
+        sibling_parents = list(dict.fromkeys(sibling_parents))
+
     target_level = code_depth(parent_prefix) + 1
+
+    def normalized_child_code(code_or_label: object) -> str:
+        candidate_codes = [canonical_code(code_or_label)]
+        if len(sibling_parents) > 1:
+            candidate_codes = [
+                code
+                for record in parse_code_expression(code_or_label)
+                for code in (record.get("start", ""), record.get("end", ""))
+                if code
+            ]
+        for code in candidate_codes:
+            for sibling_parent in sibling_parents:
+                if (
+                    code_depth(code) >= target_level
+                    and code_matches_prefix(code, sibling_parent)
+                ):
+                    child = ".".join(code.split(".")[:target_level])
+                    suffix = child[len(sibling_parent):]
+                    return f"{parent_prefix}{suffix}"
+        return ""
+
     child_labels: dict[str, str] = {}
     label_overrides = child_label_overrides or {}
     for child_code in sorted(
         {
-            code_prefix(str(code), target_level)
+            normalized_child_code(code)
             for code in nodes["canonical_code"].dropna().astype(str)
-            if code_depth(code) >= target_level
-            and str(code).startswith(parent_prefix + ".")
+            if normalized_child_code(code)
         }
     ):
         label = str(label_overrides.get(child_code, "")).strip()
@@ -1677,19 +1710,11 @@ def immediate_child_flow_rows(
         child_labels[child_code] = label or child_code
 
     out = rows.copy()
-    canonical_codes = out["common_flow_code"].map(canonical_code)
-    out["_child_flow_code"] = canonical_codes.map(
-        lambda code: (
-            code_prefix(code, target_level)
-            if code_depth(code) >= target_level
-            and str(code).startswith(parent_prefix + ".")
-            else ""
-        )
-    )
-    out = out[out["_child_flow_code"].ne("")].copy()
+    out["_child_flow_code"] = out["common_flow_code"].map(normalized_child_code)
     out["_child_flow_label"] = (
         out["_child_flow_code"].map(child_labels).fillna(out["_child_flow_code"])
     )
+    out = out[out["_child_flow_label"].ne("")].copy()
     return out
 
 
@@ -1726,6 +1751,7 @@ def resolved_immediate_child_flow_rows(
         boundary_rows,
         nodes,
         parent_prefix,
+        flow_boundary=str(area_spec.get("aggregate_flow_prefix", "")),
     )
     if child_rows.empty:
         return child_rows
@@ -1734,6 +1760,124 @@ def resolved_immediate_child_flow_rows(
         area_spec,
         group_col="_child_flow_label",
     )
+
+
+def reconciled_immediate_child_flow_rows(
+    page_df: pd.DataFrame,
+    nodes: pd.DataFrame,
+    parent_prefix: str,
+    area_spec: dict[str, object],
+    child_label_overrides: dict[str, str] | None = None,
+) -> pd.DataFrame:
+    """Reconcile a Power process breakdown to its product-card frontier.
+
+    Power exports can publish both an authoritative plant aggregate and an
+    estimated all-producer process breakdown. The process rows are useful for
+    the by-flow card, but they are not an independent total and can overlap or
+    omit one side of a paired 09.01/09.02 boundary. Preserve their proportions
+    while scaling each source/scenario/year/product slice to the exact frontier
+    used by the paired by-product card. Where no usable split exists, retain an
+    explicit unallocated residual instead of silently dropping energy.
+    """
+    authoritative = resolved_area_chart_rows(
+        page_df,
+        area_spec,
+        group_col="common_product_label",
+    )
+    detail = immediate_child_flow_rows(
+        area_spec_rows(page_df, area_spec),
+        nodes,
+        parent_prefix,
+        child_label_overrides,
+        flow_boundary=str(area_spec.get("aggregate_flow_prefix", "")),
+    )
+    detail = resolved_area_chart_rows(
+        detail,
+        area_spec,
+        group_col="_child_flow_label",
+    )
+    if authoritative.empty or "value" not in authoritative.columns:
+        return detail
+
+    key_columns = [
+        column
+        for column in (
+            "comparison_scope",
+            "economy",
+            "source_system",
+            "scenario",
+            "year",
+            "common_product_code",
+            "common_product_label",
+        )
+        if column in authoritative.columns and column in detail.columns
+    ]
+    if not key_columns:
+        return detail
+
+    authoritative_totals = (
+        authoritative.groupby(key_columns, dropna=False, as_index=False)["value"]
+        .sum()
+        .rename(columns={"value": "_authoritative_total"})
+    )
+    detail_totals = (
+        detail.groupby(key_columns, dropna=False, as_index=False)["value"]
+        .sum()
+        .rename(columns={"value": "_detail_total"})
+    )
+    coverage = authoritative_totals.merge(
+        detail_totals,
+        on=key_columns,
+        how="left",
+    )
+    coverage["_tolerance"] = (
+        1e-8 + coverage["_authoritative_total"].abs() * 1e-8
+    )
+    usable = coverage[
+        coverage["_detail_total"].notna()
+        & coverage["_detail_total"].abs().gt(coverage["_tolerance"])
+    ].copy()
+    usable["_child_scale"] = (
+        usable["_authoritative_total"] / usable["_detail_total"]
+    )
+
+    reconciled = detail.merge(
+        usable[[*key_columns, "_child_scale"]],
+        on=key_columns,
+        how="inner",
+    )
+    if not reconciled.empty:
+        reconciled["value"] = reconciled["value"] * reconciled.pop(
+            "_child_scale"
+        )
+
+    residual_contexts = coverage.merge(
+        usable[key_columns].assign(_usable=True),
+        on=key_columns,
+        how="left",
+    )
+    residual_contexts = residual_contexts[
+        residual_contexts["_usable"].isna()
+        & residual_contexts["_authoritative_total"].abs().gt(
+            residual_contexts["_tolerance"]
+        )
+    ][[*key_columns, "_authoritative_total"]]
+    if residual_contexts.empty:
+        return reconciled.reset_index(drop=True)
+
+    residual = (
+        authoritative.sort_values(key_columns)
+        .drop_duplicates(key_columns)
+        .merge(residual_contexts, on=key_columns, how="inner")
+    )
+    residual["value"] = residual.pop("_authoritative_total")
+    residual_label = (
+        f"{area_spec.get('aggregate_flow_label', 'Power')} — "
+        "not allocated to process"
+    )
+    residual["_child_flow_code"] = "residual"
+    residual["_child_flow_label"] = residual_label
+    return pd.concat([reconciled, residual], ignore_index=True, sort=False)
 
 
 def nonzero_immediate_child_flow_count(
@@ -2603,6 +2747,7 @@ def add_power_sector_overview_specs(
                 ).strip(),
                 "stacked_area_note_suffix": note,
                 "skip_product_overview_ownership": True,
+                "reconcile_child_flow_to_product_frontier": group_noun == "flow",
             })
     return specs
 
@@ -10622,14 +10767,32 @@ def render_dashboard(
                 area_spec.get("immediate_child_flow_parent_prefix", "")
             ).strip()
             if immediate_child_parent:
-                chart_page_df = immediate_child_flow_rows(
-                    area_spec_rows(page_df, display_area_spec),
-                    get_existing_flow_nodes(page_df),
-                    immediate_child_parent,
-                    dict(
-                        area_spec.get("immediate_child_flow_labels", {}) or {}
-                    ),
-                )
+                if bool(
+                    area_spec.get(
+                        "reconcile_child_flow_to_product_frontier", False
+                    )
+                ):
+                    chart_page_df = reconciled_immediate_child_flow_rows(
+                        page_df,
+                        get_existing_flow_nodes(page_df),
+                        immediate_child_parent,
+                        display_area_spec,
+                        dict(
+                            area_spec.get("immediate_child_flow_labels", {}) or {}
+                        ),
+                    )
+                else:
+                    chart_page_df = immediate_child_flow_rows(
+                        area_spec_rows(page_df, display_area_spec),
+                        get_existing_flow_nodes(page_df),
+                        immediate_child_parent,
+                        dict(
+                            area_spec.get("immediate_child_flow_labels", {}) or {}
+                        ),
+                        flow_boundary=str(
+                            area_spec.get("aggregate_flow_prefix", "")
+                        ),
+                    )
             configured_flow_groups = list(
                 area_spec.get("configured_flow_groups", []) or []
             )

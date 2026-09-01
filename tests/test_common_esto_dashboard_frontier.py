@@ -2443,6 +2443,73 @@ def test_power_plant_overview_can_promote_itself_to_navigation_root() -> None:
     ) in html
 
 
+def test_power_by_flow_reconciles_process_detail_to_product_frontier() -> None:
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030, "09.01.01,09.02.01", "17", -100.0
+            ),
+            "common_flow_label": "09.01.01,09.02.01 Electricity plants",
+            "common_product_label": "17 Electricity",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030, "09.01.01.01", "17", -100.0
+            ),
+            "common_flow_label": "Coal power (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030, "09.01.01.02", "17", -100.0
+            ),
+            "common_flow_label": "Gas power (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030, "09.01.01,09.02.01", "18", 40.0
+            ),
+            "common_flow_label": "09.01.01,09.02.01 Electricity plants",
+            "common_product_label": "18 Heat",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2030,
+                "09.01.01.01,09.02.01.01", "18", 40.0
+            ),
+            "common_flow_label": "Coal power (all producers)",
+            "common_product_label": "18 Heat",
+        },
+    ])
+    spec = {
+        "aggregate_flow_prefix": "09.01.01,09.02.01",
+        "aggregate_flow_label": "09.01.01,09.02.01 Electricity plants",
+        "explicit_flow_boundary": True,
+    }
+
+    flow_rows = renderer.reconciled_immediate_child_flow_rows(
+        rows,
+        renderer.get_existing_flow_nodes(rows),
+        "09.01.01",
+        spec,
+    )
+
+    totals = flow_rows.groupby("common_product_code")["value"].sum().to_dict()
+    assert totals == {"17": -100.0, "18": 40.0}
+    electricity = flow_rows[flow_rows["common_product_code"].eq("17")]
+    assert electricity.set_index("_child_flow_label")["value"].to_dict() == {
+        "Coal power (all producers)": -50.0,
+        "Gas power (all producers)": -50.0,
+    }
+    assert set(flow_rows["_child_flow_label"]) == {
+        "Coal power (all producers)",
+        "Gas power (all producers)",
+    }
+
+
 def test_power_own_use_navigation_stays_below_primary_owners() -> None:
     tree = renderer.line_section_tree(
         [{
