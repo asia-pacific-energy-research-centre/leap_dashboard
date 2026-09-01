@@ -4868,7 +4868,17 @@ def resolved_area_chart_rows(
                     ignore_index=True,
                 )
     chart_df = _non_overlapping_common_row_frontier(chart_df)
-    if "flow" in group_col and not area_spec.get("preserve_distinct_flow_labels"):
+    # Only a chart grouped by the raw common flow label still needs the
+    # parent/child and same-name overlap pass.  Immediate-child and configured
+    # flow groups have already collapsed their source rows onto an explicit,
+    # non-overlapping display owner.  Re-running the raw-label selector there
+    # can discard legitimate same-named leaves in different branches (for
+    # example Passenger-road bus and LPV technologies) after they have both
+    # been assigned to Passenger road.
+    if (
+        group_col == "common_flow_label"
+        and not area_spec.get("preserve_distinct_flow_labels")
+    ):
         chart_df = _non_overlapping_flow_rows(chart_df)
     return chart_df
 

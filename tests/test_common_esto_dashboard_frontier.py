@@ -2610,6 +2610,65 @@ def test_detailed_demand_allocation_keeps_duplicate_deepest_rows() -> None:
     }
 
 
+def test_road_by_flow_keeps_same_named_leaves_after_child_grouping() -> None:
+    """A synthesized Passenger-road group must retain every detailed branch."""
+    rows = pd.DataFrame([
+        _area_product_row(
+            "ESTO_EXTENDED", "historical", 2022, "15.02", "07.01", 100.0
+        ),
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2022, "15.02.01.01.02", "07.01", 30.0
+            ),
+            "common_flow_label": "15.02.01.01.02 ICE",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2022, "15.02.02.01.03", "07.01", 20.0
+            ),
+            "common_flow_label": "15.02.02.01.03 ICE",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2022, "15.02.02.02.12", "07.01", 50.0
+            ),
+            "common_flow_label": "15.02.02.02.12 ICE small",
+        },
+    ])
+
+    fixed = renderer.estimate_esto_road_detail_from_leap_base_year_shares(
+        rows,
+        comparison_source="ESTO_EXTENDED",
+        primary_source="LEAP",
+        primary_scenario="Target",
+        base_year=2022,
+    )
+    nodes = renderer.get_existing_flow_nodes(fixed)
+    area_spec = {
+        "aggregate_flow_prefix": "15.02",
+        "aggregate_flow_label": "15.02 Road",
+        "source_flow_labels": fixed["common_flow_label"].astype(str).tolist(),
+    }
+    child_rows = renderer.immediate_child_flow_rows(
+        renderer.area_spec_rows(fixed, area_spec),
+        nodes,
+        "15.02",
+    )
+    selected = renderer.resolved_area_chart_rows(
+        child_rows,
+        area_spec,
+        group_col="_child_flow_label",
+    )
+    historical = selected[selected["source_system"].eq("ESTO_EXTENDED")]
+
+    child_totals = historical.groupby("_child_flow_code")["value"].sum().to_dict()
+    assert child_totals == {
+        "15.02.01": pytest.approx(30.0),
+        "15.02.02": pytest.approx(70.0),
+    }
+    assert historical["value"].sum() == pytest.approx(100.0)
+
+
 def test_detailed_demand_allocation_uses_visible_unallocated_without_denominator() -> None:
     rows = pd.DataFrame([
         _area_product_row("ESTO_EXTENDED", "historical", 2022, "16.01-16.02", "07.01", 50.0),
