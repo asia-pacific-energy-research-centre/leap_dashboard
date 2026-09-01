@@ -464,15 +464,16 @@
         {
           "flow_boundary": "09.01-09.02",
           "child_flow_parent_prefix": "09.01",
-          "label": "09.01-09.02 Power generation",
+          "label": "09.01-09.02 Power",
+          "navigation_root": true,
           "child_flow_labels": {
             "09.01.01": "09.01.01,09.02.01 Electricity plants",
             "09.01.02": "09.01.02,09.02.02 CHP plants",
             "09.01.03": "09.01.03,09.02.03 Heat plants"
           },
           "grouping_titles": {
-            "product": "09.01-09.02 Power generation — by product",
-            "flow": "09.01-09.02 Power generation — by flow"
+            "product": "09.01-09.02 Power — by product",
+            "flow": "09.01-09.02 Power — by flow"
           },
           "stacked_area_note": "Electricity, CHP and heat plant inputs and outputs are shown together. Interim plant placeholders contribute until detailed LEAP plant branches replace them."
         },
@@ -507,31 +508,18 @@
           }
         },
         {
-          "flow_boundary": "10.01,10.02",
-          "child_flow_parent_prefix": "10",
-          "label": "Power-related losses and own use",
-          "child_flow_labels": {
-            "10.01": "10.01 Own use",
-            "10.02": "10.02 Transmission and distribution losses"
-          },
+          "flow_boundary": "10.02",
+          "child_flow_parent_prefix": "10.02",
+          "label": "10.02 Transmission and distribution losses",
+          "navigation_root": true,
           "grouping_titles": {
-            "product": "Power-related losses and own use — by product",
-            "flow": "Power-related losses and own use — by flow"
-          },
-          "stacked_area_note": "Only Power-owned own-use and transmission/distribution-loss rows are included; Refining and Other-transformation own use remain on their own pages."
-        },
-        {
-          "flow_boundary": "10.01",
-          "child_flow_parent_prefix": "10.01",
-          "label": "10.01 Own use",
-          "grouping_titles": {
-            "product": "10.01 Own use — by product",
-            "flow": "10.01 Own use — by flow"
+            "product": "10.02 Transmission and distribution losses — by product",
+            "flow": "10.02 Transmission and distribution losses — by flow"
           }
         }
       ]
     },
-    "_note": "Power Overview uses paired by-product/by-flow summaries for the first two visible hierarchy levels when at least two immediate children are non-zero. Generation, the Power-scoped flow-10 boundary, and qualifying 10.01 detail remain separate numerical owners."
+    "_note": "Power Overview uses by-product summaries for active first-level boundaries and adds by-flow summaries when at least two immediate children are non-zero. Power, Electricity plants, CHP plants, Heat plants, and transmission/distribution losses are separate navigation owners; process children remain below their plant boundary."
   },
   "placeholder_navigation": {
     "power": {

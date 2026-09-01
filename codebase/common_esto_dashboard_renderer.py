@@ -2571,19 +2571,23 @@ def add_power_sector_overview_specs(
                 if str(code).strip() and str(child_label).strip()
             },
         }
-        if nonzero_immediate_child_flow_count(
+        nonzero_child_count = nonzero_immediate_child_flow_count(
             page_df,
             nodes,
             child_parent,
             base_spec,
-        ) < minimum_nonzero_children:
-            continue
+        )
         note = str(aggregate.get("stacked_area_note", "")).strip()
         grouping_titles = aggregate.get("grouping_titles", {}) or {}
         for group_noun, group_col, title_prefix in (
             ("product", "common_product_label", "Aggregate by product"),
             ("flow", "_child_flow_label", "Aggregate by flow"),
         ):
+            if (
+                group_noun == "flow"
+                and nonzero_child_count < minimum_nonzero_children
+            ):
+                continue
             specs.append({
                 **base_spec,
                 "overview_variant": f"power_{safe_slug(label)}_by_{group_noun}",

@@ -2225,8 +2225,8 @@ def test_power_navigation_marks_only_active_interim_rollup_owners() -> None:
     assert 'data-placeholder="false">Gas CHP (all producers)' in html
 
 
-def test_power_overview_publishes_qualifying_first_two_level_pairs() -> None:
-    """Power shows generation, flow-10 and own-use pairs without a 10.02 pair."""
+def test_power_overview_publishes_flow_pair_and_product_only_leaf() -> None:
+    """Power keeps product summaries while requiring children for by-flow."""
     template = {
         "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
         "power_page": {
@@ -2325,13 +2325,14 @@ def test_power_overview_publishes_qualifying_first_two_level_pairs() -> None:
         "power", rows, generic_specs, template
     )
 
-    assert len(specs) == 6
+    assert len(specs) == 7
     assert {
         spec["aggregate_flow_label"] for spec in specs
     } == {
         "09.01-09.02 Power generation",
         "Power-related losses and own use",
         "10.01 Own use",
+        "10.02 Transmission and distribution losses",
     }
     assert all(
         sum(
@@ -2344,10 +2345,12 @@ def test_power_overview_publishes_qualifying_first_two_level_pairs() -> None:
             "10.01 Own use",
         }
     )
-    assert not any(
-        spec["aggregate_flow_label"].startswith("10.02")
-        for spec in specs
-    )
+    losses_leaf_specs = [
+        spec for spec in specs
+        if spec["aggregate_flow_label"].startswith("10.02")
+    ]
+    assert len(losses_leaf_specs) == 1
+    assert losses_leaf_specs[0]["group_col"] == "common_product_label"
     losses_flow_spec = next(
         spec for spec in specs
         if spec["aggregate_flow_label"] == "Power-related losses and own use"
@@ -2426,6 +2429,39 @@ def test_power_plant_overview_can_promote_itself_to_navigation_root() -> None:
         'data-level="1" data-hierarchy-depth="1" data-placeholder="false">'
         '09.01.01,09.02.01 Electricity plants</a>'
     ) in html
+
+
+def test_power_plant_overview_keeps_product_card_when_only_one_child_is_nonzero() -> None:
+    template = {
+        "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
+        "power_page": {
+            "page_key": "power",
+            "overview": {
+                "enabled": True,
+                "aggregates": [{
+                    "flow_boundary": "09.01.03,09.02.03",
+                    "child_flow_parent_prefix": "09.01.03",
+                    "label": "09.01.03,09.02.03 Heat plants",
+                    "navigation_root": True,
+                }],
+            },
+        },
+    }
+    rows = pd.DataFrame([{
+        **_area_product_row(
+            "LEAP", "Target", 2030, "09.01.03.01", "18", 60.0
+        ),
+        "common_flow_label": "Coal HP (all producers)",
+        "common_product_label": "18 Heat",
+    }])
+
+    specs = renderer.add_power_sector_overview_specs(
+        "power", rows, [], template
+    )
+
+    assert len(specs) == 1
+    assert specs[0]["group_col"] == "common_product_label"
+    assert specs[0]["force_navigation_root"] is True
 
 
 def test_power_residual_section_has_clear_name_and_no_duplicate_summary() -> None:
