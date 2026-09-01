@@ -2624,12 +2624,6 @@ def add_supply_bunker_overview_specs(
     if not boundary or not label:
         return list(area_specs)
     boundary_code = code_candidate_text(boundary)
-    non_boundary_specs = [
-        spec
-        for spec in area_specs
-        if code_candidate_text(spec.get("aggregate_flow_prefix", ""))
-        != boundary_code
-    ]
     detail_codes = {
         code_candidate_text(value)
         for value in bunker_config.get("preferred_detail_flow_boundaries", ["04", "05"])
@@ -2647,10 +2641,25 @@ def add_supply_bunker_overview_specs(
         boundary_code in leap_flow_codes
         and not detail_codes.intersection(leap_flow_codes)
     )
-    if not (
+    use_combined_placeholder = (
         uses_combined_international_transport_placeholder(template)
         or combined_placeholder_active
-    ):
+    )
+    excluded_codes = {boundary_code}
+    if use_combined_placeholder:
+        # Generic hierarchy discovery can emit 04 and 05 product cards from
+        # ESTO/Ninth even though LEAP only has the combined 04-05 placeholder.
+        # Those cards would be historical-only and, after page-label
+        # collapsing, can appear as a second combined card.  The explicit
+        # placeholder card is the sole comparison owner in this mode.
+        excluded_codes.update(detail_codes)
+    non_boundary_specs = [
+        spec
+        for spec in area_specs
+        if code_candidate_text(spec.get("aggregate_flow_prefix", ""))
+        not in excluded_codes
+    ]
+    if not use_combined_placeholder:
         return non_boundary_specs
 
     combined_product = next(

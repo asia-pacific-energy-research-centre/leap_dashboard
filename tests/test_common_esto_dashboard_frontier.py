@@ -745,6 +745,8 @@ def test_supply_bunker_overview_keeps_one_combined_placeholder() -> None:
     ])
 
     existing = [
+        {"aggregate_flow_prefix": "04", "aggregate_flow_label": "04 Marine"},
+        {"aggregate_flow_prefix": "05", "aggregate_flow_label": "05 Aviation"},
         {"aggregate_flow_prefix": "04-05"},
         {"aggregate_flow_prefix": "04-05"},
         {"aggregate_flow_prefix": "04-05", "overview_variant": "by_flow"},
