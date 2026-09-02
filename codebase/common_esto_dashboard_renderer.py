@@ -2548,6 +2548,14 @@ def add_transport_overview_specs(
             spec["prefer_transport_detail_frontier"] = bool(
                 flow_config.get("prefer_detail_frontier", False)
             )
+            # The generic immediate-child adapter treats the compound
+            # 15.01,15.03-15.06 boundary as child 15.01 before the
+            # source-aware transport frontier can decide whether detail is
+            # actually available.  Group this one root view by the published
+            # flow label instead, so a projection placeholder remains a
+            # compound until LEAP supplies at least two non-road components.
+            spec["group_col"] = "common_flow_label"
+            spec.pop("immediate_child_flow_parent_prefix", None)
     return specs
 
 

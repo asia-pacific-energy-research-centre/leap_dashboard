@@ -1426,6 +1426,8 @@ def test_transport_root_flow_overview_uses_source_coverage_without_relabelling()
         [{
             "aggregate_flow_prefix": "15",
             "overview_variant": "by_flow",
+            "group_col": "_child_flow_label",
+            "immediate_child_flow_parent_prefix": "15",
         }],
         {
             "transport_page": {
@@ -1441,6 +1443,8 @@ def test_transport_root_flow_overview_uses_source_coverage_without_relabelling()
     assert "collapse_compound_to_historical_child" not in specs[0]
     assert specs[0]["use_demand_coverage_frontier"] is True
     assert specs[0]["prefer_transport_detail_frontier"] is True
+    assert specs[0]["group_col"] == "common_flow_label"
+    assert "immediate_child_flow_parent_prefix" not in specs[0]
 
 
 def test_other_demand_chart_uses_economy_verified_child_after_page_pruning() -> None:
