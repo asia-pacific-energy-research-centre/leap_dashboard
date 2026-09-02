@@ -190,6 +190,7 @@
       "navigation_depth_overrides": {
         "10.01.01 Electricity, CHP and heat plants": 2
       },
+      "placeholders_second_level": true,
       "rule_note": "Electricity and heat output, plus directly related power-sector own-use rows. The specific 09.01/09.02 roots take ownership ahead of the broader Other transformation root 09."
     },
     {
@@ -407,10 +408,7 @@
     "page_key": "transport",
     "by_flow_overview": {
       "flow_boundary": "15",
-      "prefer_detail_frontier": true,
-      "collapse_compound_to_child": {
-        "15.01,15.03-15.06": ["15.01", "15.03", "15.04", "15.05", "15.06"]
-      }
+      "prefer_detail_frontier": true
     }
   },
   "other_demand_page": {

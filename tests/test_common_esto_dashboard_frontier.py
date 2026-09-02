@@ -1419,7 +1419,7 @@ def test_corrected_compound_label_updates_immediate_child_grouping() -> None:
     ]
 
 
-def test_transport_root_flow_overview_enables_nonroad_child_label_collapse() -> None:
+def test_transport_root_flow_overview_uses_source_coverage_without_relabelling() -> None:
     specs = renderer.prepare_area_specs_for_page(
         "transport",
         pd.DataFrame(),
@@ -1433,21 +1433,12 @@ def test_transport_root_flow_overview_enables_nonroad_child_label_collapse() -> 
                 "by_flow_overview": {
                     "flow_boundary": "15",
                     "prefer_detail_frontier": True,
-                    "collapse_compound_to_child": {
-                        "15.01,15.03-15.06": [
-                            "15.01", "15.03", "15.04", "15.05", "15.06"
-                        ],
-                    },
                 },
             },
         },
     )
 
-    assert specs[0]["collapse_compound_to_historical_child"] == {
-        "15.01,15.03-15.06": [
-            "15.01", "15.03", "15.04", "15.05", "15.06"
-        ],
-    }
+    assert "collapse_compound_to_historical_child" not in specs[0]
     assert specs[0]["use_demand_coverage_frontier"] is True
     assert specs[0]["prefer_transport_detail_frontier"] is True
 
@@ -2223,6 +2214,15 @@ def test_power_navigation_marks_only_active_interim_rollup_owners() -> None:
     assert html.count("jump-placeholder-label") == 2
     assert "Gas CHP (all producers)" in html
     assert 'data-placeholder="false">Gas CHP (all producers)' in html
+
+    power_tree = renderer.line_section_tree(
+        line_rows,
+        placeholders_second_level=True,
+    )
+    power_nodes = [node for _section, section_nodes in power_tree for node in section_nodes]
+    assert {
+        node["level"] for node in power_nodes if node["placeholder"]
+    } == {2}
 
 
 def test_power_overview_publishes_flow_pair_and_product_only_leaf() -> None:
@@ -3512,6 +3512,67 @@ def test_technology_stack_uses_authoritative_road_total_lines() -> None:
     assert "maximum absolute residual 40.00" in figure.layout.meta[
         "stacked_area_note"
     ]
+
+
+def test_road_flow_chart_keeps_parent_only_ninth_total() -> None:
+    """A 9th Road parent remains a comparison line when it has no child split."""
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("ESTO_EXTENDED", "historical", 2022, "15.02.01", "07.01", 60.0),
+            "common_flow_label": "15.02.01 Freight road",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2030, "15.02.01", "07.01", 55.0),
+            "common_flow_label": "15.02.01 Freight road",
+        },
+        {
+            **_area_product_row("NINTH", "Reference", 2030, "15.02", "07.01", 90.0),
+            "common_flow_label": "15.02 Road",
+        },
+        {
+            **_area_product_row("NINTH", "Target", 2030, "15.02", "07.01", 85.0),
+            "common_flow_label": "15.02 Road",
+        },
+    ])
+    detail = renderer.immediate_child_flow_rows(
+        rows,
+        renderer.get_existing_flow_nodes(rows),
+        "15.02",
+        flow_boundary="15.02",
+    )
+    assert set(detail["source_system"]) == {"ESTO_EXTENDED", "LEAP"}
+
+    figure = renderer.build_area_chart(
+        detail,
+        {
+            "aggregate_flow_prefix": "15.02",
+            "aggregate_flow_label": "15.02 Road",
+            "source_flow_labels": ["15.02.01 Freight road"],
+            "authoritative_total_flow_labels_by_system": {
+                "NINTH": ["15.02 Road"],
+            },
+        },
+        {
+            "ESTO_EXTENDED|historical": "ESTO Historical",
+            "LEAP|Target": "LEAP Target",
+            "NINTH|Reference": "9th Reference",
+            "NINTH|Target": "9th Target",
+        },
+        {
+            "chart_generation": {
+                "comparison_source_system": "ESTO_EXTENDED",
+                "primary_area_source_system": "LEAP",
+                "primary_area_scenario": "Target",
+                "base_year": 2022,
+            }
+        },
+        group_col="_child_flow_label",
+        authoritative_total_df=rows,
+    )
+
+    traces = {trace.name: list(trace.y) for trace in figure.data}
+    assert traces["9th Reference total"] == [90.0]
+    assert traces["9th Target total"] == [85.0]
 
 
 def test_technology_stack_preserves_same_named_distinct_coded_branches() -> None:

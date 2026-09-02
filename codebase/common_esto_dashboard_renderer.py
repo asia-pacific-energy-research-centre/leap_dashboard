@@ -2535,10 +2535,7 @@ def add_transport_overview_specs(
         return list(area_specs)
     flow_config = config.get("by_flow_overview", {}) or {}
     boundary = code_candidate_text(flow_config.get("flow_boundary", ""))
-    collapse_policy = dict(
-        flow_config.get("collapse_compound_to_child", {}) or {}
-    )
-    if not boundary or not collapse_policy:
+    if not boundary:
         return list(area_specs)
 
     specs = list(area_specs)
@@ -2547,7 +2544,6 @@ def add_transport_overview_specs(
             code_candidate_text(spec.get("aggregate_flow_prefix", "")) == boundary
             and str(spec.get("overview_variant", "")).strip() == "by_flow"
         ):
-            spec["collapse_compound_to_historical_child"] = collapse_policy
             spec["use_demand_coverage_frontier"] = True
             spec["prefer_transport_detail_frontier"] = bool(
                 flow_config.get("prefer_detail_frontier", False)
@@ -4848,8 +4844,13 @@ def build_area_chart(
     ) or {}
     authoritative_label_total_df = pd.DataFrame()
     if authoritative_labels_by_source:
+        authoritative_source_df = (
+            authoritative_total_df
+            if authoritative_total_df is not None
+            else df
+        )
         authoritative_rows = area_spec_rows(
-            df,
+            authoritative_source_df,
             {
                 "source_flow_labels": [],
                 "source_flow_labels_by_system": authoritative_labels_by_source,
@@ -7860,6 +7861,7 @@ def line_section_tree(
     line_rows: list[dict],
     navigation_roots: list[dict[str, object]] | None = None,
     navigation_depth_overrides: dict[str, int] | None = None,
+    placeholders_second_level: bool = False,
 ) -> list[tuple[str, list[dict[str, object]]]]:
     """Return visible flow-tree nodes grouped by renderer section.
 
@@ -8018,6 +8020,12 @@ avigation_roots``. A page-defined overview aggregate can also parent a
                 depth = 1
             else:
                 depth = 2
+            # A placeholder is an interim representation, not a true page
+            # root. Keep it in the second navigation row until the detailed
+            # source branch replaces it; the replacement then uses its normal
+            # hierarchy depth and can return to the first row.
+            if placeholders_second_level and group in placeholder_groups:
+                depth = max(depth, 2)
             depth_by_group[group] = depth
             return depth
 
@@ -8506,6 +8514,7 @@ def write_dashboard_page(
         line_rows,
         navigation_roots,
         page_config.get("navigation_depth_overrides", {}),
+        bool(page_config.get("placeholders_second_level", False)),
     )
 
     page_datasets: list[str] = [
@@ -10875,6 +10884,7 @@ def render_dashboard(
                 "aggregate_flow_label": display_aggregate_label,
             }
             chart_page_df = page_df
+            authoritative_total_source_df: pd.DataFrame | None = None
             immediate_child_parent = str(
                 area_spec.get("immediate_child_flow_parent_prefix", "")
             ).strip()
@@ -10911,6 +10921,33 @@ def render_dashboard(
                             area_spec.get("aggregate_flow_prefix", "")
                         ),
                     )
+                # A source can publish the parent aggregate but no immediate
+                # child detail. Keep that source's parent total as a
+                # comparison line in the flow view, rather than pretending it
+                # belongs to one child or losing the comparison altogether.
+                parent_rows = area_spec_rows(page_df, display_area_spec)
+                parent_sources = {
+                    str(source)
+                    for source in parent_rows["source_system"].dropna().unique()
+                }
+                child_sources = {
+                    str(source)
+                    for source in chart_page_df["source_system"].dropna().unique()
+                }
+                parent_only_sources = parent_sources - child_sources
+                labels_by_source = dict(
+                    display_area_spec.get("source_flow_labels_by_system", {}) or {}
+                )
+                parent_total_labels = {
+                    source: list(labels_by_source.get(source, []))
+                    for source in parent_only_sources
+                    if labels_by_source.get(source)
+                }
+                if parent_total_labels:
+                    display_area_spec[
+                        "authoritative_total_flow_labels_by_system"
+                    ] = parent_total_labels
+                    authoritative_total_source_df = page_df
             configured_flow_groups = list(
                 area_spec.get("configured_flow_groups", []) or []
             )
@@ -10960,6 +10997,7 @@ def render_dashboard(
                 title_prefix=str(
                     area_spec.get("title_prefix", "Aggregate by product")
                 ),
+                authoritative_total_df=authoritative_total_source_df,
             )
             if not figure.data:
                 manifest_rows[-1]["suppressed"] = True
