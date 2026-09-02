@@ -2648,6 +2648,43 @@ def test_power_own_use_navigation_stays_below_primary_owners() -> None:
     assert node["depth"] == 2
 
 
+def test_power_producer_navigation_labels_name_plant_family() -> None:
+    assert renderer.power_producer_navigation_label(
+        "Coal power CCS (all producers)"
+    ) == "Coal power CCS — Electricity plants"
+    assert renderer.power_producer_navigation_label(
+        "Gas CHP (all producers)"
+    ) == "Gas CHP — CHP plants"
+    assert renderer.power_producer_navigation_label(
+        "Coal HP (all producers)"
+    ) == "Coal HP — Heat plants"
+
+
+def test_navigation_depth_overrides_support_transport_and_buildings_tree() -> None:
+    rows = [
+        {"section_label": "Transport", "flow_group_label": "15.01,15.03-15.06 Transport non-road"},
+        {"section_label": "Transport", "flow_group_label": "15.01 Domestic air transport"},
+        {"section_label": "Buildings", "flow_group_label": "16.01 Commercial and public services"},
+        {"section_label": "Buildings", "flow_group_label": "16.01.01 Datacentres"},
+    ]
+    tree = renderer.line_section_tree(
+        rows,
+        navigation_depth_overrides={
+            "15.01,15.03-15.06 Transport non-road": 1,
+            "15.01 Domestic air transport": 2,
+            "16.01.01 Datacentres": 3,
+        },
+    )
+    depths = {
+        node["label"]: node["depth"]
+        for _section, nodes in tree
+        for node in nodes
+    }
+    assert depths["15.01,15.03-15.06 Transport non-road"] == 1
+    assert depths["15.01 Domestic air transport"] == 2
+    assert depths["16.01.01 Datacentres"] == 3
+
+
 def test_power_plant_overview_keeps_product_card_when_only_one_child_is_nonzero() -> None:
     template = {
         "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},

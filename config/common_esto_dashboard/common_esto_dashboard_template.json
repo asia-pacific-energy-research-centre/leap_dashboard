@@ -191,6 +191,7 @@
         "10.01.01 Electricity, CHP and heat plants": 2
       },
       "placeholders_second_level": true,
+      "label_all_producers_with_plant_family": true,
       "rule_note": "Electricity and heat output, plus directly related power-sector own-use rows. The specific 09.01/09.02 roots take ownership ahead of the broader Other transformation root 09."
     },
     {
@@ -262,6 +263,14 @@
         "navigation",
         "Pipeline transport"
       ],
+      "navigation_depth_overrides": {
+        "15.01,15.03-15.06 Transport non-road": 1,
+        "15.01 Domestic air transport": 2,
+        "15.03 Rail": 2,
+        "15.04 Domestic navigation": 2,
+        "15.05 Pipeline transport": 2,
+        "15.06 Non-specified transport": 2
+      },
       "rule_note": "Domestic transport final energy demand rows."
     },
     {
@@ -277,6 +286,10 @@
         "Residential",
         "Datacentres"
       ],
+      "navigation_depth_overrides": {
+        "16.01.01 Datacentres": 3,
+        "16.01.99 Commercial and public services unallocated": 3
+      },
       "rule_note": "Residential, commercial, public services, and datacentre rows."
     },
     {

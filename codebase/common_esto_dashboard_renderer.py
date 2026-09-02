@@ -7865,6 +7865,22 @@ def _overview_navigation_anchor(page_label: str, flow_label: str) -> str:
     return "overview-" + safe_slug(page_label) + "__" + safe_slug(flow_label)
 
 
+def power_producer_navigation_label(label: object) -> str:
+    """Identify detailed Power producer chips by their original plant family."""
+    text = str(label or "").strip()
+    suffix = " (all producers)"
+    if not text.endswith(suffix):
+        return text
+    producer = text[:-len(suffix)].strip()
+    if " CHP" in producer:
+        family = "CHP plants"
+    elif " HP" in producer:
+        family = "Heat plants"
+    else:
+        family = "Electricity plants"
+    return f"{producer} — {family}"
+
+
 def line_section_tree(
     line_rows: list[dict],
     navigation_roots: list[dict[str, object]] | None = None,
@@ -8504,6 +8520,16 @@ def write_dashboard_page(
     page_file = output_path.name
     area_rows = [r for r in chart_rows if r.get("chart_type") == "stacked_area" and str(r.get("section_label")) == "Overview"]
     line_rows = [r for r in chart_rows if not (r.get("chart_type") == "stacked_area" and str(r.get("section_label")) == "Overview")]
+    if bool(page_config.get("label_all_producers_with_plant_family", False)):
+        line_rows = [
+            {
+                **row,
+                "flow_group_label": power_producer_navigation_label(
+                    row.get("flow_group_label")
+                ),
+            }
+            for row in line_rows
+        ]
     navigation_roots = [
         {
             "label": str(row["navigation_root_label"]),
