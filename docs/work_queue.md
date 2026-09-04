@@ -1,5 +1,18 @@
 # LEAP dashboard work queue and handover plan
 
+## Native ESTO parent allocation — complete
+
+- **DASHQ-073 — generic historical parent allocation.** Complete 2026-09-04.
+  The active renderer now uses one shared LEAP-base-year sibling-share
+  allocator for configured Road detail and automatically discovered parents on
+  every sector page. Automatic discovery starts only from exact native ESTO
+  parents. It does not treat ESTO Extended-only structural children as
+  observations, never overwrites exact native ESTO child rows, retains the
+  parent when no matching nonzero LEAP basis exists, and conserves every
+  allocated parent total. Focused fixtures cover Road, compound Power, generic
+  Industry, native-child precedence, missing/mismatched/zero fallback, and
+  conservation.
+
 ## Source-aware aggregate routing fixes — complete
 
 - **DASHQ-072 — source-reconciled transport frontiers and overview routing.**

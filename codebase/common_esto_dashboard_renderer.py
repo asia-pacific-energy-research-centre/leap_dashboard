@@ -560,58 +560,71 @@ def estimate_esto_road_detail_from_leap_base_year_shares(
     )
 
 
-def estimate_esto_demand_detail_from_leap_base_year_shares(
+def _exact_native_history_mask(frame: pd.DataFrame) -> pd.Series:
+    """Return rows whose historical value came from an exact native ESTO key."""
+    mask = pd.Series(False, index=frame.index, dtype=bool)
+    if "is_exact_row" in frame.columns:
+        exact = frame["is_exact_row"]
+        mask |= exact.fillna(False).astype(str).str.casefold().isin(
+            {"true", "1", "yes"}
+        )
+    if "common_row_basis" in frame.columns:
+        basis = frame["common_row_basis"].fillna("").astype(str).str.casefold()
+        mask |= basis.isin({"exact_esto_row", "native_esto"})
+    return mask
+
+
+def allocate_historical_parent_by_leap_base_year_shares(
     page_df: pd.DataFrame,
     *,
     comparison_source: str,
     primary_source: str,
     primary_scenario: str,
     base_year: int,
-    component_specs: list[dict[str, object]],
+    parent_specs: list[dict[str, object]],
+    missing_basis_mode: str = "keep_parent",
 ) -> pd.DataFrame:
-    """Estimate historical ESTO detail only where genuine LEAP detail exists.
+    """Split native historical parents over the deepest LEAP child frontier.
 
-    For each component and product, the exact ESTO parent remains untouched and
-    its historical total is distributed over the non-overlapping LEAP detail
-    present in the base year.  Shares are normalised over those detailed rows,
-    so the estimates conserve the ESTO parent exactly.  Explicit zero-share
-    rows stay zero.  If the detailed LEAP denominator is zero or absent, the
-    whole ESTO value is shown as ``Unallocated`` rather than being equal-split
-    or silently assigned to a named sector.
-
-    A component with only an aggregate LEAP row is not changed.  This makes the
-    transition safe for hybrid uploads where some placeholder branches have
-    been replaced and others have not.
+    This is the shared allocation used by configured Road detail and by the
+    automatic cross-sector path.  Exact native ESTO children always take
+    precedence.  A parent is replaced only when a matching, nonzero LEAP
+    base-year basis exists for the same product; otherwise it remains visible
+    (or becomes an explicit unallocated row for the legacy demand-page mode).
     """
     required = {
         "source_system", "scenario", "year", "common_flow_code",
         "common_flow_label", "common_product_code", "common_product_label",
         "value",
     }
-    if (
-        page_df.empty
-        or not component_specs
-        or not required.issubset(page_df.columns)
-    ):
+    if page_df.empty or not parent_specs or not required.issubset(page_df.columns):
         return page_df
+    if missing_basis_mode not in {"keep_parent", "unallocated"}:
+        raise ValueError(
+            "missing_basis_mode must be either 'keep_parent' or 'unallocated'"
+        )
 
     work = page_df.copy()
-    for component_spec in component_specs:
-        boundary = str(component_spec.get("flow_boundary", "")).strip()
-        prefixes = [
-            str(value).strip()
-            for value in component_spec.get("flow_prefixes", [])
-            if str(value).strip()
-        ]
-        if not boundary or not prefixes:
+    original = page_df.copy()
+    original_native_exact = _exact_native_history_mask(original)
+    detail_key = [
+        "common_flow_code", "common_flow_label",
+        "common_product_code", "common_product_label",
+    ]
+
+    for parent_spec in parent_specs:
+        boundary = str(parent_spec.get("flow_boundary", "")).strip()
+        if not boundary:
             continue
 
         flow_text = work["common_flow_code"].astype(str).map(code_candidate_text)
-        is_exact_parent = flow_text.eq(boundary)
-        is_in_component = work["common_flow_code"].apply(
-            lambda value: code_expression_matches_any_prefix(value, prefixes)
+        is_exact_parent = flow_text.eq(code_candidate_text(boundary))
+        is_descendant = work["common_flow_code"].apply(
+            lambda value, boundary=boundary: (
+                code_candidate_text(value) != code_candidate_text(boundary)
+                and _code_expression_contains_expression(boundary, value)
+            )
         )
-        is_descendant = is_in_component & ~is_exact_parent
         is_comparison = work["source_system"].astype(str).str.casefold().eq(
             comparison_source.casefold()
         )
@@ -624,17 +637,14 @@ def estimate_esto_demand_detail_from_leap_base_year_shares(
             )
             & pd.to_numeric(work["year"], errors="coerce").eq(int(base_year))
         )
-        comparison_parent = work[is_comparison & is_exact_parent].copy()
+        parent_rows = work[is_comparison & is_exact_parent].copy()
         primary_detail = work[is_primary_base & is_descendant].copy()
-        if comparison_parent.empty or primary_detail.empty:
+        if parent_rows.empty or primary_detail.empty:
             continue
 
-        # Parents and nested intermediate rows can coexist in the converted
-        # detail. Allocation is specifically for historical detail, so select
-        # the deepest non-overlapping LEAP flow frontier rather than the
-        # aggregate-first frontier used by total charts. This places the
-        # estimate on the same technology rows the detailed chart displays.
-        drop_parent_indices: set[object] = set()
+        # Keep only the deepest non-overlapping LEAP frontier.  Intermediate
+        # totals and their children must never both contribute to the shares.
+        drop_intermediate_indices: set[object] = set()
         for _, product_rows in primary_detail.groupby(
             ["common_product_code", "common_product_label"],
             dropna=False,
@@ -652,16 +662,14 @@ def estimate_esto_demand_detail_from_leap_base_year_shares(
                     )
                     for other_index, candidate_child in codes_by_index.items()
                 ):
-                    drop_parent_indices.add(row_index)
-        if drop_parent_indices:
-            primary_detail = primary_detail.drop(index=list(drop_parent_indices))
+                    drop_intermediate_indices.add(row_index)
+        if drop_intermediate_indices:
+            primary_detail = primary_detail.drop(
+                index=list(drop_intermediate_indices)
+            )
         if primary_detail.empty:
             continue
 
-        detail_key = [
-            "common_flow_code", "common_flow_label",
-            "common_product_code", "common_product_label",
-        ]
         detail_base = primary_detail.groupby(
             detail_key, as_index=False, dropna=False
         )["value"].sum()
@@ -673,33 +681,56 @@ def estimate_esto_demand_detail_from_leap_base_year_shares(
             .drop_duplicates(detail_key, keep="first")
             .set_index(detail_key, drop=False)
         )
+        original_descendant = original["common_flow_code"].apply(
+            lambda value, boundary=boundary: (
+                code_candidate_text(value) != code_candidate_text(boundary)
+                and _code_expression_contains_expression(boundary, value)
+            )
+        )
+        native_child_product_keys = {
+            (row["common_product_code"], row["common_product_label"])
+            for _, row in original[
+                original["source_system"].astype(str).str.casefold().eq(
+                    comparison_source.casefold()
+                )
+                & original_descendant
+                & original_native_exact
+            ].iterrows()
+        }
+        work_native_exact = _exact_native_history_mask(work)
 
-        # Synthetic comparison descendants may have been inserted upstream.
-        # Once genuine LEAP detail exists, it is the structural owner and those
-        # rows are replaced with the clearly provenance-labelled allocation.
-        retained = work.loc[~(is_comparison & is_descendant)].copy()
+        drop_indices: set[object] = set()
         result_rows: list[pd.Series] = []
-        for _, parent_row in comparison_parent.iterrows():
-            parent = parent_row.copy()
-            product_code = parent.get("common_product_code")
-            product_label = parent.get("common_product_label")
+        for parent_index, parent_row in parent_rows.iterrows():
+            product_code = parent_row.get("common_product_code")
+            product_label = parent_row.get("common_product_label")
+
+            # Do not estimate over genuine native child observations.  This
+            # check uses the untouched input so earlier allocations cannot
+            # make an outer native parent appear childless.
+            native_child_exists = (
+                product_code,
+                product_label,
+            ) in native_child_product_keys
+            if native_child_exists:
+                continue
+
             product_detail = detail_base[
                 detail_base["common_product_code"].eq(product_code)
                 & detail_base["common_product_label"].eq(product_label)
             ].copy()
             denominator = float(product_detail["value"].sum())
-            parent_value = float(pd.to_numeric(parent.get("value"), errors="coerce"))
-
-            if abs(denominator) <= 1e-12:
-                unallocated = parent.copy()
+            if product_detail.empty or abs(denominator) <= 1e-12:
+                if missing_basis_mode == "keep_parent":
+                    continue
+                unallocated = parent_row.copy()
                 unallocated["common_flow_code"] = f"{boundary}.999999"
                 component_label = str(
-                    component_spec.get("label", boundary)
+                    parent_spec.get("label", boundary)
                 ).strip()
                 unallocated["common_flow_label"] = (
                     f"Unallocated within {component_label}"
                 )
-                unallocated["value"] = parent_value
                 unallocated["_historical_estimation_method"] = (
                     "unallocated_no_leap_base_year_share"
                 )
@@ -708,15 +739,17 @@ def estimate_esto_demand_detail_from_leap_base_year_shares(
                 )
                 if "is_exact_row" in work.columns:
                     unallocated["is_exact_row"] = False
+                drop_indices.add(parent_index)
                 result_rows.append(unallocated)
                 continue
 
+            parent_value = float(
+                pd.to_numeric(parent_row.get("value"), errors="coerce")
+            )
             product_detail["_allocation_share"] = (
                 product_detail["value"] / denominator
             )
             allocated_values = parent_value * product_detail["_allocation_share"]
-            # Put floating-point residue on the final nonzero-share row.  This
-            # keeps the exact parent identity without changing any zero share.
             residue = parent_value - float(allocated_values.sum())
             nonzero_positions = product_detail.index[
                 product_detail["_allocation_share"].abs().gt(1e-12)
@@ -724,20 +757,32 @@ def estimate_esto_demand_detail_from_leap_base_year_shares(
             if len(nonzero_positions):
                 allocated_values.loc[nonzero_positions[-1]] += residue
 
+            drop_indices.add(parent_index)
+            parent_year = pd.to_numeric(parent_row.get("year"), errors="coerce")
+            synthetic_descendants = (
+                is_comparison
+                & is_descendant
+                & work["common_product_code"].eq(product_code)
+                & work["common_product_label"].eq(product_label)
+                & pd.to_numeric(work["year"], errors="coerce").eq(parent_year)
+                & ~work_native_exact
+            )
+            drop_indices.update(work.index[synthetic_descendants].tolist())
+
             for position, detail_row in product_detail.iterrows():
                 key = tuple(detail_row[column] for column in detail_key)
                 template_row = templates.loc[key]
                 if isinstance(template_row, pd.DataFrame):
                     template_row = template_row.iloc[0]
-                estimate = parent.copy()
+                estimate = parent_row.copy()
                 for column in work.columns:
                     if column in template_row.index and column not in {
                         "source_system", "scenario", "year", "value",
                     }:
                         estimate[column] = template_row[column]
                 estimate["source_system"] = comparison_source
-                estimate["scenario"] = parent.get("scenario", "historical")
-                estimate["year"] = parent.get("year")
+                estimate["scenario"] = parent_row.get("scenario", "historical")
+                estimate["year"] = parent_row.get("year")
                 estimate["value"] = float(allocated_values.loc[position])
                 estimate["_historical_estimation_method"] = (
                     "estimated_from_leap_base_year_share"
@@ -749,14 +794,118 @@ def estimate_esto_demand_detail_from_leap_base_year_shares(
                     estimate["is_exact_row"] = False
                 result_rows.append(estimate)
 
-        if result_rows:
+        if drop_indices or result_rows:
             work = pd.concat(
-                [retained, pd.DataFrame(result_rows)], ignore_index=True, sort=False
+                [
+                    work.drop(index=list(drop_indices)),
+                    pd.DataFrame(result_rows),
+                ],
+                ignore_index=True,
+                sort=False,
             )
-        else:
-            work = retained
 
     return work
+
+
+def estimate_esto_demand_detail_from_leap_base_year_shares(
+    page_df: pd.DataFrame,
+    *,
+    comparison_source: str,
+    primary_source: str,
+    primary_scenario: str,
+    base_year: int,
+    component_specs: list[dict[str, object]],
+) -> pd.DataFrame:
+    """Estimate historical ESTO detail only where genuine LEAP detail exists.
+
+    For each component and product, the exact ESTO parent total is distributed
+    over the non-overlapping LEAP detail present in the base year. Shares are
+    normalised over those detailed rows, so the estimates conserve the ESTO
+    parent exactly. Explicit zero-share rows stay zero. If the detailed LEAP
+    denominator is zero or absent, the whole ESTO value is shown as
+    ``Unallocated`` rather than being equal-split or silently assigned to a
+    named sector.
+
+    A component with only an aggregate LEAP row is not changed.  This makes the
+    transition safe for hybrid uploads where some placeholder branches have
+    been replaced and others have not.
+    """
+    return allocate_historical_parent_by_leap_base_year_shares(
+        page_df,
+        comparison_source=comparison_source,
+        primary_source=primary_source,
+        primary_scenario=primary_scenario,
+        base_year=base_year,
+        parent_specs=component_specs,
+        missing_basis_mode="unallocated",
+    )
+
+
+def automatic_historical_parent_allocation_specs(
+    page_df: pd.DataFrame,
+    *,
+    comparison_source: str,
+    primary_source: str,
+    primary_scenario: str,
+    base_year: int,
+) -> list[dict[str, object]]:
+    """Discover native ESTO parents that need a LEAP-defined child split.
+
+    ESTO Extended-only structural children are intentionally absent from the
+    historical facts.  This discovery therefore starts from an exact native
+    parent and uses the LEAP base-year hierarchy only as the allocation basis.
+    It never treats a derived Extended child as an observed value.
+    """
+    required = {
+        "source_system", "scenario", "year", "common_flow_code",
+        "common_flow_label",
+    }
+    if page_df.empty or not required.issubset(page_df.columns):
+        return []
+
+    comparison_rows = page_df[
+        page_df["source_system"].astype(str).str.casefold().eq(
+            comparison_source.casefold()
+        )
+        & _exact_native_history_mask(page_df)
+    ]
+    primary_base_rows = page_df[
+        page_df["source_system"].astype(str).str.casefold().eq(
+            primary_source.casefold()
+        )
+        & page_df["scenario"].astype(str).str.casefold().eq(
+            primary_scenario.casefold()
+        )
+        & pd.to_numeric(page_df["year"], errors="coerce").eq(int(base_year))
+    ]
+    if comparison_rows.empty or primary_base_rows.empty:
+        return []
+
+    primary_codes = {
+        code_candidate_text(value)
+        for value in primary_base_rows["common_flow_code"].dropna().unique()
+        if code_candidate_text(value)
+    }
+    specs: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for _, row in comparison_rows.sort_values("common_flow_code").iterrows():
+        boundary = code_candidate_text(row.get("common_flow_code"))
+        if not boundary or boundary in seen:
+            continue
+        has_leap_child = any(
+            child != boundary
+            and _code_expression_contains_expression(boundary, child)
+            for child in primary_codes
+        )
+        if not has_leap_child:
+            continue
+        seen.add(boundary)
+        specs.append({
+            "component": "automatic_native_parent",
+            "flow_boundary": boundary,
+            "label": str(row.get("common_flow_label", boundary)).strip(),
+        })
+    return specs
 
 
 def demand_detail_component_specs_for_page(
@@ -10731,6 +10880,23 @@ def render_dashboard(
                 primary_scenario=primary_scenario,
                 base_year=base_year,
                 component_specs=detail_component_specs,
+            )
+        automatic_parent_specs = automatic_historical_parent_allocation_specs(
+            page_df,
+            comparison_source=comparison_source,
+            primary_source=primary_source,
+            primary_scenario=primary_scenario,
+            base_year=base_year,
+        )
+        if automatic_parent_specs:
+            page_df = allocate_historical_parent_by_leap_base_year_shares(
+                page_df,
+                comparison_source=comparison_source,
+                primary_source=primary_source,
+                primary_scenario=primary_scenario,
+                base_year=base_year,
+                parent_specs=automatic_parent_specs,
+                missing_basis_mode="keep_parent",
             )
         if page_key == "power":
             page_df = prepare_power_page_rows(page_df)
