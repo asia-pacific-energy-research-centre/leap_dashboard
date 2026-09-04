@@ -4120,6 +4120,48 @@ def _coverage_selected_demand_frontier(
                 selected = group.loc[group_codes.eq("15")]
             if selected.empty:
                 road_selected = group.loc[group_codes.eq("15.02")]
+                if road_selected.empty:
+                    # Historical ESTO Road parents can be allocated onto the
+                    # LEAP technology frontier before this overview is built.
+                    # Those rows still own the published 15.02 boundary here.
+                    # Recover their non-overlapping total and display it as
+                    # Road; otherwise a product that also has non-road detail
+                    # resolves the whole product group without any Road value.
+                    road_detail = group.loc[
+                        group_codes.map(
+                            lambda code: (
+                                code != "15.02"
+                                and code_matches_prefix(code, "15.02")
+                            )
+                        )
+                    ]
+                    if not road_detail.empty:
+                        estimation_basis = road_detail.get(
+                            "common_row_basis",
+                            pd.Series("", index=road_detail.index),
+                        ).fillna("").astype(str).str.casefold()
+                        if estimation_basis.eq(
+                            "estimated_from_leap_base_year_share"
+                        ).all():
+                            # The allocator has already selected the deepest
+                            # non-overlapping LEAP frontier and conserved the
+                            # native ESTO parent over it. Re-running the generic
+                            # Common-row subtotal selector can discard some of
+                            # that allocated frontier because its rows inherit
+                            # structural membership metadata from LEAP.
+                            road_selected = road_detail.copy()
+                        else:
+                            road_selected = _non_overlapping_flow_rows(
+                                _non_overlapping_common_row_frontier(road_detail)
+                            ).copy()
+                        road_selected["common_flow_code"] = "15.02"
+                        road_selected["common_flow_label"] = "15.02 Road"
+                        work.loc[
+                            road_selected.index,
+                            ["common_flow_code", "common_flow_label"],
+                        ] = road_selected[
+                            ["common_flow_code", "common_flow_label"]
+                        ]
                 if not explicit_rows.empty:
                     nonroad_selected = _non_overlapping_flow_rows(
                         _non_overlapping_common_row_frontier(explicit_rows)

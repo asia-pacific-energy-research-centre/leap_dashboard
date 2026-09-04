@@ -2973,6 +2973,44 @@ def test_transport_flow_overview_detects_detail_across_products() -> None:
     assert selected["value"].sum() == 18.0
 
 
+def test_transport_flow_overview_rolls_allocated_road_detail_to_road_boundary() -> None:
+    """Estimated Road descendants must not disappear from the root flow stack."""
+    rows = pd.DataFrame([
+        {
+            **_demand_frontier_row(
+                "ESTO_EXTENDED", "15.02.01", 400.0, "07.01"
+            ),
+            "common_flow_label": "15.02.01 Freight road",
+            "common_row_basis": "estimated_from_leap_base_year_share",
+        },
+        {
+            **_demand_frontier_row(
+                "ESTO_EXTENDED", "15.02.02", 600.0, "07.01"
+            ),
+            "common_flow_label": "15.02.02 Passenger road",
+            "common_row_basis": "estimated_from_leap_base_year_share",
+        },
+        _demand_frontier_row("ESTO_EXTENDED", "15.01", 10.0, "07.05"),
+        _demand_frontier_row("ESTO_EXTENDED", "15.03", 20.0, "07.07"),
+    ])
+
+    selected = renderer._coverage_selected_demand_frontier(
+        rows,
+        prefer_transport_detail=True,
+    )
+
+    assert set(selected["common_flow_code"]) == {
+        "15.02", "15.01", "15.03"
+    }
+    assert set(
+        selected.loc[
+            selected["common_flow_code"].eq("15.02"),
+            "common_flow_label",
+        ]
+    ) == {"15.02 Road"}
+    assert selected["value"].sum() == 1030.0
+
+
 def test_domestic_tfc_total_uses_the_displayed_hybrid_frontier() -> None:
     declared = pd.DataFrame([
         {"source_system": "LEAP", "scenario": "Target", "year": 2023, "value": 100.0},
