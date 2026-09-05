@@ -1,5 +1,13 @@
 # LEAP dashboard work queue and handover plan
 
+## Buildings historical-frontier reconciliation — complete 2026-09-05
+
+- Detailed Buildings overview charts retain published child detail only up to
+  the authoritative aggregate total. When incomplete detailed ESTO children
+  do not reconcile to the native `16.01`/`16.02` parents, the remaining value
+  is shown explicitly as unallocated instead of silently replacing the parent.
+  Fully reconciled detail and aggregate-only placeholders are unchanged.
+
 ## Dashboard consistency follow-ups — complete 2026-09-05
 
 All four recurring issues are implemented and pinned into the web runtime.

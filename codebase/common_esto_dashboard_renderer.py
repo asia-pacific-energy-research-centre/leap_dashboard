@@ -1884,7 +1884,7 @@ def configured_flow_group_rows(
     rows: pd.DataFrame,
     flow_groups: list[dict[str, object]],
 ) -> pd.DataFrame:
-    """Collapse source-specific detail to configured comparison flow owners."""
+    """Collapse source detail to configured owners, retaining reconciliation residuals."""
     if rows.empty or "common_flow_code" not in rows.columns:
         return rows.iloc[0:0].copy()
     out = rows.copy()
@@ -1898,6 +1898,10 @@ def configured_flow_group_rows(
             lambda code: _code_expression_contains_expression(boundary, code)
         )
         out.loc[mask, "_configured_flow_group_label"] = label
+    residual = out["common_flow_code"].astype(str).str.endswith(" residual")
+    out.loc[residual, "_configured_flow_group_label"] = out.loc[
+        residual, "common_flow_label"
+    ].astype(str)
     return out.loc[out["_configured_flow_group_label"].ne("")].copy()
 
 
@@ -2886,7 +2890,6 @@ def add_buildings_overview_specs(
             "source_flow_labels_by_system": labels_by_source,
             "explicit_flow_boundary": True,
             "preferred_detail_flow_boundaries": detail_boundaries,
-            "prefer_published_detail_over_parent_total": True,
             "configured_flow_groups": list(aggregate.get("flow_groups", []) or []),
             "skip_product_overview_ownership": True,
         }
@@ -11364,10 +11367,16 @@ def render_dashboard(
                 area_spec.get("configured_flow_groups", []) or []
             )
             if configured_flow_groups and group_col == "_configured_flow_group_label":
-                chart_page_df = configured_flow_group_rows(
+                chart_page_df = resolved_area_chart_rows(
                     area_spec_rows(page_df, display_area_spec),
+                    display_area_spec,
+                    group_col="common_product_label",
+                )
+                chart_page_df = configured_flow_group_rows(
+                    chart_page_df,
                     configured_flow_groups,
                 )
+                display_area_spec["rows_are_resolved_area_frontier"] = True
             chart_key = f"chart__area__{safe_slug(area_spec['aggregate_flow_prefix'])}__{safe_slug(source_aggregate_label)}"
             if overview_variant != "by_product":
                 chart_key = f"{chart_key}__{safe_slug(overview_variant)}"

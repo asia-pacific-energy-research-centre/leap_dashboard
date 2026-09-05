@@ -1961,6 +1961,95 @@ def test_detailed_buildings_overview_uses_only_two_configured_pairs() -> None:
     assert services_flow["value"].sum() == pytest.approx(20.0)
 
 
+def test_buildings_overview_reconciles_incomplete_historical_children_to_parent() -> None:
+    """Incomplete ESTO detail keeps the missing parent remainder visible."""
+    labels = {
+        "16.01-16.02": "16.01-16.02 Buildings",
+        "16.01": "16.01 Commercial and public services",
+        "16.02": "16.02 Residential",
+    }
+    rows = []
+    for source, scenario, year, values in (
+        (
+            "ESTO_EXTENDED",
+            "historical",
+            2022,
+            [("16.01-16.02", 100.0), ("16.01", 55.0), ("16.02", 35.0)],
+        ),
+        ("LEAP", "Target", 2030, [("16.01-16.02", 100.0)]),
+        ("NINTH", "Reference", 2030, [("16.01-16.02", 90.0)]),
+    ):
+        for flow, value in values:
+            row = _area_product_row(source, scenario, year, flow, "17", value)
+            row.update({
+                "common_flow_label": labels[flow],
+                "common_product_label": "17 Electricity",
+            })
+            rows.append(row)
+    frame = pd.DataFrame(rows)
+    template = {
+        "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
+        "buildings_page": {
+            "page_key": "buildings",
+            "overview": {
+                "enabled": True,
+                "aggregates": [{
+                    "flow_boundary": "16.01-16.02",
+                    "label": labels["16.01-16.02"],
+                    "preferred_detail_flow_boundaries": ["16.01", "16.02"],
+                    "flow_groups": [
+                        {"flow_boundary": "16.01", "label": labels["16.01"]},
+                        {"flow_boundary": "16.02", "label": labels["16.02"]},
+                    ],
+                }],
+            },
+        },
+    }
+
+    specs = renderer.add_buildings_overview_specs(
+        "buildings", frame, [], template
+    )
+    spec = specs[0]
+    assert not spec.get("prefer_published_detail_over_parent_total", False)
+
+    resolved = renderer.resolved_area_chart_rows(frame, spec)
+    historical = resolved[resolved["source_system"].eq("ESTO_EXTENDED")]
+    assert historical["common_flow_code"].tolist() == [
+        "16.01", "16.02", "16.01-16.02 residual"
+    ]
+    assert historical["value"].sum() == pytest.approx(100.0)
+    assert historical.loc[
+        historical["common_flow_code"].eq("16.01-16.02 residual"), "value"
+    ].item() == pytest.approx(10.0)
+
+    # Placeholder comparison surfaces remain their published parent rows;
+    # the historical residual must not leak into LEAP or 9th representations.
+    for source, expected_year, expected_value in (
+        ("LEAP", 2030, 100.0),
+        ("NINTH", 2030, 90.0),
+    ):
+        comparison = resolved[resolved["source_system"].eq(source)]
+        assert comparison["common_flow_code"].tolist() == ["16.01-16.02"]
+        assert comparison["year"].tolist() == [expected_year]
+        assert comparison["value"].item() == pytest.approx(expected_value)
+
+    flow_spec = specs[1]
+    flow_frontier = renderer.resolved_area_chart_rows(frame, flow_spec)
+    flow_rows = renderer.configured_flow_group_rows(
+        flow_frontier,
+        flow_spec["configured_flow_groups"],
+    )
+    historical_flow = flow_rows[
+        flow_rows["source_system"].eq("ESTO_EXTENDED")
+    ]
+    assert historical_flow["value"].sum() == pytest.approx(100.0)
+    assert set(historical_flow["_configured_flow_group_label"]) == {
+        labels["16.01"],
+        labels["16.02"],
+        "16.01-16.02 Buildings — remaining flow not separately identified",
+    }
+
+
 def test_detailed_road_section_keeps_only_technology_summary_under_road() -> None:
     """Detailed Road has one technology summary, owned by Road navigation."""
     rows = pd.DataFrame([
@@ -2414,7 +2503,7 @@ def test_power_navigation_marks_only_active_interim_rollup_owners() -> None:
     )
     power_nodes = [node for _section, section_nodes in power_tree for node in section_nodes]
     assert {
-        node["level"] for node in power_nodes if node["placeholder"]
+        node["depth"] for node in power_nodes if node["placeholder"]
     } == {2}
 
 
