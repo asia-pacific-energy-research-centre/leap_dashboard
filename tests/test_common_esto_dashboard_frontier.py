@@ -3067,6 +3067,9 @@ def test_power_overview_owned_flow_does_not_get_generic_duplicate_summary() -> N
         "power_page": {
             "page_key": "power",
             "overview": {
+                "suppress_redundant_detail_flow_codes": [
+                    "09.01.02,09.02.02,09.01.02.01,09.02.02.01"
+                ],
                 "aggregates": [
                     {
                         "flow_boundary": "09.01.02,09.02.02",
@@ -3091,6 +3094,10 @@ def test_power_overview_owned_flow_does_not_get_generic_duplicate_summary() -> N
         "Total transformation - no transfers" in str(row.get("flow_group_label", ""))
         for row in chart_rows
     )
+    remaining = renderer.drop_configured_redundant_detail_rows(
+        "power", rows, template
+    )
+    assert set(remaining["common_flow_code"]) == {"09.01.01"}
 
 
 def _demand_frontier_row(

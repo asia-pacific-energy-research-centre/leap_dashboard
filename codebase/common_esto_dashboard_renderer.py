@@ -3594,10 +3594,14 @@ def drop_configured_redundant_detail_rows(
         return detail_page_df.copy()
     other_config = template.get("other_demand_page", {}) or {}
     buildings_config = template.get("buildings_page", {}) or {}
+    power_config = template.get("power_page", {}) or {}
     page_configs = {
         str(other_config.get("page_key", "others")).strip(): other_config,
         str(buildings_config.get("page_key", "buildings")).strip(): (
             buildings_config.get("overview", {}) or {}
+        ),
+        str(power_config.get("page_key", "power")).strip(): (
+            power_config.get("overview", {}) or {}
         ),
     }
     config = page_configs.get(page_key, {})
