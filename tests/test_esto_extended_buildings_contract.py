@@ -184,6 +184,59 @@ def test_native_extended_children_are_preserved_while_missing_children_are_alloc
     ].shape[0]
 
 
+def test_losslessly_rolled_native_children_reconcile_one_display_fuel_envelope() -> None:
+    """Several native components can share one displayed Common fuel."""
+    rows = []
+    for common_row_id, value in (("parent-a", 40.0), ("parent-b", 60.0)):
+        row = _building_row(
+            "ESTO_EXTENDED", "historical", "05_PRC", 2022,
+            BUILDINGS_BOUNDARY, "07.01", value, exact_native=True,
+        )
+        row["common_row_id"] = common_row_id
+        rows.append(row)
+    for flow, common_row_id, value in (
+        ("16.01", "services", 30.0),
+        ("16.02", "residential", 70.0),
+    ):
+        row = _building_row(
+            "ESTO_EXTENDED", "historical", "05_PRC", 2022,
+            flow, "07.01", value,
+        )
+        row.update(
+            {
+                "common_row_id": common_row_id,
+                "common_row_basis": "connected_component_rollup",
+                "is_exact_row": False,
+            }
+        )
+        rows.append(row)
+    rows.extend(
+        [
+            _building_row(
+                "LEAP", "Target", "05_PRC", 2022,
+                "16.01", "07.01", 20.0,
+            ),
+            _building_row(
+                "LEAP", "Target", "05_PRC", 2022,
+                "16.02", "07.01", 80.0,
+            ),
+        ]
+    )
+    audit_rows: list[dict[str, object]] = []
+
+    fixed = _allocate(pd.DataFrame(rows), audit_rows=audit_rows)
+    historical = fixed[fixed["source_system"].eq("ESTO_EXTENDED")]
+
+    assert historical.set_index("common_flow_code")["value"].to_dict() == {
+        "16.01": pytest.approx(30.0),
+        "16.02": pytest.approx(70.0),
+    }
+    assert len(audit_rows) == 1
+    assert audit_rows[0]["parent_value"] == pytest.approx(100.0)
+    assert audit_rows[0]["preserved_native_child_value"] == pytest.approx(100.0)
+    assert audit_rows[0]["allocation_status"] == "native_children_reconciled"
+
+
 def test_estimated_buildings_children_conserve_each_parent_by_economy_year_and_fuel() -> None:
     source = _china_buildings_rows()
     fixed = _allocate(source)

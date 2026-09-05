@@ -590,6 +590,24 @@ def _exact_native_history_mask(frame: pd.DataFrame) -> pd.Series:
     return mask
 
 
+def _native_historical_observation_mask(frame: pd.DataFrame) -> pd.Series:
+    """Return exact or losslessly rolled rows backed by native ESTO facts."""
+    mask = _exact_native_history_mask(frame)
+    if "common_row_basis" in frame.columns:
+        basis = frame["common_row_basis"].fillna("").astype(str).str.casefold()
+        mask |= basis.eq("connected_component_rollup")
+    if "_historical_estimation_method" in frame.columns:
+        estimated = (
+            frame["_historical_estimation_method"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .ne("")
+        )
+        mask &= ~estimated
+    return mask
+
+
 def allocate_historical_parent_by_leap_base_year_shares(
     page_df: pd.DataFrame,
     *,
@@ -625,7 +643,12 @@ def allocate_historical_parent_by_leap_base_year_shares(
 
     work = page_df.copy()
     original = page_df.copy()
-    original_native_exact = _exact_native_history_mask(original)
+    original_native_observation = _native_historical_observation_mask(original)
+    context_columns = [
+        column
+        for column in ("comparison_scope", "economy", "scenario", "year")
+        if column in original.columns
+    ]
     basis_context_columns = [
         column
         for column in ("economy",)
@@ -666,6 +689,26 @@ def allocate_historical_parent_by_leap_base_year_shares(
         primary_detail = work[is_primary_base & is_descendant].copy()
         if parent_rows.empty:
             continue
+        parent_group_columns = [
+            *context_columns,
+            "common_flow_code", "common_flow_label",
+            "common_product_code", "common_product_label",
+        ]
+        parent_groups: list[tuple[list[object], pd.Series]] = []
+        for _, grouped_parents in parent_rows.groupby(
+            parent_group_columns,
+            dropna=False,
+            sort=False,
+        ):
+            aggregated_parent = grouped_parents.iloc[0].copy()
+            aggregated_parent["value"] = float(
+                pd.to_numeric(grouped_parents["value"], errors="coerce")
+                .fillna(0.0)
+                .sum()
+            )
+            parent_groups.append(
+                (grouped_parents.index.tolist(), aggregated_parent)
+            )
 
         # Keep only the deepest non-overlapping LEAP frontier.  Intermediate
         # totals and their children must never both contribute to the shares.
@@ -710,12 +753,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 and _code_expression_contains_expression(boundary, value)
             )
         )
-        work_native_exact = _exact_native_history_mask(work)
-        context_columns = [
-            column
-            for column in ("comparison_scope", "economy", "scenario", "year")
-            if column in original.columns
-        ]
+        work_native_observation = _native_historical_observation_mask(work)
         product_columns = ["common_product_code", "common_product_label"]
         detail_group_columns = [*basis_context_columns, *product_columns]
         detail_by_parent_key = {
@@ -733,7 +771,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 comparison_source.casefold()
             )
             & original_descendant
-            & original_native_exact
+            & original_native_observation
         ].copy()
         native_intermediate_indices: set[object] = set()
         for _, native_group in native_pool.groupby(
@@ -768,7 +806,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
         }
 
         synthetic_pool = work.loc[
-            is_comparison & is_descendant & ~work_native_exact
+            is_comparison & is_descendant & ~work_native_observation
         ]
         synthetic_indices_by_parent_key = {
             key: rows.index.tolist()
@@ -781,7 +819,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
 
         drop_indices: set[object] = set()
         result_rows: list[pd.Series] = []
-        for parent_index, parent_row in parent_rows.iterrows():
+        for parent_indices, parent_row in parent_groups:
             product_code = parent_row.get("common_product_code")
             product_label = parent_row.get("common_product_label")
 
@@ -854,7 +892,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
             })
 
             if abs(remainder) <= tolerance and not native_children.empty:
-                drop_indices.add(parent_index)
+                drop_indices.update(parent_indices)
                 audit.update({
                     "qa_status": "PASS",
                     "allocation_status": "native_children_reconciled",
@@ -881,13 +919,18 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 )
             if failure_reason:
                 if missing_basis_mode == "keep_parent":
-                    work.at[parent_index, "_historical_allocation_status"] = (
+                    retained_parent = parent_row.copy()
+                    retained_parent["_historical_allocation_status"] = (
                         "failed_parent_retained"
                     )
-                    work.at[parent_index, "_historical_allocation_failure_reason"] = (
+                    retained_parent["_historical_allocation_failure_reason"] = (
                         failure_reason
                     )
-                    work.at[parent_index, "_historical_allocation_uncovered_value"] = remainder
+                    retained_parent[
+                        "_historical_allocation_uncovered_value"
+                    ] = remainder
+                    drop_indices.update(parent_indices)
+                    result_rows.append(retained_parent)
                     audit.update({
                         "qa_status": "FAIL",
                         "allocation_status": "failed_parent_retained",
@@ -916,7 +959,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 )
                 if "is_exact_row" in work.columns:
                     unallocated["is_exact_row"] = False
-                drop_indices.add(parent_index)
+                drop_indices.update(parent_indices)
                 result_rows.append(unallocated)
                 audit.update({
                     "qa_status": "FAIL",
@@ -939,7 +982,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
             if len(nonzero_positions):
                 allocated_values.loc[nonzero_positions[-1]] += residue
 
-            drop_indices.add(parent_index)
+            drop_indices.update(parent_indices)
             drop_indices.update(
                 synthetic_indices_by_parent_key.get(native_lookup_key, [])
             )
