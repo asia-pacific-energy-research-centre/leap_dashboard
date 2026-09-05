@@ -1,6 +1,13 @@
 # LEAP dashboard work queue and handover plan
 
-## Dashboard consistency follow-ups — active
+## Dashboard consistency follow-ups — complete 2026-09-05
+
+All four recurring issues are implemented and pinned into the web runtime.
+The final AUS version package contains 262 compared charts (43 total and 219
+detailed overlays); Transport by-product/by-flow LEAP totals agree exactly in
+both published scopes; the redundant compound Power owner has zero cards while
+the configured CHP owner remains; and the PRC package publishes only combined
+`04-05` LEAP bunkers. Focused regression suites pass in all three repositories.
 
 - **Issue 1 — shared Transport overview frontier.** The Transport by-product
   and by-flow Overview cards must resolve the same source/year/product frontier
