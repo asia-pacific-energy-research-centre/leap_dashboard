@@ -671,7 +671,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
         # totals and their children must never both contribute to the shares.
         drop_intermediate_indices: set[object] = set()
         for _, product_rows in primary_detail.groupby(
-            ["common_product_code", "common_product_label"],
+            [*basis_context_columns, "common_product_code", "common_product_label"],
             dropna=False,
             sort=False,
         ):
@@ -711,6 +711,73 @@ def allocate_historical_parent_by_leap_base_year_shares(
             )
         )
         work_native_exact = _exact_native_history_mask(work)
+        context_columns = [
+            column
+            for column in ("comparison_scope", "economy", "scenario", "year")
+            if column in original.columns
+        ]
+        product_columns = ["common_product_code", "common_product_label"]
+        detail_group_columns = [*basis_context_columns, *product_columns]
+        detail_by_parent_key = {
+            key: rows.copy()
+            for key, rows in detail_base.groupby(
+                detail_group_columns,
+                dropna=False,
+                sort=False,
+            )
+        }
+
+        native_group_columns = [*context_columns, *product_columns]
+        native_pool = original.loc[
+            original["source_system"].astype(str).str.casefold().eq(
+                comparison_source.casefold()
+            )
+            & original_descendant
+            & original_native_exact
+        ].copy()
+        native_intermediate_indices: set[object] = set()
+        for _, native_group in native_pool.groupby(
+            native_group_columns,
+            dropna=False,
+            sort=False,
+        ):
+            codes_by_index = native_group["common_flow_code"].to_dict()
+            for row_index, candidate_parent in codes_by_index.items():
+                if any(
+                    other_index != row_index
+                    and code_candidate_text(candidate_parent)
+                    != code_candidate_text(candidate_child)
+                    and _code_expression_contains_expression(
+                        candidate_parent,
+                        candidate_child,
+                    )
+                    for other_index, candidate_child in codes_by_index.items()
+                ):
+                    native_intermediate_indices.add(row_index)
+        if native_intermediate_indices:
+            native_pool = native_pool.drop(
+                index=list(native_intermediate_indices)
+            )
+        native_children_by_parent_key = {
+            key: rows.copy()
+            for key, rows in native_pool.groupby(
+                native_group_columns,
+                dropna=False,
+                sort=False,
+            )
+        }
+
+        synthetic_pool = work.loc[
+            is_comparison & is_descendant & ~work_native_exact
+        ]
+        synthetic_indices_by_parent_key = {
+            key: rows.index.tolist()
+            for key, rows in synthetic_pool.groupby(
+                native_group_columns,
+                dropna=False,
+                sort=False,
+            )
+        }
 
         drop_indices: set[object] = set()
         result_rows: list[pd.Series] = []
@@ -718,52 +785,28 @@ def allocate_historical_parent_by_leap_base_year_shares(
             product_code = parent_row.get("common_product_code")
             product_label = parent_row.get("common_product_label")
 
-            product_detail = detail_base[
-                detail_base["common_product_code"].eq(product_code)
-                & detail_base["common_product_label"].eq(product_label)
-            ].copy()
-            for column in basis_context_columns:
-                product_detail = product_detail[
-                    product_detail[column].eq(parent_row.get(column))
+            detail_lookup_key = tuple(
+                [
+                    *(parent_row.get(column) for column in basis_context_columns),
+                    product_code,
+                    product_label,
                 ]
-            context_columns = [
-                column
-                for column in (
-                    "comparison_scope", "economy", "scenario", "year"
-                )
-                if column in original.columns
-            ]
-            native_mask = (
-                original["source_system"].astype(str).str.casefold().eq(
-                    comparison_source.casefold()
-                )
-                & original_descendant
-                & original_native_exact
-                & original["common_product_code"].eq(product_code)
-                & original["common_product_label"].eq(product_label)
             )
-            for column in context_columns:
-                native_mask &= original[column].eq(parent_row.get(column))
-            native_children = original.loc[native_mask].copy()
-            if not native_children.empty:
-                intermediate_indices: set[object] = set()
-                codes_by_index = native_children["common_flow_code"].to_dict()
-                for row_index, candidate_parent in codes_by_index.items():
-                    if any(
-                        other_index != row_index
-                        and code_candidate_text(candidate_parent)
-                        != code_candidate_text(candidate_child)
-                        and _code_expression_contains_expression(
-                            candidate_parent,
-                            candidate_child,
-                        )
-                        for other_index, candidate_child in codes_by_index.items()
-                    ):
-                        intermediate_indices.add(row_index)
-                if intermediate_indices:
-                    native_children = native_children.drop(
-                        index=list(intermediate_indices)
-                    )
+            product_detail = detail_by_parent_key.get(
+                detail_lookup_key,
+                detail_base.iloc[0:0],
+            ).copy()
+            native_lookup_key = tuple(
+                [
+                    *(parent_row.get(column) for column in context_columns),
+                    product_code,
+                    product_label,
+                ]
+            )
+            native_children = native_children_by_parent_key.get(
+                native_lookup_key,
+                native_pool.iloc[0:0],
+            ).copy()
 
             native_boundaries = [
                 code_candidate_text(value)
@@ -853,19 +896,8 @@ def allocate_historical_parent_by_leap_base_year_shares(
                     })
                     if audit_rows is not None:
                         audit_rows.append(audit)
-                    failed_synthetic_descendants = (
-                        is_comparison
-                        & is_descendant
-                        & work["common_product_code"].eq(product_code)
-                        & work["common_product_label"].eq(product_label)
-                        & ~work_native_exact
-                    )
-                    for column in context_columns:
-                        failed_synthetic_descendants &= work[column].eq(
-                            parent_row.get(column)
-                        )
                     drop_indices.update(
-                        work.index[failed_synthetic_descendants].tolist()
+                        synthetic_indices_by_parent_key.get(native_lookup_key, [])
                     )
                     continue
                 unallocated = parent_row.copy()
@@ -908,18 +940,9 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 allocated_values.loc[nonzero_positions[-1]] += residue
 
             drop_indices.add(parent_index)
-            parent_year = pd.to_numeric(parent_row.get("year"), errors="coerce")
-            synthetic_descendants = (
-                is_comparison
-                & is_descendant
-                & work["common_product_code"].eq(product_code)
-                & work["common_product_label"].eq(product_label)
-                & pd.to_numeric(work["year"], errors="coerce").eq(parent_year)
-                & ~work_native_exact
+            drop_indices.update(
+                synthetic_indices_by_parent_key.get(native_lookup_key, [])
             )
-            for column in context_columns:
-                synthetic_descendants &= work[column].eq(parent_row.get(column))
-            drop_indices.update(work.index[synthetic_descendants].tolist())
 
             for position, detail_row in missing_detail.iterrows():
                 key = tuple(detail_row[column] for column in detail_key)
