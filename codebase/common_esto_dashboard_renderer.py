@@ -4321,7 +4321,10 @@ def _non_overlapping_flow_rows(df: pd.DataFrame) -> pd.DataFrame:
 
     context_columns = [
         column
-        for column in ("comparison_scope", "economy", "source_system", "scenario")
+        for column in (
+            "comparison_scope", "economy", "source_system", "scenario",
+            "common_product_code",
+        )
         if column in work.columns
     ]
     category_rows = work[context_columns + ["common_flow_label", "_flow_code", "_flow_name", "_is_boundary_adjusted"]].drop_duplicates()
@@ -6063,6 +6066,9 @@ def resolved_area_chart_rows(
             _non_overlapping_common_row_frontier(detail_rows)
         )
         if not detail_rows.empty:
+            # ESTO is authoritative independently for every displayed fuel.
+            # A retained parent or successful detail split for one fuel must
+            # never veto (or validate) another fuel in the same year.
             context_columns = [
                 column
                 for column in (
@@ -6071,6 +6077,7 @@ def resolved_area_chart_rows(
                     "source_system",
                     "scenario",
                     "year",
+                    "common_product_code",
                 )
                 if column in chart_df.columns
             ]
@@ -6079,8 +6086,27 @@ def resolved_area_chart_rows(
                 .sum()
                 .rename(columns={"value": "_detail_total"})
             )
+            parent_boundary = code_candidate_text(
+                area_spec.get("aggregate_flow_prefix", "")
+            )
+            authoritative_parent_rows = chart_df.loc[
+                chart_df["common_flow_code"].map(code_candidate_text).eq(
+                    parent_boundary
+                )
+            ] if parent_boundary else chart_df.iloc[0:0]
+            # Once allocation succeeds, the authoritative parent is removed
+            # and its conserved children own that fuel/year fact. Do not use a
+            # surviving child fragment as a substitute parent envelope. Areas
+            # without an explicit observed boundary retain the legacy frontier.
+            parent_total_rows = (
+                authoritative_parent_rows
+                if not authoritative_parent_rows.empty
+                else parent_rows
+            )
             parent_totals = (
-                parent_rows.groupby(context_columns, dropna=False, as_index=False)["value"]
+                parent_total_rows.groupby(
+                    context_columns, dropna=False, as_index=False
+                )["value"]
                 .sum()
                 .rename(columns={"value": "_parent_total"})
             )

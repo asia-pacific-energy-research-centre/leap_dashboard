@@ -21,11 +21,13 @@ BUILDINGS_BOUNDARY = "16.01-16.02"
 BUILDINGS_LABEL = "16.01-16.02 Buildings"
 CHILD_LABELS = {
     "16.01": "16.01 Commercial and public services",
+    "16.01.99": "16.01.99 Commercial and public services unallocated",
     "16.02": "16.02 Residential",
 }
 PRODUCT_LABELS = {
     "07.01": "07.01 Motor gasoline",
     "07.07": "07.07 Gas/diesel oil",
+    "08.01": "08.01 Natural gas",
 }
 
 
@@ -195,7 +197,7 @@ def test_losslessly_rolled_native_children_reconcile_one_display_fuel_envelope()
         row["common_row_id"] = common_row_id
         rows.append(row)
     for flow, common_row_id, value in (
-        ("16.01", "services", 30.0),
+        ("16.01.99", "services", 30.0),
         ("16.02", "residential", 70.0),
     ):
         row = _building_row(
@@ -225,10 +227,13 @@ def test_losslessly_rolled_native_children_reconcile_one_display_fuel_envelope()
     audit_rows: list[dict[str, object]] = []
 
     fixed = _allocate(pd.DataFrame(rows), audit_rows=audit_rows)
-    historical = fixed[fixed["source_system"].eq("ESTO_EXTENDED")]
+    historical = fixed[
+        fixed["source_system"].eq("ESTO_EXTENDED")
+        & fixed["common_product_code"].eq("07.01")
+    ]
 
     assert historical.set_index("common_flow_code")["value"].to_dict() == {
-        "16.01": pytest.approx(30.0),
+        "16.01.99": pytest.approx(30.0),
         "16.02": pytest.approx(70.0),
     }
     assert len(audit_rows) == 1
@@ -254,6 +259,81 @@ def test_estimated_buildings_children_conserve_each_parent_by_economy_year_and_f
     pd.testing.assert_series_equal(
         actual.sort_index(), expected.sort_index(), check_names=True
     )
+
+
+def test_area_detail_reconciliation_is_isolated_per_fuel() -> None:
+    """Opposite errors in two fuels cannot cancel and select invalid detail."""
+    prior_parent = _building_row(
+        "ESTO_EXTENDED", "historical", "05_PRC", 2021,
+        BUILDINGS_BOUNDARY, "07.01", 50.0, exact_native=True,
+    )
+    prior_parent.update(
+        {
+            "is_non_expanding_rollup": True,
+            "common_row_basis": "non_expanding_rollup",
+            "_historical_allocation_status": "failed_parent_retained",
+        }
+    )
+    prior_child = _building_row(
+        "ESTO_EXTENDED", "historical", "05_PRC", 2021,
+        "16.01.99", "07.01", 80.0,
+    )
+    prior_child["common_row_basis"] = "connected_component_rollup"
+    rows: list[dict[str, object]] = [prior_parent, prior_child]
+    for flow, value in (("16.01.99", 30.0), ("16.02", 70.0)):
+        child = _building_row(
+            "ESTO_EXTENDED", "historical", "05_PRC", 2022,
+            flow, "07.01", value,
+        )
+        child["common_row_basis"] = "connected_component_rollup"
+        rows.append(child)
+    for product, parent_value, child_value in (
+        ("07.07", 50.0, 80.0),
+        ("08.01", 50.0, 20.0),
+    ):
+        parent = _building_row(
+            "ESTO_EXTENDED", "historical", "05_PRC", 2022,
+            BUILDINGS_BOUNDARY, product, parent_value, exact_native=True,
+        )
+        parent.update(
+            {
+                "is_non_expanding_rollup": True,
+                "common_row_basis": "non_expanding_rollup",
+                "_historical_allocation_status": "failed_parent_retained",
+            }
+        )
+        rows.append(parent)
+        child = _building_row(
+            "ESTO_EXTENDED", "historical", "05_PRC", 2022,
+            "16.01", product, child_value,
+        )
+        child["common_row_basis"] = "connected_component_rollup"
+        rows.append(child)
+
+    resolved = renderer.resolved_area_chart_rows(
+        pd.DataFrame(rows),
+        {
+            "aggregate_flow_prefix": BUILDINGS_BOUNDARY,
+            "aggregate_flow_label": BUILDINGS_LABEL,
+            "preferred_detail_flow_boundaries": ["16.01", "16.02"],
+            "explicit_flow_boundary": True,
+        },
+    )
+    by_product = {
+        product: list(zip(group["common_flow_code"], group["value"]))
+        for product, group in resolved.groupby("common_product_code")
+    }
+    assert by_product["07.01"] == [
+        (BUILDINGS_BOUNDARY, pytest.approx(50.0)),
+        ("16.01.99", pytest.approx(30.0)),
+        ("16.02", pytest.approx(70.0)),
+    ]
+    assert by_product["07.07"] == [
+        (BUILDINGS_BOUNDARY, pytest.approx(50.0)),
+    ]
+    assert by_product["08.01"] == [
+        (BUILDINGS_BOUNDARY, pytest.approx(50.0)),
+    ]
 
 
 def test_buildings_by_flow_surface_exposes_estimated_children() -> None:
