@@ -1,5 +1,24 @@
 # LEAP dashboard work queue and handover plan
 
+## Dashboard consistency follow-ups — active
+
+- **Issue 1 — shared Transport overview frontier.** The Transport by-product
+  and by-flow Overview cards must resolve the same source/year/product frontier
+  so their LEAP totals cannot diverge. Keep the existing Road allocation and
+  non-road placeholder/detail rules, but apply the configured coverage frontier
+  to both variants and retain a regression test across common years.
+- **Issue 2 — configured CHP boundary ownership.** The configured
+  `09.01.02,09.02.02 CHP plants` Power Overview owns its compound boundary.
+  Suppress the redundant generic `Total transformation - no transfers` flow
+  section while retaining the configured CHP product and component detail.
+- **Issue 3 — version comparison compatibility.** Update the web-app
+  comparison decorator for current `scenario:*` trace metadata and make an
+  empty comparison explicit rather than silently reporting success.
+- **Issue 4 — authoritative bunker representation.** Resolve combined
+  `04-05` placeholder versus separate `04`/`05` detail once, before row
+  filtering, and reuse that decision for Overview, detail, navigation, badges,
+  warnings, and guide text.
+
 ## Native ESTO parent allocation — complete
 
 - **DASHQ-073 — generic historical parent allocation.** Complete 2026-09-04.

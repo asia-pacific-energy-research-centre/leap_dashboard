@@ -2678,7 +2678,7 @@ def add_transport_overview_specs(
     area_specs: list[dict[str, object]],
     template: dict,
 ) -> list[dict[str, object]]:
-    """Attach the configured Transport frontier policy to its flow view."""
+    """Attach one configured Transport frontier to both overview views."""
     config = template.get("transport_page", {}) or {}
     if page_key != str(config.get("page_key", "transport")).strip():
         return list(area_specs)
@@ -2689,14 +2689,15 @@ def add_transport_overview_specs(
 
     specs = list(area_specs)
     for spec in specs:
-        if (
-            code_candidate_text(spec.get("aggregate_flow_prefix", "")) == boundary
-            and str(spec.get("overview_variant", "")).strip() == "by_flow"
-        ):
+        if code_candidate_text(spec.get("aggregate_flow_prefix", "")) == boundary:
             spec["use_demand_coverage_frontier"] = True
             spec["prefer_transport_detail_frontier"] = bool(
                 flow_config.get("prefer_detail_frontier", False)
             )
+        if (
+            code_candidate_text(spec.get("aggregate_flow_prefix", "")) == boundary
+            and str(spec.get("overview_variant", "")).strip() == "by_flow"
+        ):
             # The generic immediate-child adapter treats the compound
             # 15.01,15.03-15.06 boundary as child 15.01 before the
             # source-aware transport frontier can decide whether detail is
@@ -3049,6 +3050,146 @@ def normalize_supply_bunker_withdrawal_signs(
     return out
 
 
+def resolve_supply_bunker_representation(
+    df: pd.DataFrame,
+    template: dict,
+    *,
+    record_status: bool = True,
+) -> pd.DataFrame:
+    """Select one additive bunker frontier per source/scenario/year surface.
+
+    Observed non-zero rows are authoritative. Two populated child boundaries
+    select marine/aviation detail; otherwise an available combined row remains
+    the placeholder owner. Resolving before page filtering prevents stale
+    audit metadata from deleting genuine detail downstream.
+    """
+    supply_config = template.get("supply_page", {}) or {}
+    bunker_config = supply_config.get("bunker_overview", {}) or {}
+    boundary = code_candidate_text(bunker_config.get("flow_boundary", "04-05"))
+    detail_codes = tuple(
+        code_candidate_text(value)
+        for value in bunker_config.get(
+            "preferred_detail_flow_boundaries", ["04", "05"]
+        )
+        if code_candidate_text(value)
+    )
+    required = {"common_flow_code", "source_system", "value"}
+    if (
+        df.empty
+        or not bool(bunker_config.get("enabled", False))
+        or not boundary
+        or len(detail_codes) < 2
+        or not required.issubset(df.columns)
+    ):
+        return df
+
+    out = df.copy()
+    out["_bunker_frontier_row"] = range(len(out))
+    codes = out["common_flow_code"].astype(str).map(code_candidate_text)
+    bunker_mask = codes.isin({boundary, *detail_codes})
+    context_columns = [
+        column
+        for column in (
+            "comparison_scope",
+            "economy",
+            "source_system",
+            "scenario",
+            "year",
+        )
+        if column in out.columns
+    ]
+    rows_to_drop: set[int] = set()
+    selected_modes: list[tuple[str, str]] = []
+    discrepancies: list[float] = []
+    for context, surface in out.loc[bunker_mask].groupby(
+        context_columns, dropna=False, sort=False
+    ):
+        surface_codes = surface["common_flow_code"].astype(str).map(
+            code_candidate_text
+        )
+        active_children = {
+            child
+            for child in detail_codes
+            if _has_nonzero_values(surface.loc[surface_codes.eq(child), "value"])
+        }
+        has_combined = surface_codes.eq(boundary).any()
+        mode = "detail" if set(detail_codes).issubset(active_children) else "combined"
+        if mode == "detail":
+            rows_to_drop.update(
+                surface.loc[
+                    surface_codes.eq(boundary), "_bunker_frontier_row"
+                ].astype(int)
+            )
+            if has_combined:
+                comparison_rows = surface.copy()
+                comparison_rows["_bunker_code"] = surface_codes
+                comparison_rows["_bunker_value"] = pd.to_numeric(
+                    comparison_rows["value"], errors="coerce"
+                ).fillna(0.0)
+                product_columns = [
+                    column
+                    for column in ("common_product_code", "common_product_label")
+                    if column in comparison_rows.columns
+                ]
+                if not product_columns:
+                    comparison_rows["_bunker_product"] = "all"
+                    product_columns = ["_bunker_product"]
+                combined_values = comparison_rows.loc[
+                    comparison_rows["_bunker_code"].eq(boundary)
+                ].groupby(product_columns, dropna=False)["_bunker_value"].sum()
+                detail_values = comparison_rows.loc[
+                    comparison_rows["_bunker_code"].isin(detail_codes)
+                ].groupby(product_columns, dropna=False)["_bunker_value"].sum()
+                products = combined_values.index.union(detail_values.index)
+                difference = (
+                    combined_values.reindex(products, fill_value=0.0).abs()
+                    - detail_values.reindex(products, fill_value=0.0).abs()
+                ).abs()
+                scale = pd.concat(
+                    [
+                        combined_values.reindex(products, fill_value=0.0).abs(),
+                        detail_values.reindex(products, fill_value=0.0).abs(),
+                    ],
+                    axis=1,
+                ).max(axis=1).clip(lower=1.0)
+                material = difference.gt(1e-8 + scale * 1e-8)
+                if material.any():
+                    discrepancies.append(float(difference.loc[material].max()))
+        elif has_combined:
+            rows_to_drop.update(
+                surface.loc[
+                    surface_codes.isin(detail_codes), "_bunker_frontier_row"
+                ].astype(int)
+            )
+        else:
+            # There is no combined row to retain. Keep the available facts,
+            # but do not claim that a partial or all-zero split is full detail.
+            mode = "unresolved"
+        context_values = context if isinstance(context, tuple) else (context,)
+        source_value = context_values[context_columns.index("source_system")]
+        selected_modes.append((str(source_value).casefold(), mode))
+
+    if rows_to_drop:
+        out = out.loc[~out["_bunker_frontier_row"].isin(rows_to_drop)].copy()
+    out = out.drop(columns=["_bunker_frontier_row"])
+
+    if record_status:
+        leap_modes = [mode for source, mode in selected_modes if source == "leap"]
+        metadata_placeholder = uses_combined_international_transport_placeholder(template)
+        placeholder_active = "combined" in leap_modes or (
+            not leap_modes and metadata_placeholder
+        )
+        detail_active = "detail" in leap_modes
+        template["_supply_bunker_representation"] = {
+            "placeholder_active": placeholder_active,
+            "detail_active": detail_active,
+            "mixed": placeholder_active and detail_active,
+            "metadata_fallback": not leap_modes and metadata_placeholder,
+            "maximum_reconciliation_difference": max(discrepancies, default=0.0),
+        }
+    return out
+
+
 def add_supply_bunker_overview_specs(
     page_key: str,
     page_df: pd.DataFrame,
@@ -3075,30 +3216,13 @@ def add_supply_bunker_overview_specs(
         for value in bunker_config.get("preferred_detail_flow_boundaries", ["04", "05"])
         if code_candidate_text(value)
     }
-    leap_rows = page_df[
-        page_df["source_system"].astype(str).str.casefold().eq("leap")
-    ] if "source_system" in page_df.columns else page_df.iloc[0:0]
-    leap_flow_codes = {
-        code_candidate_text(value)
-        for value in leap_rows.get("common_flow_code", pd.Series(dtype=str))
-        if code_candidate_text(value)
-    }
-    detailed_bunker_rows_active = bool(detail_codes) and detail_codes.issubset(
-        leap_flow_codes
-    )
-    combined_placeholder_active = (
-        boundary_code in leap_flow_codes
-        and not detailed_bunker_rows_active
-    )
-    use_combined_placeholder = (
-        combined_placeholder_active
-        or (
-            leap_rows.empty
-            and uses_combined_international_transport_placeholder(template)
-        )
-    )
+    if "_supply_bunker_representation" not in template:
+        resolve_supply_bunker_representation(page_df, template)
+    status = template.get("_supply_bunker_representation", {}) or {}
+    use_combined_placeholder = bool(status.get("placeholder_active", False))
+    detail_active = bool(status.get("detail_active", False))
     excluded_codes = {boundary_code}
-    if use_combined_placeholder:
+    if use_combined_placeholder and not detail_active:
         # Generic hierarchy discovery can emit 04 and 05 product cards from
         # ESTO/Ninth even though LEAP only has the combined 04-05 placeholder.
         # Those cards would be historical-only and, after page-label
@@ -6544,6 +6668,19 @@ def _build_flow_group_aggregate_charts(
         flow_df = page_df[page_df["common_flow_label"].astype(str) == flow_label]
         if flow_df.empty:
             continue
+        if page_key == str(
+            (template.get("power_page", {}) or {}).get("page_key", "power")
+        ).strip() and any(
+            code_expression_matches_any_prefix(
+                value,
+                list(configured_flow_overview_boundaries),
+            )
+            for value in flow_df["common_flow_code"].dropna().unique()
+        ):
+            # Configured Power overview owners already publish this boundary
+            # and its available component detail. Do not create a second,
+            # generic section from the same mapped rows.
+            continue
         minimum_nonzero_children = int(
             (template.get("aggregate_chart_policy", {}) or {}).get(
                 "minimum_nonzero_child_flows", 2
@@ -8394,6 +8531,9 @@ def guide_page_mapping_table(
 
 def uses_combined_international_transport_placeholder(template: dict) -> bool:
     """Return whether Supply must use the combined bunker comparison row."""
+    resolved = template.get("_supply_bunker_representation")
+    if isinstance(resolved, dict) and "placeholder_active" in resolved:
+        return bool(resolved["placeholder_active"])
     coverage = template.get("leap_demand_sector_coverage", {}) or {}
     page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
     sectors = {
@@ -8428,12 +8568,21 @@ def guide_placeholder_status(page_key: str, template: dict) -> str:
     page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
     sectors = [str(value) for value in page_branches.get(page_key, []) if str(value).strip()]
     if page_key == "supply" and uses_combined_international_transport_placeholder(template):
+        mixed = bool(
+            (template.get("_supply_bunker_representation", {}) or {}).get("mixed")
+        )
         return (
             "The yellow warning means LEAP currently supplies international transport "
             "through the combined 'All demand aggregated/International transport' "
             "placeholder. Supply therefore shows one combined 04-05 International "
             "transport (bunkers) section. Marine (04) and aviation (05) will return as "
             "separate sections when their separate source branches replace the placeholder."
+            + (
+                " This run changes from the combined boundary to separate marine and "
+                "aviation detail during the period shown."
+                if mixed
+                else ""
+            )
         )
     if not sectors:
         return (
@@ -8452,6 +8601,10 @@ def guide_placeholder_status(page_key: str, template: dict) -> str:
 
 def page_placeholder_note(page_key: str, template: dict) -> str:
     """Return a visible page-top note when a LEAP placeholder is active."""
+    bunker_status = template.get("_supply_bunker_representation", {}) or {}
+    bunker_discrepancy = float(
+        bunker_status.get("maximum_reconciliation_difference", 0.0) or 0.0
+    )
     power_interim_branches = [
         str(value)
         for value in template.get("_power_interim_placeholder_branches", [])
@@ -8488,11 +8641,31 @@ def page_placeholder_note(page_key: str, template: dict) -> str:
         }
     )
     if page_key == "supply" and uses_combined_international_transport_placeholder(template):
-        return (
+        status = template.get("_supply_bunker_representation", {}) or {}
+        note = (
             "LEAP placeholder in use: 'All demand aggregated/International transport' "
             "provides only a combined international-transport value. This means marine "
             "(04) and aviation (05) cannot be viewed separately until the placeholder "
             "demand sector is replaced."
+        )
+        if status.get("mixed"):
+            note += (
+                " Separate marine and aviation rows are used for the years where both "
+                "are populated; the combined row is retained only for placeholder years."
+            )
+        if bunker_discrepancy > 0:
+            note += (
+                " Bunker QA warning: where combined and detailed rows coexist, the "
+                f"largest absolute reconciliation difference is {bunker_discrepancy:,.3f} PJ; "
+                "the observed detailed frontier is used without double counting."
+            )
+        return note
+    if page_key == "supply" and bunker_discrepancy > 0:
+        return (
+            "Bunker QA warning: combined and detailed international-transport rows "
+            f"coexist and differ by up to {bunker_discrepancy:,.3f} PJ in absolute "
+            "product totals. The observed marine/aviation frontier is used without "
+            "double counting."
         )
     if not sectors and not unavailable and not (
         combined_split_active and page_key in {"industry", "others"}
@@ -8574,7 +8747,11 @@ def guide_page_context(
         "datacentres_leap_vs_ninth",
     }
     placeholder_status = guide_placeholder_status(page_key, template)
-    placeholder_in_use = bool(page_placeholder_note(page_key, template))
+    placeholder_in_use = (
+        uses_combined_international_transport_placeholder(template)
+        if page_key == "supply"
+        else bool(page_placeholder_note(page_key, template))
+    )
     context = {
         "placeholder_status": placeholder_status,
         "placeholder_in_use": placeholder_in_use,
@@ -9941,6 +10118,13 @@ def build_total_demand_page(
     supply_detail_mask = assigned_df["common_flow_code"].apply(
         lambda c: code_expression_matches_any_prefix(c, supply_codes)
     )
+    if any(code_candidate_text(code) == "04-05" for code in supply_codes):
+        # The authoritative bunker resolver may replace the combined row with
+        # separate marine/aviation rows for detailed years. Keep those rows in
+        # the same supply boundary without reintroducing the removed parent.
+        supply_detail_mask |= assigned_df["common_flow_code"].astype(str).map(
+            code_candidate_text
+        ).isin({"04", "05"})
     supply_detail_df = assigned_df[supply_detail_mask].copy()
     transformation_config = config.get("transformation_composition", {})
     transformation_df = pd.DataFrame()
@@ -10749,6 +10933,7 @@ def render_dashboard(
         primary_source=primary_source,
         ninth_source=ninth_source,
     )
+    df = resolve_supply_bunker_representation(df, template)
     template["_other_nonenergy_estimated_split_active"] = bool(
         "_other_nonenergy_estimation_method" in df.columns
         and df["_other_nonenergy_estimation_method"].fillna("").astype(str).str.strip().ne("").any()
@@ -10765,6 +10950,11 @@ def render_dashboard(
             scope_df,
             primary_source=primary_source,
             ninth_source=ninth_source,
+        )
+        scope_df = resolve_supply_bunker_representation(
+            scope_df,
+            template,
+            record_status=False,
         )
     routing_special_cases = template.get("routing_special_cases", [])
     assigned_df = assign_pages(df, page_rules, routing_special_cases)
@@ -10975,38 +11165,14 @@ def render_dashboard(
                 for value in supply_config.get("exclude_flow_codes", [])
                 if str(value).strip()
             }
-            bunker_config = supply_config.get("bunker_overview", {}) or {}
-            bunker_boundary = code_candidate_text(
-                bunker_config.get("flow_boundary", "04-05")
-            )
-            bunker_children = {
-                code_candidate_text(value)
-                for value in bunker_config.get(
-                    "preferred_detail_flow_boundaries", ["04", "05"]
-                )
-                if code_candidate_text(value)
-            }
-            leap_bunker_codes = {
-                code_candidate_text(value)
-                for value in page_df.loc[
-                    page_df["source_system"].astype(str).str.casefold().eq("leap"),
-                    "common_flow_code",
-                ]
-                if code_candidate_text(value)
-            }
-            combined_bunker_placeholder_active = (
-                bunker_boundary in leap_bunker_codes
-                and not bunker_children.intersection(leap_bunker_codes)
-            )
-            if (
-                uses_combined_international_transport_placeholder(template)
-                or combined_bunker_placeholder_active
-            ):
+            bunker_status = template.get("_supply_bunker_representation", {}) or {}
+            if bunker_status.get("placeholder_active"):
                 # The placeholder has one value at the 04-05 boundary. Keep that
                 # comparable parent and suppress its 04/05 children until LEAP
                 # supplies the separate Air and Shipping source branches.
                 excluded_flow_codes.discard("04-05")
-                excluded_flow_codes.update({"04", "05"})
+                if not bunker_status.get("detail_active"):
+                    excluded_flow_codes.update({"04", "05"})
             if excluded_flow_codes and "common_flow_code" in page_df.columns:
                 page_df = page_df[
                     ~page_df["common_flow_code"].astype(str).isin(excluded_flow_codes)

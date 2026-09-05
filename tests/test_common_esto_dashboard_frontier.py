@@ -95,6 +95,45 @@ def _area_product_row(
     }
 
 
+def _bunker_template(*, stale_audit: bool = False) -> dict[str, object]:
+    """Build the smallest Supply configuration used by bunker tests."""
+    return {
+        "leap_demand_sector_coverage": {
+            "_aggregate_only_page_branches": (
+                {"supply": ["International transport"]}
+                if stale_audit
+                else {}
+            ),
+        },
+        "supply_page": {
+            "page_key": "supply",
+            "bunker_overview": {
+                "enabled": True,
+                "flow_boundary": "04-05",
+                "label": "04-05 International transport (bunkers)",
+                "preferred_detail_flow_boundaries": ["04", "05"],
+            },
+        },
+    }
+
+
+def _bunker_row(
+    flow: str,
+    value: float,
+    *,
+    year: int = 2023,
+    product: str = "07.08",
+    source: str = "LEAP",
+) -> dict[str, object]:
+    row = _area_product_row(source, "Target", year, flow, product, value)
+    row["common_flow_label"] = {
+        "04-05": "04-05 International transport (bunkers)",
+        "04": "04 International marine bunkers",
+        "05": "05 International aviation bunkers",
+    }[flow]
+    return row
+
+
 def test_placeholder_product_cards_reuse_aggregate_frontier_and_keep_ninth() -> None:
     """Area-derived cards retain the area rows without allocating a placeholder."""
     rows = pd.DataFrame([
@@ -838,6 +877,156 @@ def test_supply_bunker_detail_overrides_stale_placeholder_status() -> None:
     )
 
     assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04", "05"]
+
+
+def test_supply_bunker_resolver_keeps_combined_when_structural_children_are_zero() -> None:
+    """Zero-valued 04/05 rows are structure, not evidence of detail."""
+    template = _bunker_template(stale_audit=True)
+    rows = pd.DataFrame([
+        _bunker_row("04-05", -30.0),
+        _bunker_row("04", 0.0),
+        _bunker_row("05", 0.0),
+    ])
+
+    resolved = renderer.resolve_supply_bunker_representation(rows, template)
+
+    assert set(resolved["common_flow_code"]) == {"04-05"}
+    assert resolved["value"].sum() == -30.0
+    assert template["_supply_bunker_representation"] == {
+        "placeholder_active": True,
+        "detail_active": False,
+        "mixed": False,
+        "metadata_fallback": False,
+        "maximum_reconciliation_difference": 0.0,
+    }
+
+
+def test_supply_bunker_resolver_ignores_stale_audit_when_both_children_are_nonzero() -> None:
+    """Observed nonzero 04/05 detail wins over stale placeholder metadata."""
+    template = _bunker_template(stale_audit=True)
+    rows = pd.DataFrame([
+        _bunker_row("04-05", -30.0),
+        _bunker_row("04", -12.0),
+        _bunker_row("05", -18.0),
+    ])
+
+    resolved = renderer.resolve_supply_bunker_representation(rows, template)
+    status = template["_supply_bunker_representation"]
+
+    assert set(resolved["common_flow_code"]) == {"04", "05"}
+    assert "04-05" not in set(resolved["common_flow_code"])
+    assert resolved["value"].sum() == -30.0
+    assert status["placeholder_active"] is False
+    assert status["detail_active"] is True
+    assert status["mixed"] is False
+
+
+def test_supply_bunker_resolver_keeps_combined_when_only_one_child_is_nonzero() -> None:
+    """A partial split cannot claim that both bunker boundaries are detailed."""
+    template = _bunker_template()
+    rows = pd.DataFrame([
+        _bunker_row("04-05", -30.0),
+        _bunker_row("04", -10.0),
+        _bunker_row("05", 0.0),
+    ])
+
+    resolved = renderer.resolve_supply_bunker_representation(rows, template)
+
+    assert list(resolved["common_flow_code"]) == ["04-05"]
+    assert template["_supply_bunker_representation"]["placeholder_active"] is True
+    assert template["_supply_bunker_representation"]["detail_active"] is False
+
+
+def test_supply_bunker_resolver_conserves_exact_split_without_overlap() -> None:
+    """An exact detailed split preserves the total and selects one frontier."""
+    template = _bunker_template()
+    rows = pd.DataFrame([
+        _bunker_row("04-05", -30.0),
+        _bunker_row("04", -12.0),
+        _bunker_row("05", -18.0),
+    ])
+
+    resolved = renderer.resolve_supply_bunker_representation(rows, template)
+    selected_codes = set(resolved["common_flow_code"])
+
+    assert selected_codes == {"04", "05"}
+    assert not ({"04-05", "04", "05"} <= selected_codes)
+    assert resolved["value"].sum() == rows.loc[
+        rows["common_flow_code"].eq("04-05"), "value"
+    ].sum()
+
+
+def test_supply_bunker_resolver_handles_mixed_years_and_records_qa_difference() -> None:
+    """The bunker representation may switch by year, with mismatch surfaced."""
+    template = _bunker_template(stale_audit=True)
+    rows = pd.DataFrame([
+        _bunker_row("04-05", -30.0, year=2022),
+        _bunker_row("04", -10.0, year=2022),
+        _bunker_row("05", -15.0, year=2022),
+        _bunker_row("04-05", -40.0, year=2023),
+    ])
+
+    resolved = renderer.resolve_supply_bunker_representation(rows, template)
+    status = template["_supply_bunker_representation"]
+    by_year = {
+        year: set(group["common_flow_code"])
+        for year, group in resolved.groupby("year")
+    }
+
+    assert by_year == {2022: {"04", "05"}, 2023: {"04-05"}}
+    assert status["placeholder_active"] is True
+    assert status["detail_active"] is True
+    assert status["mixed"] is True
+    assert status["maximum_reconciliation_difference"] == 5.0
+    note = renderer.page_placeholder_note("supply", template)
+    assert "Bunker QA warning" in note
+    assert "5.000 PJ" in note
+    assert "without double counting" in note
+
+
+def test_supply_bunker_overview_specs_expose_placeholder_badge_or_detail() -> None:
+    """Overview cards and navigation badges follow the resolved status."""
+    existing = [
+        {"aggregate_flow_prefix": "04", "aggregate_flow_label": "04 Marine"},
+        {"aggregate_flow_prefix": "05", "aggregate_flow_label": "05 Aviation"},
+        {
+            "aggregate_flow_prefix": "04-05",
+            "aggregate_flow_label": "04-05 International transport (bunkers)",
+            "overview_variant": "by_product",
+        },
+    ]
+    combined_template = _bunker_template(stale_audit=True)
+    combined_specs = renderer.add_supply_bunker_overview_specs(
+        "supply",
+        pd.DataFrame([
+            _bunker_row("04-05", -30.0),
+            _bunker_row("04", 0.0),
+            _bunker_row("05", 0.0),
+        ]),
+        existing,
+        combined_template,
+    )
+    assert [spec["aggregate_flow_prefix"] for spec in combined_specs] == ["04-05"]
+    assert combined_specs[0]["navigation_placeholder"] is True
+    assert combined_specs[0]["force_navigation_root"] is True
+    assert combined_specs[0]["navigation_root_label_override"] == (
+        "04-05 International transport (bunkers)"
+    )
+
+    detail_template = _bunker_template(stale_audit=True)
+    detail_specs = renderer.add_supply_bunker_overview_specs(
+        "supply",
+        pd.DataFrame([
+            _bunker_row("04-05", -30.0),
+            _bunker_row("04", -12.0),
+            _bunker_row("05", -18.0),
+        ]),
+        existing,
+        detail_template,
+    )
+    assert [spec["aggregate_flow_prefix"] for spec in detail_specs] == ["04", "05"]
+    assert all(not spec.get("navigation_placeholder", False) for spec in detail_specs)
+    assert detail_template["_supply_bunker_representation"]["detail_active"] is True
 
 
 def test_supply_bunker_children_are_always_displayed_as_withdrawals() -> None:
@@ -2755,6 +2944,153 @@ def test_power_residual_section_has_clear_name_and_no_duplicate_summary() -> Non
     assert charts == {}
     assert chart_rows == []
     assert manifest_rows == []
+
+
+def test_transport_overview_variants_share_one_resolved_frontier() -> None:
+    """Transport by-product and by-flow totals must use identical rows."""
+    rows = []
+    for year, products in (
+        (
+            2022,
+            {
+                "07.01": (100.0, "15.02.01", 60.0, 10.0, 20.0),
+                "07.07": (100.0, "15.02.02", 40.0, 12.0, 18.0),
+            },
+        ),
+        (
+            2030,
+            {
+                "07.01": (120.0, "15.02.01", 72.0, 12.0, 24.0),
+                "07.07": (130.0, "15.02.02", 48.0, 15.0, 25.0),
+            },
+        ),
+    ):
+        for product, (parent, road, road_value, air, rail) in products.items():
+            for flow, value in (
+                ("15", parent),
+                (road, road_value),
+                ("15.01", air),
+                ("15.03", rail),
+            ):
+                row = _area_product_row(
+                    "LEAP", "Target", year, flow, product, value
+                )
+                row["common_flow_label"] = {
+                    "15": "15 Transport sector",
+                    "15.01": "15.01 Domestic air transport",
+                    "15.03": "15.03 Rail transport",
+                }.get(flow, f"{flow} Road transport")
+                rows.append(row)
+
+    template = {
+        "transport_page": {
+            "page_key": "transport",
+            "by_flow_overview": {
+                "flow_boundary": "15",
+                "prefer_detail_frontier": True,
+            },
+        },
+    }
+    specs = renderer.add_transport_overview_specs(
+        "transport",
+        [
+            {
+                "aggregate_flow_prefix": "15",
+                "aggregate_flow_label": "15 Transport sector",
+            },
+            {
+                "aggregate_flow_prefix": "15",
+                "aggregate_flow_label": "15 Transport sector",
+                "overview_variant": "by_flow",
+            },
+        ],
+        template,
+    )
+
+    assert all(spec.get("use_demand_coverage_frontier") for spec in specs)
+    frame = pd.DataFrame(rows)
+    totals_by_variant = [
+        renderer.resolved_area_chart_rows(frame, spec)
+        .groupby("year", as_index=True)["value"]
+        .sum()
+        for spec in specs
+    ]
+    pd.testing.assert_series_equal(
+        totals_by_variant[0],
+        totals_by_variant[1],
+        check_names=False,
+    )
+    assert totals_by_variant[0].to_dict() == {2022: 160.0, 2030: 196.0}
+
+
+def test_power_overview_owned_flow_does_not_get_generic_duplicate_summary() -> None:
+    """Configured CHP owns its compound boundary and generic flow does not."""
+    rows = pd.DataFrame(
+        [
+            {
+                **_area_product_row(
+                    "ESTO_EXTENDED", "historical", 2022,
+                    "09.01.02,09.02.02,09.01.02.01,09.02.02.01", "17", -10.0,
+                ),
+                "common_flow_label": (
+                    "09.01.02,09.02.02,09.01.02.01,09.02.02.01 "
+                    "Total transformation - no transfers"
+                ),
+                "component_flow_name": "CHP plants",
+                "_section_label": "Power generation and transformation",
+            },
+            {
+                **_area_product_row(
+                    "ESTO_EXTENDED", "historical", 2022,
+                    "09.01.02,09.02.02,09.01.02.01,09.02.02.01", "08", -8.0,
+                ),
+                "common_flow_label": (
+                    "09.01.02,09.02.02,09.01.02.01,09.02.02.01 "
+                    "Total transformation - no transfers"
+                ),
+                "component_flow_name": "Coal CHP",
+                "_section_label": "Power generation and transformation",
+            },
+            {
+                **_area_product_row(
+                    "ESTO_EXTENDED", "historical", 2022,
+                    "09.01.01", "17", -4.0,
+                ),
+                "common_flow_label": "09.01.01 Electricity plants",
+                "component_flow_name": "Electricity plants",
+                "_section_label": "Power generation and transformation",
+            },
+        ]
+    )
+    template = {
+        "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
+        "power_page": {
+            "page_key": "power",
+            "overview": {
+                "aggregates": [
+                    {
+                        "flow_boundary": "09.01.02,09.02.02",
+                        "child_flow_parent_prefix": "09.01.02",
+                        "label": "09.01.02,09.02.02 CHP plants",
+                    }
+                ]
+            },
+        },
+    }
+
+    _charts, chart_rows, _manifest_rows = renderer._build_flow_group_aggregate_charts(
+        rows,
+        "power",
+        "Power",
+        set(),
+        template,
+        {"ESTO_EXTENDED|historical": "ESTO Historical"},
+    )
+
+    assert not any(
+        "Total transformation - no transfers" in str(row.get("flow_group_label", ""))
+        for row in chart_rows
+    )
 
 
 def _demand_frontier_row(
