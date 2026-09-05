@@ -465,6 +465,11 @@ ROAD_DETAIL_ESTIMATION_NOTE = (
     "approximation. The overall totals are official, but the detailed "
     "categories are estimated and should be used only as a guide."
 )
+HISTORICAL_ALLOCATION_FAILURE_NOTE = (
+    "Historical detail unavailable: the official ESTO parent is retained "
+    "because the missing child allocation could not be calculated. See "
+    "historical_allocation_audit.csv."
+)
 OTHER_NONENERGY_ESTIMATION_NOTE = (
     "Estimated split: The LEAP export combines Other demand and non-energy use. "
     "The dashboard uses the 9th Outlook breakdown to show them on the correct "
@@ -502,6 +507,15 @@ def chart_note_with_lng_coverage(note: str, chart_df: pd.DataFrame) -> str:
     }
     if estimation_methods and ROAD_DETAIL_ESTIMATION_NOTE not in clean_note:
         clean_note = f"{clean_note} {ROAD_DETAIL_ESTIMATION_NOTE}".strip()
+    allocation_failures = {
+        str(value).strip()
+        for value in chart_df.get(
+            "_historical_allocation_status", pd.Series(dtype=str)
+        ).dropna()
+        if str(value).strip().startswith("failed_")
+    }
+    if allocation_failures and HISTORICAL_ALLOCATION_FAILURE_NOTE not in clean_note:
+        clean_note = f"{clean_note} {HISTORICAL_ALLOCATION_FAILURE_NOTE}".strip()
     other_nonenergy_methods = {
         str(value).strip()
         for value in chart_df.get(
@@ -543,6 +557,7 @@ def estimate_esto_road_detail_from_leap_base_year_shares(
     primary_scenario: str,
     base_year: int,
     road_boundary: str = "15.02",
+    audit_rows: list[dict[str, object]] | None = None,
 ) -> pd.DataFrame:
     """Compatibility wrapper for the configured Road detail allocation."""
     return estimate_esto_demand_detail_from_leap_base_year_shares(
@@ -557,6 +572,7 @@ def estimate_esto_road_detail_from_leap_base_year_shares(
             "flow_prefixes": [road_boundary],
             "label": "15.02 Road",
         }],
+        audit_rows=audit_rows,
     )
 
 
@@ -583,14 +599,17 @@ def allocate_historical_parent_by_leap_base_year_shares(
     base_year: int,
     parent_specs: list[dict[str, object]],
     missing_basis_mode: str = "keep_parent",
+    audit_rows: list[dict[str, object]] | None = None,
 ) -> pd.DataFrame:
     """Split native historical parents over the deepest LEAP child frontier.
 
     This is the shared allocation used by configured Road detail and by the
-    automatic cross-sector path.  Exact native ESTO children always take
-    precedence.  A parent is replaced only when a matching, nonzero LEAP
-    base-year basis exists for the same product; otherwise it remains visible
-    (or becomes an explicit unallocated row for the legacy demand-page mode).
+    automatic cross-sector path. Exact native ESTO children keep their values.
+    Any uncovered parent remainder is distributed only over missing LEAP-defined
+    children for the same product. The resulting native plus estimated child
+    frontier must conserve the ESTO parent exactly. If no usable basis exists,
+    the parent remains visible and the failure is recorded instead of creating
+    a synthetic chart residual.
     """
     required = {
         "source_system", "scenario", "year", "common_flow_code",
@@ -607,7 +626,13 @@ def allocate_historical_parent_by_leap_base_year_shares(
     work = page_df.copy()
     original = page_df.copy()
     original_native_exact = _exact_native_history_mask(original)
+    basis_context_columns = [
+        column
+        for column in ("economy",)
+        if column in original.columns
+    ]
     detail_key = [
+        *basis_context_columns,
         "common_flow_code", "common_flow_label",
         "common_product_code", "common_product_label",
     ]
@@ -639,7 +664,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
         )
         parent_rows = work[is_comparison & is_exact_parent].copy()
         primary_detail = work[is_primary_base & is_descendant].copy()
-        if parent_rows.empty or primary_detail.empty:
+        if parent_rows.empty:
             continue
 
         # Keep only the deepest non-overlapping LEAP frontier.  Intermediate
@@ -667,8 +692,6 @@ def allocate_historical_parent_by_leap_base_year_shares(
             primary_detail = primary_detail.drop(
                 index=list(drop_intermediate_indices)
             )
-        if primary_detail.empty:
-            continue
 
         detail_base = primary_detail.groupby(
             detail_key, as_index=False, dropna=False
@@ -687,16 +710,6 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 and _code_expression_contains_expression(boundary, value)
             )
         )
-        native_child_product_keys = {
-            (row["common_product_code"], row["common_product_label"])
-            for _, row in original[
-                original["source_system"].astype(str).str.casefold().eq(
-                    comparison_source.casefold()
-                )
-                & original_descendant
-                & original_native_exact
-            ].iterrows()
-        }
         work_native_exact = _exact_native_history_mask(work)
 
         drop_indices: set[object] = set()
@@ -705,23 +718,155 @@ def allocate_historical_parent_by_leap_base_year_shares(
             product_code = parent_row.get("common_product_code")
             product_label = parent_row.get("common_product_label")
 
-            # Do not estimate over genuine native child observations.  This
-            # check uses the untouched input so earlier allocations cannot
-            # make an outer native parent appear childless.
-            native_child_exists = (
-                product_code,
-                product_label,
-            ) in native_child_product_keys
-            if native_child_exists:
-                continue
-
             product_detail = detail_base[
                 detail_base["common_product_code"].eq(product_code)
                 & detail_base["common_product_label"].eq(product_label)
             ].copy()
-            denominator = float(product_detail["value"].sum())
-            if product_detail.empty or abs(denominator) <= 1e-12:
+            for column in basis_context_columns:
+                product_detail = product_detail[
+                    product_detail[column].eq(parent_row.get(column))
+                ]
+            context_columns = [
+                column
+                for column in (
+                    "comparison_scope", "economy", "scenario", "year"
+                )
+                if column in original.columns
+            ]
+            native_mask = (
+                original["source_system"].astype(str).str.casefold().eq(
+                    comparison_source.casefold()
+                )
+                & original_descendant
+                & original_native_exact
+                & original["common_product_code"].eq(product_code)
+                & original["common_product_label"].eq(product_label)
+            )
+            for column in context_columns:
+                native_mask &= original[column].eq(parent_row.get(column))
+            native_children = original.loc[native_mask].copy()
+            if not native_children.empty:
+                intermediate_indices: set[object] = set()
+                codes_by_index = native_children["common_flow_code"].to_dict()
+                for row_index, candidate_parent in codes_by_index.items():
+                    if any(
+                        other_index != row_index
+                        and code_candidate_text(candidate_parent)
+                        != code_candidate_text(candidate_child)
+                        and _code_expression_contains_expression(
+                            candidate_parent,
+                            candidate_child,
+                        )
+                        for other_index, candidate_child in codes_by_index.items()
+                    ):
+                        intermediate_indices.add(row_index)
+                if intermediate_indices:
+                    native_children = native_children.drop(
+                        index=list(intermediate_indices)
+                    )
+
+            native_boundaries = [
+                code_candidate_text(value)
+                for value in native_children.get(
+                    "common_flow_code", pd.Series(dtype=str)
+                )
+                if code_candidate_text(value)
+            ]
+            covered_by_native = product_detail["common_flow_code"].apply(
+                lambda value: any(
+                    _code_expression_contains_expression(native, value)
+                    or _code_expression_contains_expression(value, native)
+                    for native in native_boundaries
+                )
+            )
+            missing_detail = product_detail.loc[~covered_by_native].copy()
+            native_total = float(
+                pd.to_numeric(native_children.get("value", pd.Series(dtype=float)), errors="coerce")
+                .fillna(0.0)
+                .sum()
+            )
+            parent_value = float(
+                pd.to_numeric(parent_row.get("value"), errors="coerce")
+            )
+            remainder = parent_value - native_total
+            tolerance = 1e-8 + abs(parent_value) * 1e-8
+            denominator = float(
+                pd.to_numeric(missing_detail.get("value", pd.Series(dtype=float)), errors="coerce")
+                .fillna(0.0)
+                .sum()
+            )
+            audit = {
+                column: parent_row.get(column) for column in context_columns
+            }
+            audit.update({
+                "source_system": comparison_source,
+                "parent_flow_code": boundary,
+                "product_code": product_code,
+                "product_label": product_label,
+                "parent_value": parent_value,
+                "preserved_native_child_value": native_total,
+                "uncovered_parent_value": remainder,
+                "leap_basis_value": denominator,
+                "estimated_child_count": 0,
+            })
+
+            if abs(remainder) <= tolerance and not native_children.empty:
+                drop_indices.add(parent_index)
+                audit.update({
+                    "qa_status": "PASS",
+                    "allocation_status": "native_children_reconciled",
+                    "allocation_method": "native_esto_children",
+                    "failure_reason": "",
+                })
+                if audit_rows is not None:
+                    audit_rows.append(audit)
+                continue
+
+            failure_reason = ""
+            remainder_reverses_parent_sign = (
+                abs(remainder) > tolerance
+                and (
+                    (abs(parent_value) <= tolerance and abs(native_total) > tolerance)
+                    or parent_value * remainder < 0.0
+                )
+            )
+            if remainder_reverses_parent_sign:
+                failure_reason = "native_children_exceed_authoritative_parent"
+            elif missing_detail.empty or abs(denominator) <= 1e-12:
+                failure_reason = (
+                    "no_nonzero_leap_base_year_share_for_missing_children"
+                )
+            if failure_reason:
                 if missing_basis_mode == "keep_parent":
+                    work.at[parent_index, "_historical_allocation_status"] = (
+                        "failed_parent_retained"
+                    )
+                    work.at[parent_index, "_historical_allocation_failure_reason"] = (
+                        failure_reason
+                    )
+                    work.at[parent_index, "_historical_allocation_uncovered_value"] = remainder
+                    audit.update({
+                        "qa_status": "FAIL",
+                        "allocation_status": "failed_parent_retained",
+                        "allocation_method": "",
+                        "failure_reason": failure_reason,
+                    })
+                    if audit_rows is not None:
+                        audit_rows.append(audit)
+                    failed_synthetic_descendants = (
+                        is_comparison
+                        & is_descendant
+                        & work["common_product_code"].eq(product_code)
+                        & work["common_product_label"].eq(product_label)
+                        & ~work_native_exact
+                    )
+                    for column in context_columns:
+                        failed_synthetic_descendants &= work[column].eq(
+                            parent_row.get(column)
+                        )
+                    drop_indices.update(
+                        work.index[failed_synthetic_descendants].tolist()
+                    )
                     continue
                 unallocated = parent_row.copy()
                 unallocated["common_flow_code"] = f"{boundary}.999999"
@@ -741,18 +886,23 @@ def allocate_historical_parent_by_leap_base_year_shares(
                     unallocated["is_exact_row"] = False
                 drop_indices.add(parent_index)
                 result_rows.append(unallocated)
+                audit.update({
+                    "qa_status": "FAIL",
+                    "allocation_status": "failed_unallocated_legacy_mode",
+                    "allocation_method": "",
+                    "failure_reason": failure_reason,
+                })
+                if audit_rows is not None:
+                    audit_rows.append(audit)
                 continue
 
-            parent_value = float(
-                pd.to_numeric(parent_row.get("value"), errors="coerce")
+            missing_detail["_allocation_share"] = (
+                missing_detail["value"] / denominator
             )
-            product_detail["_allocation_share"] = (
-                product_detail["value"] / denominator
-            )
-            allocated_values = parent_value * product_detail["_allocation_share"]
-            residue = parent_value - float(allocated_values.sum())
-            nonzero_positions = product_detail.index[
-                product_detail["_allocation_share"].abs().gt(1e-12)
+            allocated_values = remainder * missing_detail["_allocation_share"]
+            residue = remainder - float(allocated_values.sum())
+            nonzero_positions = missing_detail.index[
+                missing_detail["_allocation_share"].abs().gt(1e-12)
             ]
             if len(nonzero_positions):
                 allocated_values.loc[nonzero_positions[-1]] += residue
@@ -767,9 +917,11 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 & pd.to_numeric(work["year"], errors="coerce").eq(parent_year)
                 & ~work_native_exact
             )
+            for column in context_columns:
+                synthetic_descendants &= work[column].eq(parent_row.get(column))
             drop_indices.update(work.index[synthetic_descendants].tolist())
 
-            for position, detail_row in product_detail.iterrows():
+            for position, detail_row in missing_detail.iterrows():
                 key = tuple(detail_row[column] for column in detail_key)
                 template_row = templates.loc[key]
                 if isinstance(template_row, pd.DataFrame):
@@ -793,6 +945,15 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 if "is_exact_row" in work.columns:
                     estimate["is_exact_row"] = False
                 result_rows.append(estimate)
+            audit.update({
+                "qa_status": "PASS",
+                "allocation_status": "allocated_missing_children",
+                "allocation_method": "detailed_leap_base_year_share",
+                "failure_reason": "",
+                "estimated_child_count": len(missing_detail),
+            })
+            if audit_rows is not None:
+                audit_rows.append(audit)
 
         if drop_indices or result_rows:
             work = pd.concat(
@@ -815,6 +976,7 @@ def estimate_esto_demand_detail_from_leap_base_year_shares(
     primary_scenario: str,
     base_year: int,
     component_specs: list[dict[str, object]],
+    audit_rows: list[dict[str, object]] | None = None,
 ) -> pd.DataFrame:
     """Estimate historical ESTO detail only where genuine LEAP detail exists.
 
@@ -822,9 +984,9 @@ def estimate_esto_demand_detail_from_leap_base_year_shares(
     over the non-overlapping LEAP detail present in the base year. Shares are
     normalised over those detailed rows, so the estimates conserve the ESTO
     parent exactly. Explicit zero-share rows stay zero. If the detailed LEAP
-    denominator is zero or absent, the whole ESTO value is shown as
-    ``Unallocated`` rather than being equal-split or silently assigned to a
-    named sector.
+    denominator is zero or absent, the authoritative ESTO parent is retained
+    and a QA failure is emitted rather than equal-splitting, assigning the
+    value to a named sector, or manufacturing a chart residual.
 
     A component with only an aggregate LEAP row is not changed.  This makes the
     transition safe for hybrid uploads where some placeholder branches have
@@ -837,7 +999,8 @@ def estimate_esto_demand_detail_from_leap_base_year_shares(
         primary_scenario=primary_scenario,
         base_year=base_year,
         parent_specs=component_specs,
-        missing_basis_mode="unallocated",
+        missing_basis_mode="keep_parent",
+        audit_rows=audit_rows,
     )
 
 
@@ -1884,7 +2047,7 @@ def configured_flow_group_rows(
     rows: pd.DataFrame,
     flow_groups: list[dict[str, object]],
 ) -> pd.DataFrame:
-    """Collapse source detail to configured owners, retaining reconciliation residuals."""
+    """Collapse source detail to configured flow owners."""
     if rows.empty or "common_flow_code" not in rows.columns:
         return rows.iloc[0:0].copy()
     out = rows.copy()
@@ -5861,7 +6024,18 @@ def resolved_area_chart_rows(
                 how="left",
             )
             tolerance = 1e-8 + coverage["_parent_total"].abs().fillna(0.0) * 1e-8
-            detail_contexts = coverage[context_columns].drop_duplicates()
+            coverage["_detail_residual"] = (
+                coverage["_parent_total"] - coverage["_detail_total"]
+            )
+            if bool(
+                area_spec.get("prefer_published_detail_over_parent_total", False)
+            ):
+                detail_contexts = coverage[context_columns].drop_duplicates()
+            else:
+                detail_contexts = coverage[
+                    coverage["_parent_total"].isna()
+                    | coverage["_detail_residual"].abs().le(tolerance)
+                ][context_columns].drop_duplicates()
             if not detail_contexts.empty:
                 detail_selected = detail_rows.merge(
                     detail_contexts.assign(_use_detail=True),
@@ -5876,66 +6050,14 @@ def resolved_area_chart_rows(
                 parent_selected = parent_selected[
                     parent_selected["_use_detail"].isna()
                 ].drop(columns="_use_detail")
-
-                coverage["_detail_residual"] = (
-                    coverage["_parent_total"] - coverage["_detail_total"]
-                )
-                residual_contexts = coverage.iloc[0:0][
-                    [*context_columns, "_detail_residual"]
-                ]
-                if not bool(
-                    area_spec.get("prefer_published_detail_over_parent_total", False)
-                ):
-                    residual_contexts = coverage[
-                        coverage["_parent_total"].notna()
-                        & coverage["_detail_residual"].abs().gt(tolerance)
-                    ][[*context_columns, "_detail_residual"]]
-                residual_rows = chart_df.iloc[0:0].copy()
-                if not residual_contexts.empty:
-                    residual_templates = (
-                        parent_rows.sort_values(context_columns)
-                        .drop_duplicates(context_columns)
-                        .merge(
-                            residual_contexts,
-                            on=context_columns,
-                            how="inner",
-                        )
-                    )
-                    residual_label = str(
-                        area_spec.get(
-                            "detail_coverage_residual_label",
-                            f"{area_spec.get('aggregate_flow_label', 'Aggregate')} "
-                            "— remaining flow not separately identified",
-                        )
-                    ).strip()
-                    residual_templates["value"] = residual_templates.pop(
-                        "_detail_residual"
-                    )
-                    residual_flow_code = str(
-                        area_spec.get("detail_coverage_residual_flow_code", "")
-                    ).strip()
-                    residual_flow_label = str(
-                        area_spec.get("detail_coverage_residual_flow_label", "")
-                    ).strip()
-                    residual_templates["common_flow_code"] = (
-                        residual_flow_code
-                        or f"{area_spec.get('aggregate_flow_prefix', '')} residual"
-                    ).strip()
-                    residual_templates["common_flow_label"] = (
-                        residual_flow_label or residual_label
-                    )
-                    if "common_product_code" in residual_templates.columns:
-                        residual_templates["common_product_code"] = "residual"
-                    if "common_product_label" in residual_templates.columns:
-                        residual_templates["common_product_label"] = (
-                            residual_flow_label or residual_label
-                        )
-                    residual_templates["is_non_expanding_rollup"] = False
-                    residual_rows = residual_templates
                 return pd.concat(
-                    [parent_selected, detail_selected, residual_rows],
+                    [parent_selected, detail_selected],
                     ignore_index=True,
                 )
+            # Detail exists but does not reconcile to the authoritative parent
+            # in any context. Keep the parent rather than manufacturing the
+            # difference as a chart category.
+            return parent_rows.reset_index(drop=True)
     chart_df = _non_overlapping_common_row_frontier(chart_df)
     # Only a chart grouped by the raw common flow label still needs the
     # parent/child and same-name overlap pass.  Immediate-child and configured
@@ -11183,6 +11305,7 @@ def render_dashboard(
 
     manifest_rows: list[dict[str, object]] = []
     page_rows: list[dict[str, object]] = []
+    historical_allocation_audit_rows: list[dict[str, object]] = []
 
     # Second pass: generate charts and pages.
     chart_config = template.get("chart_generation", {})
@@ -11224,6 +11347,7 @@ def render_dashboard(
             page_df = assigned_df[assigned_df["_page_key"].apply(safe_slug) == page_key].copy()
         if page_df.empty:
             continue
+        allocation_audit_start = len(historical_allocation_audit_rows)
         page_df = normalize_supply_bunker_withdrawal_signs(
             page_key,
             page_df,
@@ -11242,6 +11366,7 @@ def render_dashboard(
                 primary_scenario=primary_scenario,
                 base_year=base_year,
                 component_specs=detail_component_specs,
+                audit_rows=historical_allocation_audit_rows,
             )
         automatic_parent_specs = automatic_historical_parent_allocation_specs(
             page_df,
@@ -11250,6 +11375,17 @@ def render_dashboard(
             primary_scenario=primary_scenario,
             base_year=base_year,
         )
+        configured_boundaries = {
+            code_candidate_text(spec.get("flow_boundary", ""))
+            for spec in detail_component_specs
+            if code_candidate_text(spec.get("flow_boundary", ""))
+        }
+        automatic_parent_specs = [
+            spec
+            for spec in automatic_parent_specs
+            if code_candidate_text(spec.get("flow_boundary", ""))
+            not in configured_boundaries
+        ]
         if automatic_parent_specs:
             page_df = allocate_historical_parent_by_leap_base_year_shares(
                 page_df,
@@ -11259,7 +11395,12 @@ def render_dashboard(
                 base_year=base_year,
                 parent_specs=automatic_parent_specs,
                 missing_basis_mode="keep_parent",
+                audit_rows=historical_allocation_audit_rows,
             )
+        for audit_row in historical_allocation_audit_rows[
+            allocation_audit_start:
+        ]:
+            audit_row["page_key"] = page_key
         if page_key == "power":
             page_df = prepare_power_page_rows(page_df)
 
@@ -12035,6 +12176,21 @@ def render_dashboard(
             **category_basis_ui_kwargs(template),
         )
         manifest_df.to_csv(layout["supporting"] / "chart_manifest.csv", index=False)
+        audit_columns = [
+            "qa_status", "allocation_status", "failure_reason",
+            "allocation_method", "page_key", "comparison_scope", "economy",
+            "source_system", "scenario", "year", "parent_flow_code",
+            "product_code", "product_label", "parent_value",
+            "preserved_native_child_value", "uncovered_parent_value",
+            "leap_basis_value", "estimated_child_count",
+        ]
+        pd.DataFrame(
+            historical_allocation_audit_rows,
+            columns=audit_columns,
+        ).to_csv(
+            layout["supporting"] / "historical_allocation_audit.csv",
+            index=False,
+        )
     return manifest_df
 
 #%%

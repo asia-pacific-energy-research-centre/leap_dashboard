@@ -40,9 +40,11 @@ strayed into mapping logic and belongs upstream.
 
 ## Rules for this repository
 
-- **Never allocate, split, or apportion a source value.** If a value seems to
-  need splitting to fit the comparison, the structure is wrong upstream; do not
-  compensate here.
+- **Never allocate, split, or apportion during mapping ingestion.** If a value
+  fans out while being mapped to Common ESTO, the structure is wrong upstream;
+  do not compensate here. A separately labelled presentation-only historical
+  context allocation is permitted below an authoritative ESTO parent, subject
+  to DASH-036's conservation and failure rules.
 - **Never add a downstream fallback for fan-out.** `leap_mappings` asserts the
   no-split invariant and publishes the check
   (`results/common_esto/qa_common_esto_source_aggregates_split.csv`, expected
@@ -56,7 +58,9 @@ strayed into mapping logic and belongs upstream.
 - **Treat ESTO Extended as structure, not a second history.** Extended scopes
   reuse the ordinary ESTO exact rows under the `ESTO_EXTENDED` source identity.
   The additional children let reported LEAP detail remain visible, but the
-  dashboard must not allocate ordinary ESTO totals among those children.
+  dashboard must never create new historical energy. A flow-level display may
+  allocate an ESTO parent's uncovered remainder to missing children using the
+  reviewed methodology; its fuel-level total must remain ordinary ESTO.
 - **Do not re-derive mapping semantics.** `leap_dashboard/AGENTS.md` forbids
   reproducing mapping logic here. Note that it forbids a second *implementation*
   — it does not forbid this repository from performing the conversion by calling

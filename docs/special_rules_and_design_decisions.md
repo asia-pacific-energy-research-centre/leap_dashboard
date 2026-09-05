@@ -1366,7 +1366,7 @@ each source row on exactly one page.
   electricity/heat `10.02` rows on Other transformation despite their Power
   review ownership.
 
-## DASH-036: Estimated ESTO history below detailed demand aggregates
+## DASH-036: Conserved ESTO history below detailed demand aggregates
 
 **Status:** Implemented and locally verified; not deployed
 **Owner:** leap_dashboard
@@ -1381,14 +1381,19 @@ the ordinary detail renderer owns those branches. For each product, historical
 ESTO detail below the component boundary is estimated from the authoritative
 ESTO parent total using the non-overlapping LEAP base-year child shares.
 
-The ESTO parent row is retained unchanged as the authoritative comparison line.
-Allocated children add back to that parent exactly for every product and year;
-an explicit zero-share child stays zero. No equal split is used. If the LEAP
-base-year denominator is missing or zero, the ESTO amount is shown as
-**Unallocated** rather than assigned to a named sector. Estimated rows carry
-`common_row_basis=estimated_from_leap_base_year_share`; unallocated rows carry
-`common_row_basis=unallocated_no_leap_base_year_share`. They are approximate
-historical context, not measured historical observations.
+The ESTO parent is authoritative for every economy, year, and fuel. Exact
+native children retain their published values; only the uncovered parent
+remainder is allocated to missing children. Native plus estimated children add
+back to the parent exactly, and an explicit zero-share child stays zero. No
+equal split is used. Fuel/product charts remain identical to ordinary ESTO and
+never show an Extended residual.
+
+If the LEAP base-year denominator is missing or zero, or native children exceed
+the authoritative parent, retain the parent and record a failure in
+`historical_allocation_audit.csv`. Do not create an Unallocated/remaining-flow
+chart segment. Estimated flow rows carry
+`common_row_basis=estimated_from_leap_base_year_share` and are labelled as
+approximate historical context, not measured observations.
 
 The rule is applied component by component so detailed Road can coexist with a
 placeholder Transport non-road branch, for example. Non-energy use has no child
@@ -1406,8 +1411,9 @@ placeholder-to-detail navigation transition.
 ### History
 
 - 2026-08-31: Generalised the reviewed Road method to configured demand
-  components while retaining component-local placeholder ownership and an
-  explicit Unallocated fallback.
+  components while retaining component-local placeholder ownership.
+- 2026-09-05: Made partial-native allocation remainder-based, removed synthetic
+  residuals, and added a reviewable parent-retained QA failure path.
 
 ## End-to-end run report
 

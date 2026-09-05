@@ -118,7 +118,7 @@ def test_non_power_native_parent_is_automatically_allocated() -> None:
     assert history["value"].sum() == pytest.approx(120.0)
 
 
-def test_exact_native_child_prevents_parent_estimation() -> None:
+def test_exact_native_child_is_preserved_and_missing_sibling_gets_remainder() -> None:
     rows = pd.DataFrame([
         _row("ESTO_EXTENDED", 2022, "14", "08.01", 120.0, exact=True),
         _row("ESTO_EXTENDED", 2022, "14.01", "08.01", 45.0, exact=True),
@@ -130,12 +130,14 @@ def test_exact_native_child_prevents_parent_estimation() -> None:
     history = allocated[allocated["source_system"].eq("ESTO_EXTENDED")]
 
     assert history.set_index("common_flow_code")["value"].to_dict() == {
-        "14": pytest.approx(120.0),
         "14.01": pytest.approx(45.0),
+        "14.02": pytest.approx(75.0),
     }
-    assert "_historical_estimation_method" not in history.columns or history[
-        "_historical_estimation_method"
-    ].isna().all()
+    assert history["value"].sum() == pytest.approx(120.0)
+    assert history.loc[
+        history["common_flow_code"].eq("14.02"),
+        "_historical_estimation_method",
+    ].tolist() == ["estimated_from_leap_base_year_share"]
 
 
 @pytest.mark.parametrize(

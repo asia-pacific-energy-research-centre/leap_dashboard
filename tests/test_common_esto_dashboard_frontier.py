@@ -1683,7 +1683,7 @@ def test_other_demand_chart_uses_economy_verified_child_after_page_pruning() -> 
     assert projected["common_flow_label"].tolist() == ["16.03 Agriculture"]
 
 
-def test_other_demand_by_flow_labels_parent_gap_as_unallocated() -> None:
+def test_other_demand_by_flow_retains_parent_when_detail_does_not_reconcile() -> None:
     """Incomplete child coverage is not attributed without source evidence."""
     template = {
         "other_demand_page": {
@@ -1737,18 +1737,12 @@ def test_other_demand_by_flow_labels_parent_gap_as_unallocated() -> None:
         group_col="common_flow_label",
     )
 
-    assert set(resolved["common_flow_label"]) == {
-        "16.03 Agriculture",
-        "16.05 Non-specified others",
-        "Unallocated within 16.03-16.05 Other demand",
-    }
-    assert "16.03-16.05 Other sector" not in set(resolved["common_flow_label"])
-    residual = resolved.loc[
-        resolved["common_flow_code"].eq("16.03-16.05 residual"),
-        "value",
+    assert resolved[["common_flow_code", "value"]].to_dict("records") == [
+        {"common_flow_code": "16.03-16.05", "value": 30.0}
     ]
-    assert residual.tolist() == [5.0]
-    assert resolved["value"].sum() == 30.0
+    assert not resolved["common_flow_label"].str.contains(
+        "unallocated|residual", case=False, regex=True
+    ).any()
 
 
 def test_other_demand_by_flow_does_not_repeat_compound_and_child_frontiers() -> None:
@@ -1816,8 +1810,8 @@ def test_other_demand_by_flow_does_not_repeat_compound_and_child_frontiers() -> 
     assert not resolved["common_flow_label"].eq("Unallocated").any()
 
 
-def test_other_demand_by_flow_deduplicates_compound_fallback_child() -> None:
-    """A missing compound row must not select its fallback child twice."""
+def test_other_demand_by_flow_uses_parent_when_fallback_children_are_incomplete() -> None:
+    """Incomplete children never create a synthetic balancing category."""
     template = {
         "other_demand_page": {
             "page_key": "others",
@@ -1868,12 +1862,12 @@ def test_other_demand_by_flow_deduplicates_compound_fallback_child() -> None:
         rows, spec, group_col="common_flow_label"
     )
 
-    agriculture = resolved.loc[
-        resolved["common_flow_code"].eq("16.03"), "value"
+    assert resolved[["common_flow_code", "value"]].to_dict("records") == [
+        {"common_flow_code": "16.03-16.05", "value": 30.0}
     ]
-    assert agriculture.tolist() == [20.0]
-    assert resolved.loc[resolved["common_flow_label"].eq("Unallocated"), "value"].tolist() == [5.0]
-    assert resolved["value"].sum() == pytest.approx(30.0)
+    assert not resolved["common_flow_label"].str.contains(
+        "unallocated|residual", case=False, regex=True
+    ).any()
 
 
 def test_detailed_buildings_overview_uses_only_two_configured_pairs() -> None:
@@ -2016,13 +2010,11 @@ def test_buildings_overview_reconciles_incomplete_historical_children_to_parent(
 
     resolved = renderer.resolved_area_chart_rows(frame, spec)
     historical = resolved[resolved["source_system"].eq("ESTO_EXTENDED")]
-    assert historical["common_flow_code"].tolist() == [
-        "16.01", "16.02", "16.01-16.02 residual"
-    ]
+    assert historical["common_flow_code"].tolist() == ["16.01-16.02"]
     assert historical["value"].sum() == pytest.approx(100.0)
-    assert historical.loc[
-        historical["common_flow_code"].eq("16.01-16.02 residual"), "value"
-    ].item() == pytest.approx(10.0)
+    assert not historical["common_flow_label"].str.contains(
+        "remaining flow|residual", case=False, regex=True
+    ).any()
 
     # Placeholder comparison surfaces remain their published parent rows;
     # the historical residual must not leak into LEAP or 9th representations.
@@ -2044,12 +2036,7 @@ def test_buildings_overview_reconciles_incomplete_historical_children_to_parent(
     historical_flow = flow_rows[
         flow_rows["source_system"].eq("ESTO_EXTENDED")
     ]
-    assert historical_flow["value"].sum() == pytest.approx(100.0)
-    assert set(historical_flow["_configured_flow_group_label"]) == {
-        labels["16.01"],
-        labels["16.02"],
-        "16.01-16.02 Buildings — remaining flow not separately identified",
-    }
+    assert historical_flow.empty
 
 
 def test_detailed_road_section_keeps_only_technology_summary_under_road() -> None:
@@ -3853,7 +3840,7 @@ def test_road_by_flow_keeps_same_named_leaves_after_child_grouping() -> None:
     assert historical["value"].sum() == pytest.approx(100.0)
 
 
-def test_detailed_demand_allocation_uses_visible_unallocated_without_denominator() -> None:
+def test_detailed_demand_allocation_retains_parent_without_denominator() -> None:
     rows = pd.DataFrame([
         _area_product_row("ESTO_EXTENDED", "historical", 2022, "16.01-16.02", "07.01", 50.0),
         {
@@ -3879,19 +3866,13 @@ def test_detailed_demand_allocation_uses_visible_unallocated_without_denominator
             "label": "16 Buildings",
         }],
     )
-    unallocated = fixed[
-        fixed["source_system"].eq("ESTO_EXTENDED")
-        & fixed["common_flow_label"].eq("Unallocated within 16 Buildings")
+    historical = fixed[fixed["source_system"].eq("ESTO_EXTENDED")]
+    assert historical[["common_flow_code", "value"]].to_dict("records") == [
+        {"common_flow_code": "16.01-16.02", "value": 50.0}
     ]
-
-    assert unallocated["value"].tolist() == [pytest.approx(50.0)]
-    assert unallocated["common_row_basis"].tolist() == [
-        "unallocated_no_leap_base_year_share"
+    assert historical["_historical_allocation_status"].tolist() == [
+        "failed_parent_retained"
     ]
-    assert not fixed[
-        fixed["source_system"].eq("ESTO_EXTENDED")
-        & fixed["common_flow_code"].isin(["16.01", "16.02"])
-    ].shape[0]
 
 
 def test_detailed_demand_allocation_is_component_local_for_hybrid_upload() -> None:

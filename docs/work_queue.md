@@ -1,12 +1,18 @@
 # LEAP dashboard work queue and handover plan
 
-## Buildings historical-frontier reconciliation — complete 2026-09-05
+## ESTO Extended conservation and missing-flow allocation — complete 2026-09-05
 
-- Detailed Buildings overview charts retain published child detail only up to
-  the authoritative aggregate total. When incomplete detailed ESTO children
-  do not reconcile to the native `16.01`/`16.02` parents, the remaining value
-  is shown explicitly as unallocated instead of silently replacing the parent.
-  Fully reconciled detail and aggregate-only placeholders are unchanged.
+- Ordinary ESTO remains authoritative for every economy/year/fuel total.
+  Exact native children are preserved and only the uncovered parent remainder
+  is allocated across missing flow children using LEAP base-year shares.
+- Estimated flow children conserve the parent exactly and carry explicit
+  estimate provenance. Product/fuel charts remain identical to ordinary ESTO.
+- Missing or zero allocation bases retain the authoritative parent and write a
+  `historical_allocation_audit.csv` failure. The renderer never manufactures a
+  balancing chart segment or an “ESTO Extended residual.”
+- The upstream exact-row extractor now restores native ESTO `is_subtotal`
+  classifications before leaf selection. This permanently prevents native
+  leaves such as PRC Residential from disappearing during Extended generation.
 
 ## Dashboard consistency follow-ups — complete 2026-09-05
 
@@ -41,11 +47,12 @@ the configured CHP owner remains; and the PRC package publishes only combined
   allocator for configured Road detail and automatically discovered parents on
   every sector page. Automatic discovery starts only from exact native ESTO
   parents. It does not treat ESTO Extended-only structural children as
-  observations, never overwrites exact native ESTO child rows, retains the
-  parent when no matching nonzero LEAP basis exists, and conserves every
-  allocated parent total. Focused fixtures cover Road, compound Power, generic
-  Industry, native-child precedence, missing/mismatched/zero fallback, and
-  conservation.
+  observations, never overwrites exact native ESTO child rows, allocates only
+  the parent remainder when some native children already exist, retains the
+  parent with a QA failure when no matching nonzero LEAP basis exists, and
+  conserves every allocated parent total. Focused fixtures cover Road,
+  compound Power, generic Industry, partial native children,
+  missing/mismatched/zero fallback, and conservation.
 
 ## Source-aware aggregate routing fixes — complete
 

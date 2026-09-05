@@ -304,6 +304,10 @@ def test_buildings_without_leap_child_basis_keeps_parent_without_synthetic_resid
                 BUILDINGS_BOUNDARY, "07.01", 100.0, exact_native=True,
             ),
             _building_row(
+                "ESTO_EXTENDED", "historical", "05_PRC", 2022,
+                "16.01", "07.01", 20.0,
+            ),
+            _building_row(
                 "LEAP", "Target", "05_PRC", 2022,
                 BUILDINGS_BOUNDARY, "07.01", 100.0,
             ),
@@ -331,8 +335,10 @@ def test_buildings_without_leap_child_basis_keeps_parent_without_synthetic_resid
         "product_code": "07.01",
         "product_label": PRODUCT_LABELS["07.01"],
         "parent_value": 100.0,
-        "preserved_native_child_value": 0.0,
-        "uncovered_parent_value": 100.0,
+            "preserved_native_child_value": 0.0,
+            "uncovered_parent_value": 100.0,
+            "leap_basis_value": 0.0,
+            "estimated_child_count": 0,
         "qa_status": "FAIL",
         "allocation_status": "failed_parent_retained",
         "allocation_method": "",
