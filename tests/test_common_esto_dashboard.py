@@ -2626,11 +2626,12 @@ def test_common_esto_dashboard_keeps_international_transport_on_supply_without_s
     assert 'href="international_transport.html"' not in index_html
 
     supply_flows = set(manifest.loc[manifest["page_key"].eq("supply"), "common_flow_label"])
-    assert "04 International marine bunkers" not in supply_flows
-    assert "05 International aviation bunkers" not in supply_flows
-    assert "04-05 International transport (bunkers)" in supply_flows
-    assert "04-05 International transport (bunkers) — by flow" not in supply_html
-    assert ">04-05 International transport (bunkers)<" in supply_html
+    assert "04 International marine bunkers" in supply_flows
+    assert "05 International aviation bunkers" in supply_flows
+    assert "04-05 International transport (bunkers)" not in supply_flows
+    assert ">04 International marine bunkers<" in supply_html
+    assert ">05 International aviation bunkers<" in supply_html
+    assert ">04-05 International transport (bunkers)<" not in supply_html
 
     assignments = pd.read_csv(layout["supporting"] / "page_assignment_summary.csv")
     assert "international_transport" not in set(assignments["page_key"])

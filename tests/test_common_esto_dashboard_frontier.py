@@ -752,7 +752,7 @@ def test_generic_placeholder_overview_drops_uninformative_by_flow_companion() ->
     ]
 
 
-def test_supply_bunker_overview_keeps_one_combined_placeholder() -> None:
+def test_supply_bunker_overview_exposes_complete_comparison_detail() -> None:
     template = {
         "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
         "supply_page": {
@@ -794,9 +794,9 @@ def test_supply_bunker_overview_keeps_one_combined_placeholder() -> None:
         "supply", rows, existing, template
     )
 
-    assert len(specs) == 1
-    assert specs[0]["aggregate_flow_prefix"] == "04-05"
-    assert specs[0].get("overview_variant", "by_product") == "by_product"
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04", "05"]
+    assert all(spec["force_navigation_root"] is True for spec in specs)
+    assert all(spec["navigation_placeholder"] is False for spec in specs)
 
 
 def test_supply_bunker_overview_omits_combined_total_when_children_have_cards() -> None:
@@ -895,6 +895,8 @@ def test_supply_bunker_resolver_keeps_combined_when_structural_children_are_zero
     assert template["_supply_bunker_representation"] == {
         "placeholder_active": True,
         "detail_active": False,
+        "display_detail_active": False,
+        "comparison_detail_active": False,
         "mixed": False,
         "metadata_fallback": False,
         "maximum_reconciliation_difference": 0.0,

@@ -684,3 +684,10 @@ decision, not a backlog pull.
    `leap_mappings/docs/work_queue.md`.
 6. At the end of each week, record what moved to `complete_on_master`, what is
    blocked, and what must be descoped before handover.
+## Source-specific bunker detail navigation — complete 2026-09-05
+
+- Supply now exposes separate `04` marine and `05` aviation navigation and
+  charts whenever any displayed comparison source has a complete native split.
+  A source that publishes only combined `04-05` remains available for balance
+  totals but is never duplicated or allocated into the child charts.
+  Aggregate-only datasets still show one explicit combined placeholder.

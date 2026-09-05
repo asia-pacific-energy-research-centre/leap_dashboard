@@ -2530,11 +2530,27 @@ def active_placeholder_product_sections(
         if str(component).strip()
     }
     configured = coverage.get("placeholder_component_product_sections", {}) or {}
+    supply_config = template.get("supply_page", {}) or {}
+    bunker_status = template.get("_supply_bunker_representation", {}) or {}
+    bunker_boundary = code_candidate_text(
+        (supply_config.get("bunker_overview", {}) or {}).get(
+            "flow_boundary", "04-05"
+        )
+    )
+    hide_bunker_placeholder_owner = (
+        page_key == str(supply_config.get("page_key", "supply")).strip()
+        and bool(bunker_status.get("display_detail_active", False))
+    )
     sections: list[dict[str, str]] = []
     for component in sorted(active_components, key=str.casefold):
         section = configured.get(component, {}) or {}
         flow_code = str(section.get("flow_code", "")).strip()
         label = str(section.get("label", "")).strip()
+        if (
+            hide_bunker_placeholder_owner
+            and code_candidate_text(flow_code) == bunker_boundary
+        ):
+            continue
         if flow_code and label:
             sections.append({
                 "component": component,
@@ -3178,6 +3194,11 @@ def resolve_supply_bunker_representation(
 
     if record_status:
         leap_modes = [mode for source, mode in selected_modes if source == "leap"]
+        display_detail_active = any(mode == "detail" for _, mode in selected_modes)
+        comparison_detail_active = any(
+            source != "leap" and mode == "detail"
+            for source, mode in selected_modes
+        )
         metadata_placeholder = uses_combined_international_transport_placeholder(template)
         placeholder_active = "combined" in leap_modes or (
             not leap_modes and metadata_placeholder
@@ -3186,6 +3207,8 @@ def resolve_supply_bunker_representation(
         template["_supply_bunker_representation"] = {
             "placeholder_active": placeholder_active,
             "detail_active": detail_active,
+            "display_detail_active": display_detail_active,
+            "comparison_detail_active": comparison_detail_active,
             "mixed": placeholder_active and detail_active,
             "metadata_fallback": not leap_modes and metadata_placeholder,
             "maximum_reconciliation_difference": max(discrepancies, default=0.0),
@@ -3224,8 +3247,11 @@ def add_supply_bunker_overview_specs(
     status = template.get("_supply_bunker_representation", {}) or {}
     use_combined_placeholder = bool(status.get("placeholder_active", False))
     detail_active = bool(status.get("detail_active", False))
+    display_detail_active = bool(
+        status.get("display_detail_active", detail_active)
+    )
     excluded_codes = {boundary_code}
-    if use_combined_placeholder and not detail_active:
+    if use_combined_placeholder and not display_detail_active:
         # Generic hierarchy discovery can emit 04 and 05 product cards from
         # ESTO/Ninth even though LEAP only has the combined 04-05 placeholder.
         # Those cards would be historical-only and, after page-label
@@ -3238,6 +3264,51 @@ def add_supply_bunker_overview_specs(
         if code_candidate_text(spec.get("aggregate_flow_prefix", ""))
         not in excluded_codes
     ]
+    if display_detail_active:
+        # The navigation describes the comparison data that can actually be
+        # viewed, not only the LEAP frontier. ESTO or Ninth can publish a
+        # complete marine/aviation split while LEAP still publishes one
+        # combined bunker total. Keep that LEAP fact at its source-specific
+        # parent boundary, but expose the native 04 and 05 child charts rather
+        # than letting the LEAP placeholder hide real comparison detail.
+        exact_codes = page_df["common_flow_code"].astype(str).map(
+            code_candidate_text
+        )
+        exact_labels = {
+            detail_code: str(
+                page_df.loc[
+                    exact_codes.eq(detail_code), "common_flow_label"
+                ].dropna().astype(str).mode().iloc[0]
+            )
+            for detail_code in detail_codes
+            if not page_df.loc[
+                exact_codes.eq(detail_code), "common_flow_label"
+            ].dropna().empty
+        }
+        detailed_specs: list[dict[str, object]] = []
+        for spec in non_boundary_specs:
+            spec_code = code_candidate_text(
+                spec.get("aggregate_flow_prefix", "")
+            )
+            if spec_code not in detail_codes:
+                detailed_specs.append(spec)
+                continue
+            exact_label = exact_labels.get(
+                spec_code,
+                str(spec.get("aggregate_flow_label", "")).strip(),
+            )
+            detailed_specs.append({
+                **spec,
+                "aggregate_flow_label": exact_label,
+                "force_navigation_root": True,
+                "navigation_root_label_override": exact_label,
+                "navigation_placeholder": False,
+                # Compound code 04-05 contains both tokens under the generic
+                # expression matcher. Child presentation boundaries must be
+                # exact or the same combined LEAP total appears in both charts.
+                "explicit_flow_boundary": True,
+            })
+        return detailed_specs
     if not use_combined_placeholder:
         return non_boundary_specs
 
@@ -3284,6 +3355,36 @@ def add_supply_bunker_overview_specs(
         "navigation_root_label_override": label,
     }
     return [*non_boundary_specs, combined_product]
+
+
+def drop_supply_bunker_combined_detail_rows(
+    page_key: str,
+    page_df: pd.DataFrame,
+    template: dict,
+) -> pd.DataFrame:
+    """Hide the combined bunker parent from detail when 04/05 are viewable.
+
+    The parent row remains in the page's authoritative data for balance totals
+    and notes. It must not also create generic per-product charts beside the
+    separate native marine and aviation comparison sections.
+    """
+    supply_config = template.get("supply_page", {}) or {}
+    status = template.get("_supply_bunker_representation", {}) or {}
+    if (
+        page_key != str(supply_config.get("page_key", "supply")).strip()
+        or not bool(status.get("display_detail_active", False))
+        or "common_flow_code" not in page_df.columns
+    ):
+        return page_df
+    boundary = code_candidate_text(
+        (supply_config.get("bunker_overview", {}) or {}).get(
+            "flow_boundary", "04-05"
+        )
+    )
+    if not boundary:
+        return page_df
+    codes = page_df["common_flow_code"].astype(str).map(code_candidate_text)
+    return page_df.loc[~codes.eq(boundary)].copy()
 
 
 def prepare_area_specs_for_page(
@@ -8575,9 +8676,16 @@ def guide_placeholder_status(page_key: str, template: dict) -> str:
     page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
     sectors = [str(value) for value in page_branches.get(page_key, []) if str(value).strip()]
     if page_key == "supply" and uses_combined_international_transport_placeholder(template):
-        mixed = bool(
-            (template.get("_supply_bunker_representation", {}) or {}).get("mixed")
-        )
+        status = template.get("_supply_bunker_representation", {}) or {}
+        mixed = bool(status.get("mixed"))
+        if status.get("display_detail_active"):
+            return (
+                "LEAP supplies international transport through one combined bunker total, "
+                "while another comparison dataset publishes separate marine (04) and "
+                "aviation (05) detail. Supply therefore shows separate 04 and 05 sections. "
+                "The combined LEAP value is not allocated between them; missing LEAP child "
+                "series mean unavailable detail, not zero."
+            )
         return (
             "The yellow warning means LEAP currently supplies international transport "
             "through the combined 'All demand aggregated/International transport' "
@@ -8649,6 +8757,21 @@ def page_placeholder_note(page_key: str, template: dict) -> str:
     )
     if page_key == "supply" and uses_combined_international_transport_placeholder(template):
         status = template.get("_supply_bunker_representation", {}) or {}
+        if status.get("display_detail_active"):
+            note = (
+                "LEAP provides only a combined international-transport bunker total, but "
+                "separate marine (04) and aviation (05) detail is available from another "
+                "comparison dataset and is shown in separate sections. The combined LEAP "
+                "value is not allocated between those sections; absent LEAP child series "
+                "should be read as unavailable, not zero."
+            )
+            if bunker_discrepancy > 0:
+                note += (
+                    " Bunker QA warning: where combined and detailed rows coexist, the "
+                    f"largest absolute reconciliation difference is {bunker_discrepancy:,.3f} PJ; "
+                    "the observed detailed frontier is used without double counting."
+                )
+            return note
         note = (
             "LEAP placeholder in use: 'All demand aggregated/International transport' "
             "provides only a combined international-transport value. This means marine "
@@ -11178,7 +11301,10 @@ def render_dashboard(
                 # comparable parent and suppress its 04/05 children until LEAP
                 # supplies the separate Air and Shipping source branches.
                 excluded_flow_codes.discard("04-05")
-                if not bunker_status.get("detail_active"):
+                if not bunker_status.get(
+                    "display_detail_active",
+                    bunker_status.get("detail_active"),
+                ):
                     excluded_flow_codes.update({"04", "05"})
             if excluded_flow_codes and "common_flow_code" in page_df.columns:
                 page_df = page_df[
@@ -11641,6 +11767,11 @@ def render_dashboard(
         detail_page_df = drop_placeholder_only_demand_detail_rows(
             page_key,
             page_df,
+            template,
+        )
+        detail_page_df = drop_supply_bunker_combined_detail_rows(
+            page_key,
+            detail_page_df,
             template,
         )
         detail_page_df = drop_overview_owned_detail_rows(
