@@ -2022,8 +2022,12 @@ def test_placeholder_buildings_overview_keeps_rollup_and_esto_children() -> None
         "16.01-16.02 Buildings — by flow",
     ]
     assert {spec["aggregate_flow_prefix"] for spec in specs} == {"16.01-16.02"}
+    assert specs[1]["retain_parent_as_configured_flow_group"] is True
     flow_rows = renderer.configured_flow_group_rows(
-        rows, specs[1]["configured_flow_groups"]
+        rows,
+        specs[1]["configured_flow_groups"],
+        retained_parent_boundary=specs[1]["aggregate_flow_prefix"],
+        retained_parent_label=specs[1]["aggregate_flow_label"],
     )
     historical = flow_rows[flow_rows["source_system"].eq("ESTO_EXTENDED")]
     assert set(historical["_configured_flow_group_label"]) == {
@@ -2031,6 +2035,34 @@ def test_placeholder_buildings_overview_keeps_rollup_and_esto_children() -> None
         "16.02 Residential",
     }
     assert historical["value"].sum() == pytest.approx(100.0)
+    leap = flow_rows[flow_rows["source_system"].eq("LEAP")]
+    assert leap[["_configured_flow_group_label", "value"]].to_dict("records") == [
+        {"_configured_flow_group_label": "16.01-16.02 Buildings", "value": 105.0}
+    ]
+    figure = renderer.build_area_chart(
+        flow_rows,
+        {**specs[1], "rows_are_resolved_area_frontier": True},
+        {
+            "ESTO_EXTENDED|historical": "ESTO Historical",
+            "LEAP|Target": "LEAP Target",
+        },
+        {
+            "chart_generation": {
+                "comparison_source_system": "ESTO_EXTENDED",
+                "primary_area_source_system": "LEAP",
+                "primary_area_scenario": "Target",
+                "base_year": 2022,
+            }
+        },
+        group_col="_configured_flow_group_label",
+    )
+    assert {
+        trace.name for trace in figure.data if not trace.name.endswith(" total")
+    } == {
+        "16.01 Services",
+        "16.02 Residential",
+        "16.01-16.02 Buildings",
+    }
 
 
 def test_buildings_overview_reconciles_incomplete_historical_children_to_parent() -> None:

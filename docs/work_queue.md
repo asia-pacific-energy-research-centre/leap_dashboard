@@ -706,6 +706,8 @@ decision, not a backlog pull.
   row. The paired aggregate charts remain owned by `16.01-16.02 Buildings`.
 - The by-flow overview continues to use the published ESTO children
   `16.01 Commercial and public services` and `16.02 Residential` when both are
-  available, while LEAP remains at its unsplit Buildings parent.
+  available, while LEAP remains at its unsplit Buildings parent. Any exact
+  Buildings parent retained by the conservation frontier also remains visible
+  as the parent; it is never silently dropped or relabelled as a child.
 - The deeper Services overview is emitted only when Buildings detail is active.
   A focused regression covers the mixed placeholder-parent/ESTO-child case.

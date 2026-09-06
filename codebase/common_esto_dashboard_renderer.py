@@ -2112,8 +2112,17 @@ def immediate_child_flow_rows(
 def configured_flow_group_rows(
     rows: pd.DataFrame,
     flow_groups: list[dict[str, object]],
+    *,
+    retained_parent_boundary: str = "",
+    retained_parent_label: str = "",
 ) -> pd.DataFrame:
-    """Collapse source detail to configured flow owners."""
+    """Collapse source detail to configured flow owners.
+
+    A parent that survived frontier reconciliation represents an explicit
+    allocation failure for that product/year (or an intentionally unsplit
+    comparison source). Keep that exact parent as its own honest group instead
+    of dropping it or assigning it to a child.
+    """
     if rows.empty or "common_flow_code" not in rows.columns:
         return rows.iloc[0:0].copy()
     out = rows.copy()
@@ -2127,6 +2136,15 @@ def configured_flow_group_rows(
             lambda code: _code_expression_contains_expression(boundary, code)
         )
         out.loc[mask, "_configured_flow_group_label"] = label
+    parent_boundary = code_candidate_text(retained_parent_boundary)
+    if parent_boundary and retained_parent_label:
+        unmatched_parent = (
+            out["_configured_flow_group_label"].eq("")
+            & out["common_flow_code"].map(code_candidate_text).eq(parent_boundary)
+        )
+        out.loc[unmatched_parent, "_configured_flow_group_label"] = (
+            retained_parent_label
+        )
     residual = out["common_flow_code"].astype(str).str.endswith(" residual")
     out.loc[residual, "_configured_flow_group_label"] = out.loc[
         residual, "common_flow_label"
@@ -3153,6 +3171,7 @@ def add_buildings_overview_specs(
             "explicit_flow_boundary": True,
             "preferred_detail_flow_boundaries": detail_boundaries,
             "configured_flow_groups": list(aggregate.get("flow_groups", []) or []),
+            "retain_parent_as_configured_flow_group": True,
             "skip_product_overview_ownership": True,
         }
         specs.extend([
@@ -11751,6 +11770,20 @@ def render_dashboard(
                 chart_page_df = configured_flow_group_rows(
                     chart_page_df,
                     configured_flow_groups,
+                    retained_parent_boundary=(
+                        str(display_area_spec.get("aggregate_flow_prefix", ""))
+                        if display_area_spec.get(
+                            "retain_parent_as_configured_flow_group", False
+                        )
+                        else ""
+                    ),
+                    retained_parent_label=(
+                        str(display_area_spec.get("aggregate_flow_label", ""))
+                        if display_area_spec.get(
+                            "retain_parent_as_configured_flow_group", False
+                        )
+                        else ""
+                    ),
                 )
                 display_area_spec["rows_are_resolved_area_frontier"] = True
             chart_key = f"chart__area__{safe_slug(area_spec['aggregate_flow_prefix'])}__{safe_slug(source_aggregate_label)}"
