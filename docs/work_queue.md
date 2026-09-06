@@ -6,14 +6,14 @@
   A combined `All demand aggregated/International transport` source produces
   one `04-05` placeholder chart for every comparison basis; ESTO or 9th child
   detail cannot promote it to empty-LEAP `04` and `05` sections.
-- Separate marine (`04`) and aviation (`05`) charts appear only when LEAP
-  publishes both non-zero detailed Air and Shipping boundaries. A partial or
-  mixed-period LEAP split stays at `04-05` when the parent exists; otherwise it
-  is reported as unavailable. The combined value is never allocated between
-  children.
+- Any explicit LEAP Air or Shipping child row activates the detailed boundary,
+  including a reported zero. Populated available children are shown; an absent
+  or zero sibling is never manufactured. Combined-only inputs still use
+  `04-05`, and any parent/child mismatch is reported as QA rather than repaired
+  by allocation.
 - The page warning follows the same short placeholder wording used elsewhere.
-  Regression coverage asserts the mutually exclusive `{04-05}` versus
-  `{04, 05}` navigation/chart contract and the presence of LEAP totals.
+  Regression coverage asserts mutually exclusive combined/detail navigation,
+  including zero-valued, one-child, parentless, and mixed-year inputs.
 
 ## ESTO Extended conservation and missing-flow allocation — complete 2026-09-05
 

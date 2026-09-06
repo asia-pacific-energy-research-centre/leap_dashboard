@@ -942,8 +942,41 @@ def test_supply_bunker_resolver_treats_present_zero_children_as_detail() -> None
         "comparison_detail_active": False,
         "mixed": False,
         "metadata_fallback": False,
-        "maximum_reconciliation_difference": 0.0,
+        "maximum_reconciliation_difference": 30.0,
     }
+
+
+def test_supply_bunker_zero_only_child_presence_survives_in_status_metadata() -> None:
+    template = _bunker_template(stale_audit=True)
+    template["leap_demand_sector_coverage"].update({
+        "enabled": True,
+        "page_leap_branches": {"supply": ["International transport"]},
+    })
+    status_rows = pd.DataFrame([{
+        "component_branch": "International transport",
+        "detailed_branches": (
+            "Transport non road/International transport/Air;"
+            "Transport non road/International transport/Shipping"
+        ),
+        "present_detailed_branches": (
+            "Transport non road/International transport/Air"
+        ),
+        "representation_status": "detailed_preferred",
+    }])
+
+    template = filter_template_for_leap_demand_coverage(template, status_rows)
+    comparison_rows = pd.DataFrame([
+        _bunker_row("04-05", -30.0, source="ESTO_EXTENDED"),
+        _bunker_row("04", -12.0, source="ESTO_EXTENDED"),
+        _bunker_row("05", -18.0, source="ESTO_EXTENDED"),
+    ])
+    resolved = renderer.resolve_supply_bunker_representation(
+        comparison_rows, template
+    )
+
+    assert template["_supply_bunker_display_detail_codes"] == ["05"]
+    assert set(resolved["common_flow_code"]) == {"05"}
+    assert template["_supply_bunker_representation"]["detail_active"] is True
 
 
 def test_supply_bunker_resolver_ignores_stale_audit_when_both_children_are_nonzero() -> None:
@@ -1026,8 +1059,8 @@ def test_supply_bunker_overview_shows_only_one_present_child() -> None:
     assert specs[0]["navigation_placeholder"] is False
 
 
-def test_supply_bunker_resolver_marks_parentless_partial_detail_unavailable() -> None:
-    """One child without a combined parent must not become a detail display."""
+def test_supply_bunker_resolver_shows_parentless_available_child() -> None:
+    """One explicit child remains visible without inventing its sibling."""
     template = _bunker_template()
     rows = pd.DataFrame([
         _bunker_row("04", -10.0),
@@ -1043,13 +1076,11 @@ def test_supply_bunker_resolver_marks_parentless_partial_detail_unavailable() ->
     )
 
     assert list(resolved["common_flow_code"]) == ["04"]
-    assert status["placeholder_active"] is True
-    assert status["detail_active"] is False
-    assert status["display_detail_active"] is False
-    assert specs == []
-    assert "missing detail should not be read as zero" in renderer.page_placeholder_note(
-        "supply", template
-    )
+    assert status["placeholder_active"] is False
+    assert status["detail_active"] is True
+    assert status["display_detail_active"] is True
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04"]
+    assert renderer.page_placeholder_note("supply", template) == ""
 
 
 def test_supply_bunker_resolver_conserves_exact_split_without_overlap() -> None:
@@ -1071,8 +1102,8 @@ def test_supply_bunker_resolver_conserves_exact_split_without_overlap() -> None:
     ].sum()
 
 
-def test_supply_bunker_resolver_keeps_one_boundary_for_mixed_leap_years() -> None:
-    """Any placeholder year keeps the run on one conservative boundary."""
+def test_supply_bunker_resolver_uses_detail_boundary_for_mixed_leap_years() -> None:
+    """Any explicit child makes missing child years unavailable rather than combined."""
     template = _bunker_template(stale_audit=True)
     rows = pd.DataFrame([
         _bunker_row("04-05", -30.0, year=2022),
@@ -1088,16 +1119,15 @@ def test_supply_bunker_resolver_keeps_one_boundary_for_mixed_leap_years() -> Non
         for year, group in resolved.groupby("year")
     }
 
-    assert by_year == {2022: {"04-05"}, 2023: {"04-05"}}
-    assert status["placeholder_active"] is True
+    assert by_year == {2022: {"04", "05"}}
+    assert status["placeholder_active"] is False
     assert status["detail_active"] is True
-    assert status["mixed"] is True
+    assert status["mixed"] is False
     assert status["maximum_reconciliation_difference"] == 5.0
-    note = renderer.page_placeholder_note("supply", template)
-    assert note == (
-        "LEAP placeholder in use: 'All demand aggregated/International transport' "
-        "supplies International transport on this page. Detailed LEAP sector and "
-        "subsector values are not yet available; missing detail should not be read as zero."
+    assert renderer.page_placeholder_note("supply", template) == (
+        "Bunker QA warning: combined and detailed international-transport rows "
+        "coexist and differ by up to 5.000 PJ in absolute product totals. The "
+        "observed marine/aviation frontier is used without double counting."
     )
 
 
@@ -1112,8 +1142,8 @@ def test_supply_bunker_overview_specs_expose_placeholder_badge_or_detail() -> No
             "overview_variant": "by_product",
         },
     ]
-    combined_template = _bunker_template(stale_audit=True)
-    combined_specs = renderer.add_supply_bunker_overview_specs(
+    zero_detail_template = _bunker_template(stale_audit=True)
+    zero_detail_specs = renderer.add_supply_bunker_overview_specs(
         "supply",
         pd.DataFrame([
             _bunker_row("04-05", -30.0),
@@ -1121,14 +1151,10 @@ def test_supply_bunker_overview_specs_expose_placeholder_badge_or_detail() -> No
             _bunker_row("05", 0.0),
         ]),
         existing,
-        combined_template,
+        zero_detail_template,
     )
-    assert [spec["aggregate_flow_prefix"] for spec in combined_specs] == ["04-05"]
-    assert combined_specs[0]["navigation_placeholder"] is True
-    assert combined_specs[0]["force_navigation_root"] is True
-    assert combined_specs[0]["navigation_root_label_override"] == (
-        "04-05 International transport (bunkers)"
-    )
+    assert [spec["aggregate_flow_prefix"] for spec in zero_detail_specs] == ["04", "05"]
+    assert all(not spec.get("navigation_placeholder", False) for spec in zero_detail_specs)
 
     detail_template = _bunker_template(stale_audit=True)
     detail_specs = renderer.add_supply_bunker_overview_specs(

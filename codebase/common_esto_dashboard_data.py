@@ -1165,6 +1165,25 @@ def filter_template_for_leap_demand_coverage(
             representation_status_df["representation_status"].astype(str).isin(tracked_statuses),
             ["component_branch", "detailed_branches", "representation_status"],
         ].drop_duplicates().to_dict("records")
+        if "present_detailed_branches" in representation_status_df.columns:
+            bunker_rows = representation_status_df.loc[
+                representation_status_df["component_branch"]
+                .astype(str).str.strip().str.casefold().eq("international transport")
+            ]
+            present_paths = {
+                path.strip().casefold()
+                for value in bunker_rows["present_detailed_branches"].fillna("")
+                for path in str(value).split(";")
+                if path.strip()
+            }
+            bunker_detail_codes = []
+            if any(path.endswith("/shipping") for path in present_paths):
+                bunker_detail_codes.append("04")
+            if any(path.endswith("/air") for path in present_paths):
+                bunker_detail_codes.append("05")
+            coverage_config["_supply_bunker_present_detail_codes"] = (
+                bunker_detail_codes
+            )
     aggregate_only_page_branches: dict[str, list[str]] = {}
     placeholder_only_page_branches: dict[str, list[str]] = {}
     unavailable_page_branches: dict[str, list[str]] = {}

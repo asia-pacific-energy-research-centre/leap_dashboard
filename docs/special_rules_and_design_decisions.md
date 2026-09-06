@@ -1234,15 +1234,20 @@ When LEAP supplies `All demand aggregated/International transport`, show one
 comparison source to that boundary. Detail published only by ESTO or the 9th
 must not create separate charts with no LEAP series.
 
-Show flow `04` and flow `05` separately only when LEAP itself supplies both
-non-zero detailed Air and Shipping boundaries. A partial split, or a run that
-mixes placeholder and detailed LEAP years, stays at `04-05` when that parent is
-available; a parentless partial split is reported as unavailable rather than
-presented as complete detail. Never allocate a combined LEAP value between
-marine and aviation. Continue to use one
+Treat exact LEAP Air and Shipping row presence as the structural signal; zero
+is a reported value, not absence. If either child exists, use the detailed
+boundary and show the populated children that are actually available. Do not
+invent a missing or zero sibling. Combined-only inputs use `04-05`; mixed-year
+inputs keep the detailed boundary and leave unavailable years as gaps. Never
+allocate a combined LEAP value between marine and aviation. Record any
+combined-versus-child difference as QA. Continue to use one
 non-overlapping bunker frontier in the Energy balance overview supply total.
 
 ### History
+
+- 2026-09-06: Replaced value-based activation with exact child-path presence.
+  This distinguishes a reported zero from a missing branch and permits a
+  one-sided detailed input without reverting to the combined placeholder.
 
 - 2026-09-06: Replaced comparison-source promotion with the same LEAP-led
   placeholder rule used on other pages. All four current batch workbooks were

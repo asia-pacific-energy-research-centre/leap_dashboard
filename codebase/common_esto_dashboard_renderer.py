@@ -3342,10 +3342,11 @@ def resolve_supply_bunker_representation(
 ) -> pd.DataFrame:
     """Select one additive bunker frontier per source/scenario/year surface.
 
-    Observed non-zero rows are authoritative. Two populated child boundaries
-    select marine/aviation detail; otherwise an available combined row remains
-    the placeholder owner. Resolving before page filtering prevents stale
-    audit metadata from deleting genuine detail downstream.
+    Explicit LEAP child rows are authoritative evidence that marine/aviation
+    detail exists, even when their values are zero. If any present child has a
+    non-zero value, only populated children are charted; an absent or zero
+    sibling is never manufactured. Resolving before page filtering prevents
+    stale audit metadata from deleting genuine detail downstream.
     """
     supply_config = template.get("supply_page", {}) or {}
     bunker_config = supply_config.get("bunker_overview", {}) or {}
@@ -3384,6 +3385,8 @@ def resolve_supply_bunker_representation(
     ]
     detail_frontier_rows_to_drop: set[int] = set()
     combined_frontier_rows_to_drop: set[int] = set()
+    all_boundary_rows: set[int] = set()
+    all_detail_rows: set[int] = set()
     selected_modes: list[tuple[str, str]] = []
     discrepancies: list[float] = []
     for context, surface in out.loc[bunker_mask].groupby(
@@ -3392,17 +3395,37 @@ def resolve_supply_bunker_representation(
         surface_codes = surface["common_flow_code"].astype(str).map(
             code_candidate_text
         )
+        present_children = {
+            child for child in detail_codes if surface_codes.eq(child).any()
+        }
         active_children = {
             child
             for child in detail_codes
             if _has_nonzero_values(surface.loc[surface_codes.eq(child), "value"])
         }
         has_combined = surface_codes.eq(boundary).any()
-        mode = "detail" if set(detail_codes).issubset(active_children) else "combined"
+        all_boundary_rows.update(
+            surface.loc[
+                surface_codes.eq(boundary), "_bunker_frontier_row"
+            ].astype(int)
+        )
+        all_detail_rows.update(
+            surface.loc[
+                surface_codes.isin(detail_codes), "_bunker_frontier_row"
+            ].astype(int)
+        )
+        mode = "detail" if present_children else "combined"
         if mode == "detail":
             detail_frontier_rows_to_drop.update(
                 surface.loc[
                     surface_codes.eq(boundary), "_bunker_frontier_row"
+                ].astype(int)
+            )
+            displayed_children = active_children or present_children
+            detail_frontier_rows_to_drop.update(
+                surface.loc[
+                    surface_codes.isin(set(detail_codes) - displayed_children),
+                    "_bunker_frontier_row",
                 ].astype(int)
             )
             if has_combined:
@@ -3458,29 +3481,47 @@ def resolve_supply_bunker_representation(
                 ].astype(int)
             )
         else:
-            # There is no combined row to retain. Keep the available facts,
-            # but do not claim that a partial or all-zero split is full detail.
             mode = "unresolved"
         context_values = context if isinstance(context, tuple) else (context,)
         source_value = context_values[context_columns.index("source_system")]
         selected_modes.append((str(source_value).casefold(), mode))
 
     leap_modes = [mode for source, mode in selected_modes if source == "leap"]
+    leap_row_mask = bunker_mask & out["source_system"].astype(str).str.casefold().eq(
+        "leap"
+    )
+    leap_present_children = {
+        child for child in detail_codes if (leap_row_mask & codes.eq(child)).any()
+    }
+    leap_active_children = {
+        child
+        for child in detail_codes
+        if _has_nonzero_values(out.loc[leap_row_mask & codes.eq(child), "value"])
+    }
+    metadata_detail_codes = {
+        code_candidate_text(value)
+        for value in (
+            template.get("leap_demand_sector_coverage", {}) or {}
+        ).get("_supply_bunker_present_detail_codes", [])
+        if code_candidate_text(value) in set(detail_codes)
+    }
+    structural_detail_codes = leap_present_children | metadata_detail_codes
+    display_detail_codes = leap_active_children or structural_detail_codes
     comparison_detail_active = any(
         source != "leap" and mode == "detail"
         for source, mode in selected_modes
     )
     metadata_placeholder = uses_combined_international_transport_placeholder(template)
-    placeholder_active = any(
-        mode in {"combined", "unresolved"} for mode in leap_modes
-    ) or (
-        not leap_modes and metadata_placeholder
+    detail_active = bool(structural_detail_codes)
+    placeholder_active = (
+        not detail_active
+        and (
+            any(mode in {"combined", "unresolved"} for mode in leap_modes)
+            or (not leap_modes and metadata_placeholder)
+        )
     )
-    detail_active = "detail" in leap_modes
-    display_detail_active = (
-        detail_active and not placeholder_active
-        if leap_modes
-        else comparison_detail_active and not metadata_placeholder
+    display_detail_active = detail_active or (
+        not leap_modes and comparison_detail_active and not metadata_placeholder
     )
     if not record_status:
         recorded_status = template.get("_supply_bunker_representation", {}) or {}
@@ -3490,17 +3531,31 @@ def resolve_supply_bunker_representation(
         placeholder_active = bool(
             recorded_status.get("placeholder_active", placeholder_active)
         )
+        display_detail_codes = set(
+            template.get("_supply_bunker_display_detail_codes", display_detail_codes)
+        )
 
-    rows_to_drop = (
-        combined_frontier_rows_to_drop
-        if placeholder_active and not display_detail_active
-        else detail_frontier_rows_to_drop
-    )
+    if display_detail_active:
+        undisplayed_detail_rows = set(
+            out.loc[
+                bunker_mask
+                & codes.isin(set(detail_codes) - set(display_detail_codes)),
+                "_bunker_frontier_row",
+            ].astype(int)
+        )
+        rows_to_drop = all_boundary_rows | undisplayed_detail_rows
+    elif placeholder_active:
+        rows_to_drop = all_detail_rows | combined_frontier_rows_to_drop
+    else:
+        rows_to_drop = set()
     if rows_to_drop:
         out = out.loc[~out["_bunker_frontier_row"].isin(rows_to_drop)].copy()
     out = out.drop(columns=["_bunker_frontier_row"])
 
     if record_status:
+        template["_supply_bunker_display_detail_codes"] = sorted(
+            display_detail_codes
+        )
         template["_supply_bunker_representation"] = {
             "placeholder_active": placeholder_active,
             "detail_active": detail_active,
@@ -3547,6 +3602,13 @@ def add_supply_bunker_overview_specs(
     display_detail_active = bool(
         status.get("display_detail_active", detail_active)
     )
+    display_detail_codes = {
+        code_candidate_text(value)
+        for value in template.get(
+            "_supply_bunker_display_detail_codes", detail_codes
+        )
+        if code_candidate_text(value)
+    }
     excluded_codes = {boundary_code}
     if use_combined_placeholder and not display_detail_active:
         # Generic hierarchy discovery can emit 04 and 05 product cards from
@@ -3560,6 +3622,13 @@ def add_supply_bunker_overview_specs(
         for spec in area_specs
         if code_candidate_text(spec.get("aggregate_flow_prefix", ""))
         not in excluded_codes
+        and (
+            not display_detail_active
+            or code_candidate_text(spec.get("aggregate_flow_prefix", ""))
+            not in detail_codes
+            or code_candidate_text(spec.get("aggregate_flow_prefix", ""))
+            in display_detail_codes
+        )
     ]
     if display_detail_active:
         # Separate child charts are a claim that LEAP itself publishes the

@@ -134,10 +134,10 @@ def _render_supply_page(
     return manifest, html, charts
 
 
-def test_comparison_bunker_detail_does_not_split_leap_placeholder(
+def test_zero_leap_bunker_children_still_publish_detail_structure(
     tmp_path: Path,
 ) -> None:
-    """ESTO/Ninth children do not create child charts without LEAP detail."""
+    """Explicit zero LEAP children are detail structure, not a placeholder."""
     manifest, supply_html, charts = _render_supply_page(
         tmp_path, include_children=True
     )
@@ -148,38 +148,20 @@ def test_comparison_bunker_detail_does_not_split_leap_placeholder(
             "common_flow_label",
         ]
     )
-    assert aggregate_flows == {"04-05 International transport (bunkers)"}
-    assert 'data-chart-key="chart__area__04__' not in supply_html
-    assert 'data-chart-key="chart__area__05__' not in supply_html
-    assert supply_html.count(
-        'data-placeholder="true">04-05 International transport (bunkers)'
-    ) == 1
-    assert 'data-placeholder="false">04 International marine bunkers</a>' not in supply_html
-    assert 'data-placeholder="false">05 International aviation bunkers</a>' not in supply_html
+    assert {
+        "04 International marine bunkers",
+        "05 International aviation bunkers",
+    }.issubset(aggregate_flows)
+    assert "04-05 International transport (bunkers)" not in aggregate_flows
+    assert 'data-chart-key="chart__area__04__' in supply_html
+    assert 'data-chart-key="chart__area__05__' in supply_html
+    assert 'data-placeholder="true">04-05 International transport' not in supply_html
     child_area_keys = [
         key
         for key in charts
         if key.startswith(("chart__area__04__", "chart__area__05__"))
     ]
-    assert child_area_keys == []
-    combined = charts[
-        "chart__area__04_05__04_05_international_transport_bunkers"
-    ]
-    trace_names = {str(trace.get("name", "")) for trace in combined["data"]}
-    assert {
-        "ESTO Historical total",
-        "LEAP Target total",
-        "9th Target total",
-    }.issubset(trace_names)
-    assert not any(
-        key.startswith(
-            (
-                "chart__line__aggregate_product__supply__04__",
-                "chart__line__aggregate_product__supply__05__",
-            )
-        )
-        for key in charts
-    )
+    assert len(child_area_keys) == 2
 
 
 def test_detailed_leap_bunkers_use_separate_supply_pills_and_charts(
