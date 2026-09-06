@@ -922,8 +922,8 @@ def test_supply_bunker_detail_overrides_stale_placeholder_status() -> None:
     assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04", "05"]
 
 
-def test_supply_bunker_resolver_keeps_combined_when_structural_children_are_zero() -> None:
-    """Zero-valued 04/05 rows are structure, not evidence of detail."""
+def test_supply_bunker_resolver_treats_present_zero_children_as_detail() -> None:
+    """Explicit zero-valued 04/05 rows still publish the detail boundary."""
     template = _bunker_template(stale_audit=True)
     rows = pd.DataFrame([
         _bunker_row("04-05", -30.0),
@@ -933,12 +933,12 @@ def test_supply_bunker_resolver_keeps_combined_when_structural_children_are_zero
 
     resolved = renderer.resolve_supply_bunker_representation(rows, template)
 
-    assert set(resolved["common_flow_code"]) == {"04-05"}
-    assert resolved["value"].sum() == -30.0
+    assert set(resolved["common_flow_code"]) == {"04", "05"}
+    assert resolved["value"].sum() == 0.0
     assert template["_supply_bunker_representation"] == {
-        "placeholder_active": True,
-        "detail_active": False,
-        "display_detail_active": False,
+        "placeholder_active": False,
+        "detail_active": True,
+        "display_detail_active": True,
         "comparison_detail_active": False,
         "mixed": False,
         "metadata_fallback": False,
@@ -966,8 +966,8 @@ def test_supply_bunker_resolver_ignores_stale_audit_when_both_children_are_nonze
     assert status["mixed"] is False
 
 
-def test_supply_bunker_resolver_keeps_combined_when_only_one_child_is_nonzero() -> None:
-    """A partial split cannot claim that both bunker boundaries are detailed."""
+def test_supply_bunker_resolver_shows_one_present_child_without_combined_parent() -> None:
+    """A single explicit child is shown instead of the combined placeholder."""
     template = _bunker_template()
     rows = pd.DataFrame([
         _bunker_row("04-05", -30.0),
@@ -977,9 +977,53 @@ def test_supply_bunker_resolver_keeps_combined_when_only_one_child_is_nonzero() 
 
     resolved = renderer.resolve_supply_bunker_representation(rows, template)
 
-    assert list(resolved["common_flow_code"]) == ["04-05"]
-    assert template["_supply_bunker_representation"]["placeholder_active"] is True
-    assert template["_supply_bunker_representation"]["detail_active"] is False
+    assert list(resolved["common_flow_code"]) == ["04"]
+    assert template["_supply_bunker_representation"]["placeholder_active"] is False
+    assert template["_supply_bunker_representation"]["detail_active"] is True
+    assert template["_supply_bunker_representation"]["display_detail_active"] is True
+
+
+def test_supply_bunker_overview_shows_only_one_present_child() -> None:
+    template = _bunker_template()
+    page_df = pd.DataFrame([
+        {
+            "source_system": "LEAP",
+            "common_flow_code": "04-05",
+            "common_flow_label": "04-05 International transport (bunkers)",
+            "common_product_code": "07.05",
+            "common_product_label": "07.05 Kerosene type jet fuel",
+            "value": -5.0,
+        },
+        {
+            "source_system": "LEAP",
+            "common_flow_code": "04",
+            "common_flow_label": "04 International marine bunkers",
+            "common_product_code": "07.08",
+            "common_product_label": "07.08 Fuel oil",
+            "value": 0.0,
+        },
+    ])
+    renderer.resolve_supply_bunker_representation(page_df, template)
+    specs = renderer.add_supply_bunker_overview_specs(
+        "supply",
+        page_df,
+        [
+            {
+                "aggregate_flow_prefix": "04-05",
+                "aggregate_flow_label": "04-05 International transport (bunkers)",
+                "overview_variant": "by_product",
+            },
+            {
+                "aggregate_flow_prefix": "04",
+                "aggregate_flow_label": "04 International marine bunkers",
+                "overview_variant": "by_product",
+            },
+        ],
+        template,
+    )
+
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04"]
+    assert specs[0]["navigation_placeholder"] is False
 
 
 def test_supply_bunker_resolver_marks_parentless_partial_detail_unavailable() -> None:
