@@ -3382,7 +3382,8 @@ def resolve_supply_bunker_representation(
         )
         if column in out.columns
     ]
-    rows_to_drop: set[int] = set()
+    detail_frontier_rows_to_drop: set[int] = set()
+    combined_frontier_rows_to_drop: set[int] = set()
     selected_modes: list[tuple[str, str]] = []
     discrepancies: list[float] = []
     for context, surface in out.loc[bunker_mask].groupby(
@@ -3399,11 +3400,17 @@ def resolve_supply_bunker_representation(
         has_combined = surface_codes.eq(boundary).any()
         mode = "detail" if set(detail_codes).issubset(active_children) else "combined"
         if mode == "detail":
-            rows_to_drop.update(
+            detail_frontier_rows_to_drop.update(
                 surface.loc[
                     surface_codes.eq(boundary), "_bunker_frontier_row"
                 ].astype(int)
             )
+            if has_combined:
+                combined_frontier_rows_to_drop.update(
+                    surface.loc[
+                        surface_codes.isin(detail_codes), "_bunker_frontier_row"
+                    ].astype(int)
+                )
             if has_combined:
                 comparison_rows = surface.copy()
                 comparison_rows["_bunker_code"] = surface_codes
@@ -3440,7 +3447,12 @@ def resolve_supply_bunker_representation(
                 if material.any():
                     discrepancies.append(float(difference.loc[material].max()))
         elif has_combined:
-            rows_to_drop.update(
+            detail_frontier_rows_to_drop.update(
+                surface.loc[
+                    surface_codes.isin(detail_codes), "_bunker_frontier_row"
+                ].astype(int)
+            )
+            combined_frontier_rows_to_drop.update(
                 surface.loc[
                     surface_codes.isin(detail_codes), "_bunker_frontier_row"
                 ].astype(int)
@@ -3453,22 +3465,42 @@ def resolve_supply_bunker_representation(
         source_value = context_values[context_columns.index("source_system")]
         selected_modes.append((str(source_value).casefold(), mode))
 
+    leap_modes = [mode for source, mode in selected_modes if source == "leap"]
+    comparison_detail_active = any(
+        source != "leap" and mode == "detail"
+        for source, mode in selected_modes
+    )
+    metadata_placeholder = uses_combined_international_transport_placeholder(template)
+    placeholder_active = any(
+        mode in {"combined", "unresolved"} for mode in leap_modes
+    ) or (
+        not leap_modes and metadata_placeholder
+    )
+    detail_active = "detail" in leap_modes
+    display_detail_active = (
+        detail_active and not placeholder_active
+        if leap_modes
+        else comparison_detail_active and not metadata_placeholder
+    )
+    if not record_status:
+        recorded_status = template.get("_supply_bunker_representation", {}) or {}
+        display_detail_active = bool(
+            recorded_status.get("display_detail_active", display_detail_active)
+        )
+        placeholder_active = bool(
+            recorded_status.get("placeholder_active", placeholder_active)
+        )
+
+    rows_to_drop = (
+        combined_frontier_rows_to_drop
+        if placeholder_active and not display_detail_active
+        else detail_frontier_rows_to_drop
+    )
     if rows_to_drop:
         out = out.loc[~out["_bunker_frontier_row"].isin(rows_to_drop)].copy()
     out = out.drop(columns=["_bunker_frontier_row"])
 
     if record_status:
-        leap_modes = [mode for source, mode in selected_modes if source == "leap"]
-        display_detail_active = any(mode == "detail" for _, mode in selected_modes)
-        comparison_detail_active = any(
-            source != "leap" and mode == "detail"
-            for source, mode in selected_modes
-        )
-        metadata_placeholder = uses_combined_international_transport_placeholder(template)
-        placeholder_active = "combined" in leap_modes or (
-            not leap_modes and metadata_placeholder
-        )
-        detail_active = "detail" in leap_modes
         template["_supply_bunker_representation"] = {
             "placeholder_active": placeholder_active,
             "detail_active": detail_active,
@@ -3530,12 +3562,9 @@ def add_supply_bunker_overview_specs(
         not in excluded_codes
     ]
     if display_detail_active:
-        # The navigation describes the comparison data that can actually be
-        # viewed, not only the LEAP frontier. ESTO or Ninth can publish a
-        # complete marine/aviation split while LEAP still publishes one
-        # combined bunker total. Keep that LEAP fact at its source-specific
-        # parent boundary, but expose the native 04 and 05 child charts rather
-        # than letting the LEAP placeholder hide real comparison detail.
+        # Separate child charts are a claim that LEAP itself publishes the
+        # marine/aviation split. Comparison-only detail must not promote a
+        # combined LEAP placeholder to child sections with no LEAP series.
         exact_codes = page_df["common_flow_code"].astype(str).map(
             code_candidate_text
         )
@@ -3588,7 +3617,10 @@ def add_supply_bunker_overview_specs(
         None,
     )
     if combined_product is None:
-        rows = flow_boundary_candidate_rows(page_df, boundary)
+        exact_codes = page_df["common_flow_code"].astype(str).map(
+            code_candidate_text
+        )
+        rows = page_df.loc[exact_codes.eq(boundary_code)]
         if rows.empty:
             return non_boundary_specs
         labels_by_source = {
@@ -8969,28 +9001,12 @@ def guide_placeholder_status(page_key: str, template: dict) -> str:
     page_branches = coverage.get("_aggregate_only_page_branches", {}) or {}
     sectors = [str(value) for value in page_branches.get(page_key, []) if str(value).strip()]
     if page_key == "supply" and uses_combined_international_transport_placeholder(template):
-        status = template.get("_supply_bunker_representation", {}) or {}
-        mixed = bool(status.get("mixed"))
-        if status.get("display_detail_active"):
-            return (
-                "LEAP supplies international transport through one combined bunker total, "
-                "while another comparison dataset publishes separate marine (04) and "
-                "aviation (05) detail. Supply therefore shows separate 04 and 05 sections. "
-                "The combined LEAP value is not allocated between them; missing LEAP child "
-                "series mean unavailable detail, not zero."
-            )
         return (
-            "The yellow warning means LEAP currently supplies international transport "
-            "through the combined 'All demand aggregated/International transport' "
-            "placeholder. Supply therefore shows one combined 04-05 International "
-            "transport (bunkers) section. Marine (04) and aviation (05) will return as "
-            "separate sections when their separate source branches replace the placeholder."
-            + (
-                " This run changes from the combined boundary to separate marine and "
-                "aviation detail during the period shown."
-                if mixed
-                else ""
-            )
+            "The yellow warning means LEAP is using a placeholder for International "
+            f"transport. A placeholder is a broad total from the '{placeholder_branch}' "
+            "branch, used until separate Air and Shipping data are available. It preserves "
+            "the total but cannot provide marine or aviation detail. Treat that detail as "
+            "unavailable, not as zero."
         )
     if not sectors:
         return (
@@ -9049,40 +9065,11 @@ def page_placeholder_note(page_key: str, template: dict) -> str:
         }
     )
     if page_key == "supply" and uses_combined_international_transport_placeholder(template):
-        status = template.get("_supply_bunker_representation", {}) or {}
-        if status.get("display_detail_active"):
-            note = (
-                "LEAP provides only a combined international-transport bunker total, but "
-                "separate marine (04) and aviation (05) detail is available from another "
-                "comparison dataset and is shown in separate sections. The combined LEAP "
-                "value is not allocated between those sections; absent LEAP child series "
-                "should be read as unavailable, not zero."
-            )
-            if bunker_discrepancy > 0:
-                note += (
-                    " Bunker QA warning: where combined and detailed rows coexist, the "
-                    f"largest absolute reconciliation difference is {bunker_discrepancy:,.3f} PJ; "
-                    "the observed detailed frontier is used without double counting."
-                )
-            return note
-        note = (
+        return (
             "LEAP placeholder in use: 'All demand aggregated/International transport' "
-            "provides only a combined international-transport value. This means marine "
-            "(04) and aviation (05) cannot be viewed separately until the placeholder "
-            "demand sector is replaced."
+            "supplies International transport on this page. Detailed LEAP sector and "
+            "subsector values are not yet available; missing detail should not be read as zero."
         )
-        if status.get("mixed"):
-            note += (
-                " Separate marine and aviation rows are used for the years where both "
-                "are populated; the combined row is retained only for placeholder years."
-            )
-        if bunker_discrepancy > 0:
-            note += (
-                " Bunker QA warning: where combined and detailed rows coexist, the "
-                f"largest absolute reconciliation difference is {bunker_discrepancy:,.3f} PJ; "
-                "the observed detailed frontier is used without double counting."
-            )
-        return note
     if page_key == "supply" and bunker_discrepancy > 0:
         return (
             "Bunker QA warning: combined and detailed international-transport rows "

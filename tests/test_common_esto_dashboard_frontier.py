@@ -795,7 +795,7 @@ def test_generic_placeholder_overview_drops_uninformative_by_flow_companion() ->
     ]
 
 
-def test_supply_bunker_overview_exposes_complete_comparison_detail() -> None:
+def test_supply_bunker_overview_keeps_leap_placeholder_despite_comparison_detail() -> None:
     template = {
         "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
         "supply_page": {
@@ -837,9 +837,9 @@ def test_supply_bunker_overview_exposes_complete_comparison_detail() -> None:
         "supply", rows, existing, template
     )
 
-    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04", "05"]
-    assert all(spec["force_navigation_root"] is True for spec in specs)
-    assert all(spec["navigation_placeholder"] is False for spec in specs)
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04-05"]
+    assert specs[0]["force_navigation_root"] is True
+    assert specs[0]["navigation_placeholder"] is True
 
 
 def test_supply_bunker_overview_omits_combined_total_when_children_have_cards() -> None:
@@ -982,6 +982,32 @@ def test_supply_bunker_resolver_keeps_combined_when_only_one_child_is_nonzero() 
     assert template["_supply_bunker_representation"]["detail_active"] is False
 
 
+def test_supply_bunker_resolver_marks_parentless_partial_detail_unavailable() -> None:
+    """One child without a combined parent must not become a detail display."""
+    template = _bunker_template()
+    rows = pd.DataFrame([
+        _bunker_row("04", -10.0),
+    ])
+
+    resolved = renderer.resolve_supply_bunker_representation(rows, template)
+    status = template["_supply_bunker_representation"]
+    specs = renderer.add_supply_bunker_overview_specs(
+        "supply",
+        resolved,
+        [{"aggregate_flow_prefix": "04", "aggregate_flow_label": "04 Marine"}],
+        template,
+    )
+
+    assert list(resolved["common_flow_code"]) == ["04"]
+    assert status["placeholder_active"] is True
+    assert status["detail_active"] is False
+    assert status["display_detail_active"] is False
+    assert specs == []
+    assert "missing detail should not be read as zero" in renderer.page_placeholder_note(
+        "supply", template
+    )
+
+
 def test_supply_bunker_resolver_conserves_exact_split_without_overlap() -> None:
     """An exact detailed split preserves the total and selects one frontier."""
     template = _bunker_template()
@@ -1001,8 +1027,8 @@ def test_supply_bunker_resolver_conserves_exact_split_without_overlap() -> None:
     ].sum()
 
 
-def test_supply_bunker_resolver_handles_mixed_years_and_records_qa_difference() -> None:
-    """The bunker representation may switch by year, with mismatch surfaced."""
+def test_supply_bunker_resolver_keeps_one_boundary_for_mixed_leap_years() -> None:
+    """Any placeholder year keeps the run on one conservative boundary."""
     template = _bunker_template(stale_audit=True)
     rows = pd.DataFrame([
         _bunker_row("04-05", -30.0, year=2022),
@@ -1018,15 +1044,17 @@ def test_supply_bunker_resolver_handles_mixed_years_and_records_qa_difference() 
         for year, group in resolved.groupby("year")
     }
 
-    assert by_year == {2022: {"04", "05"}, 2023: {"04-05"}}
+    assert by_year == {2022: {"04-05"}, 2023: {"04-05"}}
     assert status["placeholder_active"] is True
     assert status["detail_active"] is True
     assert status["mixed"] is True
     assert status["maximum_reconciliation_difference"] == 5.0
     note = renderer.page_placeholder_note("supply", template)
-    assert "Bunker QA warning" in note
-    assert "5.000 PJ" in note
-    assert "without double counting" in note
+    assert note == (
+        "LEAP placeholder in use: 'All demand aggregated/International transport' "
+        "supplies International transport on this page. Detailed LEAP sector and "
+        "subsector values are not yet available; missing detail should not be read as zero."
+    )
 
 
 def test_supply_bunker_overview_specs_expose_placeholder_badge_or_detail() -> None:

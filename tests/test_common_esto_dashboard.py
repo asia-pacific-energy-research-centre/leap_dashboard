@@ -2626,12 +2626,12 @@ def test_common_esto_dashboard_keeps_international_transport_on_supply_without_s
     assert 'href="international_transport.html"' not in index_html
 
     supply_flows = set(manifest.loc[manifest["page_key"].eq("supply"), "common_flow_label"])
-    assert "04 International marine bunkers" in supply_flows
-    assert "05 International aviation bunkers" in supply_flows
-    assert "04-05 International transport (bunkers)" not in supply_flows
-    assert ">04 International marine bunkers<" in supply_html
-    assert ">05 International aviation bunkers<" in supply_html
-    assert ">04-05 International transport (bunkers)<" not in supply_html
+    assert "04 International marine bunkers" not in supply_flows
+    assert "05 International aviation bunkers" not in supply_flows
+    assert "04-05 International transport (bunkers)" in supply_flows
+    assert ">04 International marine bunkers<" not in supply_html
+    assert ">05 International aviation bunkers<" not in supply_html
+    assert ">04-05 International transport (bunkers)<" in supply_html
 
     assignments = pd.read_csv(layout["supporting"] / "page_assignment_summary.csv")
     assert "international_transport" not in set(assignments["page_key"])
@@ -2648,9 +2648,10 @@ def test_supply_placeholder_explains_missing_marine_and_aviation_leap_detail() -
     status = guide_placeholder_status("supply", template)
 
     assert "All demand aggregated/International transport" in note
-    assert "marine (04) and aviation (05) cannot be viewed separately" in note
-    assert "04-05 International transport (bunkers)" in status
-    assert "when their separate source branches replace the placeholder" in status
+    assert "supplies International transport on this page" in note
+    assert "missing detail should not be read as zero" in note
+    assert "separate Air and Shipping data are available" in status
+    assert "unavailable, not as zero" in status
 
 
 def test_supply_uses_combined_bunker_boundary_while_placeholder_is_active(
@@ -2716,10 +2717,8 @@ def test_supply_uses_combined_bunker_boundary_while_placeholder_is_active(
         'data-placeholder="false">04-05 International transport (bunkers)</a>'
         not in supply_html
     )
-    assert (
-        "cannot be viewed separately until the placeholder demand sector is replaced"
-        in supply_html
-    )
+    assert "supplies International transport on this page" in supply_html
+    assert "missing detail should not be read as zero" in supply_html
 
 
 def test_supply_uses_separate_bunker_sections_only_when_both_leap_flows_exist(

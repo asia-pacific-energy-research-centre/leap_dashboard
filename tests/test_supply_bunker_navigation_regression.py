@@ -30,6 +30,7 @@ def _bunker_rows(
     *,
     include_children: bool,
     include_combined: bool = True,
+    leap_children_nonzero: bool = False,
 ) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     source_values = [
@@ -67,7 +68,11 @@ def _bunker_rows(
                 if index > 0 and not include_children:
                     continue
                 label = f"{flow_code} {flow_name}"
-                child_value = 0.0 if source_system == "LEAP" else value / 2
+                child_value = (
+                    value / 2
+                    if source_system != "LEAP" or leap_children_nonzero
+                    else 0.0
+                )
                 rows.append({
                     "comparison_scope": "leap_vs_esto_vs_ninth",
                     "source_system": source_system,
@@ -89,6 +94,7 @@ def _render_supply_page(
     tmp_path: Path,
     *,
     include_children: bool,
+    leap_children_nonzero: bool = False,
 ) -> tuple[pd.DataFrame, str, dict[str, object]]:
     template = _load_template()
     # Simulate stale audit metadata from an older aggregate-only export. The
@@ -99,7 +105,13 @@ def _render_supply_page(
         "supply": ["International transport"],
     }
     rows = pd.concat(
-        [_build_common_esto_rows(), _bunker_rows(include_children=include_children)],
+        [
+            _build_common_esto_rows(),
+            _bunker_rows(
+                include_children=include_children,
+                leap_children_nonzero=leap_children_nonzero,
+            ),
+        ],
         ignore_index=True,
         sort=False,
     )
@@ -122,10 +134,10 @@ def _render_supply_page(
     return manifest, html, charts
 
 
-def test_detailed_comparison_bunkers_use_separate_supply_pills_and_charts(
+def test_comparison_bunker_detail_does_not_split_leap_placeholder(
     tmp_path: Path,
 ) -> None:
-    """Detailed comparison children replace stale combined navigation."""
+    """ESTO/Ninth children do not create child charts without LEAP detail."""
     manifest, supply_html, charts = _render_supply_page(
         tmp_path, include_children=True
     )
@@ -136,6 +148,56 @@ def test_detailed_comparison_bunkers_use_separate_supply_pills_and_charts(
             "common_flow_label",
         ]
     )
+    assert aggregate_flows == {"04-05 International transport (bunkers)"}
+    assert 'data-chart-key="chart__area__04__' not in supply_html
+    assert 'data-chart-key="chart__area__05__' not in supply_html
+    assert supply_html.count(
+        'data-placeholder="true">04-05 International transport (bunkers)'
+    ) == 1
+    assert 'data-placeholder="false">04 International marine bunkers</a>' not in supply_html
+    assert 'data-placeholder="false">05 International aviation bunkers</a>' not in supply_html
+    child_area_keys = [
+        key
+        for key in charts
+        if key.startswith(("chart__area__04__", "chart__area__05__"))
+    ]
+    assert child_area_keys == []
+    combined = charts[
+        "chart__area__04_05__04_05_international_transport_bunkers"
+    ]
+    trace_names = {str(trace.get("name", "")) for trace in combined["data"]}
+    assert {
+        "ESTO Historical total",
+        "LEAP Target total",
+        "9th Target total",
+    }.issubset(trace_names)
+    assert not any(
+        key.startswith(
+            (
+                "chart__line__aggregate_product__supply__04__",
+                "chart__line__aggregate_product__supply__05__",
+            )
+        )
+        for key in charts
+    )
+
+
+def test_detailed_leap_bunkers_use_separate_supply_pills_and_charts(
+    tmp_path: Path,
+) -> None:
+    """Separate LEAP Air and Shipping values activate 04 and 05."""
+    manifest, supply_html, charts = _render_supply_page(
+        tmp_path,
+        include_children=True,
+        leap_children_nonzero=True,
+    )
+    aggregate_flows = set(
+        manifest.loc[
+            manifest["page_key"].eq("supply")
+            & manifest["chart_type"].eq("stacked_area"),
+            "common_flow_label",
+        ]
+    )
     assert {
         "04 International marine bunkers",
         "05 International aviation bunkers",
@@ -143,14 +205,7 @@ def test_detailed_comparison_bunkers_use_separate_supply_pills_and_charts(
     assert "04-05 International transport (bunkers)" not in aggregate_flows
     assert 'data-chart-key="chart__area__04__' in supply_html
     assert 'data-chart-key="chart__area__05__' in supply_html
-    assert 'chart__line__aggregate_product__supply__04_05__' not in supply_html
-    assert 'chart__line__04_05_international_transport' not in supply_html
-    assert "sec-supply__04_05_international_transport" not in supply_html
-    assert 'data-placeholder="false">04 International marine bunkers</a>' in supply_html
-    assert 'data-placeholder="false">05 International aviation bunkers</a>' in supply_html
     assert 'data-placeholder="true">04-05 International transport' not in supply_html
-    assert 'data-placeholder="true">04 International marine bunkers' not in supply_html
-    assert 'data-placeholder="true">05 International aviation bunkers' not in supply_html
     child_area_keys = [
         key
         for key in charts
@@ -158,10 +213,9 @@ def test_detailed_comparison_bunkers_use_separate_supply_pills_and_charts(
     ]
     assert len(child_area_keys) == 2
     for key in child_area_keys:
-        assert all(
-            not str(trace.get("name", "")).startswith("LEAP ")
-            for trace in charts[key]["data"]
-        )
+        assert "LEAP Target total" in {
+            str(trace.get("name", "")) for trace in charts[key]["data"]
+        }
 
 
 def test_aggregate_only_bunkers_keep_combined_placeholder_supply_pill(tmp_path: Path) -> None:

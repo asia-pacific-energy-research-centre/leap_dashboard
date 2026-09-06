@@ -1,5 +1,20 @@
 # LEAP dashboard work queue and handover plan
 
+## LEAP-led bunker placeholder boundary — complete 2026-09-06
+
+- The actual LEAP branch representation now controls Supply bunker structure.
+  A combined `All demand aggregated/International transport` source produces
+  one `04-05` placeholder chart for every comparison basis; ESTO or 9th child
+  detail cannot promote it to empty-LEAP `04` and `05` sections.
+- Separate marine (`04`) and aviation (`05`) charts appear only when LEAP
+  publishes both non-zero detailed Air and Shipping boundaries. A partial or
+  mixed-period LEAP split stays at `04-05` when the parent exists; otherwise it
+  is reported as unavailable. The combined value is never allocated between
+  children.
+- The page warning follows the same short placeholder wording used elsewhere.
+  Regression coverage asserts the mutually exclusive `{04-05}` versus
+  `{04, 05}` navigation/chart contract and the presence of LEAP totals.
+
 ## ESTO Extended conservation and missing-flow allocation — complete 2026-09-05
 
 - Ordinary ESTO remains authoritative for every economy/year/fuel total.

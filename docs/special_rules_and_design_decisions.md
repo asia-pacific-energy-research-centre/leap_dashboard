@@ -1219,7 +1219,7 @@ upstream comparison fact. Do not source or map the rows directly in the dashboar
   comparison fact contains no flow-06 or flow-11 rows, so activation remains
   blocked on a consistent upstream mapping generation.
 
-## DASH-031: Keep marine and aviation bunkers separate on Supply
+## DASH-031: Let LEAP detail choose the Supply bunker boundary
 
 **Status:** Confirmed and implemented
 **Owner:** leap_dashboard
@@ -1228,19 +1228,26 @@ upstream comparison fact. Do not source or map the rows directly in the dashboar
 
 ### Current rule
 
-Show flow `04` and flow `05` separately on Supply and omit their combined
-`04-05 International transport (bunkers)` parent from that page. Continue to
-use the combined row as the non-overlapping bunker boundary in the Energy
-balance overview supply total.
+Use one mutually exclusive display boundary for the complete dashboard run.
+When LEAP supplies `All demand aggregated/International transport`, show one
+`04-05 International transport (bunkers)` placeholder chart and roll every
+comparison source to that boundary. Detail published only by ESTO or the 9th
+must not create separate charts with no LEAP series.
 
-When the upstream coverage record says International transport is still part
-of `All demand aggregated`, show a yellow placeholder warning. The current USA
-LEAP input supplies only `All demand aggregated/International transport`; its
-separate mapped Air and Shipping branches are absent. Do not allocate that
-combined value between marine and aviation. The separate Supply charts must
-therefore show LEAP as unavailable until detailed source data are supplied.
+Show flow `04` and flow `05` separately only when LEAP itself supplies both
+non-zero detailed Air and Shipping boundaries. A partial split, or a run that
+mixes placeholder and detailed LEAP years, stays at `04-05` when that parent is
+available; a parentless partial split is reported as unavailable rather than
+presented as complete detail. Never allocate a combined LEAP value between
+marine and aviation. Continue to use one
+non-overlapping bunker frontier in the Energy balance overview supply total.
 
 ### History
+
+- 2026-09-06: Replaced comparison-source promotion with the same LEAP-led
+  placeholder rule used on other pages. All four current batch workbooks were
+  confirmed to contain only one International transport row, so they must show
+  one `04-05` chart rather than historical-only `04` and `05` sections.
 
 - 2026-08-11: Confirmed from the upstream raw LEAP fact, converted ESTO fact,
   published source map, and Common ESTO comparison fact. The detailed mappings
