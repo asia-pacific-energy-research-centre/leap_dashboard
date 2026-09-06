@@ -1421,8 +1421,8 @@ def test_other_demand_flow_overview_keeps_ninth_compound_agriculture_rollup() ->
     assert resolved["value"].sum() == pytest.approx(212.5)
 
 
-def test_production_other_demand_frontier_includes_ninth_compound() -> None:
-    """Production config must retain the published 16.03-16.04 9th row."""
+def test_production_other_demand_frontier_prefers_native_simple_children() -> None:
+    """Production asks for native children; compound-only sources fall back."""
     template = json.loads(
         (
             REPO_ROOT
@@ -1435,8 +1435,7 @@ def test_production_other_demand_frontier_includes_ninth_compound() -> None:
         "preferred_detail_flow_boundaries"
     ]
 
-    assert preferred[0] == "16.03-16.04"
-    assert preferred == ["16.03-16.04", "16.03", "16.04", "16.05"]
+    assert preferred == ["16.03", "16.04", "16.05"]
 
 
 def test_other_demand_chart_collapses_compound_when_history_proves_one_child() -> None:
@@ -1834,8 +1833,8 @@ def test_other_demand_by_flow_retains_parent_when_detail_does_not_reconcile() ->
     ).any()
 
 
-def test_other_demand_by_flow_does_not_repeat_compound_and_child_frontiers() -> None:
-    """A preferred compound boundary owns its contained simple child rows."""
+def test_other_demand_by_flow_prefers_reconciled_native_children() -> None:
+    """Reconciled source children own history instead of a derived compound."""
     template = {
         "other_demand_page": {
             "page_key": "others",
@@ -1843,9 +1842,7 @@ def test_other_demand_by_flow_does_not_repeat_compound_and_child_frontiers() -> 
                 "enabled": True,
                 "flow_boundary": "16.03-16.05",
                 "label": "16.03-16.05 Other sector",
-                "preferred_detail_flow_boundaries": [
-                    "16.03-16.04", "16.03", "16.04", "16.05"
-                ],
+                "preferred_detail_flow_boundaries": ["16.03", "16.04", "16.05"],
                 "detail_coverage_residual_label": "Unallocated",
             },
         },
@@ -1894,7 +1891,7 @@ def test_other_demand_by_flow_does_not_repeat_compound_and_child_frontiers() -> 
         rows, spec, group_col="common_flow_label"
     )
 
-    assert set(resolved["common_flow_code"]) == {"16.03-16.04", "16.05"}
+    assert set(resolved["common_flow_code"]) == {"16.03", "16.05"}
     assert resolved["value"].sum() == pytest.approx(30.0)
     assert not resolved["common_flow_label"].eq("Unallocated").any()
 

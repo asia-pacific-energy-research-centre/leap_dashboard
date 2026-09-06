@@ -432,14 +432,14 @@
       "enabled": true,
       "flow_boundary": "16.03-16.05",
       "label": "16.03-16.05 Other sector",
-      "preferred_detail_flow_boundaries": ["16.03-16.04", "16.03", "16.04", "16.05"],
+      "preferred_detail_flow_boundaries": ["16.03", "16.04", "16.05"],
       "collapse_compound_to_historical_child": {"16.03-16.04": ["16.03", "16.04"]},
       "verified_compound_child_by_economy": {"01AUS": {"16.03-16.04": {"code": "16.03", "label": "16.03 Agriculture"}}},
       "detail_coverage_residual_label": "Unallocated within 16.03-16.05 Other demand",
       "chart_caption": "16.03-16.05 Other sector — by flow",
       "stacked_area_note": "The historical areas show the activities included in Other demand. A projected combined category is shown as one activity only when the observed base-year data show that activity accounts for the full category; otherwise it remains combined until more detail is published."
     },
-    "_note": "Both Other-demand Overview charts always use exact boundary 16.03-16.05; broad flow 16 is suppressed because it also contains sectors presented on the Buildings page. The by-flow source frontier retains a published 16.03-16.04 compound when a source does not publish its separate 16.03 and 16.04 children, then uses the deepest available non-overlapping detail. Any remaining parent/detail difference is shown conservatively as unallocated rather than assigned to a specific child. A source/year with no child detail retains its published parent unless exactly one historical child reconciles to the compound; the active LEAP placeholder is otherwise retained. Source-specific comparison rollups 16.03-16.04 and 16.03-16.05 are already owned by the continuous Overview and are not repeated below as misleading historical-only or projection-only detail sections."
+    "_note": "Both Other-demand Overview charts always use exact boundary 16.03-16.05; broad flow 16 is suppressed because it also contains sectors presented on the Buildings page. The by-flow source frontier first uses separate 16.03, 16.04 and 16.05 rows when they reconcile to the authoritative parent. A source that publishes only 16.03-16.04 retains that compound as the conservative fallback. Any remaining parent/detail difference is shown conservatively as unallocated rather than assigned to a specific child. A source/year with no child detail retains its published parent unless exactly one historical child reconciles to the compound; the active LEAP placeholder is otherwise retained. Source-specific comparison rollups 16.03-16.04 and 16.03-16.05 are already owned by the continuous Overview and are not repeated below as misleading historical-only or projection-only detail sections."
   },
   "buildings_page": {
     "page_key": "buildings",
