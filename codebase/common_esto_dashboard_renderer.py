@@ -9532,17 +9532,9 @@ def write_index(
 ) -> None:
     """Write the dashboard index page."""
     economy_heading = f" — {escape(economy_label)}" if economy_label else ""
-    def _index_counts(p: dict) -> str:
-        parts = [f'{p["area_chart_count"]} overview']
-        if p.get("summary_chart_count"):
-            parts.append(f'{p["summary_chart_count"]} summary')
-        parts.append(f'{p["line_chart_count"]} detail')
-        return ", ".join(parts)
-
     cards = "".join(
         f'<li style="margin-bottom:8px;">'
-        f'<a href="{escape(p["file"])}" style="font-weight:600;">{escape(p["label"])}</a> '
-        f'<span style="color:#6b7280;font-size:13px;">({_index_counts(p)})</span>'
+        f'<a href="{escape(p["file"])}" style="font-weight:600;">{escape(p["label"])}</a>'
         f'</li>'
         for p in pages
     )

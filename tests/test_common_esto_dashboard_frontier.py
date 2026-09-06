@@ -21,6 +21,27 @@ from common_esto_dashboard_data import (  # noqa: E402
 )
 
 
+def test_index_page_lists_pages_without_chart_count_metadata(tmp_path: Path) -> None:
+    output_path = tmp_path / "index.html"
+    renderer.write_index(
+        [
+            {
+                "file": "buildings.html",
+                "label": "Buildings",
+                "area_chart_count": 2,
+                "summary_chart_count": 0,
+                "line_chart_count": 25,
+            }
+        ],
+        output_path,
+    )
+
+    html = output_path.read_text(encoding="utf-8")
+    assert '>Buildings</a></li>' in html
+    assert "2 overview" not in html
+    assert "25 detail" not in html
+
+
 def _row(flow: str, product: str, value: float, scenario: str = "Target") -> dict[str, object]:
     return {
         "comparison_scope": "esto_extended_leap_ninth",
