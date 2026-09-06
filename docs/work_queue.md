@@ -739,3 +739,13 @@ decision, not a backlog pull.
   instead of reducing the total line to the unrelated surviving child.
 - Regression coverage requires year-scoped retained parents and keeps the
   production boundary list aligned with the compound-frontier contract.
+
+## Source-period-aware area stacks — complete 2026-09-06
+
+- Historical comparison areas and post-base-year LEAP areas use separate
+  Plotly stackgroups. This prevents Plotly from inventing zero-valued points,
+  hover labels, or coloured baselines for a category outside its source period.
+- Physical period traces retain one logical legend group, so a category that
+  genuinely exists on both sides of the base year still appears once in the
+  legend. Regression coverage includes both a projection-only Buildings parent
+  and a fuel category that continues across the source boundary.

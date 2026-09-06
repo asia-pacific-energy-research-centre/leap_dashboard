@@ -2493,6 +2493,8 @@ def _add_signed_stack_traces(
     visible: bool,
     hovertemplate: str,
     line_color: str = "",
+    legend_group: str = "",
+    showlegend: bool = True,
 ) -> int:
     """Add one logical area series to separate positive and negative stacks.
 
@@ -2514,6 +2516,8 @@ def _add_signed_stack_traces(
         visible=visible,
         hovertemplate=hovertemplate,
         line_color=line_color,
+        legend_group=legend_group,
+        showlegend=showlegend,
     )
 
 
@@ -2526,6 +2530,8 @@ def _add_preseparated_signed_stack_traces(
     visible: bool,
     hovertemplate: str,
     line_color: str = "",
+    legend_group: str = "",
+    showlegend: bool = True,
 ) -> int:
     """Add already-separated gross positive and negative category totals."""
     active_parts = [
@@ -2533,7 +2539,7 @@ def _add_preseparated_signed_stack_traces(
         for sign, values in signed_parts
         if _has_nonzero_values(values)
     ]
-    legend_group = f"{stackgroup_prefix}::{trace_name}"
+    resolved_legend_group = legend_group or f"{stackgroup_prefix}::{trace_name}"
     for part_index, (sign, values) in enumerate(active_parts):
         trace = go.Scatter(
             x=x_values,
@@ -2542,8 +2548,8 @@ def _add_preseparated_signed_stack_traces(
             stackgroup=f"{stackgroup_prefix}_{sign}",
             name=trace_name,
             visible=True if visible else False,
-            legendgroup=legend_group,
-            showlegend=part_index == 0,
+            legendgroup=resolved_legend_group,
+            showlegend=showlegend and part_index == 0,
             hovertemplate=hovertemplate,
         )
         if line_color:
@@ -5637,50 +5643,69 @@ def build_area_chart(
             & (chart_df["year"] > base_year)
             & (chart_df[group_col].isin(active_groups))
         ]
-        area_df = pd.concat([pre_base_df, post_base_df], ignore_index=True)
-        if area_df.empty:
+        period_frames = [
+            ("historical", pre_base_df),
+            ("projection", post_base_df),
+        ]
+        if all(period_df.empty for _, period_df in period_frames):
             continue
         tag = scenario_toggle_tag(primary_source, scenario_name)
         is_default = scenario_name.casefold() == default_scenario.casefold()
-        signed_area_df = area_df.copy()
-        signed_values = pd.to_numeric(signed_area_df["value"], errors="coerce").fillna(0.0)
-        signed_area_df["_positive_value"] = signed_values.clip(lower=0.0)
-        signed_area_df["_negative_value"] = signed_values.clip(upper=0.0)
-        group_df = (
-            signed_area_df.groupby([group_col, "year"], as_index=False)[
-                ["_positive_value", "_negative_value"]
-            ]
-            .sum()
-            .sort_values([group_col, "year"])
-        )
-        for group_label, group in group_df.groupby(group_col, dropna=False):
-            if not (
-                _has_nonzero_values(group["_positive_value"])
-                or _has_nonzero_values(group["_negative_value"])
-            ):
+        shown_legend_groups: set[str] = set()
+        for period_name, period_df in period_frames:
+            if period_df.empty:
                 continue
-            trace_count = _add_preseparated_signed_stack_traces(
-                fig=fig,
-                x_values=group["year"],
-                signed_parts=[
-                    ("pos", group["_positive_value"]),
-                    ("neg", group["_negative_value"]),
-                ],
-                stackgroup_prefix=f"scenario_{tag}",
-                trace_name=str(group_label),
-                visible=is_default,
-                hovertemplate=(
-                    "%{x}<br>Signed value: %{y:,.2f}"
-                    + chart_unit
-                    + "<extra>"
-                    + escape(str(group_label))
-                    + "</extra>"
-                ),
+            signed_area_df = period_df.copy()
+            signed_values = pd.to_numeric(
+                signed_area_df["value"], errors="coerce"
+            ).fillna(0.0)
+            signed_area_df["_positive_value"] = signed_values.clip(lower=0.0)
+            signed_area_df["_negative_value"] = signed_values.clip(upper=0.0)
+            group_df = (
+                signed_area_df.groupby([group_col, "year"], as_index=False)[
+                    ["_positive_value", "_negative_value"]
+                ]
+                .sum()
+                .sort_values([group_col, "year"])
             )
-            trace_meta.extend(
-                trace_meta_entry(primary_source, scenario_name, True)
-                for _ in range(trace_count)
-            )
+            for group_label, group in group_df.groupby(group_col, dropna=False):
+                if not (
+                    _has_nonzero_values(group["_positive_value"])
+                    or _has_nonzero_values(group["_negative_value"])
+                ):
+                    continue
+                logical_legend_group = f"scenario_{tag}::{group_label}"
+                trace_count = _add_preseparated_signed_stack_traces(
+                    fig=fig,
+                    x_values=group["year"],
+                    signed_parts=[
+                        ("pos", group["_positive_value"]),
+                        ("neg", group["_negative_value"]),
+                    ],
+                    # Historical and projection categories must not share a
+                    # Plotly stackgroup. Plotly otherwise infers missing points
+                    # as zero across the source boundary, drawing a false
+                    # coloured baseline and hover values before a projection-
+                    # only category exists.
+                    stackgroup_prefix=f"scenario_{tag}_{period_name}",
+                    trace_name=str(group_label),
+                    visible=is_default,
+                    hovertemplate=(
+                        "%{x}<br>Signed value: %{y:,.2f}"
+                        + chart_unit
+                        + "<extra>"
+                        + escape(str(group_label))
+                        + "</extra>"
+                    ),
+                    legend_group=logical_legend_group,
+                    showlegend=logical_legend_group not in shown_legend_groups,
+                )
+                if trace_count:
+                    shown_legend_groups.add(logical_legend_group)
+                trace_meta.extend(
+                    trace_meta_entry(primary_source, scenario_name, True)
+                    for _ in range(trace_count)
+                )
 
     authoritative_labels_by_source = area_spec.get(
         "authoritative_total_flow_labels_by_system"
