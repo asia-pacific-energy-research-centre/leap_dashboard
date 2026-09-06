@@ -5649,6 +5649,13 @@ def build_area_chart(
         ]
         if all(period_df.empty for _, period_df in period_frames):
             continue
+        historical_years = set(pd.to_numeric(pre_base_df["year"], errors="coerce"))
+        projection_years = set(pd.to_numeric(post_base_df["year"], errors="coerce"))
+        transition_year = (
+            base_year + 0.5
+            if base_year in historical_years and base_year + 1 in projection_years
+            else None
+        )
         tag = scenario_toggle_tag(primary_source, scenario_name)
         is_default = scenario_name.casefold() == default_scenario.casefold()
         shown_legend_groups: set[str] = set()
@@ -5661,6 +5668,25 @@ def build_area_chart(
             ).fillna(0.0)
             signed_area_df["_positive_value"] = signed_values.clip(lower=0.0)
             signed_area_df["_negative_value"] = signed_values.clip(upper=0.0)
+            # Separate source-period stackgroups prevent Plotly from inventing
+            # zero-valued categories outside their real period. Extend only
+            # the two adjacent annual observations to their midpoint so the
+            # filled areas meet cleanly without assigning either source a
+            # fabricated integer-year value.
+            if transition_year is not None:
+                boundary_year = (
+                    base_year if period_name == "historical" else base_year + 1
+                )
+                boundary_rows = signed_area_df[
+                    pd.to_numeric(signed_area_df["year"], errors="coerce").eq(
+                        boundary_year
+                    )
+                ].copy()
+                if not boundary_rows.empty:
+                    boundary_rows["year"] = transition_year
+                    signed_area_df = pd.concat(
+                        [signed_area_df, boundary_rows], ignore_index=True
+                    )
             group_df = (
                 signed_area_df.groupby([group_col, "year"], as_index=False)[
                     ["_positive_value", "_negative_value"]
