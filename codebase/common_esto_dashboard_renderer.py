@@ -3347,9 +3347,9 @@ def resolve_supply_bunker_representation(
     """Select one additive bunker frontier per source/scenario/year surface.
 
     Explicit LEAP child rows are authoritative evidence that marine/aviation
-    detail exists, even when their values are zero. If any present child has a
-    non-zero value, only populated children are charted; an absent or zero
-    sibling is never manufactured. Resolving before page filtering prevents
+    detail exists, even when their values are zero. A combined parent remains
+    authoritative when only one child is present because that is not a
+    complete marine/aviation split. Resolving before page filtering prevents
     stale audit metadata from deleting genuine detail downstream.
     """
     supply_config = template.get("supply_page", {}) or {}
@@ -3418,7 +3418,12 @@ def resolve_supply_bunker_representation(
                 surface_codes.isin(detail_codes), "_bunker_frontier_row"
             ].astype(int)
         )
-        mode = "detail" if present_children else "combined"
+        complete_detail = set(detail_codes).issubset(present_children)
+        mode = (
+            "detail"
+            if complete_detail or (present_children and not has_combined)
+            else "combined"
+        )
         if mode == "detail":
             detail_frontier_rows_to_drop.update(
                 surface.loc[
@@ -3516,7 +3521,13 @@ def resolve_supply_bunker_representation(
         for source, mode in selected_modes
     )
     metadata_placeholder = uses_combined_international_transport_placeholder(template)
-    detail_active = bool(structural_detail_codes)
+    leap_combined_present = bool(
+        (leap_row_mask & codes.eq(boundary)).any()
+    )
+    detail_active = bool(structural_detail_codes) and (
+        not leap_combined_present
+        or set(detail_codes).issubset(structural_detail_codes)
+    )
     placeholder_active = (
         not detail_active
         and (
