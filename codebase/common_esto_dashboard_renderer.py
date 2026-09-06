@@ -3785,7 +3785,24 @@ def prepare_area_specs_for_page(
     specs = add_buildings_overview_specs(page_key, page_df, specs, template)
     specs = add_active_placeholder_area_specs(page_key, page_df, specs, template)
     specs = add_supply_bunker_overview_specs(page_key, page_df, specs, template)
-    return add_power_sector_overview_specs(page_key, page_df, specs, template)
+    specs = add_power_sector_overview_specs(page_key, page_df, specs, template)
+    # Page-specific overview builders (notably Buildings) can create the
+    # correct owner before the generic placeholder builder runs. Propagate the
+    # current-run representation status after every builder has finished so
+    # an already-existing owner receives the same navigation marker as one
+    # created by the generic placeholder path.
+    return [
+        {
+            **spec,
+            "navigation_placeholder": True,
+        }
+        if flow_boundary_is_active_demand_placeholder(
+            spec.get("aggregate_flow_prefix", ""),
+            template,
+        )
+        else spec
+        for spec in specs
+    ]
 
 
 def prepare_power_page_rows(page_df: pd.DataFrame) -> pd.DataFrame:

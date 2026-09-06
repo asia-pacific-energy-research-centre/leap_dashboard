@@ -2219,6 +2219,10 @@ def test_placeholder_buildings_overview_keeps_rollup_and_esto_children() -> None
         "leap_demand_sector_coverage": {
             "show_aggregate_only_page_keys": ["buildings"],
             "_aggregate_only_page_branches": {"buildings": ["Buildings"]},
+            "_placeholder_only_page_branches": {"buildings": ["Buildings"]},
+            "placeholder_component_flow_prefixes": {
+                "Buildings": ["16.01", "16.02"],
+            },
             "placeholder_component_product_sections": {
                 "Buildings": {
                     "flow_code": "16.01-16.02",
@@ -2277,6 +2281,7 @@ def test_placeholder_buildings_overview_keeps_rollup_and_esto_children() -> None
         "16.01-16.02 Buildings — by flow",
     ]
     assert {spec["aggregate_flow_prefix"] for spec in specs} == {"16.01-16.02"}
+    assert all(spec["navigation_placeholder"] is True for spec in specs)
     assert specs[1]["retain_parent_as_configured_flow_group"] is True
     flow_rows = renderer.configured_flow_group_rows(
         rows,
