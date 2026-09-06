@@ -384,7 +384,7 @@
       "Industry": {"flow_code": "14", "label": "14 Industry sector"},
       "Road": {"flow_code": "15.02", "label": "15.02 Road"},
       "Transport non road": {"flow_code": "15.01,15.03-15.06", "label": "15.01,15.03-15.06 Transport non-road"},
-      "Buildings": {"flow_code": "16.01-16.02", "label": "16 Buildings"},
+      "Buildings": {"flow_code": "16.01-16.02", "label": "16.01-16.02 Buildings"},
       "Other sector": {"flow_code": "16.03-16.05", "label": "16.03-16.05 Other sector"},
       "Non Energy Use": {"flow_code": "17", "label": "17 Non-energy use"}
     },

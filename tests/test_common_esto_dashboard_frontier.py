@@ -2327,6 +2327,25 @@ def test_placeholder_buildings_overview_keeps_rollup_and_esto_children() -> None
     }
 
 
+def test_production_buildings_placeholder_owner_uses_exact_boundary_label() -> None:
+    template = json.loads(
+        (
+            REPO_ROOT
+            / "config"
+            / "common_esto_dashboard"
+            / "common_esto_dashboard_template.json"
+        ).read_text(encoding="utf-8")
+    )
+
+    owner = template["leap_demand_sector_coverage"][
+        "placeholder_component_product_sections"
+    ]["Buildings"]
+    assert owner == {
+        "flow_code": "16.01-16.02",
+        "label": "16.01-16.02 Buildings",
+    }
+
+
 def test_buildings_overview_reconciles_incomplete_historical_children_to_parent() -> None:
     """Incomplete ESTO detail keeps the missing parent remainder visible."""
     labels = {
