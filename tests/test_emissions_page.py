@@ -330,6 +330,13 @@ def test_transformation_frontier_emits_parent_child_reconciliation_qa() -> None:
     assert qa.iloc[0]["difference"] == pytest.approx(-10.0)
 
 
+def test_emissions_page_note_is_short_and_plain_language() -> None:
+    assert emissions._page_note({}, "Mt CO2e", ["LEAP"]) == (
+        "Emissions (Mt CO₂) are estimated from final demand, power generation and "
+        "energy-sector own use, using energy-weighted 9th Edition CO₂e factors."
+    )
+
+
 def test_emissions_page_is_hidden_when_its_inputs_are_missing(tmp_path):
     template = {
         "emissions_page": {

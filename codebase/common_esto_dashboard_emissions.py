@@ -1734,29 +1734,14 @@ def _sector_color_map(template: dict, assigned_df: pd.DataFrame) -> dict[str, st
 
 
 def _page_note(
-    factor_set: dict,
-    unit: str,
-    aggregate_sources: list[str],
+    _factor_set: dict,
+    _unit: str,
+    _aggregate_sources: list[str],
 ) -> str:
     """Give the page a short explanation of what its emissions represent."""
-    note = (
-        f"Emissions ({unit}) are estimated from final demand, power-sector combustion "
-        f"inputs, and energy-sector own use using "
-        f"{factor_set.get('label', factor_set.get('key', 'CO2e emissions factors'))}. "
-        "Final demand is split into Industry, Transport, Buildings, and Other demand. "
-        "Negative power-sector inputs and separately reported energy-sector own use are "
-        "treated as fuel consumption. Conversion feedstocks, positive transformation "
-        "outputs, transfers, and transmission/distribution losses are excluded. "
-        "Non-energy use, including unresolved mixed Other-sector aggregates, is excluded. "
-        "The maintained original-ESTO-flow policy controls this boundary; extended Common "
-        "ESTO rows inherit their longest original-flow ancestor and mixed rollups fail closed."
+    return (
+        "Emissions (Mt CO₂) are estimated from final demand, power generation and "
+        "energy-sector own use, using energy-weighted 9th Edition CO₂e factors."
     )
-    if aggregate_sources:
-        note += (
-            " Where LEAP detail is unavailable, aggregate demand is shown as one series for "
-            + ", ".join(aggregate_sources)
-            + "."
-        )
-    return note
 
 #%%
