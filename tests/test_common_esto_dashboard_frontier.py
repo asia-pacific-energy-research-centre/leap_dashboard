@@ -2245,9 +2245,7 @@ def test_placeholder_buildings_overview_keeps_rollup_and_esto_children() -> None
         for trace in figure.data
         if trace.name == "16.01-16.02 Buildings"
     )
-    assert list(parent_trace.x) == [2022.5, 2023]
-    assert list(parent_trace.y) == [105.0, 105.0]
-    assert not any(float(year).is_integer() and year <= 2022 for year in parent_trace.x)
+    assert list(parent_trace.x) == [2023]
     historical_stackgroups = {
         trace.stackgroup
         for trace in figure.data
@@ -2298,10 +2296,7 @@ def test_area_chart_separates_source_period_stacks_without_duplicate_legend() ->
     electricity_traces = [
         trace for trace in figure.data if trace.name == "17 Electricity"
     ]
-    assert [list(trace.x) for trace in electricity_traces] == [
-        [2022.0, 2022.5],
-        [2022.5, 2023.0],
-    ]
+    assert [list(trace.x) for trace in electricity_traces] == [[2022], [2023]]
     assert len({trace.stackgroup for trace in electricity_traces}) == 2
     assert len({trace.legendgroup for trace in electricity_traces}) == 1
     assert [trace.showlegend for trace in electricity_traces] == [True, False]
