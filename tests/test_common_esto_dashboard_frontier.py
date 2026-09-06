@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -66,6 +67,48 @@ def test_area_frontier_uses_observed_parent_without_double_counting_detail() -> 
 
     assert list(frontier.sort_values("common_product_code")["common_flow_code"]) == ["14.03.11", "14"]
     assert frontier["value"].sum() == 3.0
+
+
+def test_retained_compound_parent_suppresses_children_only_in_failure_year() -> None:
+    """One failed allocation must not hide valid children in later years."""
+    base = {
+        "comparison_scope": "esto_extended_leap_ninth",
+        "source_system": "ESTO_EXTENDED",
+        "economy": "01_AUS",
+        "scenario": "historical",
+        "common_product_code": "17",
+        "is_non_expanding_rollup": False,
+    }
+    rows = pd.DataFrame([
+        {
+            **base,
+            "year": 2012,
+            "common_flow_code": "16.03-16.05",
+            "value": 12.0,
+            "_historical_allocation_status": "failed_parent_retained",
+        },
+        {
+            **base,
+            "year": 2012,
+            "common_flow_code": "16.03",
+            "value": 10.0,
+            "_historical_allocation_status": "",
+        },
+        {
+            **base,
+            "year": 2013,
+            "common_flow_code": "16.03",
+            "value": 8.0,
+            "_historical_allocation_status": "",
+        },
+    ])
+
+    frontier = renderer._non_overlapping_common_row_frontier(rows)
+
+    assert frontier[["year", "common_flow_code", "value"]].to_dict("records") == [
+        {"year": 2012, "common_flow_code": "16.03-16.05", "value": 12.0},
+        {"year": 2013, "common_flow_code": "16.03", "value": 8.0},
+    ]
 
 
 def _area_product_row(
@@ -1348,6 +1391,24 @@ def test_other_demand_flow_overview_keeps_ninth_compound_agriculture_rollup() ->
 
     assert set(resolved["common_flow_code"]) == {"16.03-16.04", "16.05"}
     assert resolved["value"].sum() == pytest.approx(212.5)
+
+
+def test_production_other_demand_frontier_includes_ninth_compound() -> None:
+    """Production config must retain the published 16.03-16.04 9th row."""
+    template = json.loads(
+        (
+            REPO_ROOT
+            / "config"
+            / "common_esto_dashboard"
+            / "common_esto_dashboard_template.json"
+        ).read_text(encoding="utf-8")
+    )
+    preferred = template["other_demand_page"]["by_flow_overview"][
+        "preferred_detail_flow_boundaries"
+    ]
+
+    assert preferred[0] == "16.03-16.04"
+    assert preferred == ["16.03-16.04", "16.03", "16.04", "16.05"]
 
 
 def test_other_demand_chart_collapses_compound_when_history_proves_one_child() -> None:

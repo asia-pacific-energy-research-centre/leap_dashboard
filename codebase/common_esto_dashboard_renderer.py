@@ -4157,8 +4157,13 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
             continue
 
         memberships = pd.DataFrame(membership_rows).drop_duplicates()
-        observed_parents = work[
-            [*context_columns, opposite_column, axis_column]
+        allocation_status = work.get(
+            "_historical_allocation_status", pd.Series("", index=work.index)
+        ).fillna("").astype(str).str.strip()
+        retained_parent = allocation_status.eq("failed_parent_retained")
+        observed_parents = work.loc[
+            ~retained_parent,
+            [*context_columns, opposite_column, axis_column],
         ].drop_duplicates().rename(columns={axis_column: "_frontier_parent_common_code"})
         observed_details = work[
             ["_frontier_row_number", *context_columns, opposite_column, axis_column]
@@ -4173,6 +4178,44 @@ def _non_overlapping_common_row_frontier(df: pd.DataFrame) -> pd.DataFrame:
             how="inner",
         )
         drop_row_numbers.update(observed_matches["_frontier_row_number"].astype(int))
+
+        # Allocation failures deliberately retain a compound parent for only
+        # the affected product/year. They are not a published series-wide
+        # frontier: applying them across years hides valid children once native
+        # detail starts reconciling. Suppress overlapping children only beside
+        # the retained parent observation.
+        if retained_parent.any() and "year" in work.columns:
+            observation_columns = [*context_columns, "year"]
+            retained_parents = work.loc[
+                retained_parent,
+                [*observation_columns, opposite_column, axis_column],
+            ].drop_duplicates().rename(
+                columns={axis_column: "_frontier_parent_common_code"}
+            )
+            retained_details = work[
+                [
+                    "_frontier_row_number",
+                    *observation_columns,
+                    opposite_column,
+                    axis_column,
+                ]
+            ]
+            retained_matches = retained_details.merge(
+                memberships,
+                on=[opposite_column, axis_column],
+                how="inner",
+            ).merge(
+                retained_parents,
+                on=[
+                    *observation_columns,
+                    opposite_column,
+                    "_frontier_parent_common_code",
+                ],
+                how="inner",
+            )
+            drop_row_numbers.update(
+                retained_matches["_frontier_row_number"].astype(int)
+            )
 
     # The split parent and detail rows normally retain the same compressed
     # hierarchy coordinates even though their common_row_id values differ.

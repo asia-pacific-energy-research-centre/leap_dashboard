@@ -711,3 +711,16 @@ decision, not a backlog pull.
   as the parent; it is never silently dropped or relabelled as a child.
 - The deeper Services overview is emitted only when Buildings detail is active.
   A focused regression covers the mixed placeholder-parent/ESTO-child case.
+
+## Cross-view Other-demand frontier conservation — complete 2026-09-06
+
+- A compound parent retained for a failed historical allocation now suppresses
+  its children only in that exact source/product/year observation. It no longer
+  hides valid children in every later year; this restores `17 Electricity` in
+  the AUS Other-demand by-product history from 2013 onward.
+- The Other-demand by-flow frontier explicitly includes the published
+  `16.03-16.04` comparison boundary before considering separate `16.03` and
+  `16.04` children. Ninth therefore retains its complete published compound
+  instead of reducing the total line to the unrelated surviving child.
+- Regression coverage requires year-scoped retained parents and keeps the
+  production boundary list aligned with the compound-frontier contract.
