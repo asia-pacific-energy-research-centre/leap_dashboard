@@ -236,6 +236,70 @@ def test_emissions_keeps_major_sector_labels_from_aggregate_branch_rows():
     assert selected["_page_label"].tolist() == ["Industry", "Buildings"]
 
 
+def _power_transformation_rows(*pairs: tuple[str, float]) -> pd.DataFrame:
+    return pd.DataFrame([
+        {
+            "_page_key": "power",
+            "_page_label": "Power",
+            "common_flow_code": flow_code,
+            "component_flow_code": flow_code,
+            "common_flow_label": flow_code,
+            "common_product_label": "08.01 Natural gas",
+            "source_system": "NINTH",
+            "scenario": "reference",
+            "year": 2030,
+            "value": value,
+        }
+        for flow_code, value in pairs
+    ])
+
+
+def test_transformation_frontier_keeps_reconciling_power_children() -> None:
+    rows = _power_transformation_rows(
+        ("09.01", -100.0),
+        ("09.01.01", -40.0),
+        ("09.01.02", -60.0),
+    )
+
+    frontier = emissions._lowest_transformation_frontier(rows)
+
+    assert set(frontier["common_flow_code"]) == {"09.01.01", "09.01.02"}
+    assert frontier["value"].sum() == pytest.approx(-100.0)
+
+
+def test_transformation_frontier_retains_parent_when_power_children_mismatch() -> None:
+    rows = _power_transformation_rows(
+        ("09.01", -100.0),
+        ("09.01.01", -40.0),
+        ("09.01.02", -50.0),
+    )
+
+    frontier = emissions._lowest_transformation_frontier(rows)
+
+    assert set(frontier["common_flow_code"]) == {"09.01"}
+    assert frontier["value"].sum() == pytest.approx(-100.0)
+
+
+def test_transformation_frontier_emits_parent_child_reconciliation_qa() -> None:
+    rows = _power_transformation_rows(
+        ("09.01", -100.0),
+        ("09.01.01", -40.0),
+        ("09.01.02", -50.0),
+    )
+
+    selected, coverage, *_ = emissions.select_emissions_component_rows(
+        rows,
+        {"demand_page_keys": ["industry", "transport", "buildings", "others"]},
+    )
+
+    qa = coverage[coverage["common_flow_label"].eq("09.01")]
+    assert set(selected["common_flow_code"]) == {"09.01"}
+    assert len(qa) == 1
+    assert qa.iloc[0]["aggregate_value"] == pytest.approx(-100.0)
+    assert qa.iloc[0]["frontier_value"] == pytest.approx(-90.0)
+    assert qa.iloc[0]["difference"] == pytest.approx(-10.0)
+
+
 def test_emissions_page_is_hidden_when_its_inputs_are_missing(tmp_path):
     template = {
         "emissions_page": {
