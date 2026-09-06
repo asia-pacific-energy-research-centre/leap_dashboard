@@ -861,6 +861,7 @@ def test_supply_bunker_overview_keeps_leap_placeholder_despite_comparison_detail
     assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04-05"]
     assert specs[0]["force_navigation_root"] is True
     assert specs[0]["navigation_placeholder"] is True
+    assert specs[0]["skip_product_overview_ownership"] is False
 
 
 def test_supply_bunker_overview_omits_combined_total_when_children_have_cards() -> None:

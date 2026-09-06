@@ -3719,6 +3719,10 @@ def add_supply_bunker_overview_specs(
         **combined_product,
         "force_navigation_root": True,
         "navigation_placeholder": True,
+        # The combined placeholder is the authoritative visible bunker
+        # boundary, so its by-product overview must also own the per-product
+        # line cards.  Suppressing ownership leaves only the stacked overview.
+        "skip_product_overview_ownership": False,
         # Keep the overview owner and its per-product line section on one
         # navigation node.  A shortened label makes the same 04-05 boundary
         # look like two separate top-level sections.
