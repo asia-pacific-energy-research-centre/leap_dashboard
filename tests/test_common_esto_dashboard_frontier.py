@@ -2282,6 +2282,8 @@ def test_placeholder_buildings_overview_keeps_rollup_and_esto_children() -> None
     ]
     assert {spec["aggregate_flow_prefix"] for spec in specs} == {"16.01-16.02"}
     assert all(spec["navigation_placeholder"] is True for spec in specs)
+    assert specs[0]["skip_product_overview_ownership"] is False
+    assert specs[1]["skip_product_overview_ownership"] is True
     assert specs[1]["retain_parent_as_configured_flow_group"] is True
     flow_rows = renderer.configured_flow_group_rows(
         rows,

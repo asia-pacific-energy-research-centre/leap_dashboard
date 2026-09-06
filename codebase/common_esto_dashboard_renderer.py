@@ -3181,6 +3181,10 @@ def add_buildings_overview_specs(
                 "group_col": "common_product_label",
                 "title_prefix": "Aggregate by product",
                 "chart_caption": f"{label} — by product",
+                # On an aggregate-only Buildings page this overview owns the
+                # ordinary per-fuel cards. The paired by-flow overview remains
+                # the navigation owner so the placeholder pill is emitted once.
+                "skip_product_overview_ownership": False,
             },
             {
                 **base_spec,
