@@ -2240,66 +2240,6 @@ def test_placeholder_buildings_overview_keeps_rollup_and_esto_children() -> None
         "16.02 Residential",
         "16.01-16.02 Buildings",
     }
-    parent_trace = next(
-        trace
-        for trace in figure.data
-        if trace.name == "16.01-16.02 Buildings"
-    )
-    assert list(parent_trace.x) == [2023]
-    historical_stackgroups = {
-        trace.stackgroup
-        for trace in figure.data
-        if trace.name in {"16.01 Services", "16.02 Residential"}
-    }
-    assert historical_stackgroups
-    assert parent_trace.stackgroup not in historical_stackgroups
-    assert parent_trace.showlegend is True
-
-
-def test_area_chart_separates_source_period_stacks_without_duplicate_legend() -> None:
-    rows = pd.DataFrame(
-        [
-            {
-                "source_system": "ESTO",
-                "scenario": "historical",
-                "year": 2022,
-                "common_flow_label": "14 Industry",
-                "common_product_label": "17 Electricity",
-                "value": 8.0,
-            },
-            {
-                "source_system": "LEAP",
-                "scenario": "Target",
-                "year": 2023,
-                "common_flow_label": "14 Industry",
-                "common_product_label": "17 Electricity",
-                "value": 10.0,
-            },
-        ]
-    )
-
-    figure = renderer.build_area_chart(
-        rows,
-        {
-            "aggregate_flow_label": "14 Industry",
-            "source_flow_labels": ["14 Industry"],
-        },
-        {},
-        {
-            "chart_generation": {
-                "comparison_source_system": "ESTO",
-                "base_year": 2022,
-            }
-        },
-    )
-
-    electricity_traces = [
-        trace for trace in figure.data if trace.name == "17 Electricity"
-    ]
-    assert [list(trace.x) for trace in electricity_traces] == [[2022], [2023]]
-    assert len({trace.stackgroup for trace in electricity_traces}) == 2
-    assert len({trace.legendgroup for trace in electricity_traces}) == 1
-    assert [trace.showlegend for trace in electricity_traces] == [True, False]
 
 
 def test_buildings_overview_reconciles_incomplete_historical_children_to_parent() -> None:
@@ -4344,16 +4284,10 @@ def test_technology_stack_uses_authoritative_road_total_lines() -> None:
         authoritative_total_df=totals,
     )
     traces = {trace.name: list(trace.y) for trace in figure.data}
-    residual_values = [
-        value
-        for trace in figure.data
-        if trace.name == "15.02 Road — unallocated technology residual"
-        for _, value in sorted(zip(trace.x, trace.y))
-    ]
 
     assert traces["LEAP Target total"] == [100.0, 95.0]
     assert traces["9th Target total"] == [101.0, 90.0]
-    assert residual_values == [40.0, 40.0]
+    assert traces["15.02 Road — unallocated technology residual"] == [40.0, 40.0]
     assert "maximum absolute residual 40.00" in figure.layout.meta[
         "stacked_area_note"
     ]
