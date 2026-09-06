@@ -280,6 +280,36 @@ def test_transformation_frontier_retains_parent_when_power_children_mismatch() -
     assert frontier["value"].sum() == pytest.approx(-100.0)
 
 
+def test_transformation_frontier_treats_compound_chp_as_an_additive_sibling() -> None:
+    rows = _power_transformation_rows(
+        ("09", 25.0),
+        ("09.01-09.02", -100.0),
+        ("09.01.01,09.02.01", -90.0),
+        ("09.01.02,09.02.02,09.01.02.01,09.02.02.01", -10.0),
+    )
+
+    frontier = emissions._lowest_transformation_frontier(rows)
+
+    assert set(frontier["common_flow_code"]) == {
+        "09.01.01,09.02.01",
+        "09.01.02,09.02.02,09.01.02.01,09.02.02.01",
+    }
+    assert frontier["value"].sum() == pytest.approx(-100.0)
+
+
+def test_transformation_frontier_never_uses_total_transformation_as_power_fallback() -> None:
+    rows = _power_transformation_rows(
+        ("09", -200.0),
+        ("09.01-09.02", -100.0),
+        ("09.01.01,09.02.01", -90.0),
+    )
+
+    frontier = emissions._lowest_transformation_frontier(rows)
+
+    assert set(frontier["common_flow_code"]) == {"09.01-09.02"}
+    assert frontier["value"].sum() == pytest.approx(-100.0)
+
+
 def test_transformation_frontier_emits_parent_child_reconciliation_qa() -> None:
     rows = _power_transformation_rows(
         ("09.01", -100.0),

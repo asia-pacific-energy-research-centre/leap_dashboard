@@ -819,7 +819,7 @@ compared on one consistent factor-based basis. The word "measured" in the flow
 policy means included in this dashboard estimate; it does not claim that ESTO
 contains directly measured emissions.
 
-Five rules make that derivation reproducible:
+Six rules make that derivation reproducible:
 
 1. **The factor axis is declared, not assumed.** A factor set names the axis its
    factors are keyed on (`ninth_fuel`, `esto_product`, or `esto_product_flow`).
@@ -857,6 +857,15 @@ Five rules make that derivation reproducible:
    the detail. Detail is preferred over aggregate because the aggregates overlap
    each other - `16 Other sector` and `16.03-16.05,17` share `16.03-16.05` - so
    no set of aggregates is guaranteed to partition demand.
+6. **Power detail must conserve the power-sector parent.** Electricity-plant,
+   CHP, and heat-plant rows are additive siblings beneath
+   `09.01-09.02 Power sector`; a syntactically longer compound CHP code is one
+   semantic branch and must not suppress the other branches. For each source,
+   economy, scenario, year, and fuel, use the branch frontier only when it sums
+   to the reported `09.01-09.02` parent within floating-point tolerance. If it
+   does not, retain that parent and record a failed reconciliation. Never use
+   `09 Total transformation sector` as the power fallback: it also contains
+   refining and other transformation sectors outside the combustion boundary.
 
 The boundary includes direct combustion in final energy demand, power
 generation, and energy-sector own use. It deliberately excludes conversion
@@ -896,6 +905,11 @@ agree where all three report the same demand: for 20USA at 2022 all three read
 
 ### History
 
+- 2026-09-06: Made the power transformation frontier branch-aware and
+  conservation-first. The previous maximum-code-depth rule allowed an extended
+  CHP code to suppress its electricity-plant sibling in 9th emissions. Power
+  children now replace only the `09.01-09.02` parent when they reconcile; a
+  mismatch retains the parent and is written to the frontier coverage audit.
 - 2026-08-21: Replaced hard-coded transformation prefixes with the complete
   original-ESTO-flow policy. This fixed LNG liquefaction and similar conversion
   feedstocks being treated as combustion while retaining separately reported

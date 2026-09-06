@@ -749,3 +749,15 @@ decision, not a backlog pull.
   genuinely exists on both sides of the base year still appears once in the
   legend. Regression coverage includes both a projection-only Buildings parent
   and a fuel category that continues across the source boundary.
+
+## 9th power-emissions frontier conservation — complete 2026-09-06
+
+- Emissions now treats electricity plants, CHP plants, and heat plants as
+  additive siblings below `09.01-09.02 Power sector`, including compound
+  Common ESTO rows that represent one semantic CHP branch.
+- Children replace the power parent only when their per-source, economy,
+  scenario, year, and fuel sum reconciles. A mismatch retains the parent and
+  emits a failed row in `emissions_frontier_coverage_check.csv`.
+- `09 Total transformation sector` is never used as the power authority because
+  it includes refining and other transformation activity outside the declared
+  combustion boundary.

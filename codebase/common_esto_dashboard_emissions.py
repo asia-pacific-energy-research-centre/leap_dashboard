@@ -988,62 +988,217 @@ def _demand_rows(assigned_df: pd.DataFrame, config: dict) -> pd.DataFrame:
 
 _TRANSFORMATION_PAGE_KEYS = {"power", "refining", "other_transformation"}
 
+_POWER_PARENT_PREFIXES = {"09.01", "09.02"}
+_FRONTIER_RECONCILIATION_TOLERANCE = 1e-7
 
-def _lowest_transformation_frontier(df: pd.DataFrame) -> pd.DataFrame:
-    """Keep the deepest available transformation flow per source/fuel.
 
-    Transformation rows are often supplied at several hierarchy levels. A
-    vectorized depth filter is sufficient here because the sign classification
-    is performed on each lowest flow/fuel row before any higher-level netting;
-    it also avoids the quadratic label-containment work used by the demand
-    frontier across the much larger transformation table.
+def _transformation_context_keys(df: pd.DataFrame) -> list[str]:
+    """Return the columns that identify one independently reported balance value."""
+    return [
+        column
+        for column in (
+            "comparison_scope",
+            "source_system",
+            "economy",
+            "scenario",
+            "year",
+            "common_product_label",
+        )
+        if column in df.columns
+    ]
+
+
+def _power_flow_role(code: object) -> tuple[str, str] | None:
+    """Classify a Common ESTO power row as its parent or one semantic branch.
+
+    The Common ESTO power boundary is ``09.01-09.02``.  Compound generated
+    labels are atomic comparison rows: the additional code tokens in an
+    extended CHP label do not make CHP a descendant of the electricity-plant
+    branch.  All tokens in a child therefore have to identify the same
+    third-level semantic branch (01 electricity, 02 CHP, or 03 heat).
     """
-    if df.empty:
-        return df.copy()
-    renderer = _renderer()
-    work = df.copy()
-    work["_transformation_flow_depth"] = work["common_flow_code"].map(renderer.code_depth)
+    tokens = re.findall(r"\d+(?:\.\d+)*", str(code))
+    if not tokens:
+        return None
+    parts = [token.split(".") for token in tokens]
+    if not all(
+        len(item) >= 2 and ".".join(item[:2]) in _POWER_PARENT_PREFIXES
+        for item in parts
+    ):
+        return None
+    if all(len(item) == 2 for item in parts):
+        return "parent", ",".join(sorted({".".join(item[:2]) for item in parts}))
+    branches = {item[2] for item in parts if len(item) >= 3}
+    if len(branches) == 1:
+        return "branch", next(iter(branches))
+    return None
 
-    # The mapped balance can contain the same parent transformation row and
-    # its child rows.  It can also contain an exact duplicate of a child under
-    # an "including own use" rollup label.  Neither should be counted twice.
-    base_keys = [
+
+def _power_frontier_with_reconciliation(
+    power_rows: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Choose additive power siblings, falling back to the power parent.
+
+    Reconciliation is deliberately against ``09.01-09.02 Power sector`` (or
+    one of its individual 09.01/09.02 parents when that is how a source is
+    represented), never against ``09 Total transformation sector``.
+    """
+    qa_columns = [
         "source_system",
         "scenario",
         "year",
+        "common_flow_label",
         "common_product_label",
+        "aggregate_value",
+        "frontier_value",
+        "difference",
+        "status",
+        "reconciliation_action",
     ]
-    parent_mask = work["common_flow_code"].astype(str).str.strip().isin({"09", "10"})
-    has_child = work.assign(_is_child=~parent_mask).groupby(base_keys)['_is_child'].transform('any')
-    work = work.loc[~(parent_mask & has_child)].copy()
-    work = work.drop_duplicates(
-        subset=[*base_keys, "common_flow_code", "value"],
-        keep="first",
+    if power_rows.empty:
+        return power_rows.copy(), pd.DataFrame(columns=qa_columns)
+
+    work = power_rows.copy()
+    roles = work["common_flow_code"].map(_power_flow_role)
+    work["_power_role"] = roles.map(lambda item: item[0] if item else "")
+    work["_power_branch"] = roles.map(lambda item: item[1] if item else "")
+    context_keys = _transformation_context_keys(work)
+    selected_groups: list[pd.DataFrame] = []
+    qa_records: list[dict[str, object]] = []
+
+    for _, group in work.groupby(
+        context_keys, sort=False, dropna=False, observed=True
+    ):
+        parents = group[group["_power_role"].eq("parent")].copy()
+        branches = group[group["_power_role"].eq("branch")].copy()
+        unclassified = group[group["_power_role"].eq("")].copy()
+
+        # Prefer the combined 09.01-09.02 authority when present.  Otherwise
+        # individual 09.01/09.02 parent rows together define the boundary.
+        if not parents.empty:
+            parent_width = parents["_power_branch"].str.count(",") + 1
+            combined = parents[parent_width.eq(parent_width.max())]
+            if parent_width.max() > 1:
+                parents = combined
+
+        branch_frontier: list[pd.DataFrame] = []
+        for _, branch_group in branches.groupby(
+            "_power_branch", sort=False, observed=True
+        ):
+            specificity = branch_group["common_flow_code"].map(
+                lambda value: len(re.findall(r"\d+(?:\.\d+)*", str(value)))
+            )
+            branch_frontier.append(branch_group[specificity.eq(specificity.max())])
+        candidate = (
+            pd.concat(branch_frontier, ignore_index=False)
+            if branch_frontier
+            else branches.iloc[0:0].copy()
+        )
+
+        if parents.empty:
+            chosen = candidate if not candidate.empty else unclassified
+        elif candidate.empty:
+            chosen = parents
+        else:
+            parent_value = pd.to_numeric(parents["value"], errors="coerce").sum()
+            candidate_value = pd.to_numeric(candidate["value"], errors="coerce").sum()
+            difference = parent_value - candidate_value
+            reconciles = abs(difference) <= _FRONTIER_RECONCILIATION_TOLERANCE * max(
+                1.0, abs(parent_value)
+            )
+            chosen = candidate if reconciles else parents
+            parent_row = parents.iloc[0]
+            qa_records.append({
+                "source_system": parent_row.get("source_system", ""),
+                "scenario": parent_row.get("scenario", ""),
+                "year": parent_row.get("year", ""),
+                "common_flow_label": parent_row.get("common_flow_label", ""),
+                "common_product_label": parent_row.get("common_product_label", ""),
+                "aggregate_value": parent_value,
+                "frontier_value": candidate_value,
+                "difference": difference,
+                "status": "passed" if reconciles else "failed",
+                "reconciliation_action": "children" if reconciles else "parent_fallback",
+            })
+        if not chosen.empty:
+            selected_groups.append(chosen)
+
+    selected = (
+        pd.concat(selected_groups, ignore_index=False)
+        if selected_groups
+        else work.iloc[0:0].copy()
+    )
+    return (
+        selected.drop(columns=["_power_role", "_power_branch"]),
+        pd.DataFrame(qa_records, columns=qa_columns),
     )
 
-    def family(code: object) -> str:
-        # Compound boundaries such as 09.01-09.02 and
-        # 09.01.01,09.02.01 belong to the same power family. Keeping the
-        # first two code levels prevents a detailed power row from suppressing
-        # a separate refinery/other-transformation row for the same fuel.
-        tokens = re.findall(r"\d+(?:\.\d+)*", str(code))
-        prefixes = {
-            ".".join(token.split(".")[:2]) if "." in token else token
-            for token in tokens
-        }
-        return ",".join(sorted(prefixes))
 
-    work["_transformation_family"] = work["common_flow_code"].map(family)
-    depth_keys = [
-        "source_system",
-        "scenario",
-        "common_product_label",
-        "_transformation_family",
-    ]
-    max_depth = work.groupby(depth_keys)["_transformation_flow_depth"].transform("max")
-    return work.loc[work["_transformation_flow_depth"].eq(max_depth)].drop(
-        columns=["_transformation_flow_depth", "_transformation_family"]
-    )
+def _transformation_frontier_with_reconciliation(
+    df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Return the transformation frontier and power-parent conservation QA."""
+    if df.empty:
+        return df.copy(), _power_frontier_with_reconciliation(df)[1]
+
+    renderer = _renderer()
+    work = df.copy()
+    context_keys = _transformation_context_keys(work)
+
+    # A whole-sector 09/10 total is not a combustion-safe power parent.  Keep
+    # it only when no more specific row from that sector exists at all.
+    top_level = work["common_flow_code"].astype(str).str.strip().isin({"09", "10"})
+    child_sector = work["common_flow_code"].astype(str).str.extract(r"^(09|10)\.", expand=False)
+    top_sector = work["common_flow_code"].astype(str).str.strip()
+    for _, indices in work.groupby(
+        context_keys, sort=False, dropna=False, observed=True
+    ).groups.items():
+        group_index = list(indices)
+        present_child_sectors = set(child_sector.loc[group_index].dropna())
+        drop_index = [
+            index for index in group_index
+            if top_level.loc[index] and top_sector.loc[index] in present_child_sectors
+        ]
+        if drop_index:
+            work = work.drop(index=drop_index)
+
+    roles = work["common_flow_code"].map(_power_flow_role)
+    power_mask = roles.notna()
+    power, power_qa = _power_frontier_with_reconciliation(work[power_mask])
+
+    # Preserve the prior deepest-row behaviour for other independent
+    # transformation families, but resolve it per year/economy/scope.  A deep
+    # row in one year must never suppress a parent used in another year.
+    other = work[~power_mask].copy()
+    if not other.empty:
+        other["_transformation_flow_depth"] = other["common_flow_code"].map(renderer.code_depth)
+
+        def family(code: object) -> str:
+            tokens = re.findall(r"\d+(?:\.\d+)*", str(code))
+            prefixes = {
+                ".".join(token.split(".")[:2]) if "." in token else token
+                for token in tokens
+            }
+            return ",".join(sorted(prefixes))
+
+        other["_transformation_family"] = other["common_flow_code"].map(family)
+        depth_keys = [*context_keys, "_transformation_family"]
+        max_depth = other.groupby(depth_keys, dropna=False, observed=True)[
+            "_transformation_flow_depth"
+        ].transform("max")
+        other = other[other["_transformation_flow_depth"].eq(max_depth)].drop(
+            columns=["_transformation_flow_depth", "_transformation_family"]
+        )
+
+    selected = pd.concat([power, other], ignore_index=False).sort_index()
+    duplicate_keys = [*context_keys, "common_flow_code", "value"]
+    selected = selected.drop_duplicates(subset=duplicate_keys, keep="first")
+    return selected, power_qa
+
+
+def _lowest_transformation_frontier(df: pd.DataFrame) -> pd.DataFrame:
+    """Return the reconciled transformation frontier used for emissions."""
+    return _transformation_frontier_with_reconciliation(df)[0]
 
 
 def select_emissions_component_rows(
@@ -1103,7 +1258,15 @@ def select_emissions_component_rows(
     transformation, transformation_policy_resolution = apply_emissions_flow_policy(
         transformation, flow_policy, "transformation_and_own_use"
     )
-    transformation_frontier = _lowest_transformation_frontier(transformation)
+    transformation_frontier, transformation_coverage = (
+        _transformation_frontier_with_reconciliation(transformation)
+    )
+    if not transformation_coverage.empty:
+        coverage = (
+            transformation_coverage.reset_index(drop=True)
+            if coverage.empty
+            else pd.concat([coverage, transformation_coverage], ignore_index=True)
+        )
     transformation_frontier["signed_value_pj"] = pd.to_numeric(
         transformation_frontier["value"], errors="coerce"
     )
