@@ -8037,11 +8037,20 @@ _DASHBOARD_SWITCHER_JS = """
 def write_chart_bundle(charts: dict[str, go.Figure], output_path: Path) -> None:
     """Write a page-level Plotly chart bundle as JSON and JS."""
     assert_unique_line_trace_x(charts)
+    serialized_charts: dict[str, dict[str, object]] = {}
+    for key, figure in charts.items():
+        serialized = json.loads(json.dumps(figure, cls=PlotlyJSONEncoder))
+        layout = serialized.setdefault("layout", {})
+        # Every dashboard chart already has an accessible outer figcaption.
+        # Suppress the duplicated Plotly title only in the published bundle so
+        # chart builders may retain descriptive titles for tests and reuse.
+        layout.pop("title", None)
+        margin = layout.get("margin")
+        if isinstance(margin, dict) and isinstance(margin.get("t"), (int, float)):
+            margin["t"] = min(margin["t"], 48)
+        serialized_charts[key] = serialized
     payload = {
-        "charts": {
-            key: json.loads(json.dumps(figure, cls=PlotlyJSONEncoder))
-            for key, figure in charts.items()
-        }
+        "charts": serialized_charts
     }
     payload_json = json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
     output_path.write_text(payload_json, encoding="utf-8")

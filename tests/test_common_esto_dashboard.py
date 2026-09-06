@@ -917,6 +917,7 @@ def _assert_generated_dashboard_outputs(layout: dict[str, Path], expected_pages:
             traces = figure.get("data", [])
             assert traces, chart_key
             assert any(trace.get("x") and trace.get("y") for trace in traces), chart_key
+            assert "title" not in figure.get("layout", {}), chart_key
 
 
 def test_common_esto_dashboard_renders_core_pages_by_default(tmp_path: Path) -> None:
@@ -5303,7 +5304,7 @@ def test_supply_balancing_bars_use_estoleap_scope_on_default_dashboard(
     )["charts"]
     for chart_key in balancing_manifest["chart_key"]:
         figure = bundle[chart_key]
-        assert "ESTO and LEAP only" in figure["layout"]["title"]["text"]
+        assert "title" not in figure["layout"]
         assert all("9th" not in trace["name"] for trace in figure["data"])
     discrepancy_figure = bundle[
         "chart__bar__base_year__supply__11_statistical_discrepancy"
