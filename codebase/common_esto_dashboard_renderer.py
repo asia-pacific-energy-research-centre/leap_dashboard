@@ -6275,14 +6275,29 @@ def resolved_area_chart_rows(
                 )
             ] if parent_boundary else chart_df.iloc[0:0]
             # Once allocation succeeds, the authoritative parent is removed
-            # and its conserved children own that fuel/year fact. Do not use a
-            # surviving child fragment as a substitute parent envelope. Areas
-            # without an explicit observed boundary retain the legacy frontier.
-            parent_total_rows = (
-                authoritative_parent_rows
-                if not authoritative_parent_rows.empty
-                else parent_rows
-            )
+            # and its conserved children own that fuel/year fact. Resolve that
+            # parent envelope independently for every source/scenario/year/
+            # product context: one source publishing the exact boundary must
+            # not prevent another source from retaining its legitimate
+            # compound frontier (for example NINTH 16.03-16.04 plus 16.05).
+            if authoritative_parent_rows.empty:
+                parent_total_rows = parent_rows
+            else:
+                exact_parent_contexts = authoritative_parent_rows[
+                    context_columns
+                ].drop_duplicates().assign(_has_exact_parent=True)
+                fallback_parent_rows = parent_rows.merge(
+                    exact_parent_contexts,
+                    on=context_columns,
+                    how="left",
+                )
+                fallback_parent_rows = fallback_parent_rows[
+                    fallback_parent_rows["_has_exact_parent"].isna()
+                ].drop(columns="_has_exact_parent")
+                parent_total_rows = pd.concat(
+                    [authoritative_parent_rows, fallback_parent_rows],
+                    ignore_index=True,
+                )
             parent_totals = (
                 parent_total_rows.groupby(
                     context_columns, dropna=False, as_index=False

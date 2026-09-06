@@ -1512,8 +1512,8 @@ def test_other_demand_flow_overview_keeps_ninth_compound_agriculture_rollup() ->
     assert resolved["value"].sum() == pytest.approx(212.5)
 
 
-def test_production_other_demand_frontier_prefers_native_simple_children() -> None:
-    """Production asks for native children; compound-only sources fall back."""
+def test_production_other_demand_frontier_is_source_aware() -> None:
+    """Production asks for native children while preserving source compounds."""
     template = json.loads(
         (
             REPO_ROOT
@@ -1527,6 +1527,84 @@ def test_production_other_demand_frontier_prefers_native_simple_children() -> No
     ]
 
     assert preferred == ["16.03", "16.04", "16.05"]
+
+
+def test_production_other_demand_frontier_keeps_complete_ninth_total() -> None:
+    """A NINTH compound must not be replaced by only its overlapping 16.05 row."""
+    template = json.loads(
+        (
+            REPO_ROOT
+            / "config"
+            / "common_esto_dashboard"
+            / "common_esto_dashboard_template.json"
+        ).read_text(encoding="utf-8")
+    )
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "NINTH", "target", 2022, "16.03-16.04", "07.07", 86.0
+            ),
+            "common_flow_label": "16.03-16.04 Agriculture and fishing",
+            "common_product_label": "07.07 Gas/diesel oil",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row(
+                "NINTH", "target", 2022, "16.05", "07.07", 1.2
+            ),
+            "common_flow_label": "16.05 Non-specified others",
+            "common_product_label": "07.07 Gas/diesel oil",
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03", "07.07", 80.0
+            ),
+            "common_flow_label": "16.03 Agriculture",
+            "common_product_label": "07.07 Gas/diesel oil",
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.03-16.05", "07.07", 87.2
+            ),
+            "common_flow_label": "16.03-16.05 Other sector",
+            "common_product_label": "07.07 Gas/diesel oil",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.04", "07.07", 6.0
+            ),
+            "common_flow_label": "16.04 Fishing",
+            "common_product_label": "07.07 Gas/diesel oil",
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "16.05", "07.07", 1.2
+            ),
+            "common_flow_label": "16.05 Non-specified others",
+            "common_product_label": "07.07 Gas/diesel oil",
+        },
+    ])
+
+    spec = next(
+        spec
+        for spec in renderer.add_other_demand_flow_overview_spec(
+            "others", rows, [], template
+        )
+        if spec.get("overview_variant") == "by_flow"
+    )
+    resolved = renderer.resolved_area_chart_rows(
+        rows,
+        spec,
+        group_col="common_flow_label",
+    )
+
+    ninth = resolved[resolved["source_system"].eq("NINTH")]
+    esto = resolved[resolved["source_system"].eq("ESTO_EXTENDED")]
+    assert set(ninth["common_flow_code"]) == {"16.03-16.04", "16.05"}
+    assert ninth["value"].sum() == pytest.approx(87.2)
+    assert set(esto["common_flow_code"]) == {"16.03", "16.04", "16.05"}
+    assert esto["value"].sum() == pytest.approx(87.2)
 
 
 def test_other_demand_chart_collapses_compound_when_history_proves_one_child() -> None:
