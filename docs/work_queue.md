@@ -698,3 +698,14 @@ decision, not a backlog pull.
   A source that publishes only combined `04-05` remains available for balance
   totals but is never duplicated or allocated into the child charts.
   Aggregate-only datasets still show one explicit combined placeholder.
+
+## Placeholder Buildings overview identity — complete 2026-09-06
+
+- A retained LEAP `Buildings` placeholder now changes projection detail only;
+  it no longer changes the Overview owner to the deepest surviving Services
+  row. The paired aggregate charts remain owned by `16.01-16.02 Buildings`.
+- The by-flow overview continues to use the published ESTO children
+  `16.01 Commercial and public services` and `16.02 Residential` when both are
+  available, while LEAP remains at its unsplit Buildings parent.
+- The deeper Services overview is emitted only when Buildings detail is active.
+  A focused regression covers the mixed placeholder-parent/ESTO-child case.

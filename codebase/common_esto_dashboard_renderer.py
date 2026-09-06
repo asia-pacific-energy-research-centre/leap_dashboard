@@ -3064,16 +3064,28 @@ def add_buildings_overview_specs(
     area_specs: list[dict[str, object]],
     template: dict,
 ) -> list[dict[str, object]]:
-    """Publish only the configured detailed Buildings hierarchy pairs."""
+    """Publish the configured Buildings overview at its honest boundary.
+
+    A LEAP aggregate placeholder changes the projection detail, not the
+    identity of the Buildings page. In that mode retain only the configured
+    Buildings parent pair; ESTO can still supply its available immediate
+    children to the by-flow chart.
+    """
     config = template.get("buildings_page", {}) or {}
     overview = config.get("overview", {}) or {}
     configured_page_key = str(config.get("page_key", "buildings")).strip()
     if (
         page_key != configured_page_key
         or not bool(overview.get("enabled", False))
-        or aggregate_only_demand_page_active(page_key, template)
     ):
         return list(area_specs)
+
+    aggregate_only = aggregate_only_demand_page_active(page_key, template)
+    placeholder_boundaries = {
+        code_candidate_text(section.get("flow_code", ""))
+        for section in active_placeholder_product_sections(page_key, template)
+        if code_candidate_text(section.get("flow_code", ""))
+    }
 
     # This page has a deliberately small, user-owned hierarchy. Generic tree
     # discovery can otherwise add broad flow 16 or repeat 16.01-16.02.
@@ -3086,6 +3098,11 @@ def add_buildings_overview_specs(
     for aggregate in overview.get("aggregates", []) or []:
         boundary = str(aggregate.get("flow_boundary", "")).strip()
         label = str(aggregate.get("label", "")).strip()
+        if (
+            aggregate_only
+            and code_candidate_text(boundary) not in placeholder_boundaries
+        ):
+            continue
         detail_boundaries = [
             str(value).strip()
             for value in aggregate.get("preferred_detail_flow_boundaries", [])

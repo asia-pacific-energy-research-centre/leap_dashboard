@@ -1957,6 +1957,82 @@ def test_detailed_buildings_overview_uses_only_two_configured_pairs() -> None:
     assert services_flow["value"].sum() == pytest.approx(20.0)
 
 
+def test_placeholder_buildings_overview_keeps_rollup_and_esto_children() -> None:
+    """LEAP placeholder status must not rename the Buildings chart owner."""
+    template = {
+        "aggregate_chart_policy": {"minimum_nonzero_child_flows": 2},
+        "leap_demand_sector_coverage": {
+            "show_aggregate_only_page_keys": ["buildings"],
+            "_aggregate_only_page_branches": {"buildings": ["Buildings"]},
+            "placeholder_component_product_sections": {
+                "Buildings": {
+                    "flow_code": "16.01-16.02",
+                    "label": "16 Buildings",
+                },
+            },
+        },
+        "buildings_page": {
+            "page_key": "buildings",
+            "overview": {
+                "enabled": True,
+                "aggregates": [
+                    {
+                        "flow_boundary": "16.01-16.02",
+                        "label": "16.01-16.02 Buildings",
+                        "preferred_detail_flow_boundaries": ["16.01", "16.02"],
+                        "flow_groups": [
+                            {"flow_boundary": "16.01", "label": "16.01 Services"},
+                            {"flow_boundary": "16.02", "label": "16.02 Residential"},
+                        ],
+                    },
+                    {
+                        "flow_boundary": "16.01",
+                        "label": "16.01 Commercial and public services",
+                        "preferred_detail_flow_boundaries": ["16.01.01", "16.01.99"],
+                        "flow_groups": [],
+                    },
+                ],
+            },
+        },
+    }
+    labels = {
+        "16.01-16.02": "16.01-16.02 Buildings",
+        "16.01": "16.01 Commercial and public services",
+        "16.02": "16.02 Residential",
+    }
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(source, scenario, year, flow, "17", value),
+            "common_flow_label": labels[flow],
+            "common_product_label": "17 Electricity",
+        }
+        for source, scenario, year, flow, value in [
+            ("ESTO_EXTENDED", "historical", 2022, "16.01", 60.0),
+            ("ESTO_EXTENDED", "historical", 2022, "16.02", 40.0),
+            ("LEAP", "Target", 2023, "16.01-16.02", 105.0),
+        ]
+    ])
+
+    specs = renderer.prepare_area_specs_for_page(
+        "buildings", rows, [{"aggregate_flow_prefix": "16.01.99"}], template
+    )
+
+    assert [spec["chart_caption"] for spec in specs] == [
+        "16.01-16.02 Buildings — by product",
+        "16.01-16.02 Buildings — by flow",
+    ]
+    assert {spec["aggregate_flow_prefix"] for spec in specs} == {"16.01-16.02"}
+    flow_rows = renderer.configured_flow_group_rows(
+        rows, specs[1]["configured_flow_groups"]
+    )
+    historical = flow_rows[flow_rows["source_system"].eq("ESTO_EXTENDED")]
+    assert set(historical["_configured_flow_group_label"]) == {
+        "16.01 Services",
+        "16.02 Residential",
+    }
+    assert historical["value"].sum() == pytest.approx(100.0)
+
+
 def test_buildings_overview_reconciles_incomplete_historical_children_to_parent() -> None:
     """Incomplete ESTO detail keeps the missing parent remainder visible."""
     labels = {
