@@ -8863,6 +8863,35 @@ avigation_roots``. A page-defined overview aggregate can also parent a
         existing_groups.add(root_label)
         root_targets[root_label] = str(root.get("target") or "").strip()
 
+    # A combined bunker placeholder can reach the navigation through both its
+    # by-product line owner (historically labelled ``04-05 International
+    # transport``) and its overview root (the canonical ``(bunkers)`` label).
+    # They are one representation boundary, not two Supply sections. Retain
+    # every card and anchor, but publish one canonical chip while placeholder
+    # coverage is active. Detailed 04 and 05 owners do not meet this condition.
+    bunker_groups = [
+        group
+        for groups in seen_sections.values()
+        for group in groups
+        if group in placeholder_groups
+        and code_candidate_text(group) == "04-05"
+        and "international transport" in group.casefold()
+    ]
+    canonical_bunker = next(
+        (group for group in bunker_groups if "(bunkers)" in group.casefold()),
+        "",
+    )
+    if canonical_bunker and len(set(bunker_groups)) > 1:
+        for groups in seen_sections.values():
+            retained: list[str] = []
+            for group in groups:
+                normalized = canonical_bunker if group in bunker_groups else group
+                if normalized not in retained:
+                    retained.append(normalized)
+            groups[:] = retained
+        placeholder_groups.difference_update(bunker_groups)
+        placeholder_groups.add(canonical_bunker)
+
     depth_overrides = {
         str(label).strip(): int(depth)
         for label, depth in (navigation_depth_overrides or {}).items()

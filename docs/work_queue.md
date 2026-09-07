@@ -15,6 +15,21 @@
   Regression coverage asserts mutually exclusive combined/detail navigation,
   including zero-valued, one-child, parentless, and mixed-year inputs.
 
+## Version-comparison provenance follow-up — complete 2026-09-07
+
+- Placeholder Supply navigation can receive the combined `04-05` boundary
+  from both the by-product owner and its overview card. It now retains one
+  canonical `04-05 International transport (bunkers)` chip while retaining all
+  cards; genuinely detailed `04` and `05` navigation is unchanged.
+- AUS 2022 evidence confirms that the apparent Industry value near 1 PJ is not
+  the 14 Industry total: both exports supply 950.200976 PJ. The placeholder
+  export supplies a 105.235489 PJ combined Other/non-energy boundary, which is
+  presented as 102.355204 PJ Other demand plus 2.880285 PJ estimated
+  Non-energy use using the documented 9th product/year share. The detailed
+  export supplies 105.235489 PJ Other demand and a separate 201.959062 PJ
+  Non-energy use branch. These are source-representation differences; no
+  value is rescaled to make the two versions agree.
+
 ## ESTO Extended conservation and missing-flow allocation — complete 2026-09-05
 
 - Ordinary ESTO remains authoritative for every economy/year/fuel total.

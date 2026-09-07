@@ -1038,7 +1038,7 @@ def test_supply_bunker_resolver_shows_one_present_child_without_combined_parent(
     assert template["_supply_bunker_representation"]["display_detail_active"] is True
 
 
-def test_supply_bunker_overview_shows_only_one_present_child() -> None:
+def test_supply_bunker_overview_retains_combined_boundary_for_one_present_child() -> None:
     template = _bunker_template()
     page_df = pd.DataFrame([
         {
@@ -1077,8 +1077,8 @@ def test_supply_bunker_overview_shows_only_one_present_child() -> None:
         template,
     )
 
-    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04"]
-    assert specs[0]["navigation_placeholder"] is False
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04-05"]
+    assert specs[0]["navigation_placeholder"] is True
 
 
 def test_supply_bunker_resolver_shows_parentless_available_child() -> None:
@@ -3984,6 +3984,25 @@ def test_combined_other_placeholder_is_split_and_conserves_leap_total() -> None:
     assert set(leap["_other_nonenergy_estimation_method"].dropna()) == {
         "ninth_product_year_sector_share_of_combined_leap_placeholder"
     }
+
+
+def test_published_nonenergy_detail_is_not_redistributed_from_other_demand() -> None:
+    """A detailed export is source data, not a cue to rescale Other demand."""
+    rows = pd.DataFrame([
+        _area_product_row("LEAP", "Target", 2022, "16.03-16.05", "07.07", 105.235489),
+        {
+            **_area_product_row("LEAP", "Target", 2022, "17", "07.12", 201.959062),
+            "common_flow_label": "17 Non-energy use",
+        },
+    ])
+
+    split = renderer.split_combined_other_nonenergy_placeholder(
+        rows,
+        primary_source="LEAP",
+        ninth_source="NINTH",
+    )
+
+    assert split.equals(rows)
 
 
 def test_road_history_uses_leap_base_year_fuel_shares_not_equal_splits() -> None:

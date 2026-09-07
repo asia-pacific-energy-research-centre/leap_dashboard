@@ -220,6 +220,10 @@ def test_aggregate_only_bunkers_keep_combined_placeholder_supply_pill(tmp_path: 
     assert supply_html.count(
         'data-placeholder="true">04-05 International transport (bunkers)'
     ) == 1
+    assert (
+        'data-placeholder="true">04-05 International transport</a>'
+        not in supply_html
+    )
     assert 'data-placeholder="false">04 International marine bunkers</a>' not in supply_html
     assert 'data-placeholder="false">05 International aviation bunkers</a>' not in supply_html
     assert 'data-chart-key="chart__area__04__' not in supply_html
