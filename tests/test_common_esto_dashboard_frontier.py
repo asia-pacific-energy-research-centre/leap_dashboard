@@ -3604,6 +3604,24 @@ def test_mixed_transport_frontier_keeps_detailed_road_and_placeholder_nonroad() 
     assert selected["value"].sum() == 125.0
 
 
+def test_mixed_transport_frontier_recognizes_nonroad_on_different_products() -> None:
+    """A Road-only fuel must not retain the generated flow-15 duplicate."""
+    rows = pd.DataFrame([
+        _demand_frontier_row("LEAP", "15", 100.0, "07.07"),
+        _demand_frontier_row("LEAP", "15.02", 100.0, "07.07"),
+        _demand_frontier_row(
+            "LEAP", "15.01,15.03-15.06", 25.0, "07.05"
+        ),
+    ])
+
+    selected = renderer._coverage_selected_demand_frontier(rows)
+
+    assert set(selected["common_flow_code"]) == {
+        "15.02", "15.01,15.03-15.06"
+    }
+    assert selected["value"].sum() == 125.0
+
+
 def test_mixed_transport_frontier_stops_at_road_before_technology_detail() -> None:
     rows = pd.DataFrame([
         _demand_frontier_row("LEAP", "15", 100.0),

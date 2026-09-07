@@ -4612,11 +4612,14 @@ def _coverage_selected_demand_frontier(
     nonroad_mask = work["common_flow_code"].astype(str).map(
         lambda code: _code_expression_contains_expression("15.01,15.03-15.06", code)
     )
-    nonroad_keys = work.loc[nonroad_mask, context].drop_duplicates()
+    nonroad_context = [
+        column for column in context if column != "common_product_code"
+    ]
+    nonroad_keys = work.loc[nonroad_mask, nonroad_context].drop_duplicates()
     if not broad.empty and not road.empty and not nonroad_keys.empty:
         matches = (
             broad.merge(road, on=context, how="inner", suffixes=("_broad", "_road"))
-            .merge(nonroad_keys, on=context, how="inner")
+            .merge(nonroad_keys, on=nonroad_context, how="inner")
         )
         scale = matches[["value_broad", "value_road"]].abs().max(axis=1)
         duplicates = matches[
