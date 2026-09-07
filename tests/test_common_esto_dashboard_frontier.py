@@ -3879,6 +3879,66 @@ def test_transport_flow_overview_rolls_allocated_road_detail_to_road_boundary() 
     assert selected["value"].sum() == 1030.0
 
 
+def test_transport_flow_overview_conserves_reconciled_native_road_children() -> None:
+    """Distinct native vehicle rows may share a label but remain additive."""
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022, "15.02", "07.01", 10.0
+            ),
+            "common_row_basis": "exact_esto_row",
+            "is_exact_row": True,
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022,
+                "15.02.01", "07.01", 4.0,
+            ),
+            "common_flow_label": "15.02.01 ICE",
+            "common_row_basis": "exact_esto_row",
+            "is_exact_row": True,
+        },
+        {
+            **_area_product_row(
+                "ESTO_EXTENDED", "historical", 2022,
+                "15.02.02", "07.01", 6.0,
+            ),
+            "common_flow_label": "15.02.02 ICE",
+            "common_row_basis": "exact_esto_row",
+            "is_exact_row": True,
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2022, "15.02.01", "07.01", 4.0
+            ),
+            "common_flow_label": "15.02.01 ICE",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2022, "15.02.02", "07.01", 6.0
+            ),
+            "common_flow_label": "15.02.02 ICE",
+        },
+    ])
+
+    allocated = renderer.estimate_esto_road_detail_from_leap_base_year_shares(
+        rows,
+        comparison_source="ESTO_EXTENDED",
+        primary_source="LEAP",
+        primary_scenario="Target",
+        base_year=2022,
+    )
+    historical = allocated[allocated["source_system"].eq("ESTO_EXTENDED")]
+    selected = renderer._coverage_selected_demand_frontier(
+        historical,
+        prefer_transport_detail=True,
+    )
+
+    assert len(selected) == 2
+    assert set(selected["common_flow_code"]) == {"15.02"}
+    assert selected["value"].sum() == pytest.approx(10.0)
+
+
 def test_domestic_tfc_total_uses_the_displayed_hybrid_frontier() -> None:
     declared = pd.DataFrame([
         {"source_system": "LEAP", "scenario": "Target", "year": 2023, "value": 100.0},

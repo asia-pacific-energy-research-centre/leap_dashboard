@@ -642,7 +642,9 @@ def allocate_historical_parent_by_leap_base_year_shares(
         )
 
     work = page_df.copy()
-    original = page_df.copy()
+    allocation_row_id = "_historical_allocation_row_id"
+    work[allocation_row_id] = range(len(work))
+    original = work.copy()
     original_native_observation = _native_historical_observation_mask(original)
     context_columns = [
         column
@@ -893,6 +895,12 @@ def allocate_historical_parent_by_leap_base_year_shares(
 
             if abs(remainder) <= tolerance and not native_children.empty:
                 drop_indices.update(parent_indices)
+                work.loc[
+                    work[allocation_row_id].isin(
+                        native_children[allocation_row_id]
+                    ),
+                    "_historical_allocation_frontier_owner",
+                ] = boundary
                 audit.update({
                     "qa_status": "PASS",
                     "allocation_status": "native_children_reconciled",
@@ -986,6 +994,12 @@ def allocate_historical_parent_by_leap_base_year_shares(
             drop_indices.update(
                 synthetic_indices_by_parent_key.get(native_lookup_key, [])
             )
+            work.loc[
+                work[allocation_row_id].isin(
+                    native_children[allocation_row_id]
+                ),
+                "_historical_allocation_frontier_owner",
+            ] = boundary
 
             for position, detail_row in missing_detail.iterrows():
                 key = tuple(detail_row[column] for column in detail_key)
@@ -1008,6 +1022,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 estimate["common_row_basis"] = (
                     "estimated_from_leap_base_year_share"
                 )
+                estimate["_historical_allocation_frontier_owner"] = boundary
                 if "is_exact_row" in work.columns:
                     estimate["is_exact_row"] = False
                 result_rows.append(estimate)
@@ -1031,7 +1046,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 sort=False,
             )
 
-    return work
+    return work.drop(columns=[allocation_row_id], errors="ignore")
 
 
 def estimate_esto_demand_detail_from_leap_base_year_shares(
@@ -4808,11 +4823,20 @@ def _coverage_selected_demand_frontier(
                         )
                     ]
                     if not road_detail.empty:
+                        allocation_owner = road_detail.get(
+                            "_historical_allocation_frontier_owner",
+                            pd.Series("", index=road_detail.index),
+                        ).fillna("").astype(str).map(code_candidate_text)
                         estimation_basis = road_detail.get(
                             "common_row_basis",
                             pd.Series("", index=road_detail.index),
                         ).fillna("").astype(str).str.casefold()
-                        if estimation_basis.eq(
+                        allocated_frontier = allocation_owner.eq("15.02")
+                        if allocated_frontier.any():
+                            road_selected = road_detail.loc[
+                                allocated_frontier
+                            ].copy()
+                        elif estimation_basis.eq(
                             "estimated_from_leap_base_year_share"
                         ).all():
                             # The allocator has already selected the deepest
