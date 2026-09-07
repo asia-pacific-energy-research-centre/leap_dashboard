@@ -121,6 +121,17 @@ def test_factor_table_resolves_common_axis_with_blank_as_zero(factor_workspace):
     assert diagnostics["axis_values_without_factor"].empty
 
 
+def test_factor_table_applies_esto_product_override(factor_workspace):
+    factor_workspace["factor_set"]["esto_product_factor_overrides"] = {
+        "15.05 Other biomass": 0.0,
+    }
+    factors, _ = emissions.build_factor_table(
+        factor_workspace["factor_set"], factor_workspace["mapping_sources"]
+    )
+    by_label = factors.set_index("common_product_label")["emissions_factor"]
+    assert by_label["15.05 Other biomass"] == pytest.approx(0.0)
+
+
 def test_multiple_gases_in_one_factor_column_is_refused(factor_workspace, tmp_path):
     factor_set = dict(factor_workspace["factor_set"])
     mixed = tmp_path / "mixed.csv"
@@ -367,6 +378,11 @@ def test_shipped_factor_set_config_is_loadable():
     factor_set = emissions.select_factor_set(config)
     assert factor_set["mapping_axis"] in emissions.SUPPORTED_MAPPING_AXES
     assert emissions._resolve_repo_path(factor_set["path"]).exists()
+    overrides = factor_set["esto_product_factor_overrides"]
+    assert overrides["15.01 Fuelwood & woodwaste"] == 0.0
+    assert overrides["16.03 Municipal solid waste (renewable)"] == 0.0
+    assert "16.02 Industrial waste" not in overrides
+    assert "16.04 Municipal solid waste (non-renewable)" not in overrides
 
 
 def test_template_declares_the_emissions_page():

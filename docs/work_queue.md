@@ -750,3 +750,12 @@ decision, not a backlog pull.
 - `09 Total transformation sector` is never used as the power authority because
   it includes refining and other transformation activity outside the declared
   combustion boundary.
+
+## Biogenic CO2 exclusion from energy totals — complete 2026-09-07
+
+- The active factor set now overrides biogenic fuels to zero in the dashboard's
+  energy-sector total, consistently across Buildings, Industry, Power, and all
+  other eligible combustion rows.
+- Positive biomass combustion-CO2 factors remain unchanged in the source table
+  for future memo-item reporting. Industrial waste and non-renewable municipal
+  waste retain their source factors.

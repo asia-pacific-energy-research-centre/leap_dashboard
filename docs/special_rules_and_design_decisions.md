@@ -837,8 +837,13 @@ Six rules make that derivation reproducible:
    no mappable code at all (`19_total`, `20_total_renewables`) are dropped and
    reported.
 3. **A blank factor means no emissions, not missing data.** Blanks resolve to
-   zero, so electricity, heat, hydrogen, and the renewable carriers contribute
-   nothing at the point of final use rather than dropping out of a total.
+   zero, so electricity, heat, and hydrogen contribute nothing at the point of
+   final use rather than dropping out of a total. Biogenic fuels are explicitly
+   overridden to zero for the energy-sector total: their positive combustion-CO2
+   factors remain in the source table for memo-item reporting, but are excluded
+   here to avoid combining gross biogenic combustion CO2 with the inventory
+   total. Industrial waste and non-renewable municipal waste retain their
+   source factors.
 4. **Original ESTO flows declare the combustion boundary.**
    `esto_emissions_flow_policy.csv` contains every original flow from
    `00APEC_2024_low_with_subtotals.csv`, its inclusion flag, treatment, and
@@ -905,6 +910,11 @@ agree where all three report the same demand: for 20USA at 2022 all three read
 
 ### History
 
+- 2026-09-07: Excluded biogenic combustion CO2 from the dashboard energy-sector
+  total through declared ESTO-product factor overrides. This removed PNG's
+  fuelwood and charcoal CO2 from Buildings while applying the same boundary to
+  biomass in Industry and Power; the positive source factors were preserved for
+  future memo-item reporting.
 - 2026-09-06: Made the power transformation frontier branch-aware and
   conservation-first. The previous maximum-code-depth rule allowed an extended
   CHP code to suppress its electricity-plant sibling in 9th emissions. Power

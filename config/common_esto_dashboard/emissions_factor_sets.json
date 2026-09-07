@@ -31,7 +31,18 @@
       "ninth_conflict_resolution": "prefer_specific_then_mean",
       "component_conflict_resolution": "mean",
       "esto_product_factor_overrides": {
-        "_note": "Optional {esto_product: factor} escape hatch applied after the 9th-fuel join and before the common-axis collapse. Keys starting with _ are ignored."
+        "_note": "Energy-sector totals exclude biogenic CO2 to match IPCC inventory reporting. The positive source factors remain available for separately reported biomass-combustion memo estimates; these overrides affect only the dashboard total. Industrial waste and non-renewable municipal waste retain their source factors.",
+        "15.01 Fuelwood & woodwaste": 0.0,
+        "15.02 Bagasse": 0.0,
+        "15.03 Charcoal": 0.0,
+        "15.04 Black liquor": 0.0,
+        "15.05 Other biomass": 0.0,
+        "16.01 Biogas": 0.0,
+        "16.03 Municipal solid waste (renewable)": 0.0,
+        "16.05 Biogasoline": 0.0,
+        "16.06 Biodiesel": 0.0,
+        "16.07 Bio jet kerosene": 0.0,
+        "16.08 Other liquid biofuels": 0.0
       }
     }
   ]
