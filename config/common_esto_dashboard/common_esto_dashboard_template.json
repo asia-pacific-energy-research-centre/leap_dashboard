@@ -64,7 +64,7 @@
     "minimum_nonzero_child_flows": 2,
     "always_show_flow_codes_by_page": {
       "supply": ["01", "02", "03", "04", "05", "04-05", "06", "11"],
-      "industry": ["17"]
+      "industry": ["14", "17"]
     },
     "always_show_section_labels_by_page": {
       "refining": ["Refining"]

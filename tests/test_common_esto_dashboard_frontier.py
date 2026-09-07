@@ -2689,6 +2689,45 @@ def test_explicit_leaf_aggregate_exception_keeps_product_summary_only() -> None:
     )
 
 
+def test_industry_parent_keeps_product_overview_with_one_observed_child() -> None:
+    rows = []
+    for source, flow, label, value in (
+        ("LEAP", "14", "14 Industry sector", 40.0),
+        (
+            "ESTO_EXTENDED",
+            "14.03.11",
+            "14.03.11 Non-specified industry",
+            30.0,
+        ),
+    ):
+        row = _area_product_row(source, "Target", 2030, flow, "07.07", value)
+        row.update({
+            "common_flow_label": label,
+            "common_product_label": "07.07 Gas/diesel oil",
+        })
+        rows.append(row)
+
+    specs = renderer.pick_area_specs(
+        pd.DataFrame(rows),
+        {
+            "chart_generation": {},
+            "aggregate_chart_policy": {
+                "minimum_nonzero_child_flows": 2,
+                "always_show_flow_codes_by_page": {
+                    "industry": ["14", "17"],
+                },
+            },
+        },
+        page_key="industry",
+    )
+
+    assert len(specs) == 1
+    assert specs[0]["aggregate_flow_prefix"] == "14"
+    assert specs[0].get("group_col", "common_product_label") == (
+        "common_product_label"
+    )
+
+
 def test_parent_product_summary_adds_flow_companion_for_two_nonzero_children() -> None:
     """Passenger road gains a child-flow view without losing its fuel view."""
     rows = _passenger_road_hierarchy_rows(second_child_value=20.0)
