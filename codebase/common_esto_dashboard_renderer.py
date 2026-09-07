@@ -3207,6 +3207,10 @@ def add_buildings_overview_specs(
                 "group_col": "_configured_flow_group_label",
                 "title_prefix": "Aggregate by flow",
                 "chart_caption": f"{label} — by flow",
+                **({
+                    "authoritative_total_flow_boundary": boundary,
+                    "authoritative_total_from_page_rows": True,
+                } if not aggregate_only else {}),
             },
         ])
     return specs
@@ -11862,6 +11866,8 @@ def render_dashboard(
             }
             chart_page_df = page_df
             authoritative_total_source_df: pd.DataFrame | None = None
+            if bool(area_spec.get("authoritative_total_from_page_rows", False)):
+                authoritative_total_source_df = page_df
             immediate_child_parent = str(
                 area_spec.get("immediate_child_flow_parent_prefix", "")
             ).strip()
