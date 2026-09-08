@@ -17,6 +17,7 @@ Run from the repo root:  python scripts/generate_code_colors.py
 from __future__ import annotations
 
 import colorsys
+import csv
 import json
 import os
 import re
@@ -334,6 +335,47 @@ product.update(dict(custom_colors.get("product", {})))
 flow.update(dict(custom_colors.get("flow", {})))
 for axis, colors in dict(custom_colors.get("plotting", {})).items():
     plotting_colors.setdefault(axis, {}).update(dict(colors))
+
+# The ESTO-extended power leaves describe generating fuels, not new
+# transformation families. Read their stable codes and canonical names from
+# the mapping-owned Common ESTO output; never recreate the upstream registry's
+# numeric ordering here. Apply this after both source and custom layers so the
+# bold leaf palette stays aligned to product colours on every regeneration.
+_POWER_FLOW_PRODUCT_CODES = {
+    "Coal CHP (all producers)": "01",
+    "Coal HP (all producers)": "01",
+    "Coal hydrogen blended (all producers)": "01",
+    "Coal power (all producers)": "01",
+    "Coal power CCS (all producers)": "01",
+    "Gas CHP (all producers)": "08",
+    "Gas HP (all producers)": "08",
+    "Gas power (all producers)": "08",
+    "Gas power CCS (all producers)": "08",
+    "Geothermal (all producers)": "11",
+    "Hydro (all producers)": "10",
+    "Nuclear (all producers)": "09",
+    "Oil (all producers)": "07",
+    "Others (all producers)": "16",
+    "Others CHP (all producers)": "16",
+    "Others HP (all producers)": "16",
+    "Petroleum products CHP (all producers)": "07",
+    "Petroleum products HP (all producers)": "07",
+    "Solar (all producers)": "12",
+    "Solar CSP (all producers)": "12",
+    "Solar rooftop (all producers)": "12",
+    "Solar utility PV (all producers)": "12",
+    "Solid biomass (all producers)": "15",
+    "Wind (all producers)": "14",
+    "Wind offshore (all producers)": "14",
+}
+with COMMON_ROWS.open(newline="", encoding="utf-8-sig") as _common_rows_file:
+    for _row in csv.DictReader(_common_rows_file):
+        _product_code = _POWER_FLOW_PRODUCT_CODES.get(_row.get("common_flow_name", ""))
+        if not _product_code:
+            continue
+        for _flow_code in _row.get("component_flow_code", "").split(","):
+            if _flow_code := _flow_code.strip():
+                flow[_flow_code] = product[_product_code]
 common_memberships = load_common_rollup_memberships(COMMON_ROWS)
 common_colors = build_common_rollup_colors(
     {"product": product, "flow": flow},

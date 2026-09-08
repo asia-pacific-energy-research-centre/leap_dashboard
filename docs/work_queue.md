@@ -759,3 +759,11 @@ decision, not a backlog pull.
 - Positive biomass combustion-CO2 factors remain unchanged in the source table
   for future memo-item reporting. Industrial waste and non-renewable municipal
   waste retain their source factors.
+
+## Fuel-aligned Power colours — complete 2026-09-08
+
+- Detailed electricity, CHP, and heat-process flows now reuse the bold
+  product-family palette while taking stable codes and canonical names from
+  the mapping-owned Common ESTO output.
+- The 20USA fixture rendered 319 charts; publication readiness passed and
+  page-noise reported zero flags.

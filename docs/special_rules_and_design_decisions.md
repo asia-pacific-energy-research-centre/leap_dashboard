@@ -1482,3 +1482,17 @@ Also report coverage, dropped rows, source-versus-output totals, hierarchy consi
   remove manifest coverage.
 - Legacy regeneration is blocked by current external mapping cardinality, so
   tracked legacy pages are the comparison baseline.
+
+## Fuel-aligned power-process colours
+
+Detailed electricity, CHP, and heat-plant flow categories use the same bold
+colour as their principal input-fuel family. Coal is black, gas blue, oil
+purple, geothermal brown, hydro pale blue, nuclear pink, solar gold, wind
+navy, biomass green, and other processes grey.
+
+Main-activity and autoproducer variants, including CCS, hydrogen-blended,
+solar-technology, offshore-wind, CHP, and heat-plant leaves, retain their
+fuel-family colour rather than receiving lighter transformation-family shades.
+Stable flow codes and canonical labels come from the mapping-owned Common ESTO
+output; the dashboard owns only this presentation mapping to its existing
+product-colour families.

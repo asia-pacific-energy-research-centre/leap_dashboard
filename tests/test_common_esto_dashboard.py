@@ -3249,6 +3249,32 @@ def test_code_colors_walk_up_to_the_nearest_mapped_ancestor() -> None:
     assert color_for_code("14.03.99 New Subsector", "flow") == color_for_code("14.03 Manufacturing", "flow")
 
 
+def test_power_fuel_leaves_use_the_matching_fuel_colours() -> None:
+    colors = load_code_colors()
+    for flow_code, product_code in {
+        "09.01.01.01": "01",  # Coal electricity
+        "09.01.01.04": "08",  # Gas electricity
+        "09.01.01.07": "10",  # Hydro electricity
+        "09.01.01.08": "09",  # Nuclear electricity
+        "09.01.01.09": "16",  # Other electricity
+        "09.01.01.10": "07",  # Oil electricity
+        "09.01.01.11": "12",  # Solar electricity
+        "09.01.01.15": "15",  # Biomass electricity
+        "09.01.01.17": "14",  # Wind electricity
+        "09.02.02.02": "08",  # Gas CHP
+        "09.01.01.18": "14",  # Offshore wind electricity
+        "09.01.02.04": "07",  # Petroleum-products CHP
+    }.items():
+        assert colors["flow"][flow_code] == colors["product"][product_code]
+
+    assert color_for_code(
+        "09.01.01.11,09.02.01.11 Solar (all producers)", "flow"
+    ) == colors["product"]["12"]
+    assert color_for_code(
+        "09.01.01.17,09.02.01.17 Wind (all producers)", "flow"
+    ) == colors["product"]["14"]
+
+
 def test_code_colors_keep_product_and_flow_namespaces_separate() -> None:
     # Product 16 is Others; flow 16.01 is Commercial and public services.
     assert color_for_code("16 Others", "product") != color_for_code("16.01 Commercial and public services", "flow")
