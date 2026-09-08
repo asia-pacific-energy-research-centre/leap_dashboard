@@ -1497,6 +1497,11 @@ Stable flow codes and canonical labels come from the mapping-owned Common ESTO
 output; the dashboard owns only this presentation mapping to its existing
 product-colour families.
 
+The maintained upstream power-process registry is the completeness boundary,
+including categories not yet admitted into a particular Common ESTO output.
+Storage uses the existing Batteries crimson (`#CC0049`); solid-biomass CHP and
+heat plants use the biomass green (`#2E8B57`).
+
 Area-trace display names may intentionally omit their code (for example,
 `Solar (all producers)`). The renderer must therefore resolve the colour from
 the grouped row's `common_flow_code` before serialising the trace; it must not

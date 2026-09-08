@@ -769,3 +769,7 @@ decision, not a backlog pull.
   then rendered 523 charts with no Power placeholders; all nine visible
   power-process families carried their expected serialized fill colour.
   Publication readiness passed and page-noise reported zero flags for both.
+- Registry-completeness coverage now includes all 56 main-activity and
+  autoproducer electricity, CHP, and heat-plant codes, including Storage and
+  solid-biomass CHP/HP entries that are not yet admitted into every generated
+  Common ESTO dataset.

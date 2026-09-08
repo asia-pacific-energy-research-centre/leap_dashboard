@@ -3275,6 +3275,21 @@ def test_power_fuel_leaves_use_the_matching_fuel_colours() -> None:
     ) == colors["product"]["14"]
 
 
+def test_every_registered_power_process_leaf_has_an_explicit_colour() -> None:
+    code_colors = load_code_colors()
+    colors = code_colors["flow"]
+    expected_codes = {
+        *(f"{parent}.{index:02d}" for parent in ("09.01.01", "09.02.01") for index in range(1, 19)),
+        *(f"{parent}.{index:02d}" for parent in ("09.01.02", "09.02.02") for index in range(1, 6)),
+        *(f"{parent}.{index:02d}" for parent in ("09.01.03", "09.02.03") for index in range(1, 6)),
+    }
+
+    assert expected_codes <= colors.keys()
+    assert colors["09.01.01.16"] == "#CC0049"  # Storage/Batteries
+    assert colors["09.02.02.05"] == code_colors["product"]["15"]
+    assert colors["09.01.03.05"] == code_colors["product"]["15"]
+
+
 def test_area_chart_colours_uncoded_power_names_from_their_flow_codes() -> None:
     flow_code = "09.01.01.11,09.02.01.11"
     flow_name = "Solar (all producers)"

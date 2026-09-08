@@ -16,6 +16,7 @@ Run from the repo root:  python scripts/generate_code_colors.py
 """
 from __future__ import annotations
 
+import ast
 import colorsys
 import csv
 import json
@@ -36,6 +37,13 @@ OUT = REPO_ROOT / "config" / "common_esto_dashboard" / "code_colors.json"
 CUSTOM_COLORS = OUT.with_name("code_colors_custom.json")
 COLOR_SOURCE_XLSX = OUT.parents[1] / "archive" / "master_config 9th visualisation.xlsx"
 DEFAULT_COMMON_ROWS = REPO_ROOT.parent / "leap_mappings" / "results" / "common_esto" / "common_esto_rows.csv"
+POWER_REGISTRY_SOURCE = (
+    REPO_ROOT.parent
+    / "leap_mappings"
+    / "codebase"
+    / "mapping_tools"
+    / "build_esto_extended_test.py"
+)
 FALLBACK_COMMON_ROWS = REPO_ROOT / "tests" / "fixtures" / "common_esto_dashboard" / "common_esto_rows.csv"
 COMMON_ROWS = Path(os.getenv("COMMON_ESTO_ROWS_PATH", str(DEFAULT_COMMON_ROWS)))
 if not COMMON_ROWS.exists():
@@ -117,6 +125,25 @@ def _sheet_values(sheet_name: str, column_name: str) -> list[str]:
     header = [str(value).strip() if value is not None else "" for value in next(rows)]
     column_index = header.index(column_name)
     return sorted({str(row[column_index]).strip() for row in rows if row[column_index] is not None and str(row[column_index]).strip()})
+
+
+def _load_power_process_registry() -> dict[str, dict[str, tuple[str, str]]]:
+    """Read the mapping-owned stable power registry without importing its workflow."""
+    if not POWER_REGISTRY_SOURCE.exists():
+        return {}
+    module = ast.parse(POWER_REGISTRY_SOURCE.read_text(encoding="utf-8"))
+    for node in module.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if any(
+            isinstance(target, ast.Name)
+            and target.id == "POWER_PROCESS_EXTENSION_REGISTRY"
+            for target in node.targets
+        ):
+            return ast.literal_eval(node.value)
+    raise ValueError(
+        f"POWER_PROCESS_EXTENSION_REGISTRY not found in {POWER_REGISTRY_SOURCE}"
+    )
 
 
 def _plotting_color_catalogue(source_colors: dict[str, str]) -> tuple[dict[str, dict[str, str]], dict[str, list[str]]]:
@@ -342,35 +369,55 @@ for axis, colors in dict(custom_colors.get("plotting", {})).items():
 # numeric ordering here. Apply this after both source and custom layers so the
 # bold leaf palette stays aligned to product colours on every regeneration.
 _POWER_FLOW_PRODUCT_CODES = {
-    "Coal CHP (all producers)": "01",
-    "Coal HP (all producers)": "01",
-    "Coal hydrogen blended (all producers)": "01",
-    "Coal power (all producers)": "01",
-    "Coal power CCS (all producers)": "01",
-    "Gas CHP (all producers)": "08",
-    "Gas HP (all producers)": "08",
-    "Gas power (all producers)": "08",
-    "Gas power CCS (all producers)": "08",
-    "Geothermal (all producers)": "11",
-    "Hydro (all producers)": "10",
-    "Nuclear (all producers)": "09",
-    "Oil (all producers)": "07",
-    "Others (all producers)": "16",
-    "Others CHP (all producers)": "16",
-    "Others HP (all producers)": "16",
-    "Petroleum products CHP (all producers)": "07",
-    "Petroleum products HP (all producers)": "07",
-    "Solar (all producers)": "12",
-    "Solar CSP (all producers)": "12",
-    "Solar rooftop (all producers)": "12",
-    "Solar utility PV (all producers)": "12",
-    "Solid biomass (all producers)": "15",
-    "Wind (all producers)": "14",
-    "Wind offshore (all producers)": "14",
+    "Coal CHP": "01",
+    "Coal HP": "01",
+    "Coal hydrogen blended": "01",
+    "Coal power": "01",
+    "Coal power CCS": "01",
+    "Gas CHP": "08",
+    "Gas HP": "08",
+    "Gas power": "08",
+    "Gas power CCS": "08",
+    "Geothermal": "11",
+    "Hydro": "10",
+    "Nuclear": "09",
+    "Oil": "07",
+    "Others": "16",
+    "Others CHP": "16",
+    "Others HP": "16",
+    "Petroleum products CHP": "07",
+    "Petroleum products HP": "07",
+    "Solar": "12",
+    "Solar CSP": "12",
+    "Solar rooftop": "12",
+    "Solar utility PV": "12",
+    "Solid biomass": "15",
+    "Solid biomass CHP": "15",
+    "Solid biomass HP": "15",
+    "Wind": "14",
+    "Wind offshore": "14",
 }
+_POWER_PARENT_CODES = {
+    "Electricity Generation": ("09.01.01", "09.02.01"),
+    "CHP plants": ("09.01.02", "09.02.02"),
+    "Heat plants": ("09.01.03", "09.02.03"),
+}
+for _process, _entries in _load_power_process_registry().items():
+    for _, (_leaf_code, _canonical_name) in _entries.items():
+        _power_color = (
+            source_colors.get("Batteries", "#CC0049")
+            if _canonical_name == "Storage"
+            else product[_POWER_FLOW_PRODUCT_CODES[_canonical_name]]
+        )
+        for _parent_code in _POWER_PARENT_CODES[_process]:
+            flow[f"{_parent_code}.{_leaf_code}"] = _power_color
+
+# A fixture checkout may not have the sibling mapping source. Continue to
+# cover every admitted category from the Common ESTO rows in that environment.
 with COMMON_ROWS.open(newline="", encoding="utf-8-sig") as _common_rows_file:
     for _row in csv.DictReader(_common_rows_file):
-        _product_code = _POWER_FLOW_PRODUCT_CODES.get(_row.get("common_flow_name", ""))
+        _flow_name = _row.get("common_flow_name", "").removesuffix(" (all producers)")
+        _product_code = _POWER_FLOW_PRODUCT_CODES.get(_flow_name)
         if not _product_code:
             continue
         for _flow_code in _row.get("component_flow_code", "").split(","):
