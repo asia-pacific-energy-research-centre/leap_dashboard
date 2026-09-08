@@ -765,5 +765,7 @@ decision, not a backlog pull.
 - Detailed electricity, CHP, and heat-process flows now reuse the bold
   product-family palette while taking stable codes and canonical names from
   the mapping-owned Common ESTO output.
-- The 20USA fixture rendered 319 charts; publication readiness passed and
-  page-noise reported zero flags.
+- The compact 20USA fixture rendered 319 charts. A full-detail 20USA workbook
+  then rendered 523 charts with no Power placeholders; all nine visible
+  power-process families carried their expected serialized fill colour.
+  Publication readiness passed and page-noise reported zero flags for both.

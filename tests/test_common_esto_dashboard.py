@@ -3275,6 +3275,40 @@ def test_power_fuel_leaves_use_the_matching_fuel_colours() -> None:
     ) == colors["product"]["14"]
 
 
+def test_area_chart_colours_uncoded_power_names_from_their_flow_codes() -> None:
+    flow_code = "09.01.01.11,09.02.01.11"
+    flow_name = "Solar (all producers)"
+    rows = pd.DataFrame([
+        {
+            "source_system": source,
+            "scenario": scenario,
+            "year": year,
+            "common_flow_code": flow_code,
+            "common_flow_label": flow_name,
+            "common_product_code": "17",
+            "common_product_label": "17 Electricity",
+            "value": value,
+        }
+        for source, scenario, year, value in [
+            ("ESTO", "historical", 2022, 8.0),
+            ("LEAP", "Target", 2023, 10.0),
+        ]
+    ])
+
+    figure = build_area_chart(
+        rows,
+        {"aggregate_flow_label": flow_name, "source_flow_labels": [flow_name]},
+        {},
+        {"chart_generation": {"comparison_source_system": "ESTO", "base_year": 2022}},
+        group_col="common_flow_label",
+    )
+
+    area_trace = next(trace for trace in figure.data if trace.stackgroup)
+    assert area_trace.name == flow_name
+    assert area_trace.line.color == "#FFD700"
+    assert area_trace.fillcolor == "#FFD700"
+
+
 def test_code_colors_keep_product_and_flow_namespaces_separate() -> None:
     # Product 16 is Others; flow 16.01 is Commercial and public services.
     assert color_for_code("16 Others", "product") != color_for_code("16.01 Commercial and public services", "flow")

@@ -1496,3 +1496,8 @@ fuel-family colour rather than receiving lighter transformation-family shades.
 Stable flow codes and canonical labels come from the mapping-owned Common ESTO
 output; the dashboard owns only this presentation mapping to its existing
 product-colour families.
+
+Area-trace display names may intentionally omit their code (for example,
+`Solar (all producers)`). The renderer must therefore resolve the colour from
+the grouped row's `common_flow_code` before serialising the trace; it must not
+depend on reparsing the visible legend label.

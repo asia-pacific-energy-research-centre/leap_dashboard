@@ -2563,6 +2563,7 @@ def _add_preseparated_signed_stack_traces(
         )
         if line_color:
             trace.line.color = line_color
+            trace.fillcolor = line_color
         fig.add_trace(trace)
     return len(active_parts)
 
@@ -5711,6 +5712,16 @@ def build_area_chart(
                 or _has_nonzero_values(group["_negative_value"])
             ):
                 continue
+            group_color = ""
+            code_axis = code_axis_for_group_col(group_col)
+            code_col = group_col.removesuffix("_label") + "_code"
+            if code_axis and code_col in area_df.columns:
+                group_codes = area_df.loc[
+                    area_df[group_col].eq(group_label), code_col
+                ].dropna().astype(str).str.strip()
+                group_codes = group_codes[group_codes.ne("")].unique()
+                if len(group_codes) == 1:
+                    group_color = color_for_code(group_codes[0], code_axis)
             trace_count = _add_preseparated_signed_stack_traces(
                 fig=fig,
                 x_values=group["year"],
@@ -5728,6 +5739,7 @@ def build_area_chart(
                     + escape(str(group_label))
                     + "</extra>"
                 ),
+                line_color=group_color,
             )
             trace_meta.extend(
                 trace_meta_entry(primary_source, scenario_name, True)
