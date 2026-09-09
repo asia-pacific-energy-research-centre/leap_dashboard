@@ -1570,20 +1570,25 @@ def build_emissions_page(
     missing = unmatched_factor_rows(emissions_df)
     missing_labels = sorted(set(missing["common_product_label"].astype(str)))
     emissions_df = emissions_df[emissions_df[EMISSIONS_COLUMN].notna()].copy()
-    if emissions_df.empty:
-        return _write_explained_empty_page(
-            page_key, page_label, layout, all_pages, economy_label, dashboard_switcher,
-            current_dashboard, dashboard_updated_label,
-            "No emissions charts: none of the demand fuels for this economy carry an "
-            f"emissions factor. Unmatched fuels: {', '.join(missing_labels) or 'none'}.",
-            scope_ui_kwargs,
-            write_page=write_page,
-        )
     diagnostics["frontier_coverage_check"] = coverage_check
     diagnostics["source_selection"] = source_selection
     diagnostics["flow_policy"] = flow_policy
     diagnostics["flow_policy_resolution"] = flow_policy_resolution
     diagnostics["unmatched_factor_rows"] = missing
+    if emissions_df.empty:
+        if write_page:
+            for name, frame in diagnostics.items():
+                frame.to_csv(layout["supporting"] / f"emissions_{name}.csv", index=False)
+        warning = _unmatched_factor_warning(missing)
+        return _write_explained_empty_page(
+            page_key, page_label, layout, all_pages, economy_label, dashboard_switcher,
+            current_dashboard, dashboard_updated_label,
+            "No emissions charts: none of the demand fuels for this economy carry an "
+            f"emissions factor. Unmatched fuels: {', '.join(missing_labels) or 'none'}. "
+            f"{warning}",
+            scope_ui_kwargs,
+            write_page=write_page,
+        )
     if write_page:
         for name, frame in diagnostics.items():
             frame.to_csv(layout["supporting"] / f"emissions_{name}.csv", index=False)
@@ -1788,6 +1793,13 @@ def _page_note(
     )
     if unmatched_rows is None or unmatched_rows.empty:
         return note
+    return f"{note} {_unmatched_factor_warning(unmatched_rows)}"
+
+
+def _unmatched_factor_warning(unmatched_rows: pd.DataFrame) -> str:
+    """Return the compact, row-specific missing-factor warning used on-page."""
+    if unmatched_rows.empty:
+        return ""
     identifier_columns = [
         column
         for column in (
@@ -1801,7 +1813,7 @@ def _page_note(
     ]
     remainder = "" if len(unmatched_rows) <= len(identifiers) else "; …"
     return (
-        f"{note} WARNING: {len(unmatched_rows)} selected row(s) have no emissions "
+        f"WARNING: {len(unmatched_rows)} selected row(s) have no emissions "
         "factor and are excluded from chart totals. Affected: "
         f"{'; '.join(identifiers)}{remainder}. Full list: "
         "supporting_files/emissions_unmatched_factor_rows.csv."
