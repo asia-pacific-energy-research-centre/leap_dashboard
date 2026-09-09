@@ -2834,7 +2834,7 @@ def test_supply_uses_separate_bunker_sections_only_when_both_leap_flows_exist(
     })
 
 
-def test_supply_keeps_combined_bunkers_when_only_one_leap_child_exists() -> None:
+def test_supply_shows_available_detail_when_only_one_leap_child_exists() -> None:
     template = _load_template()
     page_df = pd.DataFrame([
         {
@@ -2872,7 +2872,7 @@ def test_supply_keeps_combined_bunkers_when_only_one_leap_child_exists() -> None
         template,
     )
 
-    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04-05"]
+    assert [spec["aggregate_flow_prefix"] for spec in specs] == ["04"]
 
 
 def test_common_esto_dashboard_switcher_uses_current_dashboard_label(tmp_path: Path) -> None:
