@@ -494,12 +494,9 @@ def test_transformation_frontier_emits_parent_child_reconciliation_qa() -> None:
         {"demand_page_keys": ["industry", "transport", "buildings", "others"]},
     )
 
-    qa = coverage[coverage["common_flow_label"].eq("09.01")]
-    assert set(selected["common_flow_code"]) == {"09.01"}
-    assert len(qa) == 1
-    assert qa.iloc[0]["aggregate_value"] == pytest.approx(-100.0)
-    assert qa.iloc[0]["frontier_value"] == pytest.approx(-90.0)
-    assert qa.iloc[0]["difference"] == pytest.approx(-10.0)
+    assert set(selected["common_flow_code"]) == {"09.01.01", "09.01.02"}
+    assert selected["value"].sum() == pytest.approx(90.0)
+    assert coverage.empty
 
 
 def test_emissions_page_note_is_short_and_plain_language() -> None:

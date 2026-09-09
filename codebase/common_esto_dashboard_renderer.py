@@ -2351,19 +2351,90 @@ def resolved_immediate_child_frontier(
     """
     if child_rows.empty or "_child_flow_code" not in child_rows.columns:
         return child_rows
+    # A zero-valued plant-family parent is not an authority over a reported
+    # non-zero process below it. This occurs in the PRC 2022 LEAP export.
+    work = child_rows.copy()
+    context_columns = [
+        column for column in (
+            "comparison_scope", "economy", "source_system", "scenario",
+            "year", "common_product_code", "common_product_label",
+        ) if column in work.columns
+    ]
+    if context_columns and "value" in work.columns:
+        depths = work["common_flow_code"].map(code_depth)
+        child_depths = work["_child_flow_code"].map(code_depth)
+        direct_parent = depths.eq(child_depths)
+        nonzero_descendant = (
+            work.loc[~direct_parent & pd.to_numeric(work["value"], errors="coerce").abs().gt(1e-12),
+                     ["_child_flow_code", *context_columns]]
+            .drop_duplicates()
+            .assign(_has_nonzero_descendant=True)
+        )
+        if not nonzero_descendant.empty:
+            work = work.merge(
+                nonzero_descendant,
+                on=["_child_flow_code", *context_columns],
+                how="left",
+            )
+            drop_zero_parent = (
+                direct_parent.reindex(work.index, fill_value=False)
+                & pd.to_numeric(work["value"], errors="coerce").abs().le(1e-12)
+                & work["_has_nonzero_descendant"].fillna(False)
+            )
+            work = work.loc[~drop_zero_parent].drop(columns="_has_nonzero_descendant")
     parts = [
         resolved_area_chart_rows(
             child_group,
-            area_spec,
+            {**area_spec, "use_power_detail_frontier": False},
             group_col="_child_flow_label",
         )
-        for _child_code, child_group in child_rows.groupby(
+        for _child_code, child_group in work.groupby(
             "_child_flow_code",
             dropna=False,
             sort=False,
         )
     ]
     return pd.concat(parts, ignore_index=True, sort=False) if parts else child_rows
+
+
+def power_detail_frontier(page_df: pd.DataFrame, area_spec: dict[str, object]) -> pd.DataFrame:
+    """Return the Power Overview's source-reported plant-family frontier."""
+    parent_prefix = str(area_spec.get("immediate_child_flow_parent_prefix", "09.01")).strip()
+    detail = immediate_child_flow_rows(
+        area_spec_rows(page_df, area_spec),
+        get_existing_flow_nodes(page_df),
+        parent_prefix,
+        dict(area_spec.get("immediate_child_flow_labels", {}) or {}),
+        flow_boundary=str(area_spec.get("aggregate_flow_prefix", "09.01-09.02")),
+    )
+    process_rows = uncoded_power_process_child_rows(
+        page_df, area_spec_rows(page_df, area_spec), parent_prefix
+    )
+    if not process_rows.empty:
+        detail = pd.concat([detail, process_rows], ignore_index=True, sort=False)
+    if detail.empty:
+        return detail
+    context_columns = [
+        column for column in (
+            "comparison_scope", "economy", "source_system", "scenario",
+            "year", "common_product_code", "common_product_label",
+        ) if column in detail.columns
+    ]
+    selected: list[pd.DataFrame] = []
+    for _, group in detail.groupby(["_child_flow_code", *context_columns], dropna=False, sort=False):
+        depth = code_depth(group["_child_flow_code"].iloc[0])
+        direct_parent = group["common_flow_code"].map(code_depth).eq(depth)
+        parents = group.loc[direct_parent]
+        children = group.loc[~direct_parent]
+        # A non-zero immediate parent is the source's compact plant-family
+        # observation. A zero parent cannot suppress reported process detail.
+        if not parents.empty and pd.to_numeric(parents["value"], errors="coerce").abs().sum() > 1e-12:
+            selected.append(parents)
+        elif not children.empty:
+            selected.append(children)
+        else:
+            selected.append(parents)
+    return pd.concat(selected, ignore_index=True, sort=False) if selected else detail.iloc[0:0].copy()
 
 
 def reconciled_immediate_child_flow_rows(
@@ -3378,6 +3449,7 @@ def add_power_sector_overview_specs(
             "source_flow_labels": source_labels,
             "source_flow_labels_by_system": labels_by_source,
             "explicit_flow_boundary": True,
+            "use_power_detail_frontier": boundary == "09.01-09.02",
             "force_navigation_root": bool(
                 aggregate.get("navigation_root", False)
             ),
@@ -6382,6 +6454,8 @@ def resolved_area_chart_rows(
     comparison must show the same published source rows as its parent area,
     rather than independently selecting or allocating sector detail.
     """
+    if bool(area_spec.get("use_power_detail_frontier", False)):
+        return power_detail_frontier(df, area_spec)
     if bool(area_spec.get("rows_are_resolved_area_frontier", False)):
         return df.copy()
     chart_df = area_spec_rows(df, area_spec)

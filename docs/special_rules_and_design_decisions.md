@@ -940,11 +940,14 @@ eligibility. This preserves eligible `10.01` energy-sector own-use rows,
 including `10.01.11 Oil refineries`, while ordinary energy pages continue to
 hide duplicate/inclusive rows according to their display rules.
 
-Power uses the complete active-scope `09.01-09.02` authority per
-source/scenario/year/product when published children do not reconcile. The
-dashboard must not splice companion-scope Power rows with a different product
-axis into the factor calculation; if detailed data is needed, it must first be
-returned to the active axis through mapping-owned semantics.
+Power emissions and both `09.01-09.02 Power` Overview charts use the same
+source-reported plant-family frontier. This prevents an incomplete broad Power
+parent from erasing a non-zero Electricity/CHP/Heat child. In particular, the
+PRC 2022 LEAP export reports coal under `Coal power` while its Electricity
+plants parent is zero, and its broad `09.01-09.02` parent contains only Heat
+plants. The cause of that source-parent representation difference between 2022
+and 2023 remains unresolved and must be investigated upstream; the dashboard
+does not allocate or fabricate a replacement value.
 
 An unresolved emissions factor is neither zero nor an acceptable quiet drop.
 The page visibly names up to three affected source/scenario/year/flow/product

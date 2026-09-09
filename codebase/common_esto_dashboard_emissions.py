@@ -1298,8 +1298,30 @@ def select_emissions_component_rows(
     transformation, transformation_policy_resolution = apply_emissions_flow_policy(
         transformation, flow_policy, "transformation_and_own_use"
     )
-    transformation_frontier, transformation_coverage = (
-        _transformation_frontier_with_reconciliation(transformation)
+    power_mask = transformation["common_flow_code"].map(_power_flow_role).notna()
+    power = transformation.loc[power_mask].copy()
+    other_transformation = transformation.loc[~power_mask].copy()
+    power_frontier = _renderer().power_detail_frontier(
+        power,
+        {
+            "aggregate_flow_prefix": "09.01-09.02",
+            "aggregate_flow_label": "09.01-09.02 Power",
+            "explicit_flow_boundary": True,
+            "immediate_child_flow_parent_prefix": "09.01",
+            "immediate_child_flow_labels": {
+                "09.01.01": "09.01.01,09.02.01 Electricity plants",
+                "09.01.02": "09.01.02,09.02.02 CHP plants",
+                "09.01.03": "09.01.03,09.02.03 Heat plants",
+            },
+        },
+    )
+    other_frontier, transformation_coverage = _transformation_frontier_with_reconciliation(
+        other_transformation
+    )
+    selected_transformation = [frame for frame in (power_frontier, other_frontier) if not frame.empty]
+    transformation_frontier = (
+        pd.concat(selected_transformation, ignore_index=True)
+        if selected_transformation else transformation.iloc[0:0].copy()
     )
     if not transformation_coverage.empty:
         coverage = (
