@@ -3288,6 +3288,41 @@ def test_power_by_flow_keeps_full_projected_process_composition_and_audits_scali
     assert all(row["absolute_mismatch"] > 0 for row in diagnostics)
 
 
+def test_power_detail_frontier_does_not_stack_parent_with_published_processes() -> None:
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("LEAP", "Target", 2023, "09.01.01,09.02.01", "17", 100.0),
+            "common_flow_label": "09.01.01,09.02.01 Electricity plants",
+            "common_product_label": "17 Electricity",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2023, "09.01.01.01", "17", 60.0),
+            "common_flow_label": "Coal power (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2023, "09.01.01.02", "17", 40.0),
+            "common_flow_label": "Gas power (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+    spec = {
+        "aggregate_flow_prefix": "09.01.01,09.02.01",
+        "aggregate_flow_label": "09.01.01,09.02.01 Electricity plants",
+        "immediate_child_flow_parent_prefix": "09.01.01",
+        "immediate_child_flow_labels": {
+            "09.01.01,09.02.01": "09.01.01,09.02.01 Electricity plants",
+        },
+    }
+
+    frontier = renderer.power_detail_frontier(rows, spec)
+
+    assert "09.01.01,09.02.01" not in set(frontier["common_flow_code"])
+    assert set(frontier["common_flow_code"]) == {"09.01.01.901", "09.01.01.902"}
+    assert frontier["value"].sum() == pytest.approx(100.0)
+
+
 def test_chart_frontier_fallback_is_auditable_and_warns() -> None:
     rows = pd.DataFrame([
         {

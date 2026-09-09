@@ -2426,9 +2426,16 @@ def power_detail_frontier(page_df: pd.DataFrame, area_spec: dict[str, object]) -
         direct_parent = group["common_flow_code"].map(code_depth).eq(depth)
         parents = group.loc[direct_parent]
         children = group.loc[~direct_parent]
-        # A non-zero immediate parent is the source's compact plant-family
-        # observation. A zero parent cannot suppress reported process detail.
-        if not parents.empty and pd.to_numeric(parents["value"], errors="coerce").abs().sum() > 1e-12:
+        # Prefer published process detail whenever it is present. A non-zero
+        # parent is only the frontier when its descendants are absent or all
+        # zero; a zero parent must not suppress non-zero process detail.
+        nonzero_children = (
+            pd.to_numeric(children["value"], errors="coerce").abs().gt(1e-12).any()
+            if not children.empty else False
+        )
+        if not parents.empty and not nonzero_children and pd.to_numeric(
+            parents["value"], errors="coerce"
+        ).abs().sum() > 1e-12:
             selected.append(parents)
         elif not children.empty:
             selected.append(children)
