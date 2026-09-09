@@ -31,6 +31,11 @@ TEMPLATE_PATH = (
     REPO_ROOT / "config" / "common_esto_dashboard" / "common_esto_dashboard_template.json"
 )
 SERIES_CONFIG_PATH = REPO_ROOT / "config" / "common_esto_dashboard" / "series_config.json"
+EMISSIONS_FACTOR_CONFIG_PATH = REPO_ROOT / "config" / "common_esto_dashboard" / "emissions_factor_sets.json"
+EMISSIONS_FACTOR_FILE_PATH = REPO_ROOT / "config" / "9th_edition_co2_emissions_factors_by_fuel_energy_weighted_20250403_122429.csv"
+EMISSIONS_FLOW_POLICY_PATH = REPO_ROOT / "config" / "common_esto_dashboard" / "esto_emissions_flow_policy.csv"
+MAPPINGS_ROOT = REPO_ROOT.parent / "leap_mappings"
+EMISSIONS_NINTH_FUEL_MAPPING_PATH = MAPPINGS_ROOT / "config" / "outlook_mappings_single_axis.xlsx"
 
 
 def _render(tmp_path: Path, **overrides: object) -> dict[str, object]:
@@ -83,6 +88,10 @@ def test_optional_inputs_are_declared() -> None:
         "missing_branch_exceptions_path",
         "relationships_path",
         "esto_vintage_issue",
+        "emissions_factor_config_path",
+        "emissions_factor_file_path",
+        "emissions_ninth_fuel_mapping_path",
+        "emissions_flow_policy_path",
     }
 
 
@@ -357,9 +366,39 @@ def test_render_writes_dashboard_index_and_manifest(tmp_path: Path) -> None:
 
     manifest = pd.read_csv(manifest_path)
     assert len(manifest) == int(result["chart_count"])
-
     bundles = list((tmp_path / "outputs" / "20USA" / "chart_bundles").glob("*.js"))
     assert bundles, "expected at least one Plotly chart bundle"
+
+
+@pytest.mark.skipif(
+    not EMISSIONS_NINTH_FUEL_MAPPING_PATH.is_file(),
+    reason="leap_mappings checkout is required for the portable-emissions fixture render",
+)
+def test_portable_render_includes_emissions_with_explicit_assets(tmp_path: Path) -> None:
+    """Portable paths must produce the page and its factor/coverage evidence."""
+    result = _render(
+        tmp_path,
+        emissions_factor_config_path=EMISSIONS_FACTOR_CONFIG_PATH,
+        emissions_factor_file_path=EMISSIONS_FACTOR_FILE_PATH,
+        emissions_ninth_fuel_mapping_path=EMISSIONS_NINTH_FUEL_MAPPING_PATH,
+        emissions_flow_policy_path=EMISSIONS_FLOW_POLICY_PATH,
+    )
+
+    root = Path(str(result["output_root"]))
+    emissions_page = root / "dashboards" / "emissions.html"
+    manifest = pd.read_csv(Path(str(result["chart_manifest"])))
+    assert emissions_page.is_file()
+    assert set(manifest.loc[manifest["page_key"].eq("emissions"), "chart_key"]) == {
+        "chart__area__emissions__fuel",
+        "chart__area__emissions__sector",
+    }
+    assert (root / "supporting_files" / "emissions_by_sector_and_fuel.csv").is_file()
+    assert (root / "supporting_files" / "emissions_factor_resolution.csv").is_file()
+
+
+def test_portable_emissions_rejects_an_incomplete_asset_set(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="requires factor config"):
+        _render(tmp_path, emissions_factor_config_path=EMISSIONS_FACTOR_CONFIG_PATH)
 
 
 def test_trace_only_render_is_bundle_equivalent_without_presentation_outputs(

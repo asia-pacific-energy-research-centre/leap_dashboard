@@ -11460,6 +11460,7 @@ def render_dashboard(
     additional_pages: list[dict[str, str]] | None = None,
     source_category_map: pd.DataFrame | None = None,
     unmet_requirements_df: pd.DataFrame | None = None,
+    emissions_factor_config: dict | None = None,
     trace_only: bool = False,
 ) -> pd.DataFrame:
     """Render dashboard charts, optionally writing only comparison trace bundles.
@@ -11592,7 +11593,11 @@ def render_dashboard(
 
     # The Emissions page is derived from the demand pages above, so it must be
     # in the inventory before any page renders its navigation chips.
-    if emissions_page_enabled(template, assigned_df):
+    if emissions_page_enabled(
+        template,
+        assigned_df,
+        factor_config_path=emissions_factor_config,
+    ):
         emissions_config = template.get("emissions_page", {})
         emissions_page_key = safe_slug(emissions_config.get("page_key", "emissions"))
         page_inventory.append({
@@ -12434,7 +12439,11 @@ def render_dashboard(
 
     emissions_manifest_rows: list[dict] = []
     emissions_page_row: dict | None = None
-    if emissions_page_enabled(template, assigned_df):
+    if emissions_page_enabled(
+        template,
+        assigned_df,
+        factor_config_path=emissions_factor_config,
+    ):
         emissions_manifest_rows, emissions_page_row = build_emissions_page(
             assigned_df, template, series_labels, layout, page_inventory,
             primary_source=primary_source, primary_scenario=primary_scenario,
@@ -12442,6 +12451,7 @@ def render_dashboard(
             dashboard_switcher=dashboard_switcher,
             current_dashboard=current_dashboard,
             dashboard_updated_label=dashboard_updated_label,
+            factor_config_path=emissions_factor_config,
             write_page=not trace_only,
         )
     manifest_rows.extend(emissions_manifest_rows)

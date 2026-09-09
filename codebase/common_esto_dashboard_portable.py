@@ -21,14 +21,11 @@ reviewers see the same diagnostic, rather than a reduced substitute.
 Deliberately **not** included here:
 
 - the capacity-unmet convergence page (needs a ``leap_initialisation`` run CSV);
-- the upstream Common ESTO fast-path data refresh;
-- the Emissions page. ``render_dashboard`` still offers it, but its factor
-  mapping needs the ``leap_mappings`` 9th-fuel contract and generated
-  ESTO -> common axis map, so a portable package without that checkout renders
-  neither the page nor its navigation chip. See
-  ``common_esto_dashboard_emissions.emissions_page_enabled``.
+- the upstream Common ESTO fast-path data refresh.
 
-Use ``common_esto_dashboard_workflow.py`` when those pages are wanted.
+The Emissions page is supported when its explicit factor, flow-policy, and
+9th-fuel mapping-contract inputs are supplied. This keeps a portable package
+self-contained without making it discover a sibling ``leap_mappings`` checkout.
 """
 
 from __future__ import annotations
@@ -95,6 +92,10 @@ OPTIONAL_DASHBOARD_INPUTS = {
     "missing_branch_exceptions_path": "Known missing LEAP branch exception ledger",
     "relationships_path": "LEAP-to-Common ESTO mapping relationships",
     "esto_vintage_issue": "Selected ESTO release issue (for example 2026)",
+    "emissions_factor_config_path": "Emissions factor-set configuration JSON",
+    "emissions_factor_file_path": "Active emissions factor CSV",
+    "emissions_ninth_fuel_mapping_path": "9th-fuel to ESTO-product mapping workbook",
+    "emissions_flow_policy_path": "Combustion-boundary flow policy CSV",
 }
 
 
@@ -210,6 +211,62 @@ def dashboard_base_year_from_leap_data(
     return int(leap_years.min())
 
 
+def _portable_emissions_factor_config(
+    *,
+    template: dict,
+    common_rows_path: Path,
+    factor_config_path: Path | str | None,
+    factor_file_path: Path | str | None,
+    ninth_fuel_mapping_path: Path | str | None,
+    flow_policy_path: Path | str | None,
+) -> dict | None:
+    """Resolve emissions inputs into a layout-independent factor config.
+
+    The maintained factor config uses repository-relative paths. A portable
+    release stages its assets elsewhere, so convert only the selected factor
+    set and mapping sources to explicit paths before passing them to the shared
+    emissions renderer. Supplying any, but not all, portable-only inputs is a
+    configuration error: silently dropping the navigation page would hide an
+    incomplete release.
+    """
+    supplied = [
+        factor_config_path,
+        factor_file_path,
+        ninth_fuel_mapping_path,
+        flow_policy_path,
+    ]
+    if not any(supplied):
+        return None
+    if not all(supplied):
+        raise ValueError(
+            "Portable Emissions rendering requires factor config, factor file, "
+            "9th-fuel mapping workbook, and flow policy paths together."
+        )
+    config = json.loads(Path(str(factor_config_path)).read_text(encoding="utf-8"))
+    active_key = str(
+        template.get("emissions_page", {}).get("factor_set_key")
+        or config.get("active_factor_set", "")
+    ).strip()
+    selected = [
+        item for item in config.get("factor_sets", [])
+        if str(item.get("key", "")).strip() == active_key
+    ]
+    if len(selected) != 1:
+        raise ValueError(
+            f"Portable Emissions factor config has no unique active factor set {active_key!r}."
+        )
+    selected[0]["path"] = str(Path(str(factor_file_path)).resolve())
+    mapping_sources = config.setdefault("mapping_sources", {})
+    mapping_sources["ninth_fuel_to_esto_workbook"] = str(
+        Path(str(ninth_fuel_mapping_path)).resolve()
+    )
+    mapping_sources["esto_to_common_map"] = str(common_rows_path.resolve())
+    template.setdefault("emissions_page", {})["flow_policy_path"] = str(
+        Path(str(flow_policy_path)).resolve()
+    )
+    return config
+
+
 def copy_mapping_diagnostics_page(
     *,
     output_root: Path | str,
@@ -306,6 +363,10 @@ def render_common_esto_dashboard(
     missing_branch_exceptions_path: Path | str | None = None,
     relationships_path: Path | str | None = None,
     esto_vintage_issue: str = "",
+    emissions_factor_config_path: Path | str | None = None,
+    emissions_factor_file_path: Path | str | None = None,
+    emissions_ninth_fuel_mapping_path: Path | str | None = None,
+    emissions_flow_policy_path: Path | str | None = None,
     comparison_scope: str = "esto_leap_ninth",
     wide_file_scope: str = "esto_leap_ninth",
     min_year: int | None = 2010,
@@ -341,6 +402,14 @@ def render_common_esto_dashboard(
     template = filter_template_for_leap_demand_coverage(
         template,
         representation_status_df,
+    )
+    emissions_factor_config = _portable_emissions_factor_config(
+        template=template,
+        common_rows_path=Path(common_rows_path),
+        factor_config_path=emissions_factor_config_path,
+        factor_file_path=emissions_factor_file_path,
+        ninth_fuel_mapping_path=emissions_ninth_fuel_mapping_path,
+        flow_policy_path=emissions_flow_policy_path,
     )
     resolved_power_interim_audit_path = (
         Path(power_interim_audit_path)
@@ -456,6 +525,7 @@ def render_common_esto_dashboard(
         dashboard_updated_label=dashboard_updated_label,
         source_category_map=source_category_map,
         additional_pages=list(additional_pages),
+        emissions_factor_config=emissions_factor_config,
         trace_only=trace_only,
     )
 

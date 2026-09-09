@@ -24,6 +24,7 @@ import os
 import re
 from html import escape
 from pathlib import Path
+from typing import Mapping
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -236,8 +237,16 @@ def apply_emissions_flow_policy(
 # ---------------------------------------------------------------------------
 # Factor set configuration
 # ---------------------------------------------------------------------------
-def load_factor_set_config(config_path: str | Path) -> dict:
-    """Load the emissions factor-set config file."""
+def load_factor_set_config(config_path: str | Path | Mapping[str, object]) -> dict:
+    """Load the emissions factor-set config file or use a supplied config.
+
+    Portable callers resolve the factor file and mapping-contract paths outside
+    the normal repository layout, then pass the resulting config dictionary.
+    Keeping that relocation at the packaging boundary avoids a second copy of
+    the emissions-factor semantics in the portable renderer.
+    """
+    if isinstance(config_path, Mapping):
+        return dict(config_path)
     return json.loads(_resolve_repo_path(config_path).read_text(encoding="utf-8"))
 
 
@@ -1375,7 +1384,7 @@ def select_emissions_demand_rows(
 def emissions_page_enabled(
     template: dict,
     assigned_df: pd.DataFrame | None = None,
-    factor_config_path: str | Path | None = None,
+    factor_config_path: str | Path | Mapping[str, object] | None = None,
 ) -> bool:
     """Whether the Emissions page should appear in navigation and be rendered.
 
@@ -1449,7 +1458,7 @@ def build_emissions_page(
     dashboard_switcher: list[dict[str, str]] | None = None,
     current_dashboard: str = "",
     dashboard_updated_label: str = "",
-    factor_config_path: str | Path | None = None,
+    factor_config_path: str | Path | Mapping[str, object] | None = None,
     write_page: bool = True,
 ) -> tuple[list[dict], dict | None]:
     """Build the Emissions page (config-driven bespoke page).
