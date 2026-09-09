@@ -3210,6 +3210,120 @@ def test_power_by_flow_reconciles_process_detail_to_product_frontier() -> None:
     }
 
 
+def test_power_by_flow_keeps_full_projected_process_composition_and_audits_scaling() -> None:
+    """Parent-plus-process Power rows retain their composition after 2022."""
+    process_labels = [
+        "Coal power", "Coal power CCS", "Gas power", "Gas power CCS",
+        "Oil power", "Nuclear power", "Hydro power", "Geothermal power",
+        "Solar power", "Wind power", "Biomass power", "Biogas power",
+        "Waste power", "Other renewable power", "Other sources power",
+    ]
+    rows: list[dict] = []
+    expected_totals: dict[tuple[int, str], float] = {}
+    for year, product_code, parent_total in (
+        (2023, "01.02", -300.0), (2030, "17", 450.0), (2060, "01.02", -600.0),
+    ):
+        expected_totals[(year, product_code)] = parent_total
+        rows.append({
+            **_area_product_row(
+                "LEAP", "Target", year, "09.01.01,09.02.01", product_code,
+                parent_total,
+            ),
+            "common_flow_label": "09.01.01,09.02.01 Electricity plants",
+            "common_product_label": f"{product_code} Product",
+            "is_non_expanding_rollup": True,
+        })
+        for index, label in enumerate(process_labels, start=1):
+            rows.append({
+                **_area_product_row(
+                    "LEAP", "Target", year, f"09.01.01.{index:02}", product_code,
+                    (index + 1) * (-1.0 if parent_total < 0 else 1.0),
+                ),
+                "common_flow_label": f"{label} (all producers)",
+                "common_product_label": f"{product_code} Product",
+            })
+    source_rows = pd.DataFrame(rows)
+    spec = {
+        "aggregate_flow_prefix": "09.01.01,09.02.01",
+        "aggregate_flow_label": "09.01.01,09.02.01 Electricity plants",
+        "explicit_flow_boundary": True,
+    }
+    diagnostics: list[dict] = []
+
+    template = json.loads(
+        (
+            REPO_ROOT
+            / "config"
+            / "common_esto_dashboard"
+            / "common_esto_dashboard_template.json"
+        ).read_text(encoding="utf-8")
+    )
+    overview_specs = renderer.add_power_sector_overview_specs(
+        "power", source_rows, [], template
+    )
+    assert any(
+        overview.get("overview_variant", "").endswith("electricity_plants_by_flow")
+        for overview in overview_specs
+    )
+
+    flow_rows = renderer.reconciled_immediate_child_flow_rows(
+        source_rows,
+        renderer.get_existing_flow_nodes(source_rows),
+        "09.01.01",
+        spec,
+        diagnostic_rows=diagnostics,
+        diagnostic_context={"page_key": "power", "chart_key": "power_flow"},
+    )
+
+    assert set(flow_rows["_child_flow_label"]) == {
+        f"{label} (all producers)" for label in process_labels
+    }
+    totals = flow_rows.groupby(["year", "common_product_code"])["value"].sum()
+    assert totals.to_dict() == pytest.approx(expected_totals)
+    assert len(diagnostics) == 3
+    assert {row["renderer_action"] for row in diagnostics} == {
+        "reconciled_child_composition"
+    }
+    assert {row["year"] for row in diagnostics} == {2023, 2030, 2060}
+    assert all(row["absolute_mismatch"] > 0 for row in diagnostics)
+
+
+def test_chart_frontier_fallback_is_auditable_and_warns() -> None:
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("LEAP", "Target", 2030, "15", "17", 100.0),
+            "common_flow_label": "15 Transport sector",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2030, "15.02", "17", 70.0),
+            "common_flow_label": "15.02 Road",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+    spec = {
+        "aggregate_flow_prefix": "15",
+        "aggregate_flow_label": "15 Transport sector",
+        "explicit_flow_boundary": True,
+        "preferred_detail_flow_boundaries": ["15.02"],
+    }
+    diagnostics: list[dict] = []
+
+    selected = renderer.resolved_area_chart_rows(
+        rows,
+        spec,
+        diagnostic_rows=diagnostics,
+        diagnostic_context={"page_key": "transport", "chart_key": "transport_flow"},
+    )
+
+    assert selected["common_flow_code"].tolist() == ["15"]
+    assert diagnostics[0]["renderer_action"] == "retained_authoritative_parent"
+    assert diagnostics[0]["rejection_reason"] == (
+        "child_frontier_does_not_reconcile_to_authoritative_parent"
+    )
+    assert "Warning:" in renderer.chart_frontier_notice(diagnostics)
+
+
 def test_power_by_flow_keeps_siblings_of_compound_interim_child() -> None:
     """A repeated plant parent inside one child cannot suppress its siblings."""
     rows = pd.DataFrame([

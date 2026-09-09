@@ -28,6 +28,7 @@ from codebase.common_esto_dashboard_emissions import select_emissions_component_
 from codebase.common_esto_dashboard_output_layout import build_output_layout, publish_to_docs
 from codebase.common_esto_dashboard_portable import dashboard_base_year_from_leap_data
 from codebase.common_esto_dashboard_renderer import (
+    CHART_FRONTIER_DIAGNOSTIC_COLUMNS,
     _PAGE_CSS,
     _SCENARIO_TOGGLE_JS,
     _split_non_energy_sector_for_total_demand,
@@ -932,6 +933,11 @@ def test_common_esto_dashboard_renders_core_pages_by_default(tmp_path: Path) -> 
 
     _assert_generated_dashboard_outputs(layout, DEFAULT_CORE_PAGES)
     assert (layout["supporting"] / "chart_manifest.csv").exists()
+    frontier_audit = layout["supporting"] / "chart_frontier_diagnostics.csv"
+    assert frontier_audit.exists()
+    assert set(pd.read_csv(frontier_audit).columns) == set(
+        CHART_FRONTIER_DIAGNOSTIC_COLUMNS
+    )
 
     page_keys = set(manifest["page_key"])
     assert "transport" in page_keys

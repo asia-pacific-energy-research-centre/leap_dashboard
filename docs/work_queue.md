@@ -17,6 +17,18 @@
   rows remain excluded from the numerical chart total rather than being
   silently treated as zero.
 
+## Power process composition and chart-frontier diagnostics — complete 2026-09-09
+
+- The Power Electricity-plants by-flow overview now keeps its published
+  process composition through projected years and scales each
+  source/scenario/year/product slice to the authoritative parent frontier.
+  The paired by-product chart and total line remain parent-authoritative.
+- `supporting/chart_frontier_diagnostics.csv` is the renderer-wide audit for
+  reconciled composition, retained-parent fallback and explicit residual
+  decisions. A chart whose requested child grain cannot be retained now carries
+  a concise warning; successful Power reconciliation carries an informational
+  note. The central audit does not make proportional reconciliation generic.
+
 ## LEAP-led bunker placeholder boundary — complete 2026-09-06
 
 - The actual LEAP branch representation now controls Supply bunker structure.

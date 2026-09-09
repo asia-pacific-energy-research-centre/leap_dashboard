@@ -1478,6 +1478,40 @@ placeholder-to-detail navigation transition.
 - 2026-09-05: Made partial-native allocation remainder-based, removed synthetic
   residuals, and added a reviewable parent-retained QA failure path.
 
+## DASH-037: Chart-frontier fallback diagnostics and Power process composition
+
+**Status:** Implemented and locally verified
+**Owner:** leap_dashboard
+**Type:** Presentation reconciliation and diagnostic provenance
+**Affected areas:** area-chart frontier selection; Power by-flow overview;
+`supporting/chart_frontier_diagnostics.csv`
+
+### Current rule
+
+The dashboard does not change the mapping-owned Common ESTO rows. When a chart
+requests a detailed frontier but must retain an authoritative parent because
+the published children are absent or do not reconcile, it records that loss of
+granularity in one renderer-owned audit and adds a concise chart warning. The
+audit identifies the chart, source, scenario, parent, product and year, records
+the parent and child totals plus absolute/percentage mismatch, and states the
+rejection reason and renderer action.
+
+Power by-flow is a narrower opt-in presentation exception. The known
+non-overlapping plant process partition may preserve its child proportions and
+scale each source/scenario/year/product composition to the same authoritative
+frontier as the paired by-product card. It never changes the by-product chart
+or total line. A nonzero process basis produces an informational audit/footnote;
+a missing or zero basis keeps an explicit unallocated process residual and a
+warning. No other chart gains proportional reconciliation merely by using the
+central diagnostic mechanism.
+
+### Validation
+
+Regression coverage uses parent-plus-15-process rows in 2023, 2030 and 2060,
+and proves the process labels survive while every product-year sum equals its
+parent. It also covers a generic mismatched preferred-child frontier, which
+retains the parent and emits a warning/audit record.
+
 ## End-to-end run report
 
 Append a dated subsection after each end-to-end run. Report:
@@ -1490,6 +1524,22 @@ Append a dated subsection after each end-to-end run. Report:
 - the next decisions requiring human guidance.
 
 Also report coverage, dropped rows, source-versus-output totals, hierarchy consistency, mapping cardinality inherited from upstream data, and semantic correctness of grouping and presentation. A successful render is not evidence that the published comparison is correct.
+
+### 2026-09-09 Power composition and frontier-diagnostic fixture run
+
+- The tracked 20USA fixture rendered through the production renderer and
+  published the chart manifest, page-assignment summary, chart bundles and
+  `chart_frontier_diagnostics.csv`; publication readiness passed after the
+  normal sign-semantics summary was supplied for that direct fixture render.
+- The audit contains 389 proportional composition decisions, 19 retained-parent
+  decisions and 6 explicit residual decisions. Page-noise analysis reported no
+  flagged pages.
+- This fixture snapshot does not contain projected Electricity-plant process
+  rows, so it cannot visually demonstrate the 15-process card. The dedicated
+  regression uses parent-plus-process coexistence at 2023, 2030 and 2060 and
+  verifies exact product-level parent conservation. The full workflow's default
+  worktree-relative sibling path also lacks its output contract; use the real
+  `leap_mappings` root for a production-data run.
 
 ### 2026-06-27 migration and visual-review run
 

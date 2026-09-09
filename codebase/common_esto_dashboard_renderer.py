@@ -84,6 +84,92 @@ SUMMARY_COMPONENT_COLUMNS = [
 ]
 
 
+# Presentation-frontier decisions are separate from Common ESTO mapping.  The
+# source facts and their upstream mapping remain untouched; this audit records
+# only cases where a chart deliberately uses a parent envelope, a residual, or
+# a proportional composition to make its displayed frontier explicit.
+CHART_FRONTIER_DIAGNOSTIC_COLUMNS = [
+    "chart_key", "page_key", "chart_title", "comparison_scope", "economy",
+    "source_system", "scenario", "year", "parent_flow_code",
+    "parent_flow_label", "product_code", "product_label", "parent_total",
+    "child_total", "absolute_mismatch", "percentage_mismatch",
+    "rejection_reason", "renderer_action", "notice_severity",
+]
+
+
+def append_chart_frontier_diagnostics(
+    audit_rows: list[dict] | None,
+    coverage: pd.DataFrame,
+    *,
+    area_spec: dict[str, object],
+    renderer_action: str,
+    rejection_reason: str,
+    notice_severity: str,
+    diagnostic_context: dict[str, object] | None = None,
+) -> None:
+    """Append one auditable chart-frontier decision per affected context."""
+    if audit_rows is None or coverage.empty:
+        return
+    context = diagnostic_context or {}
+    parent_code = code_candidate_text(area_spec.get("aggregate_flow_prefix", ""))
+    parent_label = str(area_spec.get("aggregate_flow_label", "")).strip()
+    for row in coverage.to_dict("records"):
+        parent_total = pd.to_numeric(row.get("_authoritative_total", row.get("_parent_total")), errors="coerce")
+        child_total = pd.to_numeric(row.get("_detail_total"), errors="coerce")
+        mismatch = parent_total - child_total if pd.notna(parent_total) and pd.notna(child_total) else pd.NA
+        percentage = (
+            abs(float(mismatch)) / abs(float(parent_total)) * 100
+            if pd.notna(mismatch) and pd.notna(parent_total) and abs(float(parent_total)) > 1e-12
+            else pd.NA
+        )
+        audit_rows.append({
+            "chart_key": str(context.get("chart_key", "")),
+            "page_key": str(context.get("page_key", "")),
+            "chart_title": str(context.get("chart_title", parent_label)),
+            "comparison_scope": row.get("comparison_scope", ""),
+            "economy": row.get("economy", ""),
+            "source_system": row.get("source_system", ""),
+            "scenario": row.get("scenario", ""),
+            "year": row.get("year", ""),
+            "parent_flow_code": parent_code,
+            "parent_flow_label": parent_label,
+            "product_code": row.get("common_product_code", ""),
+            "product_label": row.get("common_product_label", ""),
+            "parent_total": parent_total,
+            "child_total": child_total,
+            "absolute_mismatch": abs(float(mismatch)) if pd.notna(mismatch) else pd.NA,
+            "percentage_mismatch": percentage,
+            "rejection_reason": rejection_reason,
+            "renderer_action": renderer_action,
+            "notice_severity": notice_severity,
+        })
+
+
+def chart_frontier_notice(diagnostic_rows: list[dict]) -> str:
+    """Return a compact chart footnote for the recorded frontier decisions."""
+    if not diagnostic_rows:
+        return ""
+    warning_rows = [
+        row for row in diagnostic_rows
+        if str(row.get("notice_severity", "")).casefold() == "warning"
+    ]
+    years = sorted({str(row.get("year", "")) for row in diagnostic_rows if str(row.get("year", ""))})
+    year_text = ", ".join(years[:6]) + ("…" if len(years) > 6 else "")
+    if warning_rows:
+        return (
+            "Warning: requested child detail could not reconcile to its authoritative "
+            f"parent in {len(warning_rows)} product-year context(s)"
+            + (f" ({year_text})" if year_text else "")
+            + "; the parent or an explicit residual is retained. See "
+            "supporting/chart_frontier_diagnostics.csv."
+        )
+    return (
+        "Process composition is proportionally scaled to the authoritative "
+        "parent total; supporting/chart_frontier_diagnostics.csv records the "
+        "pre-scale difference."
+    )
+
+
 
 #%%
 def safe_slug(value: object) -> str:
@@ -2286,6 +2372,8 @@ def reconciled_immediate_child_flow_rows(
     parent_prefix: str,
     area_spec: dict[str, object],
     child_label_overrides: dict[str, str] | None = None,
+    diagnostic_rows: list[dict] | None = None,
+    diagnostic_context: dict[str, object] | None = None,
 ) -> pd.DataFrame:
     """Reconcile a Power process breakdown to its product-card frontier.
 
@@ -2362,6 +2450,15 @@ def reconciled_immediate_child_flow_rows(
         coverage["_detail_total"].notna()
         & coverage["_detail_total"].abs().gt(coverage["_tolerance"])
     ].copy()
+    append_chart_frontier_diagnostics(
+        diagnostic_rows,
+        usable,
+        area_spec=area_spec,
+        renderer_action="reconciled_child_composition",
+        rejection_reason="nonzero_child_composition_scaled_to_authoritative_parent",
+        notice_severity="information",
+        diagnostic_context=diagnostic_context,
+    )
     usable["_child_scale"] = (
         usable["_authoritative_total"] / usable["_detail_total"]
     )
@@ -2386,7 +2483,16 @@ def reconciled_immediate_child_flow_rows(
         & residual_contexts["_authoritative_total"].abs().gt(
             residual_contexts["_tolerance"]
         )
-    ][[*key_columns, "_authoritative_total"]]
+    ][[*key_columns, "_authoritative_total", "_detail_total"]]
+    append_chart_frontier_diagnostics(
+        diagnostic_rows,
+        residual_contexts,
+        area_spec=area_spec,
+        renderer_action="explicit_unallocated_residual",
+        rejection_reason="missing_or_zero_child_composition",
+        notice_severity="warning",
+        diagnostic_context=diagnostic_context,
+    )
     if residual_contexts.empty:
         return reconciled.reset_index(drop=True)
 
@@ -6267,6 +6373,8 @@ def resolved_area_chart_rows(
     area_spec: dict[str, object],
     *,
     group_col: str = "common_product_label",
+    diagnostic_rows: list[dict] | None = None,
+    diagnostic_context: dict[str, object] | None = None,
 ) -> pd.DataFrame:
     """Return the exact source-specific frontier used by an area chart.
 
@@ -6322,6 +6430,7 @@ def resolved_area_chart_rows(
                     "scenario",
                     "year",
                     "common_product_code",
+                    "common_product_label",
                 )
                 if column in chart_df.columns
             ]
@@ -6387,6 +6496,19 @@ def resolved_area_chart_rows(
                     coverage["_parent_total"].isna()
                     | coverage["_detail_residual"].abs().le(tolerance)
                 ][context_columns].drop_duplicates()
+                fallback_contexts = coverage[
+                    coverage["_parent_total"].notna()
+                    & coverage["_detail_residual"].abs().gt(tolerance)
+                ]
+                append_chart_frontier_diagnostics(
+                    diagnostic_rows,
+                    fallback_contexts,
+                    area_spec=area_spec,
+                    renderer_action="retained_authoritative_parent",
+                    rejection_reason="child_frontier_does_not_reconcile_to_authoritative_parent",
+                    notice_severity="warning",
+                    diagnostic_context=diagnostic_context,
+                )
             if not detail_contexts.empty:
                 detail_selected = detail_rows.merge(
                     detail_contexts.assign(_use_detail=True),
@@ -6409,6 +6531,31 @@ def resolved_area_chart_rows(
             # in any context. Keep the parent rather than manufacturing the
             # difference as a chart category.
             return parent_rows.reset_index(drop=True)
+        # The area explicitly requested a detailed frontier, but this source
+        # only reports its parent. Keep the parent fact and make the loss of
+        # requested granularity visible to both reviewers and the audit file.
+        context_columns = [
+            column for column in (
+                "comparison_scope", "economy", "source_system", "scenario",
+                "year", "common_product_code", "common_product_label",
+            )
+            if column in parent_rows.columns
+        ]
+        if context_columns and not parent_rows.empty:
+            parent_coverage = (
+                parent_rows.groupby(context_columns, dropna=False, as_index=False)["value"]
+                .sum().rename(columns={"value": "_authoritative_total"})
+            )
+            parent_coverage["_detail_total"] = pd.NA
+            append_chart_frontier_diagnostics(
+                diagnostic_rows,
+                parent_coverage,
+                area_spec=area_spec,
+                renderer_action="retained_authoritative_parent",
+                rejection_reason="requested_child_frontier_not_published",
+                notice_severity="warning",
+                diagnostic_context=diagnostic_context,
+            )
     chart_df = _non_overlapping_common_row_frontier(chart_df)
     # Only a chart grouped by the raw common flow label still needs the
     # parent/child and same-name overlap pass.  Immediate-child and configured
@@ -11636,6 +11783,7 @@ def render_dashboard(
     manifest_rows: list[dict[str, object]] = []
     page_rows: list[dict[str, object]] = []
     historical_allocation_audit_rows: list[dict[str, object]] = []
+    chart_frontier_diagnostic_rows: list[dict[str, object]] = []
 
     # Second pass: generate charts and pages.
     chart_config = template.get("chart_generation", {})
@@ -11855,6 +12003,7 @@ def render_dashboard(
         }
         rendered_overview_product_owners: set[str] = set()
         for area_spec in area_specs:
+            frontier_diagnostic_start = len(chart_frontier_diagnostic_rows)
             overview_variant = str(
                 area_spec.get("overview_variant", "by_product")
             ).strip()
@@ -11914,6 +12063,13 @@ def render_dashboard(
                         dict(
                             area_spec.get("immediate_child_flow_labels", {}) or {}
                         ),
+                        diagnostic_rows=chart_frontier_diagnostic_rows,
+                        diagnostic_context={
+                            "page_key": page_key,
+                            "chart_title": str(
+                                area_spec.get("chart_caption", display_aggregate_label)
+                            ),
+                        },
                     )
                     # The reconciliation helper has already resolved overlap
                     # separately inside each immediate child.  Reapplying the
@@ -11995,7 +12151,29 @@ def render_dashboard(
                 chart_page_df,
                 display_area_spec,
                 group_col=group_col,
+                diagnostic_rows=chart_frontier_diagnostic_rows,
+                diagnostic_context={
+                    "chart_key": chart_key,
+                    "page_key": page_key,
+                    "chart_title": str(
+                        area_spec.get("chart_caption", display_aggregate_label)
+                    ),
+                },
             )
+            chart_diagnostics = chart_frontier_diagnostic_rows[
+                frontier_diagnostic_start:
+            ]
+            for diagnostic in chart_diagnostics:
+                diagnostic["chart_key"] = chart_key
+                diagnostic["page_key"] = page_key
+            diagnostic_notice = chart_frontier_notice(chart_diagnostics)
+            if diagnostic_notice:
+                existing_note = str(
+                    display_area_spec.get("stacked_area_note_suffix", "")
+                ).strip()
+                display_area_spec["stacked_area_note_suffix"] = " ".join(
+                    value for value in (existing_note, diagnostic_notice) if value
+                )
             if not area_chart_allowed_for_demand_coverage(
                 page_key,
                 area_df,
@@ -12538,6 +12716,13 @@ def render_dashboard(
             columns=audit_columns,
         ).to_csv(
             layout["supporting"] / "historical_allocation_audit.csv",
+            index=False,
+        )
+        pd.DataFrame(
+            chart_frontier_diagnostic_rows,
+            columns=CHART_FRONTIER_DIAGNOSTIC_COLUMNS,
+        ).to_csv(
+            layout["supporting"] / "chart_frontier_diagnostics.csv",
             index=False,
         )
     return manifest_df
