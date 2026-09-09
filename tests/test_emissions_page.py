@@ -164,6 +164,90 @@ def test_attach_emissions_multiplies_value_by_factor():
     assert pd.isna(result.loc[1, emissions.EMISSIONS_COLUMN])
 
 
+def test_unmatched_factor_rows_keep_full_source_observation_identity():
+    rows = pd.DataFrame([{
+        "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+        "source_system": "LEAP", "scenario": "Target", "year": 2023,
+        "common_flow_code": "10.01.11", "common_flow_label": "10.01.11 Oil refineries",
+        "common_product_code": "99", "common_product_label": "99 Unmapped fuel",
+        "value": 12.0, "_emissions_component": "Power generation and own use",
+    }])
+    attached = emissions.attach_emissions(rows, pd.DataFrame([{
+        "common_product_label": "01 Coal", "emissions_factor": 0.1, "emissions_unit": "Mt CO2e",
+    }]))
+
+    missing = emissions.unmatched_factor_rows(attached)
+
+    assert missing.to_dict("records") == [{
+        "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+        "source_system": "LEAP", "scenario": "Target", "year": 2023,
+        "common_flow_code": "10.01.11", "common_flow_label": "10.01.11 Oil refineries",
+        "common_product_code": "99", "common_product_label": "99 Unmapped fuel",
+        "value": 12.0, "_emissions_component": "Power generation and own use",
+    }]
+
+
+def test_emissions_page_writes_and_shows_unmatched_factor_warning(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    layout = {
+        "supporting": tmp_path / "supporting_files",
+        "chart_bundles": tmp_path / "chart_bundles",
+        "dashboards": tmp_path / "dashboards",
+    }
+    for path in layout.values():
+        path.mkdir()
+    assigned = pd.DataFrame([
+        {
+            "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            "source_system": "LEAP", "scenario": "Target", "year": 2023,
+            "_page_key": "industry", "_page_label": "Industry",
+            "common_flow_code": "14", "common_flow_label": "14 Industry sector",
+            "common_product_code": "99", "common_product_label": "99 Unmapped fuel", "value": 10.0,
+        },
+        {
+            "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            "source_system": "LEAP", "scenario": "Target", "year": 2023,
+            "_page_key": "industry", "_page_label": "Industry",
+            "common_flow_code": "14", "common_flow_label": "14 Industry sector",
+            "common_product_code": "01", "common_product_label": "01 Coal", "value": 20.0,
+        },
+    ])
+    template = {
+        "emissions_page": {
+            "enabled": True, "page_key": "emissions", "page_label": "Emissions",
+            "demand_page_keys": ["industry"], "aggregate_flow_code": "13",
+        },
+        "chart_generation": {"base_year": 2022},
+    }
+    monkeypatch.setattr(emissions, "emissions_page_enabled", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(emissions, "load_factor_set_config", lambda _path: {})
+    monkeypatch.setattr(emissions, "select_factor_set", lambda *_args: {
+        "key": "test", "label": "Test factors", "emissions_unit": "Mt CO2e",
+    })
+    monkeypatch.setattr(emissions, "build_factor_table", lambda *_args, **_kwargs: (
+        pd.DataFrame([{
+            "common_product_label": "01 Coal", "emissions_factor": 0.1, "emissions_unit": "Mt CO2e",
+        }]),
+        {"factor_resolution": pd.DataFrame()},
+    ))
+
+    emissions.build_emissions_page(
+        assigned, template, {"LEAP|Target": "LEAP Target"}, layout,
+        [{"page_key": "emissions", "page_label": "Emissions", "file": "emissions.html"}],
+        economy_label="United States of America",
+    )
+
+    warning_csv = layout["supporting"] / "emissions_unmatched_factor_rows.csv"
+    assert warning_csv.exists()
+    warning_rows = pd.read_csv(warning_csv)
+    assert warning_rows[["source_system", "scenario", "year", "common_flow_label", "common_product_label"]].to_dict("records") == [{
+        "source_system": "LEAP", "scenario": "Target", "year": 2023,
+        "common_flow_label": "14 Industry sector", "common_product_label": "99 Unmapped fuel",
+    }]
+    page_html = (layout["dashboards"] / "emissions.html").read_text(encoding="utf-8")
+    assert "WARNING: 1 selected row(s) have no emissions factor" in page_html
+    assert "LEAP | Target | 2023 | 14 Industry sector | 99 Unmapped fuel" in page_html
+
+
 def _hierarchy_rows() -> pd.DataFrame:
     """One source reporting a sector total, its children, and a spanning rollup."""
     return pd.DataFrame(
@@ -289,6 +373,28 @@ def test_transformation_frontier_retains_parent_when_power_children_mismatch() -
 
     assert set(frontier["common_flow_code"]) == {"09.01"}
     assert frontier["value"].sum() == pytest.approx(-100.0)
+
+
+def test_transformation_frontier_uses_active_scope_power_parent_per_year() -> None:
+    rows = pd.concat([
+        _power_transformation_rows(
+            ("09.01-09.02", -100.0),
+            ("09.01.01,09.02.01", -35.0),
+            ("09.01.02,09.02.02", -45.0),
+        ),
+        _power_transformation_rows(
+            ("09.01-09.02", -90.0),
+            ("09.01.01,09.02.01", -30.0),
+            ("09.01.02,09.02.02", -40.0),
+        ).assign(year=2031),
+    ], ignore_index=True)
+
+    frontier = emissions._lowest_transformation_frontier(rows)
+
+    assert frontier[["year", "common_flow_code", "value"]].to_dict("records") == [
+        {"year": 2030, "common_flow_code": "09.01-09.02", "value": -100.0},
+        {"year": 2031, "common_flow_code": "09.01-09.02", "value": -90.0},
+    ]
 
 
 def test_transformation_frontier_treats_compound_chp_as_an_additive_sibling() -> None:

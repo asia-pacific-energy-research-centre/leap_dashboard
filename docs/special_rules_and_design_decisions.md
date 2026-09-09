@@ -931,6 +931,33 @@ agree where all three report the same demand: for 20USA at 2022 all three read
   the gap was parent and child flows counted together, which is what rule 4
   above now prevents.
 
+## DASH-037: Emissions use the active source boundary and show unmatched factors
+
+**Decision:** The factor-based Emissions page derives its input before
+presentation-only flow exclusions are applied. Its maintained
+`esto_emissions_flow_policy.csv` is the sole authority for combustion
+eligibility. This preserves eligible `10.01` energy-sector own-use rows,
+including `10.01.11 Oil refineries`, while ordinary energy pages continue to
+hide duplicate/inclusive rows according to their display rules.
+
+Power uses the complete active-scope `09.01-09.02` authority per
+source/scenario/year/product when published children do not reconcile. The
+dashboard must not splice companion-scope Power rows with a different product
+axis into the factor calculation; if detailed data is needed, it must first be
+returned to the active axis through mapping-owned semantics.
+
+An unresolved emissions factor is neither zero nor an acceptable quiet drop.
+The page visibly names up to three affected source/scenario/year/flow/product
+observations and points to
+`supporting_files/emissions_unmatched_factor_rows.csv`, which carries the
+complete list. Chart totals continue to omit only those explicitly warned
+rows. Blank factors declared by the factor set remain intentional zero-factor
+carriers and do not enter this warning.
+
+**Verification:** Focused regression tests cover active-scope Power parent
+fallback, policy-eligible refinery own use surviving presentation exclusions,
+and the on-page plus CSV unmatched-factor warning.
+
 ## DASH-022: Single-boundary overview cards inherit their real comparison label
 
 **Status:** Confirmed and implemented

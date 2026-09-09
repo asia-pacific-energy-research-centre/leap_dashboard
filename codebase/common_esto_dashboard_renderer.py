@@ -11487,6 +11487,10 @@ def render_dashboard(
     excluded_flow_labels = template.get("excluded_flow_labels", [])
     df = _keep_one_measure_for_energy_balance_charts(df)
     df = drop_esto_post_base_year_rows(df, comparison_source, base_year)
+    # Presentation exclusions hide duplicate/inclusive comparison rows from
+    # ordinary energy charts. They must not redefine the emissions boundary:
+    # the maintained ESTO-flow policy is the sole authority for that page.
+    emissions_source_df = df.copy()
     df = drop_excluded_flow_rows(df, excluded_flow_code_prefixes, excluded_flow_labels)
     df = split_combined_other_nonenergy_placeholder(
         df,
@@ -11520,6 +11524,20 @@ def render_dashboard(
     assigned_df = assign_pages(df, page_rules, routing_special_cases)
     assigned_df = assign_bespoke_overview_rows(
         assigned_df,
+        template.get("total_demand_page", {}),
+    )
+    emissions_source_df = split_combined_other_nonenergy_placeholder(
+        emissions_source_df,
+        primary_source=primary_source,
+        ninth_source=ninth_source,
+    )
+    emissions_source_df = resolve_supply_bunker_representation(
+        emissions_source_df,
+        template,
+        record_status=False,
+    )
+    emissions_assigned_df = assign_bespoke_overview_rows(
+        assign_pages(emissions_source_df, page_rules, routing_special_cases),
         template.get("total_demand_page", {}),
     )
     if not trace_only:
@@ -11595,7 +11613,7 @@ def render_dashboard(
     # in the inventory before any page renders its navigation chips.
     if emissions_page_enabled(
         template,
-        assigned_df,
+        emissions_assigned_df,
         factor_config_path=emissions_factor_config,
     ):
         emissions_config = template.get("emissions_page", {})
@@ -12441,11 +12459,11 @@ def render_dashboard(
     emissions_page_row: dict | None = None
     if emissions_page_enabled(
         template,
-        assigned_df,
+        emissions_assigned_df,
         factor_config_path=emissions_factor_config,
     ):
         emissions_manifest_rows, emissions_page_row = build_emissions_page(
-            assigned_df, template, series_labels, layout, page_inventory,
+            emissions_assigned_df, template, series_labels, layout, page_inventory,
             primary_source=primary_source, primary_scenario=primary_scenario,
             economy_label=economy_label,
             dashboard_switcher=dashboard_switcher,

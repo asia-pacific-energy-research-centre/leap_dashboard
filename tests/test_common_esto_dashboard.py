@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 import plotly.graph_objects as go
 
+from codebase import common_esto_dashboard_renderer as dashboard_renderer
 from codebase.common_esto_dashboard_data import (
     ALL_SCOPES,
     DEFAULT_WIDE_FILE_SCOPE,
@@ -1142,6 +1143,45 @@ def test_refinery_own_use_is_only_shown_in_the_inclusive_boundary() -> None:
     assert filtered["common_flow_label"].tolist() == [
         "09.07 Oil refineries (including own use)",
     ]
+
+
+def test_emissions_keeps_refinery_own_use_after_presentation_exclusion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    template = _load_template()
+    captured: dict[str, pd.DataFrame] = {}
+
+    def capture_emissions_rows(assigned_df, *_args, **_kwargs):
+        captured["rows"] = assigned_df.copy()
+        return [], None
+
+    monkeypatch.setattr(dashboard_renderer, "emissions_page_enabled", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(dashboard_renderer, "build_emissions_page", capture_emissions_rows)
+    rows = pd.DataFrame([
+        {
+            "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            "source_system": "LEAP", "scenario": "Target", "year": 2023,
+            "common_flow_code": "14", "common_flow_label": "14 Industry sector",
+            "common_product_code": "01", "common_product_label": "01 Coal",
+            "value": 20.0, "is_non_expanding_rollup": False,
+        },
+        {
+            "comparison_scope": "esto_leap_ninth", "economy": "20_USA",
+            "source_system": "LEAP", "scenario": "Target", "year": 2023,
+            "common_flow_code": "10.01.11", "common_flow_label": "10.01.11 Oil refineries",
+            "common_product_code": "07", "common_product_label": "07 Gasoline",
+            "value": -5.0, "is_non_expanding_rollup": False,
+        },
+    ])
+    layout = build_output_layout(tmp_path / "outputs", "20USA", clear_existing=True)
+
+    render_dashboard(rows, template, _load_series_config(), layout)
+
+    assert "10.01.11" not in set(
+        pd.read_csv(layout["supporting"] / "page_assignment_summary.csv")["common_flow_code"]
+    )
+    assert "10.01.11" in set(captured["rows"]["common_flow_code"])
 
 
 def test_gas_works_own_use_is_not_plotted_as_a_standalone_flow() -> None:

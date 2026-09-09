@@ -654,6 +654,37 @@ def attach_emissions(
     return merged
 
 
+def unmatched_factor_rows(emissions_df: pd.DataFrame) -> pd.DataFrame:
+    """Return every selected combustion row that has no resolved factor.
+
+    Missing factors are a data-quality warning, never an implicit zero. Keep
+    the source observation identifiers so a dashboard reader can locate the
+    exact source/scenario/year/flow/product row omitted from chart totals.
+    """
+    columns = [
+        column
+        for column in (
+            "comparison_scope", "economy", "source_system", "scenario", "year",
+            "common_flow_code", "common_flow_label", "common_product_code",
+            "common_product_label", "value", "signed_value_pj",
+            "_emissions_component", "_sector_label",
+        )
+        if column in emissions_df.columns
+    ]
+    if emissions_df.empty:
+        return pd.DataFrame(columns=columns)
+    missing = emissions_df[emissions_df[EMISSIONS_COLUMN].isna()].copy()
+    sort_columns = [
+        column
+        for column in ("source_system", "scenario", "year", "common_flow_code", "common_product_code")
+        if column in columns
+    ]
+    result = missing[columns]
+    if sort_columns:
+        result = result.sort_values(sort_columns, kind="stable")
+    return result.reset_index(drop=True)
+
+
 #%%
 # ---------------------------------------------------------------------------
 # Non-overlapping demand frontier
@@ -1536,7 +1567,7 @@ def build_emissions_page(
     unit = str(factor_set.get("emissions_unit", DEFAULT_EMISSIONS_UNIT))
 
     emissions_df = attach_emissions(demand_df, factors)
-    missing = emissions_df[emissions_df[EMISSIONS_COLUMN].isna()]
+    missing = unmatched_factor_rows(emissions_df)
     missing_labels = sorted(set(missing["common_product_label"].astype(str)))
     emissions_df = emissions_df[emissions_df[EMISSIONS_COLUMN].notna()].copy()
     if emissions_df.empty:
@@ -1552,6 +1583,7 @@ def build_emissions_page(
     diagnostics["source_selection"] = source_selection
     diagnostics["flow_policy"] = flow_policy
     diagnostics["flow_policy_resolution"] = flow_policy_resolution
+    diagnostics["unmatched_factor_rows"] = missing
     if write_page:
         for name, frame in diagnostics.items():
             frame.to_csv(layout["supporting"] / f"emissions_{name}.csv", index=False)
@@ -1661,6 +1693,7 @@ def build_emissions_page(
                         "source_system",
                     ].astype(str).unique()
                 ),
+                missing,
             ),
             dashboard_updated_label=dashboard_updated_label,
             **scope_ui_kwargs,
@@ -1746,11 +1779,32 @@ def _page_note(
     _factor_set: dict,
     _unit: str,
     _aggregate_sources: list[str],
+    unmatched_rows: pd.DataFrame | None = None,
 ) -> str:
     """Give the page a short explanation of what its emissions represent."""
-    return (
+    note = (
         "Emissions (Mt CO₂) are estimated from final demand, power generation and "
         "energy-sector own use, using energy-weighted 9th Edition CO₂e factors."
+    )
+    if unmatched_rows is None or unmatched_rows.empty:
+        return note
+    identifier_columns = [
+        column
+        for column in (
+            "source_system", "scenario", "year", "common_flow_label", "common_product_label",
+        )
+        if column in unmatched_rows.columns
+    ]
+    identifiers = [
+        " | ".join(str(row[column]) for column in identifier_columns)
+        for _, row in unmatched_rows.loc[:, identifier_columns].drop_duplicates().head(3).iterrows()
+    ]
+    remainder = "" if len(unmatched_rows) <= len(identifiers) else "; …"
+    return (
+        f"{note} WARNING: {len(unmatched_rows)} selected row(s) have no emissions "
+        "factor and are excluded from chart totals. Affected: "
+        f"{'; '.join(identifiers)}{remainder}. Full list: "
+        "supporting_files/emissions_unmatched_factor_rows.csv."
     )
 
 #%%

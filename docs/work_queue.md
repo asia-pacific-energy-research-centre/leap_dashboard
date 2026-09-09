@@ -1,5 +1,22 @@
 # LEAP dashboard work queue and handover plan
 
+## Emissions source-boundary and factor-visibility correction — complete 2026-09-09
+
+- The Emissions page now retains its own pre-presentation-exclusion input. The
+  maintained ESTO emissions-flow policy, rather than chart-only exclusions,
+  decides which combustion rows are eligible. This restores `10.01.11 Oil
+  refineries` and other policy-eligible `10.01` own-use observations while
+  retaining their existing omission from ordinary energy-chart navigation.
+- Power emissions retain the active-scope `09.01-09.02` parent when that
+  source/year/product's children do not reconcile. No companion-scope source
+  rows are spliced into the factor calculation, and conversion feedstocks
+  remain excluded by policy.
+- Every selected row lacking an emissions factor is now listed in
+  `supporting_files/emissions_unmatched_factor_rows.csv` and called out on
+  the Emissions page with source, scenario, year, flow, and product. Those
+  rows remain excluded from the numerical chart total rather than being
+  silently treated as zero.
+
 ## LEAP-led bunker placeholder boundary — complete 2026-09-06
 
 - The actual LEAP branch representation now controls Supply bunker structure.
