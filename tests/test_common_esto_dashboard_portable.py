@@ -396,6 +396,33 @@ def test_portable_render_includes_emissions_with_explicit_assets(tmp_path: Path)
     assert (root / "supporting_files" / "emissions_factor_resolution.csv").is_file()
 
 
+def test_portable_render_accepts_legacy_emissions_factor_data_path_alias(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_factor_config(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(portable, "_portable_emissions_factor_config", fake_factor_config)
+    monkeypatch.setattr(
+        portable,
+        "render_dashboard",
+        lambda *args, **kwargs: pd.DataFrame(),
+    )
+    legacy_factor_path = tmp_path / "legacy-factor-file.csv"
+    result = _render(
+        tmp_path,
+        emissions_factor_config_path=EMISSIONS_FACTOR_CONFIG_PATH,
+        emissions_factor_data_path=legacy_factor_path,
+    )
+
+    assert captured["factor_file_path"] == legacy_factor_path
+    assert Path(str(result["output_root"]), "supporting_files").is_dir()
+
+
 def test_portable_emissions_rejects_an_incomplete_asset_set(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="requires factor config"):
         _render(tmp_path, emissions_factor_config_path=EMISSIONS_FACTOR_CONFIG_PATH)

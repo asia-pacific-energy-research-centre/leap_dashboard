@@ -365,6 +365,8 @@ def render_common_esto_dashboard(
     esto_vintage_issue: str = "",
     emissions_factor_config_path: Path | str | None = None,
     emissions_factor_file_path: Path | str | None = None,
+    # Compatibility alias used by older portable-release launchers.
+    emissions_factor_data_path: Path | str | None = None,
     emissions_ninth_fuel_mapping_path: Path | str | None = None,
     emissions_flow_policy_path: Path | str | None = None,
     comparison_scope: str = "esto_leap_ninth",
@@ -396,6 +398,8 @@ def render_common_esto_dashboard(
     unavailable source cells.
     """
     economy_key = normalize_dashboard_economy_key(economy)
+    if emissions_factor_file_path is None:
+        emissions_factor_file_path = emissions_factor_data_path
     if code_colors_path is not None:
         set_code_colors_path(code_colors_path)
     template = json.loads(Path(template_path).read_text(encoding="utf-8"))
