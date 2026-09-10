@@ -1301,20 +1301,12 @@ def select_emissions_component_rows(
     power_mask = transformation["common_flow_code"].map(_power_flow_role).notna()
     power = transformation.loc[power_mask].copy()
     other_transformation = transformation.loc[~power_mask].copy()
-    power_frontier = _renderer().power_detail_frontier(
-        power,
-        {
-            "aggregate_flow_prefix": "09.01-09.02",
-            "aggregate_flow_label": "09.01-09.02 Power",
-            "explicit_flow_boundary": True,
-            "immediate_child_flow_parent_prefix": "09.01",
-            "immediate_child_flow_labels": {
-                "09.01.01": "09.01.01,09.02.01 Electricity plants",
-                "09.01.02": "09.01.02,09.02.02 CHP plants",
-                "09.01.03": "09.01.03,09.02.03 Heat plants",
-            },
-        },
-    )
+    # Emissions need a conserving combustion boundary, not the full detail
+    # frontier used by the Power page.  The latter may intentionally expose
+    # source-reported process/placeholder rows even when they do not add back
+    # to the authoritative 09.01-09.02 parent.  Reuse the emissions-specific
+    # reconciliation here so the detailed Power charts remain unchanged.
+    power_frontier, power_coverage = _power_frontier_with_reconciliation(power)
     other_frontier, transformation_coverage = _transformation_frontier_with_reconciliation(
         other_transformation
     )
@@ -1323,12 +1315,14 @@ def select_emissions_component_rows(
         pd.concat(selected_transformation, ignore_index=True)
         if selected_transformation else transformation.iloc[0:0].copy()
     )
-    if not transformation_coverage.empty:
-        coverage = (
-            transformation_coverage.reset_index(drop=True)
-            if coverage.empty
-            else pd.concat([coverage, transformation_coverage], ignore_index=True)
-        )
+    transformation_coverage_frames = [
+        frame for frame in (power_coverage, transformation_coverage) if not frame.empty
+    ]
+    if transformation_coverage_frames:
+        coverage = pd.concat(
+            ([coverage] if not coverage.empty else []) + transformation_coverage_frames,
+            ignore_index=True,
+        ).reset_index(drop=True)
     transformation_frontier["signed_value_pj"] = pd.to_numeric(
         transformation_frontier["value"], errors="coerce"
     )

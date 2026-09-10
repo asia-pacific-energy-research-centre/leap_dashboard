@@ -494,9 +494,35 @@ def test_transformation_frontier_emits_parent_child_reconciliation_qa() -> None:
         {"demand_page_keys": ["industry", "transport", "buildings", "others"]},
     )
 
-    assert set(selected["common_flow_code"]) == {"09.01.01", "09.01.02"}
-    assert selected["value"].sum() == pytest.approx(90.0)
-    assert coverage.empty
+    assert set(selected["common_flow_code"]) == {"09.01"}
+    assert selected["value"].sum() == pytest.approx(100.0)
+    qa = coverage[coverage["common_flow_label"].eq("09.01")]
+    assert len(qa) == 1
+    assert qa.iloc[0]["status"] == "failed"
+    assert qa.iloc[0]["reconciliation_action"] == "parent_fallback"
+
+
+def test_emissions_power_reconciliation_does_not_change_detailed_power_frontier() -> None:
+    rows = _power_transformation_rows(
+        ("09.01-09.02", -100.0),
+        ("09.01.01,09.02.01", -40.0),
+        ("09.01.03,09.02.03", -60.0),
+    )
+
+    selected, coverage, *_ = emissions.select_emissions_component_rows(
+        rows,
+        {"demand_page_keys": ["industry", "transport", "buildings", "others"]},
+    )
+
+    assert set(selected["common_flow_code"]) == {
+        "09.01.01,09.02.01",
+        "09.01.03,09.02.03",
+    }
+    assert selected["value"].sum() == pytest.approx(100.0)
+    qa = coverage[coverage["common_flow_label"].eq("09.01-09.02")]
+    assert len(qa) == 1
+    assert qa.iloc[0]["status"] == "passed"
+    assert qa.iloc[0]["reconciliation_action"] == "children"
 
 
 def test_emissions_page_note_is_short_and_plain_language() -> None:
