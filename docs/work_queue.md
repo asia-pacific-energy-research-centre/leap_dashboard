@@ -24,6 +24,13 @@ Acceptance checks: confirm the selected fingerprint files are present on
 `master`, run their focused tests, run the page-migration contract checks, and
 record the resulting commit and any intentionally skipped cumulative commits.
 
+Current all-placeholders review baseline: the full-horizon dashboard at
+`C:\Users\Work\Downloads\prc_five_fixture_validation_20260910_webapp_full\all_placeholders_webapp_full\05PRC\dashboards\index.html`
+was generated from dashboard commit `1fe6f2f` using the current renderer,
+`esto_extended_leap_ninth`, and 2010–2060 data. The current review assessment
+is that this dashboard is correct in all areas except Emissions; Emissions is
+the outstanding exception to resolve when the fingerprint merge is resumed.
+
 ## Emissions source-boundary and factor-visibility correction — complete 2026-09-09
 
 - The Emissions page now retains its own pre-presentation-exclusion input. The
