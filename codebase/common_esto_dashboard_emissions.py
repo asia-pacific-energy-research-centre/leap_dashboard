@@ -935,7 +935,11 @@ def _stacked_emissions_chart(
             if (scenario_df["source_system"].astype(str).str.casefold() == "esto").any():
                 stacked_sources.add("ESTO")
             stacked_sources.add(stack_source_name)
-            trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, True))
+            # The page-level scenario toggle re-applies visibility from
+            # trace_meta after Plotly loads. Keep the same default-scenario
+            # choice there, otherwise both LEAP scenario stacks become
+            # visible even though the Plotly traces were created hidden.
+            trace_meta.append(trace_meta_entry(stack_source_name, scenario_name, is_default))
 
     totals = emissions_df.groupby(["source_system", "scenario", "year"], as_index=False)[EMISSIONS_COLUMN].sum()
     for (source_system, scenario), group in totals.groupby(["source_system", "scenario"]):

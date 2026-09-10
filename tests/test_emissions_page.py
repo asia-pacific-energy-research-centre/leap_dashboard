@@ -532,6 +532,43 @@ def test_emissions_page_note_is_short_and_plain_language() -> None:
     )
 
 
+def test_emissions_stacked_scenarios_keep_only_default_stack_visible() -> None:
+    rows = pd.DataFrame([
+        {
+            "source_system": "ESTO_EXTENDED", "scenario": "historical", "year": 2022,
+            "common_product_label": "08.01 Natural gas", "_sector_label": "Industry",
+            "emissions_value": 10.0,
+        },
+        {
+            "source_system": "LEAP", "scenario": "Target", "year": 2023,
+            "common_product_label": "08.01 Natural gas", "_sector_label": "Industry",
+            "emissions_value": 20.0,
+        },
+        {
+            "source_system": "LEAP", "scenario": "Reference", "year": 2023,
+            "common_product_label": "08.01 Natural gas", "_sector_label": "Industry",
+            "emissions_value": 30.0,
+        },
+    ])
+
+    figure = emissions._stacked_emissions_chart(
+        rows,
+        "_sector_label",
+        "Emissions by sector",
+        "Mt CO2e",
+        {},
+        "LEAP",
+        "Target",
+        2022,
+    )
+
+    stack_meta = [
+        entry for entry in figure.layout.meta["trace_meta"]
+        if entry["metric"] == "both"
+    ]
+    assert [entry["active_visible"] for entry in stack_meta[:2]] == [True, False]
+
+
 def test_emissions_page_is_hidden_when_its_inputs_are_missing(tmp_path):
     template = {
         "emissions_page": {
