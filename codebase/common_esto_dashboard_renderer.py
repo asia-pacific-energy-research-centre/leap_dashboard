@@ -6012,7 +6012,10 @@ def build_area_chart(
         if not authoritative_totals.empty
         else authoritative_label_total_df
     )
-    if bool(area_spec.get("comparison_total_uses_detail_stack", False)):
+    if (
+        bool(area_spec.get("comparison_total_uses_detail_stack", False))
+        and not effective_authoritative_total_df.empty
+    ):
         effective_authoritative_total_df = effective_authoritative_total_df[
             effective_authoritative_total_df["source_system"].astype(str).str.casefold()
             != comparison_source.casefold()
