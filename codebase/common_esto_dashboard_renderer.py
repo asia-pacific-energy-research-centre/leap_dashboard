@@ -3457,6 +3457,12 @@ def add_power_sector_overview_specs(
             "source_flow_labels_by_system": labels_by_source,
             "explicit_flow_boundary": True,
             "use_power_detail_frontier": boundary == "09.01-09.02",
+            # The Power overview has an authoritative parent total.  Do not
+            # expose the internal detail-vs-parent diagnostic as a second
+            # ESTO series in the user-facing chart when configured off.
+            "show_technology_coverage_trace": bool(
+                aggregate.get("show_technology_coverage_trace", True)
+            ),
             "force_navigation_root": bool(
                 aggregate.get("navigation_root", False)
             ),
@@ -6027,6 +6033,8 @@ def build_area_chart(
             on=["source_system", "scenario", "year"],
             how="inner",
         )
+        if not bool(area_spec.get("show_technology_coverage_trace", True)):
+            coverage_with_parent = coverage_with_parent.iloc[0:0]
         for (source_system, scenario), group in coverage_with_parent.groupby(
             ["source_system", "scenario"], dropna=False
         ):
