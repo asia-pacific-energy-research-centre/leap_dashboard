@@ -3323,6 +3323,79 @@ def test_power_detail_frontier_does_not_stack_parent_with_published_processes() 
     assert frontier["value"].sum() == pytest.approx(100.0)
 
 
+def test_road_detail_frontier_keeps_nonspecified_road_with_vehicle_children() -> None:
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("LEAP", "Target", 2023, "15.02", "07.01", 100.0),
+            "common_flow_label": "15.02 Road",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2023, "15.02.01", "07.01", 60.0),
+            "common_flow_label": "15.02.01 Freight road",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2023, "15.02.02", "07.01", 30.0),
+            "common_flow_label": "15.02.02 Passenger road",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2023, "15.02.99", "07.01", 10.0),
+            "common_flow_label": "15.02.99 Nonspecified road",
+        },
+    ])
+
+    selected = renderer.resolved_area_chart_rows(
+        rows,
+        {
+            "aggregate_flow_prefix": "15.02",
+            "explicit_flow_boundary": True,
+            "prefer_road_detail_frontier": True,
+        },
+        group_col="common_flow_label",
+    )
+
+    assert set(selected["common_flow_label"]) == {
+        "15.02.01 Freight road",
+        "15.02.02 Passenger road",
+        "15.02.99 Nonspecified road",
+    }
+    assert selected["value"].sum() == pytest.approx(100.0)
+    assert not selected["common_flow_label"].str.contains(
+        "technology residual", case=False, na=False
+    ).any()
+
+
+def test_power_product_frontier_includes_heat_plants() -> None:
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("LEAP", "Target", 2023, "09.01-09.02", "17", -100.0),
+            "common_flow_label": "09.01-09.02 Power sector",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2023, "09.01.01,09.02.01", "17", -70.0),
+            "common_flow_label": "09.01.01,09.02.01 Electricity plants",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2023, "09.01.03,09.02.03", "18", -30.0),
+            "common_flow_label": "09.01.03,09.02.03 Heat plants",
+        },
+    ])
+    spec = {
+        "aggregate_flow_prefix": "09.01-09.02",
+        "aggregate_flow_label": "09.01-09.02 Power",
+        "explicit_flow_boundary": True,
+        "use_power_detail_frontier": True,
+    }
+
+    selected = renderer.resolved_area_chart_rows(
+        rows,
+        spec,
+        group_col="common_product_label",
+    )
+
+    assert "09.01.03,09.02.03 Heat plants" in set(selected["common_flow_label"])
+    assert selected["value"].sum() == pytest.approx(-100.0)
+
+
 def test_chart_frontier_fallback_is_auditable_and_warns() -> None:
     rows = pd.DataFrame([
         {
@@ -4658,10 +4731,8 @@ def test_technology_stack_uses_authoritative_road_total_lines() -> None:
 
     assert traces["LEAP Target total"] == [100.0, 95.0]
     assert traces["9th Target total"] == [101.0, 90.0]
-    assert traces["15.02 Road — unallocated technology residual"] == [40.0, 40.0]
-    assert "maximum absolute residual 40.00" in figure.layout.meta[
-        "stacked_area_note"
-    ]
+    assert not any("technology residual" in str(name).casefold() for name in traces)
+    assert "maximum absolute gap 40.00" in figure.layout.meta["stacked_area_note"]
 
 
 def test_road_flow_chart_keeps_parent_only_ninth_total() -> None:

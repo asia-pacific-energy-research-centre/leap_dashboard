@@ -5067,6 +5067,67 @@ def _coverage_selected_demand_frontier(
     return pd.concat([locked, generic], ignore_index=True)
 
 
+def _road_detail_frontier(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep Road's most detailed observed rows for a vehicle-type stack.
+
+    The Road overview has an authoritative ``15.02`` parent and may also
+    carry vehicle-type rows below it.  The generic common-row frontier is
+    intentionally parent-first, but that is not suitable for the detail
+    stack: the parent would hide valid siblings such as ``Nonspecified road``.
+    Resolve each source/scenario/year/product surface independently and use
+    the child frontier whenever it exists; retain the parent only when no
+    Road child is available for that surface.
+    """
+    if df.empty or "common_flow_code" not in df.columns:
+        return df.copy()
+
+    work = df.copy()
+    codes = work["common_flow_code"].astype(str).map(canonical_code)
+    road_mask = codes.eq("15.02") | codes.str.startswith("15.02.")
+    road = work.loc[road_mask].copy()
+    nonroad = work.loc[~road_mask].copy()
+    if road.empty:
+        return df.copy()
+
+    context_columns = [
+        column
+        for column in (
+            "comparison_scope", "economy", "source_system", "scenario",
+            "year", "common_product_code", "common_product_label",
+        )
+        if column in road.columns
+    ]
+    if not context_columns:
+        return _non_overlapping_flow_rows(
+            _non_overlapping_common_row_frontier(road)
+        )
+
+    selected_parts: list[pd.DataFrame] = []
+    for _, surface in road.groupby(context_columns, dropna=False, sort=False):
+        child_mask = surface["common_flow_code"].astype(str).map(
+            lambda code: canonical_code(code) != "15.02"
+            and code_matches_prefix(canonical_code(code), "15.02")
+        )
+        children = surface.loc[child_mask]
+        if children.empty:
+            selected_parts.append(surface)
+            continue
+        selected_parts.append(
+            _non_overlapping_flow_rows(
+                _non_overlapping_common_row_frontier(children)
+            )
+        )
+
+    selected = (
+        pd.concat(selected_parts, ignore_index=False, sort=False)
+        if selected_parts
+        else road.iloc[0:0].copy()
+    )
+    if nonroad.empty:
+        return selected.reset_index(drop=True)
+    return pd.concat([selected, nonroad], ignore_index=True, sort=False)
+
+
 def _source_demand_frontier_for_year(
     demand_df: pd.DataFrame,
     source_name: str,
@@ -5806,29 +5867,6 @@ def build_area_chart(
                 coverage_residual_max = float(
                     residuals["_coverage_residual"].abs().max()
                 )
-                identity = ["source_system", "scenario", "year"]
-                templates = chart_df.drop_duplicates(identity).set_index(identity)
-                residual_rows: list[dict[str, object]] = []
-                for residual in residuals.to_dict("records"):
-                    key = tuple(residual[column] for column in identity)
-                    if key not in templates.index:
-                        continue
-                    template_row = templates.loc[key]
-                    if isinstance(template_row, pd.DataFrame):
-                        template_row = template_row.iloc[0]
-                    row = template_row.to_dict()
-                    row.update({column: residual[column] for column in identity})
-                    row["value"] = residual["_coverage_residual"]
-                    row[group_col] = "15.02 Road — unallocated technology residual"
-                    if group_col == "common_flow_label":
-                        row["common_flow_code"] = "15.02 residual"
-                    row["_technology_coverage_residual"] = True
-                    residual_rows.append(row)
-                if residual_rows:
-                    chart_df = pd.concat(
-                        [chart_df, pd.DataFrame(residual_rows)],
-                        ignore_index=True,
-                    )
 
     pre_base_df = chart_df[
         (chart_df["source_system"].astype(str).str.casefold() == comparison_source.casefold())
@@ -6079,9 +6117,9 @@ def build_area_chart(
         )
         if coverage_residual_max > 1e-9:
             stacked_area_note = (
-                f"{stacked_area_note} The visible technology coverage gap is shown as an "
-                f"unallocated-technology residual so the stack reconciles to that boundary "
-                f"(maximum absolute residual "
+                f"{stacked_area_note} The dotted technology-coverage line shows the "
+                f"difference between visible detail and that boundary "
+                f"(maximum absolute gap "
                 f"{coverage_residual_max:,.2f}{chart_unit})."
             )
 
@@ -6463,6 +6501,8 @@ def resolved_area_chart_rows(
     """
     if bool(area_spec.get("use_power_detail_frontier", False)):
         return power_detail_frontier(df, area_spec)
+    if bool(area_spec.get("prefer_road_detail_frontier", False)):
+        return _road_detail_frontier(area_spec_rows(df, area_spec))
     if bool(area_spec.get("rows_are_resolved_area_frontier", False)):
         return df.copy()
     chart_df = area_spec_rows(df, area_spec)
@@ -6973,6 +7013,11 @@ def _build_section_aggregate_charts(
         if required_boundary:
             area_spec["authoritative_total_flow_boundary"] = required_boundary
             area_spec["preserve_distinct_flow_labels"] = True
+            if code_candidate_text(required_boundary) == "15.02":
+                # The Road section's detail stack must retain every observed
+                # vehicle-type child, including Nonspecified road.  Its
+                # authoritative total remains the exact 15.02 parent.
+                area_spec["prefer_road_detail_frontier"] = True
         effective_flow_rows = _non_overlapping_flow_rows(
             _non_overlapping_common_row_frontier(area_df)
         )

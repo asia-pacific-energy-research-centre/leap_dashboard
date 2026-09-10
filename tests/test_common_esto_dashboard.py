@@ -4879,7 +4879,8 @@ def test_road_technology_section_uses_authoritative_parent_totals() -> None:
     assert list(trace_by_name["LEAP Target technology coverage"].y) == [80.0]
     assert list(trace_by_name["9th Target total"].y) == [102.0]
     assert list(trace_by_name["9th Target technology coverage"].y) == [70.0]
-    assert "coverage gap" in figure.layout.meta["stacked_area_note"].casefold()
+    assert "technology-coverage line" in figure.layout.meta["stacked_area_note"].casefold()
+    assert "maximum absolute gap" in figure.layout.meta["stacked_area_note"].casefold()
 
 
 def test_transport_placeholder_prefixes_keep_road_and_non_road_distinct() -> None:
