@@ -1,5 +1,29 @@
 # LEAP dashboard work queue and handover plan
 
+## Major next-week merge item — semantic dashboard fingerprints — pending 2026-09-10
+
+This is the key integration item from the week of 2026-09-07. The semantic
+fingerprint tooling remains outside `master` on the cumulative `7454`
+worktree, headed by `2fa5ecb` and including `8eedc57`.
+
+Merge the fingerprint slice deliberately rather than merging the entire
+cumulative worktree. The intended slice includes
+`codebase/common_esto_dashboard_semantic_fingerprint.py`,
+`scripts/compare_dashboard_semantic_fingerprints.py`, the semantic-fingerprint
+tests, and the page-migration fixture registry/configuration needed by those
+checks. Review dependencies and whether any of the preceding buildings/USA
+diagnostic commits are required before applying it.
+
+Current status: the older `bundle_fingerprint_t3.csv` fixtures are already in
+`master`, but the semantic fingerprint implementation, comparison script,
+registry, and tests are not. The main checkout has uncommitted renderer,
+configuration, test, and documentation changes that overlap the cumulative
+branch, so preserve and reconcile those changes before integration.
+
+Acceptance checks: confirm the selected fingerprint files are present on
+`master`, run their focused tests, run the page-migration contract checks, and
+record the resulting commit and any intentionally skipped cumulative commits.
+
 ## Emissions source-boundary and factor-visibility correction — complete 2026-09-09
 
 - The Emissions page now retains its own pre-presentation-exclusion input. The
