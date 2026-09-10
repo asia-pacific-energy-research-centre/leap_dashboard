@@ -3463,6 +3463,9 @@ def add_power_sector_overview_specs(
             "show_technology_coverage_trace": bool(
                 aggregate.get("show_technology_coverage_trace", True)
             ),
+            "comparison_total_uses_detail_stack": bool(
+                aggregate.get("comparison_total_uses_detail_stack", False)
+            ),
             "force_navigation_root": bool(
                 aggregate.get("navigation_root", False)
             ),
@@ -6009,6 +6012,11 @@ def build_area_chart(
         if not authoritative_totals.empty
         else authoritative_label_total_df
     )
+    if bool(area_spec.get("comparison_total_uses_detail_stack", False)):
+        effective_authoritative_total_df = effective_authoritative_total_df[
+            effective_authoritative_total_df["source_system"].astype(str).str.casefold()
+            != comparison_source.casefold()
+        ]
     if effective_authoritative_total_df.empty:
         displayed_total_df = coverage_total_df.copy()
     else:
@@ -6033,7 +6041,10 @@ def build_area_chart(
             on=["source_system", "scenario", "year"],
             how="inner",
         )
-        if not bool(area_spec.get("show_technology_coverage_trace", True)):
+        show_technology_coverage_trace = bool(
+            area_spec.get("show_technology_coverage_trace", True)
+        )
+        if not show_technology_coverage_trace:
             coverage_with_parent = coverage_with_parent.iloc[0:0]
         for (source_system, scenario), group in coverage_with_parent.groupby(
             ["source_system", "scenario"], dropna=False
@@ -6123,7 +6134,10 @@ def build_area_chart(
             f"{stacked_area_note} Dashed totals use the authoritative "
             f"{authoritative_boundary} boundary."
         )
-        if coverage_residual_max > 1e-9:
+        if (
+            bool(area_spec.get("show_technology_coverage_trace", True))
+            and coverage_residual_max > 1e-9
+        ):
             stacked_area_note = (
                 f"{stacked_area_note} The dotted technology-coverage line shows the "
                 f"difference between visible detail and that boundary "

@@ -482,6 +482,7 @@
           "label": "09.01-09.02 Power",
           "navigation_root": true,
           "show_technology_coverage_trace": false,
+          "comparison_total_uses_detail_stack": true,
           "child_flow_labels": {
             "09.01.01": "09.01.01,09.02.01 Electricity plants",
             "09.01.02": "09.01.02,09.02.02 CHP plants",

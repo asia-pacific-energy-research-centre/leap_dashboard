@@ -2942,6 +2942,7 @@ def test_power_overview_publishes_flow_pair_and_product_only_leaf() -> None:
                         "child_flow_parent_prefix": "09.01",
                         "label": "09.01-09.02 Power generation",
                         "show_technology_coverage_trace": False,
+                        "comparison_total_uses_detail_stack": True,
                     },
                     {
                         "flow_boundary": "10.01,10.02",
@@ -3034,6 +3035,10 @@ def test_power_overview_publishes_flow_pair_and_product_only_leaf() -> None:
     assert len(power_overview_specs) == 2
     assert all(
         spec["show_technology_coverage_trace"] is False
+        for spec in power_overview_specs
+    )
+    assert all(
+        spec["comparison_total_uses_detail_stack"] is True
         for spec in power_overview_specs
     )
     assert {
