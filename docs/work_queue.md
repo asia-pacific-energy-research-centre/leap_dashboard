@@ -802,3 +802,28 @@ decision, not a backlog pull.
   autoproducer electricity, CHP, and heat-plant codes, including Storage and
   solid-biomass CHP/HP entries that are not yet admitted into every generated
   Common ESTO dataset.
+
+## PRC chart-to-input reconciliation follow-up — pending 2026-09-10
+
+- Road detail: retain `Nonspecified road` in all `15.02 Road` aggregate totals.
+  It is included in the overall Road total but is currently omitted when the
+  stack is built from the flows inside the Road sector. This must be corrected
+  without restoring the removed synthetic technology-residual category.
+- Supply detail: review the unmapped composite fuel pairs in the 2023 input
+  comparison. The affected mappings are `Bitumen + Petroleum coke` and
+  `Lubricants + Refinery feedstocks + Paraffin waxes + White spirit SBP + Other
+  products`. Use the LEAP-to-ESTO comparison basis to identify the exact fuel
+  rows. Do not retain extra source values that are outside the canonical
+  mapping. Add a visible dashboard indication when a source value cannot be
+  mapped.
+- Transformation and TPES: reconcile the mapped input values against the
+  `Total Transformation`, `Total Primary Supply`, and `Other loss and own use`
+  rows. The current provided mappings do not sum to those totals and need an
+  upstream mapping review before dashboard-side adjustments are made.
+- Power detail: include `Heat plants` in the `09.01-09.02 Power — by product`
+  stack. The comparison difference appears to come from this omitted branch.
+
+Acceptance checks: compare 2023 source rows and dashboard chart values by
+canonical fuel label, preserve signed transformation and loss/own-use values,
+verify Road and Power aggregate conservation, and make unmapped rows explicit
+in diagnostics and the dashboard where appropriate.
