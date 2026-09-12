@@ -5769,6 +5769,14 @@ def build_area_chart(
         area_spec,
         group_col,
     )
+    chart_df = harmonize_historical_detail_level_to_projection(
+        chart_df,
+        area_spec,
+        group_col,
+        primary_source=primary_source,
+        comparison_source=comparison_source,
+        base_year=base_year,
+    )
 
     authoritative_boundary = str(
         area_spec.get("authoritative_total_flow_boundary", "")
@@ -5880,7 +5888,12 @@ def build_area_chart(
             .sum()
             .sort_values([group_col, "year"])
         )
-        for group_label, group in group_df.groupby(group_col, dropna=False):
+        unique_groups = sorted(
+            group_df[group_col].dropna().unique(),
+            key=lambda label: _area_stack_group_sort_key(label, area_spec, group_col),
+        )
+        for group_label in unique_groups:
+            group = group_df[group_df[group_col].eq(group_label)]
             if not (
                 _has_nonzero_values(group["_positive_value"])
                 or _has_nonzero_values(group["_negative_value"])
@@ -6449,6 +6462,150 @@ def synchronize_compound_grouping_labels(
         )
         out.loc[corrected, group_col] = out.loc[corrected, "common_flow_label"]
         grouping_labels = out[group_col].astype(str).str.strip()
+    return out
+
+
+def _area_stack_group_sort_key(
+    group_label: object,
+    area_spec: dict[str, object],
+    group_col: str,
+) -> tuple[object, ...]:
+    """Provide a stable, presentation-safe stacking order for area charts.
+
+    For the Transport overview chart (flow 15), anchor Road at the bottom of
+    the stack and Non-Road on top, so switching between detailed and placeholder
+    models never flips the vertical stacking position of non-road modes.
+    """
+    label_str = str(group_label or "").strip()
+    prefix = code_candidate_text(area_spec.get("aggregate_flow_prefix", ""))
+    if prefix == "15" and group_col in ("common_flow_label", "_configured_flow_group_label"):
+        codes = parse_code_expression(label_str)
+        is_road = False
+        if codes:
+            start_code = codes[0].get("start", "")
+            if code_matches_prefix(start_code, "15.02"):
+                is_road = True
+        elif "road" in label_str.casefold() and "non-road" not in label_str.casefold() and "non road" not in label_str.casefold():
+            is_road = True
+        return (0 if is_road else 1, section_order_key(label_str))
+    return section_order_key(label_str)
+
+
+def harmonize_historical_detail_level_to_projection(
+    chart_df: pd.DataFrame,
+    area_spec: dict[str, object],
+    group_col: str,
+    *,
+    primary_source: str,
+    comparison_source: str,
+    base_year: int,
+) -> pd.DataFrame:
+    """Harmonize historical detail level to projection detail level.
+
+    When the projection source (e.g. LEAP) only reports at an aggregate parent
+    level (e.g. 16.01 Commercial and public services, or a compound flow) and
+    publishes no child detail, collapse historical (ESTO) child detail back to
+    the parent category. This prevents stacked area charts from displaying
+    artificial step-changes where synthetic historical child traces (like .99)
+    collapse to zero at base year and a new parent trace abruptly appears.
+    """
+    if chart_df.empty or group_col not in chart_df.columns:
+        return chart_df
+
+    if group_col not in ("common_flow_label", "_configured_flow_group_label"):
+        return chart_df
+
+    proj_mask = (
+        chart_df["source_system"].astype(str).str.casefold().eq(primary_source.casefold())
+        & (chart_df["year"] > base_year)
+    )
+    proj_rows = chart_df.loc[proj_mask]
+    if proj_rows.empty:
+        return chart_df
+
+    hist_mask = (
+        chart_df["source_system"].astype(str).str.casefold().isin({
+            comparison_source.casefold(), "esto", "esto_extended"
+        })
+        & (chart_df["year"] <= base_year)
+    )
+    hist_rows = chart_df.loc[hist_mask]
+    if hist_rows.empty:
+        return chart_df
+
+    parent_prefix = code_candidate_text(area_spec.get("aggregate_flow_prefix", ""))
+    parent_label = str(area_spec.get("aggregate_flow_label", "")).strip()
+    out = chart_df.copy()
+
+    # Case A: configured flow groups with a retained parent and unallocated child
+    if group_col == "_configured_flow_group_label" and bool(area_spec.get("retain_parent_as_configured_flow_group")):
+        configured_groups = area_spec.get("configured_flow_groups", []) or []
+        has_unallocated_child = any(
+            str(g.get("flow_boundary", "")).endswith(".99")
+            or "unallocated" in str(g.get("label", "")).casefold()
+            or "nonspecified" in str(g.get("label", "")).casefold()
+            for g in configured_groups
+        )
+        if has_unallocated_child:
+            child_labels = {
+                str(g.get("label", "")).strip()
+                for g in configured_groups
+                if str(g.get("label", "")).strip()
+            }
+            specific_labels = {
+                str(g.get("label", "")).strip()
+                for g in configured_groups
+                if str(g.get("label", "")).strip()
+                and not str(g.get("flow_boundary", "")).endswith(".99")
+                and "unallocated" not in str(g.get("label", "")).casefold()
+                and "nonspecified" not in str(g.get("label", "")).casefold()
+            }
+            proj_specific_val = (
+                pd.to_numeric(proj_rows.loc[proj_rows[group_col].isin(specific_labels), "value"], errors="coerce")
+                .abs()
+                .sum()
+            ) if specific_labels else 0.0
+            proj_parent_val = (
+                pd.to_numeric(proj_rows.loc[proj_rows[group_col].eq(parent_label), "value"], errors="coerce")
+                .abs()
+                .sum()
+            )
+            if proj_parent_val > 1e-6 and proj_specific_val < 1e-6:
+                relabel_mask = hist_mask & out[group_col].isin(child_labels)
+                if relabel_mask.any():
+                    out.loc[relabel_mask, group_col] = parent_label
+                    if "common_flow_label" in out.columns:
+                        out.loc[relabel_mask, "common_flow_label"] = parent_label
+                    if parent_prefix and "common_flow_code" in out.columns:
+                        out.loc[relabel_mask, "common_flow_code"] = parent_prefix
+                    return out
+
+    # Case B: common_flow_label
+    if parent_prefix and "common_flow_code" in out.columns:
+        proj_codes = set(proj_rows["common_flow_code"].dropna().map(code_candidate_text))
+        if parent_prefix in proj_codes:
+            proj_child_codes = {c for c in proj_codes if c != parent_prefix and code_matches_prefix(c, parent_prefix)}
+            proj_child_val = (
+                pd.to_numeric(
+                    proj_rows.loc[
+                        proj_rows["common_flow_code"].map(code_candidate_text).isin(proj_child_codes),
+                        "value"
+                    ],
+                    errors="coerce"
+                ).abs().sum()
+            ) if proj_child_codes else 0.0
+
+            if proj_child_val < 1e-6:
+                hist_codes = set(hist_rows["common_flow_code"].dropna().map(code_candidate_text))
+                hist_child_codes = {c for c in hist_codes if c != parent_prefix and code_matches_prefix(c, parent_prefix)}
+                if hist_child_codes:
+                    relabel_mask = hist_mask & out["common_flow_code"].map(code_candidate_text).isin(hist_child_codes)
+                    if relabel_mask.any():
+                        out.loc[relabel_mask, "common_flow_code"] = parent_prefix
+                        if parent_label:
+                            out.loc[relabel_mask, "common_flow_label"] = parent_label
+                        return out
+
     return out
 
 

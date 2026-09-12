@@ -3338,7 +3338,7 @@ def test_power_detail_frontier_does_not_stack_parent_with_published_processes() 
     assert frontier["value"].sum() == pytest.approx(100.0)
 
 
-def test_road_detail_frontier_keeps_nonspecified_road_with_vehicle_children() -> None:
+def test_road_detail_frontier_keeps_authoritative_parent_and_no_residual() -> None:
     rows = pd.DataFrame([
         {
             **_area_product_row("LEAP", "Target", 2023, "15.02", "07.01", 100.0),
@@ -3363,16 +3363,11 @@ def test_road_detail_frontier_keeps_nonspecified_road_with_vehicle_children() ->
         {
             "aggregate_flow_prefix": "15.02",
             "explicit_flow_boundary": True,
-            "prefer_road_detail_frontier": True,
         },
         group_col="common_flow_label",
     )
 
-    assert set(selected["common_flow_label"]) == {
-        "15.02.01 Freight road",
-        "15.02.02 Passenger road",
-        "15.02.99 Nonspecified road",
-    }
+    assert set(selected["common_flow_label"]) == {"15.02 Road"}
     assert selected["value"].sum() == pytest.approx(100.0)
     assert not selected["common_flow_label"].str.contains(
         "technology residual", case=False, na=False

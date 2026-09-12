@@ -4,6 +4,38 @@ This is the decision log for `leap_dashboard`. Record rules whose correct behavi
 
 Cross-repository decisions use a `CROSS-###` ID and have one authoritative entry in the repository that owns the implementation. Other affected repositories should link to that entry instead of copying it.
 
+## DASH-037: Emissions use the active source boundary and show unmatched factors
+
+While all the others in this docuemtnation cant be dated, this was definitely from the 10th september 2026 just before i left.
+
+**Decision:** The factor-based Emissions page derives its input before
+presentation-only flow exclusions are applied. Its maintained
+`esto_emissions_flow_policy.csv` is the sole authority for combustion
+eligibility. This preserves eligible `10.01` energy-sector own-use rows,
+including `10.01.11 Oil refineries`, while ordinary energy pages continue to
+hide duplicate/inclusive rows according to their display rules.
+
+Power emissions and both `09.01-09.02 Power` Overview charts use the same
+source-reported plant-family frontier. This prevents an incomplete broad Power
+parent from erasing a non-zero Electricity/CHP/Heat child. In particular, the
+PRC 2022 LEAP export reports coal under `Coal power` while its Electricity
+plants parent is zero, and its broad `09.01-09.02` parent contains only Heat
+plants. The cause of that source-parent representation difference between 2022
+and 2023 remains unresolved and must be investigated upstream; the dashboard
+does not allocate or fabricate a replacement value.
+
+An unresolved emissions factor is neither zero nor an acceptable quiet drop.
+The page visibly names up to three affected source/scenario/year/flow/product
+observations and points to
+`supporting_files/emissions_unmatched_factor_rows.csv`, which carries the
+complete list. Chart totals continue to omit only those explicitly warned
+rows. Blank factors declared by the factor set remain intentional zero-factor
+carriers and do not enter this warning.
+
+**Verification:** Focused regression tests cover active-scope Power parent
+fallback, policy-eligible refinery own use surviving presentation exclusions,
+and the on-page plus CSV unmatched-factor warning.
+
 ## DASH-034: Section order follows the ESTO code hierarchy
 
 **Status:** Confirmed
@@ -930,36 +962,6 @@ agree where all three report the same demand: for 20USA at 2022 all three read
   demand row and reported 4,838 Mt CO2e for 20USA 2022 against 3,443 for LEAP;
   the gap was parent and child flows counted together, which is what rule 4
   above now prevents.
-
-## DASH-037: Emissions use the active source boundary and show unmatched factors
-
-**Decision:** The factor-based Emissions page derives its input before
-presentation-only flow exclusions are applied. Its maintained
-`esto_emissions_flow_policy.csv` is the sole authority for combustion
-eligibility. This preserves eligible `10.01` energy-sector own-use rows,
-including `10.01.11 Oil refineries`, while ordinary energy pages continue to
-hide duplicate/inclusive rows according to their display rules.
-
-Power emissions and both `09.01-09.02 Power` Overview charts use the same
-source-reported plant-family frontier. This prevents an incomplete broad Power
-parent from erasing a non-zero Electricity/CHP/Heat child. In particular, the
-PRC 2022 LEAP export reports coal under `Coal power` while its Electricity
-plants parent is zero, and its broad `09.01-09.02` parent contains only Heat
-plants. The cause of that source-parent representation difference between 2022
-and 2023 remains unresolved and must be investigated upstream; the dashboard
-does not allocate or fabricate a replacement value.
-
-An unresolved emissions factor is neither zero nor an acceptable quiet drop.
-The page visibly names up to three affected source/scenario/year/flow/product
-observations and points to
-`supporting_files/emissions_unmatched_factor_rows.csv`, which carries the
-complete list. Chart totals continue to omit only those explicitly warned
-rows. Blank factors declared by the factor set remain intentional zero-factor
-carriers and do not enter this warning.
-
-**Verification:** Focused regression tests cover active-scope Power parent
-fallback, policy-eligible refinery own use surviving presentation exclusions,
-and the on-page plus CSV unmatched-factor warning.
 
 ## DASH-022: Single-boundary overview cards inherit their real comparison label
 
