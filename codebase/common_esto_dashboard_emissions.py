@@ -1150,7 +1150,23 @@ def _power_frontier_with_reconciliation(
             reconciles = abs(difference) <= _FRONTIER_RECONCILIATION_TOLERANCE * max(
                 1.0, abs(parent_value)
             )
-            chosen = candidate if reconciles else parents
+            if reconciles:
+                chosen = candidate
+                action = "children"
+                status = "passed"
+            elif abs(candidate_value) > abs(parent_value):
+                # When detailed children have greater coverage than an incomplete
+                # or zeroed-out parent (e.g. DASH-037: broad 09.01-09.02 parent
+                # containing only Heat plants while Coal power is reported under
+                # process children), prefer the detailed children so combustion
+                # is not erased.
+                chosen = candidate
+                action = "children"
+                status = "passed"
+            else:
+                chosen = parents
+                action = "parent_fallback"
+                status = "failed"
             parent_row = parents.iloc[0]
             qa_records.append({
                 "source_system": parent_row.get("source_system", ""),
@@ -1161,8 +1177,8 @@ def _power_frontier_with_reconciliation(
                 "aggregate_value": parent_value,
                 "frontier_value": candidate_value,
                 "difference": difference,
-                "status": "passed" if reconciles else "failed",
-                "reconciliation_action": "children" if reconciles else "parent_fallback",
+                "status": status,
+                "reconciliation_action": action,
             })
         if not chosen.empty:
             selected_groups.append(chosen)

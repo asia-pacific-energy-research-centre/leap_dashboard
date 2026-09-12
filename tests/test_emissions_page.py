@@ -525,6 +525,32 @@ def test_emissions_power_reconciliation_does_not_change_detailed_power_frontier(
     assert qa.iloc[0]["reconciliation_action"] == "children"
 
 
+def test_emissions_power_reconciliation_prefers_children_when_parent_incomplete() -> None:
+    # DASH-037: Broad 09.01-09.02 parent contains only Heat plants (-10.0),
+    # while detailed power processes report full generation (-100.0).
+    # Detailed children must be retained so combustion is not erased.
+    rows = _power_transformation_rows(
+        ("09.01-09.02", -10.0),
+        ("09.01.01.01,09.02.01.01", -90.0),
+        ("09.01.03,09.02.03", -10.0),
+    )
+
+    selected, coverage, *_ = emissions.select_emissions_component_rows(
+        rows,
+        {"demand_page_keys": ["industry", "transport", "buildings", "others"]},
+    )
+
+    assert set(selected["common_flow_code"]) == {
+        "09.01.01.01,09.02.01.01",
+        "09.01.03,09.02.03",
+    }
+    assert selected["value"].sum() == pytest.approx(100.0)
+    qa = coverage[coverage["common_flow_label"].eq("09.01-09.02")]
+    assert len(qa) == 1
+    assert qa.iloc[0]["status"] == "passed"
+    assert qa.iloc[0]["reconciliation_action"] == "children"
+
+
 def test_emissions_page_note_is_short_and_plain_language() -> None:
     assert emissions._page_note({}, "Mt CO2e", ["LEAP"]) == (
         "Emissions (Mt CO₂) are estimated from final demand, power generation and "
