@@ -3510,6 +3510,9 @@ def add_power_sector_overview_specs(
                 "stacked_area_note_suffix": note,
                 "skip_product_overview_ownership": True,
                 "reconcile_child_flow_to_product_frontier": group_noun == "flow",
+                "authoritative_total_flow_boundary": (
+                    boundary if group_noun == "flow" else ""
+                ),
             })
     return specs
 
@@ -5074,67 +5077,6 @@ def _coverage_selected_demand_frontier(
     unresolved = unresolved.drop(columns="_demand_frontier_row")
     generic = _non_overlapping_flow_rows(_non_overlapping_common_row_frontier(unresolved))
     return pd.concat([locked, generic], ignore_index=True)
-
-
-def _road_detail_frontier(df: pd.DataFrame) -> pd.DataFrame:
-    """Keep Road's most detailed observed rows for a vehicle-type stack.
-
-    The Road overview has an authoritative ``15.02`` parent and may also
-    carry vehicle-type rows below it.  The generic common-row frontier is
-    intentionally parent-first, but that is not suitable for the detail
-    stack: the parent would hide valid siblings such as ``Nonspecified road``.
-    Resolve each source/scenario/year/product surface independently and use
-    the child frontier whenever it exists; retain the parent only when no
-    Road child is available for that surface.
-    """
-    if df.empty or "common_flow_code" not in df.columns:
-        return df.copy()
-
-    work = df.copy()
-    codes = work["common_flow_code"].astype(str).map(canonical_code)
-    road_mask = codes.eq("15.02") | codes.str.startswith("15.02.")
-    road = work.loc[road_mask].copy()
-    nonroad = work.loc[~road_mask].copy()
-    if road.empty:
-        return df.copy()
-
-    context_columns = [
-        column
-        for column in (
-            "comparison_scope", "economy", "source_system", "scenario",
-            "year", "common_product_code", "common_product_label",
-        )
-        if column in road.columns
-    ]
-    if not context_columns:
-        return _non_overlapping_flow_rows(
-            _non_overlapping_common_row_frontier(road)
-        )
-
-    selected_parts: list[pd.DataFrame] = []
-    for _, surface in road.groupby(context_columns, dropna=False, sort=False):
-        child_mask = surface["common_flow_code"].astype(str).map(
-            lambda code: canonical_code(code) != "15.02"
-            and code_matches_prefix(canonical_code(code), "15.02")
-        )
-        children = surface.loc[child_mask]
-        if children.empty:
-            selected_parts.append(surface)
-            continue
-        selected_parts.append(
-            _non_overlapping_flow_rows(
-                _non_overlapping_common_row_frontier(children)
-            )
-        )
-
-    selected = (
-        pd.concat(selected_parts, ignore_index=False, sort=False)
-        if selected_parts
-        else road.iloc[0:0].copy()
-    )
-    if nonroad.empty:
-        return selected.reset_index(drop=True)
-    return pd.concat([selected, nonroad], ignore_index=True, sort=False)
 
 
 def _source_demand_frontier_for_year(
@@ -7038,11 +6980,6 @@ def _build_section_aggregate_charts(
         if required_boundary:
             area_spec["authoritative_total_flow_boundary"] = required_boundary
             area_spec["preserve_distinct_flow_labels"] = True
-            if code_candidate_text(required_boundary) == "15.02":
-                # The Road section's detail stack must retain every observed
-                # vehicle-type child, including Nonspecified road.  Its
-                # authoritative total remains the exact 15.02 parent.
-                area_spec["prefer_road_detail_frontier"] = True
         effective_flow_rows = _non_overlapping_flow_rows(
             _non_overlapping_common_row_frontier(area_df)
         )
@@ -9143,7 +9080,17 @@ avigation_roots``. A page-defined overview aggregate can also parent a
         root_label = str(root.get("label") or "").strip()
         root_code = code_candidate_text(root_label)
         section_hint = str(root.get("section_label") or "").strip()
-        if not root_label or root_label in existing_groups:
+        existing_group_match = (
+            root_label in existing_groups
+            or bool(
+                root_code
+                and any(
+                    code_candidate_text(group) == root_code
+                    for group in existing_groups
+                )
+            )
+        )
+        if not root_label or existing_group_match:
             if root_label and bool(root.get("placeholder")):
                 placeholder_groups.add(root_label)
             continue
@@ -12228,6 +12175,11 @@ def render_dashboard(
                     # build_area_chart) would let a compound interim child
                     # suppress its process siblings a second time.
                     display_area_spec["rows_are_resolved_area_frontier"] = True
+                    # The detail stack is reconciled to the product frontier,
+                    # but the LEAP total line must still come from the exact
+                    # published aggregate. In Power this keeps Heat in the
+                    # by-flow total after the base year.
+                    authoritative_total_source_df = page_df
                 else:
                     chart_page_df = immediate_child_flow_rows(
                         area_spec_rows(page_df, display_area_spec),

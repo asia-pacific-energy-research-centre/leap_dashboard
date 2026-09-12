@@ -380,7 +380,7 @@
       "industry": ["17"]
     },
     "placeholder_component_product_sections": {
-      "International transport": {"flow_code": "04-05", "label": "04-05 International transport"},
+      "International transport": {"flow_code": "04-05", "label": "04-05 International transport (bunkers)"},
       "Industry": {"flow_code": "14", "label": "14 Industry sector"},
       "Road": {"flow_code": "15.02", "label": "15.02 Road"},
       "Transport non road": {"flow_code": "15.01,15.03-15.06", "label": "15.01,15.03-15.06 Transport non-road"},
