@@ -2487,6 +2487,17 @@ def reconciled_immediate_child_flow_rows(
             sort=False,
         )
     detail = resolved_immediate_child_frontier(detail, area_spec)
+    suppressed_child_codes = {
+        code_candidate_text(value)
+        for value in area_spec.get("suppress_child_flow_codes", [])
+        if code_candidate_text(value)
+    }
+    if suppressed_child_codes and "common_flow_code" in detail.columns:
+        detail = detail.loc[
+            ~detail["common_flow_code"].map(code_candidate_text).isin(
+                suppressed_child_codes
+            )
+        ].copy()
     if authoritative.empty or "value" not in authoritative.columns:
         return detail
 
@@ -3477,6 +3488,12 @@ def add_power_sector_overview_specs(
                 if str(code).strip() and str(child_label).strip()
             },
         }
+        if boundary == "09.01.02,09.02.02":
+            base_spec["suppress_child_flow_codes"] = {
+                code_candidate_text(value)
+                for value in overview.get("suppress_redundant_detail_flow_codes", [])
+                if code_candidate_text(value)
+            }
         nonzero_child_count = nonzero_immediate_child_flow_count(
             page_df,
             nodes,
