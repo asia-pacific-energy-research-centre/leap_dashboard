@@ -6624,6 +6624,35 @@ def resolved_area_chart_rows(
     rather than independently selecting or allocating sector detail.
     """
     if bool(area_spec.get("use_power_detail_frontier", False)):
+        frontier_max_year = area_spec.get("power_detail_frontier_max_year")
+        if frontier_max_year is not None and "year" in df.columns:
+            years = pd.to_numeric(df["year"], errors="coerce")
+            # Resolve the historical frontier against the complete hierarchy.
+            # Resolving a year-sliced frame can discard the parent/child context
+            # needed by Power's frontier selector and produce an empty area
+            # chart even though the product cards still have data.
+            full_frontier = power_detail_frontier(df, area_spec)
+            historical_rows = full_frontier.loc[
+                pd.to_numeric(full_frontier["year"], errors="coerce")
+                <= int(frontier_max_year)
+            ]
+            projection_rows = df.loc[years > int(frontier_max_year)]
+            parts = [historical_rows] if not historical_rows.empty else []
+            if not projection_rows.empty:
+                parts.append(
+                    resolved_area_chart_rows(
+                        projection_rows,
+                        {**area_spec, "use_power_detail_frontier": False},
+                        group_col=group_col,
+                        diagnostic_rows=diagnostic_rows,
+                        diagnostic_context=diagnostic_context,
+                    )
+                )
+            return (
+                pd.concat(parts, ignore_index=True, sort=False)
+                if parts
+                else df.iloc[0:0].copy()
+            )
         return power_detail_frontier(df, area_spec)
     if bool(area_spec.get("prefer_road_detail_frontier", False)):
         return _road_detail_frontier(area_spec_rows(df, area_spec))

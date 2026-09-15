@@ -3338,6 +3338,63 @@ def test_power_detail_frontier_does_not_stack_parent_with_published_processes() 
     assert frontier["value"].sum() == pytest.approx(100.0)
 
 
+def test_power_detail_frontier_year_split_keeps_history_and_projection_parent() -> None:
+    rows = pd.DataFrame([
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2022, "09.01.01,09.02.01", "17", -100.0
+            ),
+            "common_flow_label": "09.01.01,09.02.01 Electricity plants",
+            "common_product_label": "17 Electricity",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2022, "09.01.01.01", "17", -100.0
+            ),
+            "common_flow_label": "Coal power (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2023, "09.01.01,09.02.01", "17", -120.0
+            ),
+            "common_flow_label": "09.01.01,09.02.01 Electricity plants",
+            "common_product_label": "17 Electricity",
+            "is_non_expanding_rollup": True,
+        },
+        {
+            **_area_product_row(
+                "LEAP", "Target", 2023, "09.01.01.01", "17", -60.0
+            ),
+            "common_flow_label": "Coal power (all producers)",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+    spec = {
+        "aggregate_flow_prefix": "09.01.01,09.02.01",
+        "aggregate_flow_label": "09.01.01,09.02.01 Electricity plants",
+        "explicit_flow_boundary": True,
+        "use_power_detail_frontier": True,
+        "power_detail_frontier_max_year": 2022,
+        "immediate_child_flow_parent_prefix": "09.01.01",
+        "immediate_child_flow_labels": {
+            "09.01.01,09.02.01": "09.01.01,09.02.01 Electricity plants",
+        },
+    }
+
+    resolved = renderer.resolved_area_chart_rows(rows, spec)
+    totals = resolved.groupby("year")["value"].sum()
+
+    assert totals.to_dict() == pytest.approx({2022: -100.0, 2023: -120.0})
+    assert set(resolved.loc[resolved["year"].eq(2022), "common_flow_code"]) == {
+        "09.01.01.01"
+    }
+    assert set(resolved.loc[resolved["year"].eq(2023), "common_flow_code"]) == {
+        "09.01.01,09.02.01"
+    }
+
+
 def test_road_detail_frontier_keeps_authoritative_parent_and_no_residual() -> None:
     rows = pd.DataFrame([
         {
