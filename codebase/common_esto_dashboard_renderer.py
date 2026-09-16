@@ -6025,7 +6025,19 @@ def build_area_chart(
             ["source_system", "scenario"], dropna=False
         ):
             if str(source_system).casefold() != comparison_source.casefold():
-                group = group[group["year"] >= base_year]
+                # The stacked area uses comparison-source history through the
+                # base year and modelled projections after it. Keep total and
+                # coverage lines on that same seam so an uncalibrated model
+                # value at the base year cannot create a false visual gap.
+                source_base_year = (
+                    ninth_base_year_for_rows(chart_df, base_year)
+                    if str(source_system).casefold() == "ninth"
+                    else base_year
+                )
+                if (group["year"] > source_base_year).any():
+                    group = group[group["year"] > source_base_year]
+                else:
+                    group = group[group["year"] >= source_base_year]
             if group.empty:
                 continue
             label = series_label_from_values(source_system, scenario, series_labels)
@@ -6061,11 +6073,19 @@ def build_area_chart(
         # split into separate pos/neg stackgroups (see comment above), so the
         # stack alone no longer shows a single net total line to compare
         # against ESTO/NINTH totals.
-        # Non-comparison-source totals (LEAP and NINTH) include the base-year
-        # point when supplied. Keeping that point beside ESTO makes any
-        # calibration gap visible, while earlier backcast years remain hidden.
+        # Non-comparison-source totals (LEAP and NINTH) start after their
+        # source-specific base year, matching the historical/projection seam
+        # used by the stacked area.
         if str(source_system).casefold() != comparison_source.casefold():
-            group = group[group["year"] >= base_year]
+            source_base_year = (
+                ninth_base_year_for_rows(chart_df, base_year)
+                if str(source_system).casefold() == "ninth"
+                else base_year
+            )
+            if (group["year"] > source_base_year).any():
+                group = group[group["year"] > source_base_year]
+            else:
+                group = group[group["year"] >= source_base_year]
         if group.empty:
             continue
         label = series_label_from_values(source_system, scenario, series_labels)
@@ -7860,7 +7880,10 @@ def build_product_chart(
                 if str(source_system).casefold() == "ninth"
                 else base_year
             )
-            group = group[group["year"] >= source_base_year]
+            if (group["year"] > source_base_year).any():
+                group = group[group["year"] > source_base_year]
+            else:
+                group = group[group["year"] >= source_base_year]
         if group.empty:
             continue
         label = series_label(group.iloc[0], series_labels)

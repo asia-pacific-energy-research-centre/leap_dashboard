@@ -706,7 +706,7 @@ the complete transformation product stack.
   gas works even though 5,133 rows for the broad transformation category were
   present in the page assignment summary.
 
-## DASH-017: Comparison lines expose available base-year calibration gaps
+## DASH-017: Comparison lines use the historical/projection seam
 
 **Status:** Confirmed and implemented
 **Owner:** leap_dashboard
@@ -715,20 +715,23 @@ the complete transformation product stack.
 
 ### Current rule
 
-Show LEAP and Ninth comparison-line values at the configured base year whenever
-those values exist. Hide their earlier backcast years. Continue using ESTO for
-the stacked historical area through the base year and LEAP for the stacked
-projection only after it, so the fill boundary remains unchanged.
+Use ESTO for the stacked historical area through the base year and start LEAP
+and Ninth comparison lines after their source-specific base year. This keeps
+the total lines on the same seam as the stacked area and prevents an
+uncalibrated model value at the base year from creating a misleading visual
+gap. A source with only a base-year point remains visible as a standalone
+point; it is not connected across the seam.
 
-This intentionally allows ESTO, LEAP, and Ninth to display different values at
-the same base-year x coordinate. That visible gap is calibration evidence and
-must not be concealed by starting projection lines one year later.
+The underlying LEAP base-year values remain available in the comparison data
+and diagnostics for calibration review. This presentation rule only prevents
+those values from being mistaken for the historical series in ordinary charts.
 
 ### Validation
 
 Regression tests require aggregate total lines and individual flow-product
-lines to include LEAP and Ninth at the base year while excluding their earlier
-years. A point available only before the base year remains non-renderable.
+lines to begin after the relevant base year when future values exist. A source
+with only a base-year point remains renderable as a standalone point, while a
+point available only before the base year remains non-renderable.
 
 ### History
 

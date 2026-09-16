@@ -4796,8 +4796,8 @@ def test_technology_stack_uses_authoritative_road_total_lines() -> None:
     )
     traces = {trace.name: list(trace.y) for trace in figure.data}
 
-    assert traces["LEAP Target total"] == [100.0, 95.0]
-    assert traces["9th Target total"] == [101.0, 90.0]
+    assert traces["LEAP Target total"] == [95.0]
+    assert traces["9th Target total"] == [90.0]
     assert not any("technology residual" in str(name).casefold() for name in traces)
     assert "maximum absolute gap 40.00" in figure.layout.meta["stacked_area_note"]
 
