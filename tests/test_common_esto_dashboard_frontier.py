@@ -3499,6 +3499,35 @@ def test_chart_frontier_fallback_is_auditable_and_warns() -> None:
     assert "Warning:" in renderer.chart_frontier_notice(diagnostics)
 
 
+def test_preferred_detail_cannot_replace_larger_authoritative_parent() -> None:
+    rows = pd.DataFrame([
+        {
+            **_area_product_row("LEAP", "Target", 2030, "15", "17", 100.0),
+            "common_flow_label": "15 Transport sector",
+            "common_product_label": "17 Electricity",
+        },
+        {
+            **_area_product_row("LEAP", "Target", 2030, "15.02", "17", 70.0),
+            "common_flow_label": "15.02 Road",
+            "common_product_label": "17 Electricity",
+        },
+    ])
+
+    selected = renderer.resolved_area_chart_rows(
+        rows,
+        {
+            "aggregate_flow_prefix": "15",
+            "aggregate_flow_label": "15 Transport sector",
+            "explicit_flow_boundary": True,
+            "preferred_detail_flow_boundaries": ["15.02"],
+            "prefer_published_detail_over_parent_total": True,
+        },
+    )
+
+    assert selected["common_flow_code"].tolist() == ["15"]
+    assert selected["value"].sum() == pytest.approx(100.0)
+
+
 def test_power_by_flow_keeps_siblings_of_compound_interim_child() -> None:
     """A repeated plant parent inside one child cannot suppress its siblings."""
     rows = pd.DataFrame([

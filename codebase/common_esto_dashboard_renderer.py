@@ -6778,28 +6778,36 @@ def resolved_area_chart_rows(
             coverage["_detail_residual"] = (
                 coverage["_parent_total"] - coverage["_detail_total"]
             )
-            if bool(
-                area_spec.get("prefer_published_detail_over_parent_total", False)
-            ):
-                detail_contexts = coverage[context_columns].drop_duplicates()
-            else:
-                detail_contexts = coverage[
-                    coverage["_parent_total"].isna()
-                    | coverage["_detail_residual"].abs().le(tolerance)
-                ][context_columns].drop_duplicates()
-                fallback_contexts = coverage[
-                    coverage["_parent_total"].notna()
-                    & coverage["_detail_residual"].abs().gt(tolerance)
-                ]
-                append_chart_frontier_diagnostics(
-                    diagnostic_rows,
-                    fallback_contexts,
-                    area_spec=area_spec,
-                    renderer_action="retained_authoritative_parent",
-                    rejection_reason="child_frontier_does_not_reconcile_to_authoritative_parent",
-                    notice_severity="warning",
-                    diagnostic_context=diagnostic_context,
+            # Published detail is safe when it reconciles to the parent. If it
+            # does not, only prefer it when its absolute coverage is greater
+            # than the parent (for example, an incomplete/zeroed parent).
+            # Never replace a larger authoritative parent with a smaller child
+            # frontier: that silently drops source energy.
+            detail_contexts = coverage[
+                coverage["_parent_total"].isna()
+                | coverage["_detail_residual"].abs().le(tolerance)
+                | (
+                    coverage["_detail_total"].abs()
+                    > coverage["_parent_total"].abs() + tolerance
                 )
+            ][context_columns].drop_duplicates()
+            fallback_contexts = coverage[
+                coverage["_parent_total"].notna()
+                & coverage["_detail_residual"].abs().gt(tolerance)
+                & ~(
+                    coverage["_detail_total"].abs()
+                    > coverage["_parent_total"].abs() + tolerance
+                )
+            ]
+            append_chart_frontier_diagnostics(
+                diagnostic_rows,
+                fallback_contexts,
+                area_spec=area_spec,
+                renderer_action="retained_authoritative_parent",
+                rejection_reason="child_frontier_does_not_reconcile_to_authoritative_parent",
+                notice_severity="warning",
+                diagnostic_context=diagnostic_context,
+            )
             if not detail_contexts.empty:
                 detail_selected = detail_rows.merge(
                     detail_contexts.assign(_use_detail=True),
