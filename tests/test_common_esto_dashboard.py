@@ -4373,7 +4373,7 @@ def test_energy_balance_fuel_area_uses_esto_history_on_leap_category_frontier() 
     assert not any("supply" in str(trace.name).casefold() for trace in figure.data)
 
 
-def test_leap_and_ninth_lines_start_after_the_base_year() -> None:
+def test_leap_and_ninth_lines_include_available_base_year_values() -> None:
     series_labels = {
         "ESTO|historical": "ESTO Historical",
         "LEAP|Target": "LEAP Target",
@@ -4439,10 +4439,10 @@ def test_leap_and_ninth_lines_start_after_the_base_year() -> None:
     )
     product_years = {trace.name: list(trace.x) for trace in product_figure.data}
 
-    assert area_years["LEAP Target total"] == [2023]
-    assert area_years["9th Target total"] == [2023]
-    assert product_years["LEAP Target"] == [2023]
-    assert product_years["9th Target"] == [2023]
+    assert area_years["LEAP Target total"] == [2022, 2023]
+    assert area_years["9th Target total"] == [2022, 2023]
+    assert product_years["LEAP Target"] == [2022, 2023]
+    assert product_years["9th Target"] == [2022, 2023]
 
 
 def test_non_expanding_frontier_uses_shared_aggregate_id_when_axis_codes_differ() -> None:
