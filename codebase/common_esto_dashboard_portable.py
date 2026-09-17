@@ -60,6 +60,7 @@ from common_esto_dashboard_data import (  # noqa: E402
 )
 from common_esto_dashboard_output_layout import build_output_layout  # noqa: E402
 from common_esto_dashboard_renderer import render_dashboard, set_code_colors_path  # noqa: E402
+from codebase.utilities.economy_codes import canonicalize_economy_code  # noqa: E402
 
 
 __all__ = [
@@ -185,7 +186,7 @@ def normalize_dashboard_economy_key(economy: object) -> str:
     Accepts either the underscore-normalized workflow form (``20_USA``) or the
     compact dashboard form (``20USA``) and always returns the compact form.
     """
-    key = str(economy).replace("_", "").strip()
+    key = canonicalize_economy_code(economy).replace("_", "")
     if not key:
         raise ValueError("An economy code is required (for example '20_USA').")
     return key
@@ -538,6 +539,11 @@ def render_common_esto_dashboard(
         "output_root": str(layout["root"]),
         "dashboard_index": str(layout["dashboards"] / "index.html") if not trace_only else "",
         "chart_manifest": str(layout["supporting"] / "chart_manifest.csv") if not trace_only else "",
+        "semantic_fingerprint": (
+            str(layout["verification"] / "semantic_fingerprint.json.gz")
+            if not trace_only
+            else ""
+        ),
         "sign_semantics_summary": str(layout["supporting"] / "sign_semantics_summary.csv") if not trace_only else "",
         "comparison_trace_root": str(layout["root"]) if trace_only else "",
         "chart_bundle_directory": str(layout["chart_bundles"]),
@@ -559,7 +565,7 @@ def render_common_esto_dashboard(
 
 
 def render_common_esto_comparison_traces(**kwargs: object) -> dict[str, object]:
-    """Render the normal dashboard chart bundles without presentation outputs.
+    """Render chart bundles for every dashboard comparison basis.
 
     This is intentionally a thin call-through to :func:`render_common_esto_dashboard`.
     Version comparison therefore shares every reviewed input, mapping-derived
@@ -567,32 +573,8 @@ def render_common_esto_comparison_traces(**kwargs: object) -> dict[str, object]:
     the full renderer instead of maintaining a second comparison mapping path.
     """
     call_kwargs = dict(kwargs)
-    template_path = Path(str(call_kwargs["template_path"]))
-    economy_key = normalize_dashboard_economy_key(call_kwargs["economy"])
-    definitions = configured_comparison_scopes(
-        json.loads(template_path.read_text(encoding="utf-8"))
-    )
-    default = next(item for item in definitions if item["is_default"])
-    options = [
-        {
-            "comparison_scope": str(item["comparison_scope"]),
-            "label": str(item["label"]),
-            "dashboard_key": f"{economy_key}{item['output_suffix']}",
-        }
-        for item in definitions
-    ]
-    call_kwargs.update(
-        {
-            "comparison_scope": str(default["comparison_scope"]),
-            "dashboard_key": f"{economy_key}{default['output_suffix']}",
-            "category_basis_options": options,
-            "active_dataset_filter_options": list(default["source_systems"]),
-            "dashboard_key_suffix": str(default["output_suffix"]),
-            "clear_existing": True,
-            "trace_only": True,
-        }
-    )
-    return render_common_esto_dashboard(**call_kwargs)
+    call_kwargs["trace_only"] = True
+    return render_common_esto_dashboard_variants(**call_kwargs)
 
 
 def render_common_esto_dashboard_variants(
@@ -602,7 +584,8 @@ def render_common_esto_dashboard_variants(
     template_path = Path(str(kwargs["template_path"]))
     output_root = Path(str(kwargs["output_root"]))
     economy_key = normalize_dashboard_economy_key(kwargs["economy"])
-    diagnostics_result = copy_mapping_diagnostics_page(
+    trace_only = bool(kwargs.get("trace_only", False))
+    diagnostics_result = None if trace_only else copy_mapping_diagnostics_page(
         output_root=output_root,
         economy=economy_key,
         source_page_path=kwargs.get("mapping_diagnostics_source_page_path"),

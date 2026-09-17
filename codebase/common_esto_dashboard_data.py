@@ -31,7 +31,19 @@ DEFAULT_WIDE_FILE_SCOPE = "esto_leap_ninth"
 # frame double-counts them (see DEFAULT_WIDE_FILE_SCOPE above).
 ALL_SCOPES = "__all_scopes__"
 ID_COLUMNS_WIDE = ["economy", "scenario", "product", "flow"]
-OUTPUT_CONTRACT_VERSION = "common_esto_output_contract_v1"
+OUTPUT_CONTRACT_VERSION = "common_esto_output_contract_v2"
+LEGACY_OUTPUT_CONTRACT_VERSION = "common_esto_output_contract_v1"
+OBSERVED_ORDINARY_ESTO_PROVENANCE = "observed_ordinary_esto"
+OBSERVED_INDEPENDENT_EXTENDED_PROVENANCE = "observed_independent_esto_extended"
+LEGACY_EXTENDED_UNKNOWN_PROVENANCE = "legacy_extended_unknown"
+LEAP_SHARE_ESTIMATE_PROVENANCE = "leap_share_estimate"
+NATIVE_CHILD_SHARE_ESTIMATE_PROVENANCE = "native_child_share_estimate"
+OBSERVED_EXTENDED_FACT_PROVENANCE = frozenset(
+    {
+        OBSERVED_ORDINARY_ESTO_PROVENANCE,
+        OBSERVED_INDEPENDENT_EXTENDED_PROVENANCE,
+    }
+)
 
 # Every row loaded through this module today is an energy series, so these are
 # the defaults every existing input resolves to. A non-energy measure (e.g.
@@ -68,6 +80,7 @@ def ninth_base_year_for_rows(df: pd.DataFrame, default_base_year: int) -> int:
 LEGACY_TEXT_COLUMNS = {
     "comparison_scope",
     "source_system",
+    "fact_value_provenance",
     "economy",
     "scenario",
     "product",
@@ -84,13 +97,31 @@ LEGACY_TEXT_COLUMNS = {
 CONTRACT_FACT_COLUMNS = [
     "comparison_scope",
     "source_system",
+    "fact_value_provenance",
     "economy",
     "scenario",
     "year",
     "common_row_id",
     "value",
 ]
-CONTRACT_FACT_KEY_COLUMNS = CONTRACT_FACT_COLUMNS[:6]
+CONTRACT_FACT_KEY_COLUMNS = [
+    "comparison_scope",
+    "source_system",
+    "economy",
+    "scenario",
+    "year",
+    "common_row_id",
+]
+LEGACY_CONTRACT_FACT_COLUMNS = [
+    "comparison_scope",
+    "source_system",
+    "economy",
+    "scenario",
+    "year",
+    "common_row_id",
+    "value",
+]
+LEGACY_CONTRACT_FACT_KEY_COLUMNS = LEGACY_CONTRACT_FACT_COLUMNS[:6]
 
 CONTRACT_METADATA_COLUMNS = [
     "comparison_scope",
@@ -115,6 +146,7 @@ CONTRACT_METADATA_KEY_COLUMNS = CONTRACT_METADATA_COLUMNS[:2]
 REQUIRED_COLUMNS = [
     "comparison_scope",
     "source_system",
+    "fact_value_provenance",
     "economy",
     "scenario",
     "year",
@@ -130,6 +162,7 @@ REQUIRED_COLUMNS = [
 CONTRACT_JOINED_COLUMNS = [
     "comparison_scope",
     "source_system",
+    "fact_value_provenance",
     "economy",
     "scenario",
     "year",
@@ -577,10 +610,34 @@ def load_wide_common_esto_data(
     long_df["common_product_name"] = product_parts.apply(lambda item: item[1])
     long_df["common_product_label"] = product_parts.apply(lambda item: item[2])
     long_df["comparison_scope"] = DEFAULT_COMPARISON_SCOPE
+    long_df = _with_legacy_fact_value_provenance(long_df)
     long_df = long_df[REQUIRED_COLUMNS].copy()
     long_df["year"] = pd.to_numeric(long_df["year"], errors="coerce")
     long_df["value"] = pd.to_numeric(long_df["value"], errors="coerce").fillna(0)
     return long_df
+
+
+def _with_legacy_fact_value_provenance(df: pd.DataFrame) -> pd.DataFrame:
+    """Attach a safe provenance label when a pre-v2 adapter has none.
+
+    Old artifacts never proved that numeric ESTO Extended values were observed.
+    They therefore receive a deliberately non-observed label rather than being
+    upgraded by their source name or structural mapping flags.
+    """
+    out = df.copy()
+    if "fact_value_provenance" in out.columns:
+        values = out["fact_value_provenance"].astype(str).str.strip()
+        if values.eq("").any():
+            raise ValueError("Common ESTO fact_value_provenance must be non-empty when supplied.")
+        out["fact_value_provenance"] = values
+        return out
+    source = out["source_system"].astype(str).str.casefold()
+    out["fact_value_provenance"] = "source_native_observation"
+    out.loc[source.eq("esto"), "fact_value_provenance"] = OBSERVED_ORDINARY_ESTO_PROVENANCE
+    out.loc[source.eq("esto_extended"), "fact_value_provenance"] = (
+        LEGACY_EXTENDED_UNKNOWN_PROVENANCE
+    )
+    return out
 
 
 def load_long_common_esto_data(path: Path) -> pd.DataFrame:
@@ -611,9 +668,13 @@ def load_long_common_esto_data(path: Path) -> pd.DataFrame:
             dtype=_legacy_csv_text_dtypes(path),
             low_memory=False,
         ).fillna("")
-    missing_columns = [column for column in REQUIRED_COLUMNS if column not in df.columns]
+    required_without_provenance = [
+        column for column in REQUIRED_COLUMNS if column != "fact_value_provenance"
+    ]
+    missing_columns = [column for column in required_without_provenance if column not in df.columns]
     if missing_columns:
         raise ValueError(f"Common ESTO data is missing required columns: {missing_columns}")
+    df = _with_legacy_fact_value_provenance(df)
     df["year"] = pd.to_numeric(df["year"], errors="coerce")
     df["value"] = pd.to_numeric(df["value"], errors="coerce").fillna(0)
     return df
@@ -656,7 +717,7 @@ def _validate_contract_member_declaration(
     expected_columns: list[str],
     expected_key_columns: list[str],
 ) -> dict:
-    """Validate the strict v1 declaration for one tabular contract member."""
+    """Validate the strict declaration for one tabular contract member."""
     if not isinstance(declaration, dict):
         raise ValueError(f"Output contract {member_name} declaration must be an object.")
     required_fields = {
@@ -775,7 +836,7 @@ def _duplicate_metadata_error(metadata: pd.DataFrame) -> ValueError:
 
 
 def load_common_esto_output_contract(manifest_path: Path) -> pd.DataFrame:
-    """Load and strictly validate the opt-in Common ESTO v1 output contract."""
+    """Load Common ESTO v2, retaining a fail-safe adapter for v1 artifacts."""
     manifest_path = Path(manifest_path)
     if not manifest_path.is_file():
         raise FileNotFoundError(f"Common ESTO output contract not found: {manifest_path}")
@@ -787,10 +848,15 @@ def load_common_esto_output_contract(manifest_path: Path) -> pd.DataFrame:
         ) from error
     if not isinstance(manifest, dict):
         raise ValueError("Common ESTO output contract must contain a JSON object.")
-    if manifest.get("contract_version") != OUTPUT_CONTRACT_VERSION:
+    contract_version = manifest.get("contract_version")
+    if contract_version not in {
+        OUTPUT_CONTRACT_VERSION,
+        LEGACY_OUTPUT_CONTRACT_VERSION,
+    }:
         raise ValueError(
             f"Unsupported Common ESTO output contract version "
-            f"{manifest.get('contract_version')!r}; expected {OUTPUT_CONTRACT_VERSION!r}."
+            f"{contract_version!r}; expected {OUTPUT_CONTRACT_VERSION!r} or "
+            f"{LEGACY_OUTPUT_CONTRACT_VERSION!r}."
         )
     if not str(manifest.get("run_id", "")).strip():
         raise ValueError("Common ESTO output contract is missing a non-empty run_id.")
@@ -808,11 +874,21 @@ def load_common_esto_output_contract(manifest_path: Path) -> pd.DataFrame:
             "Common ESTO output contract observed_rows_only must be exactly true."
         )
 
+    fact_columns = (
+        CONTRACT_FACT_COLUMNS
+        if contract_version == OUTPUT_CONTRACT_VERSION
+        else LEGACY_CONTRACT_FACT_COLUMNS
+    )
+    fact_key_columns = (
+        CONTRACT_FACT_KEY_COLUMNS
+        if contract_version == OUTPUT_CONTRACT_VERSION
+        else LEGACY_CONTRACT_FACT_KEY_COLUMNS
+    )
     fact_declaration = _validate_contract_member_declaration(
         manifest.get("fact"),
         member_name="fact",
-        expected_columns=CONTRACT_FACT_COLUMNS,
-        expected_key_columns=CONTRACT_FACT_KEY_COLUMNS,
+        expected_columns=fact_columns,
+        expected_key_columns=fact_key_columns,
     )
     metadata_declaration = _validate_contract_member_declaration(
         manifest.get("metadata"),
@@ -824,7 +900,7 @@ def load_common_esto_output_contract(manifest_path: Path) -> pd.DataFrame:
         manifest_path,
         fact_declaration,
         member_name="fact",
-        expected_columns=CONTRACT_FACT_COLUMNS,
+        expected_columns=fact_columns,
     )
     metadata = _read_contract_member(
         manifest_path,
@@ -833,13 +909,13 @@ def load_common_esto_output_contract(manifest_path: Path) -> pd.DataFrame:
         expected_columns=CONTRACT_METADATA_COLUMNS,
     )
 
-    if fact[CONTRACT_FACT_KEY_COLUMNS].eq("").any(axis=None):
+    if fact[fact_key_columns].eq("").any(axis=None):
         raise ValueError("Output contract fact key columns must not contain empty values.")
     if metadata[CONTRACT_METADATA_KEY_COLUMNS].eq("").any(axis=None):
         raise ValueError("Output contract metadata key columns must not contain empty values.")
-    if fact.duplicated(CONTRACT_FACT_KEY_COLUMNS).any():
+    if fact.duplicated(fact_key_columns).any():
         raise ValueError(
-            f"Output contract fact key is not unique: {CONTRACT_FACT_KEY_COLUMNS}."
+            f"Output contract fact key is not unique: {fact_key_columns}."
         )
     if metadata.duplicated(CONTRACT_METADATA_KEY_COLUMNS).any():
         raise _duplicate_metadata_error(metadata)
@@ -899,6 +975,13 @@ def load_common_esto_output_contract(manifest_path: Path) -> pd.DataFrame:
             )
         metadata[column] = normalized.eq("true")
 
+    if contract_version == OUTPUT_CONTRACT_VERSION:
+        provenance = fact["fact_value_provenance"].astype(str).str.strip()
+        if provenance.eq("").any():
+            raise ValueError("Output contract fact_value_provenance must be non-empty for v2.")
+        fact["fact_value_provenance"] = provenance
+    else:
+        fact = _with_legacy_fact_value_provenance(fact)
     fact["year"] = numeric_years.astype(int)
     fact["value"] = numeric_values.astype(float)
     joined = fact.merge(
@@ -981,7 +1064,11 @@ def load_common_esto_data(
         loaded = load_long_common_esto_data(path)
     else:
         sample_df = pd.read_csv(path, nrows=0, low_memory=False)
-        if all(column in sample_df.columns for column in REQUIRED_COLUMNS):
+        if all(
+            column in sample_df.columns
+            for column in REQUIRED_COLUMNS
+            if column != "fact_value_provenance"
+        ):
             loaded = load_long_common_esto_data(path)
         elif all(column in sample_df.columns for column in ID_COLUMNS_WIDE) and get_year_columns(sample_df):
             loaded = load_wide_common_esto_data(path, wide_file_scope=wide_file_scope)

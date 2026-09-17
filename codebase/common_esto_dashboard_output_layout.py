@@ -9,7 +9,7 @@ import shutil
 #%%
 def clear_generated_output_folders(layout: dict[str, Path]) -> None:
     """Remove generated dashboard files from this pack's output folders."""
-    for key in ["dashboards", "chart_bundles", "supporting"]:
+    for key in ["dashboards", "chart_bundles", "supporting", "verification"]:
         path = layout[key]
         if path.exists():
             shutil.rmtree(path)
@@ -23,6 +23,7 @@ def build_output_layout(output_root: Path, economy: str, *, clear_existing: bool
         "dashboards": root / "dashboards",
         "chart_bundles": root / "chart_bundles",
         "supporting": root / "supporting_files",
+        "verification": root / "_verification",
     }
     if clear_existing:
         clear_generated_output_folders(layout)

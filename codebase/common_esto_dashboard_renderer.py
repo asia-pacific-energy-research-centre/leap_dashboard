@@ -29,9 +29,26 @@ except ModuleNotFoundError:  # pragma: no cover - import shim
     )
 
 try:  # pragma: no cover - import shim
-    from common_esto_dashboard_data import ninth_base_year_for_rows
+    from common_esto_dashboard_data import (
+        LEAP_SHARE_ESTIMATE_PROVENANCE,
+        NATIVE_CHILD_SHARE_ESTIMATE_PROVENANCE,
+        OBSERVED_EXTENDED_FACT_PROVENANCE,
+        ninth_base_year_for_rows,
+    )
 except ModuleNotFoundError:  # pragma: no cover - import shim
-    from codebase.common_esto_dashboard_data import ninth_base_year_for_rows
+    from codebase.common_esto_dashboard_data import (
+        LEAP_SHARE_ESTIMATE_PROVENANCE,
+        NATIVE_CHILD_SHARE_ESTIMATE_PROVENANCE,
+        OBSERVED_EXTENDED_FACT_PROVENANCE,
+        ninth_base_year_for_rows,
+    )
+
+try:  # pragma: no cover - import shim
+    from common_esto_dashboard_semantic_fingerprint import write_semantic_fingerprint
+except ModuleNotFoundError:  # pragma: no cover - import shim
+    from codebase.common_esto_dashboard_semantic_fingerprint import (
+        write_semantic_fingerprint,
+    )
 
 
 def _chart_unit(df: pd.DataFrame, default: str = "PJ") -> str:
@@ -52,6 +69,56 @@ def _chart_unit(df: pd.DataFrame, default: str = "PJ") -> str:
         return default
     mode = values.mode()
     return str(mode.iloc[0]) if not mode.empty else default
+
+
+def discontinuous_trace_values(
+    years: pd.Series,
+    values: pd.Series,
+    customdata: object = None,
+) -> tuple[list[object], list[object], object]:
+    """Insert Plotly nulls between non-consecutive annual observations."""
+    x_values: list[object] = []
+    y_values: list[object] = []
+    custom_values: list[object] | None = [] if customdata is not None else None
+    last_year: int | None = None
+    custom_rows = list(customdata) if customdata is not None else []
+    for index, (year, value) in enumerate(zip(years, values)):
+        numeric_year = int(year)
+        if last_year is not None and numeric_year - last_year > 1:
+            x_values.append(None)
+            y_values.append(None)
+            if custom_values is not None:
+                custom_values.append([None] * len(custom_rows[index]))
+        x_values.append(numeric_year)
+        y_values.append(value)
+        if custom_values is not None:
+            custom_values.append(custom_rows[index])
+        last_year = numeric_year
+    return x_values, y_values, custom_values
+
+
+def _eligible_extended_observations(
+    df: pd.DataFrame,
+    *,
+    allow_display_estimates: bool = True,
+) -> pd.DataFrame:
+    """Keep Extended history only when its provenance permits this display.
+
+    Display estimates are explicitly labelled and are not observations. They
+    may appear in detail charts, but Power selection passes ``False`` so they
+    cannot qualify as historical source evidence.
+    """
+    if df.empty or not {"source_system", "fact_value_provenance"}.issubset(df.columns):
+        return df.copy()
+    extended = df["source_system"].astype(str).str.casefold().eq("esto_extended")
+    allowed = set(OBSERVED_EXTENDED_FACT_PROVENANCE)
+    if allow_display_estimates:
+        allowed.update({
+            LEAP_SHARE_ESTIMATE_PROVENANCE,
+            NATIVE_CHILD_SHARE_ESTIMATE_PROVENANCE,
+        })
+    eligible = df["fact_value_provenance"].astype(str).isin(allowed)
+    return df.loc[~extended | eligible].copy()
 
 
 CODE_MATCH_COLUMNS = [
@@ -547,8 +614,8 @@ LNG_CHILD_SOURCE_UNAVAILABLE_NOTE = (
     "detailed liquefaction/regasification child, so this chart shows LEAP only;"
 )
 ROAD_DETAIL_ESTIMATION_NOTE = (
-    "Estimated historical detail: The historical breakdown shown here is an "
-    "approximation. The overall totals are official, but the detailed "
+    "Estimated historical detail: LEAP child shares inform this historical "
+    "breakdown. The official ESTO parent total is conserved, while the detailed "
     "categories are estimated and should be used only as a guide."
 )
 HISTORICAL_ALLOCATION_FAILURE_NOTE = (
@@ -703,17 +770,20 @@ def allocate_historical_parent_by_leap_base_year_shares(
     base_year: int,
     parent_specs: list[dict[str, object]],
     missing_basis_mode: str = "keep_parent",
+    allow_estimated_children: bool = True,
+    share_reference_year: int | None = None,
     audit_rows: list[dict[str, object]] | None = None,
 ) -> pd.DataFrame:
     """Split native historical parents over the deepest LEAP child frontier.
 
     This is the shared allocation used by configured Road detail and by the
     automatic cross-sector path. Exact native ESTO children keep their values.
-    Any uncovered parent remainder is distributed only over missing LEAP-defined
-    children for the same product. The resulting native plus estimated child
-    frontier must conserve the ESTO parent exactly. If no usable basis exists,
-    the parent remains visible and the failure is recorded instead of creating
-    a synthetic chart residual.
+    Any uncovered parent remainder is distributed over missing LEAP-defined
+    children. Power can fall back from the first projection year to the nearest
+    usable product/sign basis and then to an all-product technology split.
+    The resulting native plus estimated child frontier conserves the ESTO parent.
+    If no usable basis exists, the parent remains visible and the decision is
+    recorded instead of creating a synthetic chart residual.
     """
     required = {
         "source_system", "scenario", "year", "common_flow_code",
@@ -764,6 +834,15 @@ def allocate_historical_parent_by_leap_base_year_shares(
         is_comparison = work["source_system"].astype(str).str.casefold().eq(
             comparison_source.casefold()
         )
+        effective_share_year = int(
+            base_year if share_reference_year is None else share_reference_year
+        )
+        primary_year_values = pd.to_numeric(work["year"], errors="coerce")
+        share_year_mask = (
+            primary_year_values.ge(effective_share_year)
+            if share_reference_year is not None
+            else primary_year_values.eq(effective_share_year)
+        )
         is_primary_base = (
             work["source_system"].astype(str).str.casefold().eq(
                 primary_source.casefold()
@@ -771,7 +850,7 @@ def allocate_historical_parent_by_leap_base_year_shares(
             & work["scenario"].astype(str).str.casefold().eq(
                 primary_scenario.casefold()
             )
-            & pd.to_numeric(work["year"], errors="coerce").eq(int(base_year))
+            & share_year_mask
         )
         parent_rows = work[is_comparison & is_exact_parent].copy()
         primary_detail = work[is_primary_base & is_descendant].copy()
@@ -802,7 +881,10 @@ def allocate_historical_parent_by_leap_base_year_shares(
         # totals and their children must never both contribute to the shares.
         drop_intermediate_indices: set[object] = set()
         for _, product_rows in primary_detail.groupby(
-            [*basis_context_columns, "common_product_code", "common_product_label"],
+            [
+                *basis_context_columns, "year",
+                "common_product_code", "common_product_label",
+            ],
             dropna=False,
             sort=False,
         ):
@@ -825,16 +907,11 @@ def allocate_historical_parent_by_leap_base_year_shares(
             )
 
         detail_base = primary_detail.groupby(
-            detail_key, as_index=False, dropna=False
+            ["year", *detail_key], as_index=False, dropna=False
         )["value"].sum()
         detail_base["value"] = pd.to_numeric(
             detail_base["value"], errors="coerce"
         ).fillna(0.0)
-        templates = (
-            primary_detail.sort_values(detail_key)
-            .drop_duplicates(detail_key, keep="first")
-            .set_index(detail_key, drop=False)
-        )
         original_descendant = original["common_flow_code"].apply(
             lambda value, boundary=boundary: (
                 code_candidate_text(value) != code_candidate_text(boundary)
@@ -843,16 +920,6 @@ def allocate_historical_parent_by_leap_base_year_shares(
         )
         work_native_observation = _native_historical_observation_mask(work)
         product_columns = ["common_product_code", "common_product_label"]
-        detail_group_columns = [*basis_context_columns, *product_columns]
-        detail_by_parent_key = {
-            key: rows.copy()
-            for key, rows in detail_base.groupby(
-                detail_group_columns,
-                dropna=False,
-                sort=False,
-            )
-        }
-
         native_group_columns = [*context_columns, *product_columns]
         native_pool = original.loc[
             original["source_system"].astype(str).str.casefold().eq(
@@ -911,17 +978,6 @@ def allocate_historical_parent_by_leap_base_year_shares(
             product_code = parent_row.get("common_product_code")
             product_label = parent_row.get("common_product_label")
 
-            detail_lookup_key = tuple(
-                [
-                    *(parent_row.get(column) for column in basis_context_columns),
-                    product_code,
-                    product_label,
-                ]
-            )
-            product_detail = detail_by_parent_key.get(
-                detail_lookup_key,
-                detail_base.iloc[0:0],
-            ).copy()
             native_lookup_key = tuple(
                 [
                     *(parent_row.get(column) for column in context_columns),
@@ -941,14 +997,6 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 )
                 if code_candidate_text(value)
             ]
-            covered_by_native = product_detail["common_flow_code"].apply(
-                lambda value: any(
-                    _code_expression_contains_expression(native, value)
-                    or _code_expression_contains_expression(value, native)
-                    for native in native_boundaries
-                )
-            )
-            missing_detail = product_detail.loc[~covered_by_native].copy()
             native_total = float(
                 pd.to_numeric(native_children.get("value", pd.Series(dtype=float)), errors="coerce")
                 .fillna(0.0)
@@ -959,11 +1007,134 @@ def allocate_historical_parent_by_leap_base_year_shares(
             )
             remainder = parent_value - native_total
             tolerance = 1e-8 + abs(parent_value) * 1e-8
-            denominator = float(
-                pd.to_numeric(missing_detail.get("value", pd.Series(dtype=float)), errors="coerce")
-                .fillna(0.0)
-                .sum()
+
+            def uncovered_basis_rows(candidate_rows: pd.DataFrame) -> pd.DataFrame:
+                if candidate_rows.empty or not native_boundaries:
+                    return candidate_rows.copy()
+                covered = candidate_rows["common_flow_code"].apply(
+                    lambda value: any(
+                        _code_expression_contains_expression(native, value)
+                        or _code_expression_contains_expression(value, native)
+                        for native in native_boundaries
+                    )
+                )
+                return candidate_rows.loc[~covered].copy()
+
+            selected_basis = detail_base.iloc[0:0].copy()
+            selected_basis_year: int | None = None
+            fallback_level = ""
+            candidate_years = sorted(
+                pd.to_numeric(primary_detail.get("year", pd.Series(dtype=float)),
+                              errors="coerce")
+                .dropna().astype(int).unique().tolist()
             )
+            basis_context_mask = pd.Series(
+                True, index=detail_base.index, dtype=bool
+            )
+            for column in basis_context_columns:
+                basis_context_mask &= detail_base[column].eq(
+                    parent_row.get(column)
+                )
+            product_mask = (
+                basis_context_mask
+                & detail_base["common_product_code"].eq(product_code)
+                & detail_base["common_product_label"].eq(product_label)
+            )
+
+            def has_remainder_sign_basis(candidate_rows: pd.DataFrame) -> bool:
+                values = pd.to_numeric(
+                    candidate_rows.get("value", pd.Series(dtype=float)),
+                    errors="coerce",
+                ).fillna(0.0)
+                if remainder < -tolerance:
+                    return float(-values.loc[values.lt(0.0)].sum()) > 1e-12
+                if remainder > tolerance:
+                    return float(values.loc[values.gt(0.0)].sum()) > 1e-12
+                return False
+
+            for candidate_year in candidate_years:
+                candidate = detail_base.loc[
+                    detail_base["year"].eq(candidate_year) & product_mask
+                ]
+                candidate = uncovered_basis_rows(candidate)
+                if has_remainder_sign_basis(candidate):
+                    selected_basis = candidate
+                    selected_basis_year = candidate_year
+                    fallback_level = (
+                        "same_product_first_projection_year"
+                        if share_reference_year is not None
+                        and candidate_year == effective_share_year
+                        else "same_product_reference_year"
+                        if share_reference_year is None
+                        else "same_product_nearest_projection_year"
+                    )
+                    break
+
+            if (
+                selected_basis.empty
+                and share_reference_year is not None
+                and remainder
+            ):
+                all_product = detail_base.loc[
+                    detail_base["year"].eq(effective_share_year)
+                    & basis_context_mask
+                ].copy()
+                all_product = uncovered_basis_rows(all_product)
+                if has_remainder_sign_basis(all_product):
+                    grouped_signs = []
+                    group_columns = [
+                        "common_flow_code", "common_flow_label"
+                    ]
+                    for sign_rows in (
+                        all_product.loc[
+                            pd.to_numeric(all_product["value"], errors="coerce").lt(0)
+                        ],
+                        all_product.loc[
+                            pd.to_numeric(all_product["value"], errors="coerce").gt(0)
+                        ],
+                    ):
+                        if sign_rows.empty:
+                            continue
+                        grouped = sign_rows.groupby(
+                            group_columns,
+                            as_index=False,
+                            dropna=False,
+                        )["value"].sum()
+                        templates = (
+                            sign_rows.sort_values(group_columns)
+                            .drop_duplicates(group_columns, keep="first")
+                        )
+                        grouped_signs.append(grouped.merge(
+                            templates.drop(columns="value", errors="ignore"),
+                            on=group_columns,
+                            how="left",
+                        ))
+                    selected_basis = pd.concat(
+                        grouped_signs, ignore_index=True, sort=False
+                    )
+                    selected_basis_year = effective_share_year
+                    fallback_level = "all_product_first_projection_year"
+
+            missing_detail = selected_basis.copy()
+            basis_values = pd.to_numeric(
+                missing_detail.get("value", pd.Series(dtype=float)),
+                errors="coerce",
+            ).fillna(0.0)
+            positive_basis = float(basis_values.loc[basis_values.gt(0)].sum())
+            negative_basis = float(-basis_values.loc[basis_values.lt(0)].sum())
+            if remainder < -tolerance:
+                share_detail = missing_detail.loc[basis_values.le(0)].copy()
+                denominator = negative_basis
+            elif remainder > tolerance:
+                share_detail = missing_detail.loc[basis_values.ge(0)].copy()
+                denominator = positive_basis
+            else:
+                share_detail = missing_detail.iloc[0:0].copy()
+                denominator = 0.0
+            if selected_basis_year is not None:
+                effective_parent_share_year = selected_basis_year
+            else:
+                effective_parent_share_year = effective_share_year
             audit = {
                 column: parent_row.get(column) for column in context_columns
             }
@@ -976,6 +1147,30 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 "preserved_native_child_value": native_total,
                 "uncovered_parent_value": remainder,
                 "leap_basis_value": denominator,
+                "leap_share_reference_year": effective_parent_share_year,
+                "leap_share_fallback_level": fallback_level,
+                "leap_share_basis_scope": (
+                    "all_products" if fallback_level.startswith("all_product")
+                    else "same_product"
+                ),
+                "leap_share_sign": (
+                    "negative" if remainder < -tolerance
+                    else "positive" if remainder > tolerance
+                    else "zero"
+                ),
+                "leap_share_positive_basis_value": positive_basis,
+                "leap_share_negative_basis_value": negative_basis,
+                "leap_share_basis_mismatch_value": (
+                    abs(denominator - abs(remainder))
+                    if denominator > tolerance
+                    else float("nan")
+                ),
+                "basis_parent_mismatch_ratio": (
+                    abs(denominator - abs(remainder))
+                    / max(abs(remainder), tolerance)
+                    if denominator > tolerance
+                    else float("nan")
+                ),
                 "estimated_child_count": 0,
             })
 
@@ -997,6 +1192,17 @@ def allocate_historical_parent_by_leap_base_year_shares(
                     audit_rows.append(audit)
                 continue
 
+            if not allow_estimated_children:
+                audit.update({
+                    "qa_status": "PASS",
+                    "allocation_status": "parent_retained_estimation_disabled",
+                    "allocation_method": "",
+                    "failure_reason": "estimated_children_disabled_for_chart",
+                })
+                if audit_rows is not None:
+                    audit_rows.append(audit)
+                continue
+
             failure_reason = ""
             remainder_reverses_parent_sign = (
                 abs(remainder) > tolerance
@@ -1007,11 +1213,83 @@ def allocate_historical_parent_by_leap_base_year_shares(
             )
             if remainder_reverses_parent_sign:
                 failure_reason = "native_children_exceed_authoritative_parent"
-            elif missing_detail.empty or abs(denominator) <= 1e-12:
+            elif share_detail.empty or abs(denominator) <= 1e-12:
                 failure_reason = (
                     "no_nonzero_leap_base_year_share_for_missing_children"
                 )
             if failure_reason:
+                native_values = pd.to_numeric(
+                    native_children.get("value", pd.Series(dtype=float)),
+                    errors="coerce",
+                ).fillna(0.0)
+                native_share_fallback = bool(
+                    parent_spec.get("native_child_share_fallback", False)
+                )
+                native_share_basis_is_valid = (
+                    native_share_fallback
+                    and failure_reason
+                    == "no_nonzero_leap_base_year_share_for_missing_children"
+                    and abs(native_total) > tolerance
+                    and parent_value * native_total > 0.0
+                    and (native_values * native_total).ge(-tolerance).all()
+                )
+                if native_share_basis_is_valid:
+                    allocation_shares = native_values / native_total
+                    allocated_values = remainder * allocation_shares
+                    nonzero_positions = allocation_shares.index[
+                        allocation_shares.abs().gt(1e-12)
+                    ]
+                    residue = remainder - float(allocated_values.sum())
+                    if len(nonzero_positions):
+                        allocated_values.loc[nonzero_positions[-1]] += residue
+
+                    drop_indices.update(parent_indices)
+                    drop_indices.update(
+                        synthetic_indices_by_parent_key.get(native_lookup_key, [])
+                    )
+                    work.loc[
+                        work[allocation_row_id].isin(
+                            native_children[allocation_row_id]
+                        ),
+                        "_historical_allocation_frontier_owner",
+                    ] = boundary
+                    for position in nonzero_positions:
+                        native_child = native_children.loc[position]
+                        estimate = parent_row.copy()
+                        for column in work.columns:
+                            if column in native_child.index and column not in {
+                                "source_system", "scenario", "year", "value",
+                            }:
+                                estimate[column] = native_child[column]
+                        estimate["source_system"] = comparison_source
+                        estimate["scenario"] = parent_row.get(
+                            "scenario", "historical"
+                        )
+                        estimate["year"] = parent_row.get("year")
+                        estimate["value"] = float(allocated_values.loc[position])
+                        estimate["_historical_estimation_method"] = (
+                            "estimated_from_native_child_share"
+                        )
+                        estimate["common_row_basis"] = (
+                            "estimated_from_native_child_share"
+                        )
+                        estimate["_historical_allocation_frontier_owner"] = boundary
+                        estimate["fact_value_provenance"] = (
+                            NATIVE_CHILD_SHARE_ESTIMATE_PROVENANCE
+                        )
+                        estimate["is_exact_row"] = False
+                        result_rows.append(estimate)
+                    audit.update({
+                        "qa_status": "PASS",
+                        "allocation_status": "allocated_existing_children",
+                        "allocation_method": "native_historical_child_share",
+                        "failure_reason": "",
+                        "estimated_child_count": len(nonzero_positions),
+                    })
+                    if audit_rows is not None:
+                        audit_rows.append(audit)
+                    continue
+
                 if missing_basis_mode == "keep_parent":
                     retained_parent = parent_row.copy()
                     retained_parent["_historical_allocation_status"] = (
@@ -1054,6 +1332,8 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 if "is_exact_row" in work.columns:
                     unallocated["is_exact_row"] = False
                 drop_indices.update(parent_indices)
+                unallocated["fact_value_provenance"] = LEAP_SHARE_ESTIMATE_PROVENANCE
+                unallocated["is_exact_row"] = False
                 result_rows.append(unallocated)
                 audit.update({
                     "qa_status": "FAIL",
@@ -1065,13 +1345,14 @@ def allocate_historical_parent_by_leap_base_year_shares(
                     audit_rows.append(audit)
                 continue
 
-            missing_detail["_allocation_share"] = (
-                missing_detail["value"] / denominator
-            )
-            allocated_values = remainder * missing_detail["_allocation_share"]
+            share_values = pd.to_numeric(
+                share_detail["value"], errors="coerce"
+            ).fillna(0.0).abs()
+            share_detail["_allocation_share"] = share_values / denominator
+            allocated_values = remainder * share_detail["_allocation_share"]
             residue = remainder - float(allocated_values.sum())
-            nonzero_positions = missing_detail.index[
-                missing_detail["_allocation_share"].abs().gt(1e-12)
+            nonzero_positions = share_detail.index[
+                share_detail["_allocation_share"].abs().gt(1e-12)
             ]
             if len(nonzero_positions):
                 allocated_values.loc[nonzero_positions[-1]] += residue
@@ -1087,17 +1368,16 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 "_historical_allocation_frontier_owner",
             ] = boundary
 
-            for position, detail_row in missing_detail.iterrows():
-                key = tuple(detail_row[column] for column in detail_key)
-                template_row = templates.loc[key]
-                if isinstance(template_row, pd.DataFrame):
-                    template_row = template_row.iloc[0]
+            for position, detail_row in share_detail.iterrows():
+                template_row = detail_row
                 estimate = parent_row.copy()
                 for column in work.columns:
                     if column in template_row.index and column not in {
                         "source_system", "scenario", "year", "value",
                     }:
                         estimate[column] = template_row[column]
+                estimate["common_product_code"] = product_code
+                estimate["common_product_label"] = product_label
                 estimate["source_system"] = comparison_source
                 estimate["scenario"] = parent_row.get("scenario", "historical")
                 estimate["year"] = parent_row.get("year")
@@ -1111,13 +1391,26 @@ def allocate_historical_parent_by_leap_base_year_shares(
                 estimate["_historical_allocation_frontier_owner"] = boundary
                 if "is_exact_row" in work.columns:
                     estimate["is_exact_row"] = False
+                estimate["fact_value_provenance"] = LEAP_SHARE_ESTIMATE_PROVENANCE
+                estimate["is_exact_row"] = False
                 result_rows.append(estimate)
+            mismatch_warning = abs(denominator - abs(remainder)) > tolerance
             audit.update({
-                "qa_status": "PASS",
-                "allocation_status": "allocated_missing_children",
+                "qa_status": "WARNING" if mismatch_warning else "PASS",
+                "allocation_status": (
+                    "allocated_missing_children_with_basis_mismatch_warning"
+                    if mismatch_warning
+                    else "allocated_missing_children"
+                ),
                 "allocation_method": "detailed_leap_base_year_share",
                 "failure_reason": "",
-                "estimated_child_count": len(missing_detail),
+                "estimated_child_count": len(share_detail),
+                "mismatch_warning": (
+                    "LEAP same-sign share basis differs from ESTO remainder; "
+                    "shares applied proportionally."
+                    if mismatch_warning
+                    else ""
+                ),
             })
             if audit_rows is not None:
                 audit_rows.append(audit)
@@ -1261,6 +1554,9 @@ def demand_detail_component_specs_for_page(
             "flow_boundary": boundary,
             "flow_prefixes": component_prefixes,
             "label": str(section.get("label", boundary)).strip(),
+            "native_child_share_fallback": bool(
+                section.get("native_child_share_fallback", False)
+            ),
         })
     return specs
 
@@ -1336,6 +1632,48 @@ def flow_name_without_code(flow_label: object) -> str:
     text = str(flow_label or "").strip()
     parts = text.split(maxsplit=1)
     return parts[1] if len(parts) > 1 and code_candidate_text(text) else text
+
+
+_SYNTHETIC_TECHNOLOGY_DIAGNOSTIC_TEXT = (
+    "unallocated technology residual",
+    "technology coverage",
+)
+
+
+def _drop_synthetic_technology_diagnostic_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep synthetic technology-coverage diagnostics out of dashboard data."""
+    text_columns = df.select_dtypes(include=["object", "string", "category"]).columns
+    if not len(text_columns):
+        return df.copy()
+    keep = pd.Series(True, index=df.index)
+    for column in text_columns:
+        values = df[column].astype("string").fillna("").str.casefold()
+        for forbidden in _SYNTHETIC_TECHNOLOGY_DIAGNOSTIC_TEXT:
+            keep &= ~values.str.contains(forbidden, regex=False)
+    return df.loc[keep].copy()
+
+
+def _transport_road_vehicle_type(code: object) -> str:
+    code_text = code_candidate_text(code)
+    for prefix, label in (
+        ("15.02.01.01", "LCVs"),
+        ("15.02.01.02", "Trucks"),
+        ("15.02.02.01", "Buses"),
+        ("15.02.02.02", "LPVs"),
+        ("15.02.02.03", "Motorcycles"),
+    ):
+        if code_text == prefix or code_text.startswith(prefix + "."):
+            return label
+    return ""
+
+
+def _transport_road_drivetrain(label: object) -> str:
+    match = re.search(
+        r"\b(BEV|ICE|PHEV|FCEV)\b",
+        flow_name_without_code(label),
+        flags=re.IGNORECASE,
+    )
+    return match.group(1).upper() if match else ""
 
 
 def section_order_key(label: object) -> tuple[object, ...]:
@@ -2429,13 +2767,31 @@ def power_detail_frontier(page_df: pd.DataFrame, area_spec: dict[str, object]) -
         # Prefer published process detail whenever it is present. A non-zero
         # parent is only the frontier when its descendants are absent or all
         # zero; a zero parent must not suppress non-zero process detail.
-        nonzero_children = (
-            pd.to_numeric(children["value"], errors="coerce").abs().gt(1e-12).any()
-            if not children.empty else False
+        parent_values = pd.to_numeric(
+            parents.get("value", pd.Series(dtype=float)), errors="coerce"
+        ).fillna(0.0)
+        child_values = pd.to_numeric(
+            children.get("value", pd.Series(dtype=float)), errors="coerce"
+        ).fillna(0.0)
+        parent_total = float(parent_values.sum())
+        child_total = float(child_values.sum())
+        nonzero_children = bool(child_values.abs().gt(1e-12).any())
+        children_reconcile = (
+            not parents.empty
+            and not children.empty
+            and abs(child_total - parent_total) <= 1e-8 + abs(parent_total) * 1e-8
         )
-        if not parents.empty and not nonzero_children and pd.to_numeric(
-            parents["value"], errors="coerce"
-        ).abs().sum() > 1e-12:
+        # Child rows can be legitimate native detail, but a partial child set
+        # must not replace an authoritative parent and silently reduce the
+        # displayed source total.
+        if (
+            not parents.empty
+            and nonzero_children
+            and not children_reconcile
+            and abs(parent_total) > 1e-12
+        ):
+            selected.append(parents)
+        elif not parents.empty and not nonzero_children and abs(parent_total) > 1e-12:
             selected.append(parents)
         elif not children.empty:
             selected.append(children)
@@ -2634,6 +2990,11 @@ def area_spec_rows(df: pd.DataFrame, area_spec: dict[str, object]) -> pd.DataFra
     product and only a child for another.  Keep the full subtree here and let
     the row frontier choose the observed parent or detail per series/product.
     """
+    # ``Series.apply`` on an empty frame yields an object-typed empty series.
+    # Using that as ``df[...]`` selects zero columns rather than zero rows,
+    # which loses the schema required by the area-chart no-data path.
+    if df.empty:
+        return df.copy()
     aggregate_prefix = str(area_spec.get("aggregate_flow_prefix") or "").strip()
     if aggregate_prefix and "common_flow_code" in df.columns:
         if bool(area_spec.get("explicit_flow_boundary")):
@@ -2745,10 +3106,12 @@ def _add_preseparated_signed_stack_traces(
     ]
     legend_group = f"{stackgroup_prefix}::{trace_name}"
     for part_index, (sign, values) in enumerate(active_parts):
+        trace_x, trace_y, _ = discontinuous_trace_values(x_values, values)
         trace = go.Scatter(
-            x=x_values,
-            y=values,
+            x=trace_x,
+            y=trace_y,
             mode="lines",
+            connectgaps=False,
             stackgroup=f"{stackgroup_prefix}_{sign}",
             name=trace_name,
             visible=True if visible else False,
@@ -2820,6 +3183,7 @@ def _comparison_projection_area_rows(
         source_column.eq(comparison_source.casefold())
         & df["year"].le(base_year)
     ].copy()
+    historical = _eligible_extended_observations(historical)
     if not selected_source:
         # A two-way LEAP+ESTO basis can legitimately have only an aggregate
         # LEAP projection (for example All demand aggregated in China). Keep
@@ -2962,6 +3326,71 @@ def overview_product_root_prefixes(page_key: str, template: dict) -> set[str]:
             if code_prefix(section["flow_code"], 1)
         )
     return roots
+
+
+def page_chart_layer_config(
+    page_key: str,
+    layer_name: str,
+    template: dict,
+) -> dict[str, object]:
+    """Return one layer from an opt-in page-wide chart ownership contract."""
+    contracts = template.get("page_chart_contracts", {}) or {}
+    contract = contracts.get(page_key, {}) or {}
+    layer = (contract.get("layers", {}) or {}).get(layer_name, {})
+    if isinstance(layer, bool):
+        return {"enabled": layer}
+    return dict(layer) if isinstance(layer, dict) else {}
+
+
+def page_chart_layer_enabled(
+    page_key: str,
+    layer_name: str,
+    template: dict,
+    *,
+    default: bool = True,
+) -> bool:
+    """Return whether the page contract permits one renderer layer."""
+    return bool(page_chart_layer_config(page_key, layer_name, template).get("enabled", default))
+
+
+def page_product_leaf_chart_enabled(
+    page_key: str,
+    flow_code: object,
+    template: dict,
+) -> bool:
+    """Return whether one flow/product leaf card belongs on its page.
+
+    Road's vehicle and drivetrain aggregates replace only product cards below
+    their configured Road boundary. All other page leaves retain the standard
+    chart-layer default, with explicit page contracts such as Buildings still
+    taking precedence.
+    """
+    if not page_chart_layer_enabled(page_key, "leaf_charts", template):
+        return False
+    overrides = (
+        (template.get("section_aggregate_overrides", {}) or {})
+        .get(page_key, {})
+    )
+    for override in overrides.values():
+        boundary = str(override.get("required_flow_boundary", "")).strip()
+        if (
+            boundary
+            and bool(override.get("hide_product_leaf_charts", False))
+            and code_candidate_text(flow_code) != code_candidate_text(boundary)
+            and code_expression_matches_prefix(flow_code, boundary)
+        ):
+            return False
+    return True
+
+
+def page_overview_config(page_key: str, template: dict) -> dict[str, object]:
+    """Read a contract-owned Overview, with the legacy template as fallback."""
+    contract_overview = page_chart_layer_config(page_key, "overview", template)
+    if contract_overview:
+        return contract_overview
+    legacy_page = template.get(f"{page_key}_page", {}) or {}
+    legacy_overview = legacy_page.get("overview", {}) or {}
+    return dict(legacy_overview) if isinstance(legacy_overview, dict) else {}
 
 
 def active_placeholder_product_sections(
@@ -3301,7 +3730,7 @@ def add_buildings_overview_specs(
     children to the by-flow chart.
     """
     config = template.get("buildings_page", {}) or {}
-    overview = config.get("overview", {}) or {}
+    overview = page_overview_config(page_key, template)
     configured_page_key = str(config.get("page_key", "buildings")).strip()
     if (
         page_key != configured_page_key
@@ -3383,7 +3812,11 @@ def add_buildings_overview_specs(
             "preferred_detail_flow_boundaries": detail_boundaries,
             "configured_flow_groups": list(aggregate.get("flow_groups", []) or []),
             "retain_parent_as_configured_flow_group": True,
+            "stacked_area_note_suffix": str(
+                aggregate.get("stacked_area_note", "")
+            ).strip(),
             "skip_product_overview_ownership": True,
+            "skip_placeholder_product_cards": aggregate_only,
         }
         specs.extend([
             {
@@ -3467,13 +3900,12 @@ def add_power_sector_overview_specs(
             "source_flow_labels": source_labels,
             "source_flow_labels_by_system": labels_by_source,
             "explicit_flow_boundary": True,
-            "use_power_detail_frontier": boundary == "09.01-09.02",
-            # The Power overview has an authoritative parent total.  Do not
-            # expose the internal detail-vs-parent diagnostic as a second
-            # ESTO series in the user-facing chart when configured off.
-            "show_technology_coverage_trace": bool(
-                aggregate.get("show_technology_coverage_trace", True)
-            ),
+            "use_power_detail_frontier": boundary in {
+                "09.01-09.02",
+                "09.01.01,09.02.01",
+            },
+            # Keep the configured comparison basis for the Power overview's
+            # independently displayed authoritative total lines.
             "comparison_total_uses_detail_stack": bool(
                 aggregate.get("comparison_total_uses_detail_stack", False)
             ),
@@ -3488,6 +3920,10 @@ def add_power_sector_overview_specs(
                 if str(code).strip() and str(child_label).strip()
             },
         }
+        if boundary == "09.01.01,09.02.01":
+            base_spec["power_detail_frontier_max_year"] = int(
+                (template.get("chart_generation", {}) or {}).get("base_year", 2022)
+            )
         if boundary == "09.01.02,09.02.02":
             base_spec["suppress_child_flow_codes"] = {
                 code_candidate_text(value)
@@ -3516,7 +3952,10 @@ def add_power_sector_overview_specs(
                 "overview_variant": f"power_{safe_slug(label)}_by_{group_noun}",
                 "group_col": group_col,
                 "immediate_child_flow_parent_prefix": (
-                    child_parent if group_noun == "flow" else ""
+                    child_parent
+                    if group_noun == "flow"
+                    or base_spec["use_power_detail_frontier"]
+                    else ""
                 ),
                 "title_prefix": title_prefix,
                 "chart_caption": str(
@@ -3529,6 +3968,9 @@ def add_power_sector_overview_specs(
                 "reconcile_child_flow_to_product_frontier": group_noun == "flow",
                 "authoritative_total_flow_boundary": (
                     boundary if group_noun == "flow" else ""
+                ),
+                "prefer_resolved_frontier_total_on_parent_mismatch": (
+                    group_noun == "flow" and page_key == "power"
                 ),
             })
     return specs
@@ -3577,9 +4019,9 @@ def resolve_supply_bunker_representation(
     """Select one additive bunker frontier per source/scenario/year surface.
 
     Explicit LEAP child rows are authoritative evidence that marine/aviation
-    detail exists, even when their values are zero. A combined parent remains
-    authoritative when only one child is present because that is not a
-    complete marine/aviation split. Resolving before page filtering prevents
+    detail exists, even when their values are zero. If any present child has a
+    non-zero value, only populated children are charted; an absent or zero
+    sibling is never manufactured. Resolving before page filtering prevents
     stale audit metadata from deleting genuine detail downstream.
     """
     supply_config = template.get("supply_page", {}) or {}
@@ -3648,12 +4090,7 @@ def resolve_supply_bunker_representation(
                 surface_codes.isin(detail_codes), "_bunker_frontier_row"
             ].astype(int)
         )
-        complete_detail = set(detail_codes).issubset(present_children)
-        mode = (
-            "detail"
-            if complete_detail or (present_children and not has_combined)
-            else "combined"
-        )
+        mode = "detail" if present_children else "combined"
         if mode == "detail":
             detail_frontier_rows_to_drop.update(
                 surface.loc[
@@ -3751,13 +4188,7 @@ def resolve_supply_bunker_representation(
         for source, mode in selected_modes
     )
     metadata_placeholder = uses_combined_international_transport_placeholder(template)
-    leap_combined_present = bool(
-        (leap_row_mask & codes.eq(boundary)).any()
-    )
-    detail_active = bool(structural_detail_codes) and (
-        not leap_combined_present
-        or set(detail_codes).issubset(structural_detail_codes)
-    )
+    detail_active = bool(structural_detail_codes)
     placeholder_active = (
         not detail_active
         and (
@@ -4055,8 +4486,13 @@ def prepare_area_specs_for_page(
 
 
 def prepare_power_page_rows(page_df: pd.DataFrame) -> pd.DataFrame:
-    """Give Power generation and residual own-use rows honest section names."""
-    out = page_df.copy()
+    """Keep audited historical allocations and label Power sections for display.
+
+    Allocation estimates are created upstream from the authoritative ESTO
+    parent using LEAP child shares. They are displayable historical detail,
+    even though they must not be reused as observed source evidence.
+    """
+    out = _eligible_extended_observations(page_df, allow_display_estimates=True)
     codes = out["common_flow_code"].astype(str).map(canonical_code)
     out.loc[
         codes.eq("09.01") | codes.eq("09.02")
@@ -4237,6 +4673,25 @@ def power_interim_flow_is_active(
     )
 
 
+def power_interim_overview_spec_is_hidden(
+    page_key: str,
+    code_or_label: object,
+    group_col: str,
+    template: dict,
+) -> bool:
+    """Hide only placeholder Power views that require a flow split.
+
+    A retained interim branch is still a real, fuel-resolved Power total, so
+    its by-product overview remains useful.  It does not provide a defensible
+    process allocation, so the by-flow companion stays hidden until detailed
+    LEAP branches replace the placeholder.
+    """
+    return (
+        power_interim_flow_is_active(page_key, code_or_label, template)
+        and str(group_col).strip() != "common_product_label"
+    )
+
+
 def drop_placeholder_only_demand_detail_rows(
     page_key: str,
     page_df: pd.DataFrame,
@@ -4329,13 +4784,10 @@ def drop_configured_redundant_detail_rows(
     if detail_page_df.empty or "common_flow_code" not in detail_page_df.columns:
         return detail_page_df.copy()
     other_config = template.get("other_demand_page", {}) or {}
-    buildings_config = template.get("buildings_page", {}) or {}
     power_config = template.get("power_page", {}) or {}
     page_configs = {
         str(other_config.get("page_key", "others")).strip(): other_config,
-        str(buildings_config.get("page_key", "buildings")).strip(): (
-            buildings_config.get("overview", {}) or {}
-        ),
+        "buildings": page_overview_config("buildings", template),
         str(power_config.get("page_key", "power")).strip(): (
             power_config.get("overview", {}) or {}
         ),
@@ -4857,9 +5309,47 @@ def _coverage_selected_demand_frontier(
         column for column in context if column != "common_product_code"
     ]
     nonroad_keys = work.loc[nonroad_mask, nonroad_context].drop_duplicates()
-    if not broad.empty and not road.empty and not nonroad_keys.empty:
+    road_candidates = road
+    if prefer_transport_detail:
+        # Level 2 inputs can expose Road only through its additive 15.02.*
+        # children. Use that sum only for product contexts with no direct Road
+        # row, so the shared/default frontier keeps its existing behavior.
+        road_detail = work.loc[codes.str.startswith("15.02.")].copy()
+        road_frontier = _non_overlapping_flow_rows(
+            _non_overlapping_common_row_frontier(road_detail)
+        )
+        if not road_frontier.empty:
+            detail_totals = (
+                road_frontier.groupby(context, dropna=False, as_index=False)["value"]
+                .sum()
+            )
+            if road.empty:
+                road_candidates = detail_totals
+            else:
+                detail_totals = detail_totals.merge(
+                    road[context].drop_duplicates().assign(_direct_road=True),
+                    on=context,
+                    how="left",
+                )
+                road_candidates = pd.concat(
+                    [
+                        road,
+                        detail_totals.loc[
+                            detail_totals["_direct_road"].isna(),
+                            [*context, "value"],
+                        ],
+                    ],
+                    ignore_index=True,
+                )
+
+    if not broad.empty and not road_candidates.empty and not nonroad_keys.empty:
         matches = (
-            broad.merge(road, on=context, how="inner", suffixes=("_broad", "_road"))
+            broad.merge(
+                road_candidates,
+                on=context,
+                how="inner",
+                suffixes=("_broad", "_road"),
+            )
             .merge(nonroad_keys, on=nonroad_context, how="inner")
         )
         scale = matches[["value_broad", "value_road"]].abs().max(axis=1)
@@ -5691,11 +6181,7 @@ def _apply_total_series_chrome(fig: go.Figure) -> None:
         if trace_line is not None:
             trace_line.color = color
             trace_line.width = max(float(trace_line.width or 0), 2.25)
-            trace_line.dash = (
-                "dot"
-                if "technology coverage" in trace_name.casefold()
-                else style["dash"]
-            )
+            trace_line.dash = style["dash"]
         if getattr(trace, "marker", None) is not None:
             trace.marker.color = color
             if hasattr(trace.marker, "size"):
@@ -5778,6 +6264,13 @@ def build_area_chart(
     embedding the same ESTO pre-base-year segment. The page-level chooser
     selects which scenario stack is visible.
     """
+    df = _drop_synthetic_technology_diagnostic_rows(
+        _eligible_extended_observations(df)
+    )
+    if authoritative_total_df is not None:
+        authoritative_total_df = _drop_synthetic_technology_diagnostic_rows(
+            _eligible_extended_observations(authoritative_total_df)
+        )
     chart_df = resolved_area_chart_rows(df, area_spec, group_col=group_col)
     chart_unit = _chart_unit(chart_df)
     chart_config = template.get("chart_generation", {})
@@ -5810,14 +6303,6 @@ def build_area_chart(
         area_spec.get("authoritative_total_flow_boundary", "")
     ).strip()
     authoritative_totals = pd.DataFrame()
-    coverage_total_df = (
-        chart_df.groupby(
-            ["source_system", "scenario", "year"], as_index=False
-        )["value"]
-        .sum()
-        .sort_values(["source_system", "scenario", "year"])
-    )
-    coverage_residual_max = 0.0
     if authoritative_boundary:
         total_source_df = df if authoritative_total_df is None else authoritative_total_df
         exact_boundary_mask = total_source_df["common_flow_code"].astype(str).map(
@@ -5832,28 +6317,42 @@ def build_area_chart(
                 )["value"]
                 .sum()
             )
-            stack_totals = (
-                chart_df.groupby(
-                    ["source_system", "scenario", "year"], as_index=False
-                )["value"]
-                .sum()
-                .rename(columns={"value": "stack_value"})
-            )
-            residuals = authoritative_totals.merge(
-                stack_totals,
-                on=["source_system", "scenario", "year"],
-                how="inner",
-            )
-            residuals["_coverage_residual"] = (
-                residuals["value"] - residuals["stack_value"]
-            )
-            residuals = residuals[
-                residuals["_coverage_residual"].abs().gt(1e-9)
-            ].copy()
-            if not residuals.empty:
-                coverage_residual_max = float(
-                    residuals["_coverage_residual"].abs().max()
+            if bool(
+                area_spec.get(
+                    "prefer_resolved_frontier_total_on_parent_mismatch",
+                    False,
                 )
+            ):
+                resolved_totals = chart_df.groupby(
+                    ["source_system", "scenario", "year"], as_index=False
+                )["value"].sum().rename(
+                    columns={"value": "_resolved_frontier_total"}
+                )
+                compared_totals = authoritative_totals.merge(
+                    resolved_totals,
+                    on=["source_system", "scenario", "year"],
+                    how="left",
+                )
+                source_is_primary = (
+                    compared_totals["source_system"].astype(str).str.casefold()
+                    == primary_source.casefold()
+                )
+                mismatch = (
+                    source_is_primary
+                    & compared_totals["_resolved_frontier_total"].notna()
+                    & (
+                        compared_totals["value"]
+                        - compared_totals["_resolved_frontier_total"]
+                    ).abs().gt(
+                        1e-8 + compared_totals["value"].abs() * 1e-8
+                    )
+                )
+                compared_totals.loc[mismatch, "value"] = compared_totals.loc[
+                    mismatch, "_resolved_frontier_total"
+                ]
+                authoritative_totals = compared_totals[
+                    ["source_system", "scenario", "year", "value"]
+                ]
 
     pre_base_df = chart_df[
         (chart_df["source_system"].astype(str).str.casefold() == comparison_source.casefold())
@@ -6004,7 +6503,13 @@ def build_area_chart(
             != comparison_source.casefold()
         ]
     if effective_authoritative_total_df.empty:
-        displayed_total_df = coverage_total_df.copy()
+        displayed_total_df = (
+            chart_df.groupby(
+                ["source_system", "scenario", "year"], as_index=False
+            )["value"]
+            .sum()
+            .sort_values(["source_system", "scenario", "year"])
+        )
     else:
         total_keys = ["source_system", "scenario"]
         authoritative_series = {
@@ -6014,56 +6519,15 @@ def build_area_chart(
             )
         }
         fallback_parts = [effective_authoritative_total_df]
-        for key, group in coverage_total_df.groupby(total_keys, dropna=False):
+        for key, group in chart_df.groupby(total_keys, dropna=False):
             normalized_key = tuple(key if isinstance(key, tuple) else (key,))
             if normalized_key not in authoritative_series:
-                fallback_parts.append(group)
-        displayed_total_df = pd.concat(fallback_parts, ignore_index=True)
-
-        coverage_with_parent = coverage_total_df.merge(
-            effective_authoritative_total_df.rename(
-                columns={"value": "authoritative_value"}
-            ),
-            on=["source_system", "scenario", "year"],
-            how="inner",
-        )
-        show_technology_coverage_trace = bool(
-            area_spec.get("show_technology_coverage_trace", True)
-        )
-        if not show_technology_coverage_trace:
-            coverage_with_parent = coverage_with_parent.iloc[0:0]
-        for (source_system, scenario), group in coverage_with_parent.groupby(
-            ["source_system", "scenario"], dropna=False
-        ):
-            if str(source_system).casefold() != comparison_source.casefold():
-                group = group[group["year"] >= base_year]
-            if group.empty:
-                continue
-            label = series_label_from_values(source_system, scenario, series_labels)
-            group = group.copy()
-            group["coverage_gap"] = group["authoritative_value"] - group["value"]
-            fig.add_trace(
-                go.Scatter(
-                    x=group["year"],
-                    y=group["value"],
-                    mode="lines+markers",
-                    name=f"{label} technology coverage",
-                    line={"dash": "dot", "width": 1.5},
-                    customdata=group[["authoritative_value", "coverage_gap"]].to_numpy(),
-                    hovertemplate=(
-                        "%{x}<br>Visible technology coverage: %{y:,.2f}"
-                        + chart_unit
-                        + "<br>Authoritative total: %{customdata[0]:,.2f}"
-                        + chart_unit
-                        + "<br>Coverage gap: %{customdata[1]:,.2f}"
-                        + chart_unit
-                        + "<extra>"
-                        + escape(label)
-                        + "</extra>"
-                    ),
+                fallback_parts.append(
+                    group.groupby(
+                        ["source_system", "scenario", "year"], as_index=False
+                    )["value"].sum()
                 )
-            )
-            trace_meta.append(trace_meta_entry(source_system, scenario, True))
+        displayed_total_df = pd.concat(fallback_parts, ignore_index=True)
 
     for (source_system, scenario), group in displayed_total_df.groupby(["source_system", "scenario"], dropna=False):
         # Every dataset gets an explicit signed-sum total line, including ones
@@ -6072,19 +6536,32 @@ def build_area_chart(
         # split into separate pos/neg stackgroups (see comment above), so the
         # stack alone no longer shows a single net total line to compare
         # against ESTO/NINTH totals.
-        # Non-comparison-source totals (LEAP and NINTH) include the base-year
-        # point when supplied. Keeping that point beside ESTO makes any
-        # calibration gap visible, while earlier backcast years remain hidden.
+        # Non-comparison-source totals (LEAP and NINTH) retain their
+        # source-specific base-year anchor.  The areas still use the
+        # historical/projection seam, but omitting that common anchor from the
+        # total traces made the 2022 comparison point disappear.
         if str(source_system).casefold() != comparison_source.casefold():
-            group = group[group["year"] >= base_year]
+            source_base_year = (
+                ninth_base_year_for_rows(chart_df, base_year)
+                if str(source_system).casefold() == "ninth"
+                else base_year
+            )
+            if (group["year"] >= source_base_year).any():
+                group = group[group["year"] >= source_base_year]
+            else:
+                group = group[group["year"] >= source_base_year]
         if group.empty:
             continue
         label = series_label_from_values(source_system, scenario, series_labels)
+        trace_x, trace_y, _ = discontinuous_trace_values(
+            group["year"], group["value"]
+        )
         fig.add_trace(
             go.Scatter(
-                x=group["year"],
-                y=group["value"],
+                x=trace_x,
+                y=trace_y,
                 mode="lines+markers",
+                connectgaps=False,
                 name=f"{label} total",
                 line={"dash": "dash"},
                 hovertemplate=(
@@ -6106,12 +6583,6 @@ def build_area_chart(
         ),
         chart_df,
     )
-    if not effective_authoritative_total_df.empty and not authoritative_boundary:
-        stacked_area_note = (
-            f"{stacked_area_note} Dashed lines are authoritative parent totals; "
-            "dotted coverage lines sum only the visible detailed technologies, "
-            "and the difference is the coverage gap."
-        )
     note_suffix = str(area_spec.get("stacked_area_note_suffix", "")).strip()
     if note_suffix:
         stacked_area_note = f"{stacked_area_note} {note_suffix}"
@@ -6120,16 +6591,6 @@ def build_area_chart(
             f"{stacked_area_note} Dashed totals use the authoritative "
             f"{authoritative_boundary} boundary."
         )
-        if (
-            bool(area_spec.get("show_technology_coverage_trace", True))
-            and coverage_residual_max > 1e-9
-        ):
-            stacked_area_note = (
-                f"{stacked_area_note} The dotted technology-coverage line shows the "
-                f"difference between visible detail and that boundary "
-                f"(maximum absolute gap "
-                f"{coverage_residual_max:,.2f}{chart_unit})."
-            )
 
     fig.update_layout(
         title=title_with_sign_note(f"{title_prefix}: {area_spec['aggregate_flow_label']}", chart_df),
@@ -6664,6 +7125,29 @@ def resolved_area_chart_rows(
                 pd.to_numeric(full_frontier["year"], errors="coerce")
                 <= int(frontier_max_year)
             ]
+            # A comparison source may publish only the aggregate parent in the
+            # historical slice while the detailed LEAP frontier starts later.
+            # The full-frame frontier can then select only the later detail and
+            # leave the historical product overview empty. Recover that
+            # source-local parent frontier without changing the normal detailed
+            # path when historical detail is available.
+            if historical_rows.empty:
+                historical_input = df.loc[
+                    years <= int(frontier_max_year)
+                ]
+                if not historical_input.empty:
+                    historical_rows = power_detail_frontier(
+                        historical_input,
+                        area_spec,
+                    )
+                    if historical_rows.empty:
+                        historical_rows = resolved_area_chart_rows(
+                            historical_input,
+                            {**area_spec, "use_power_detail_frontier": False},
+                            group_col=group_col,
+                            diagnostic_rows=diagnostic_rows,
+                            diagnostic_context=diagnostic_context,
+                        )
             projection_rows = df.loc[years > int(frontier_max_year)]
             parts = [historical_rows] if not historical_rows.empty else []
             if not projection_rows.empty:
@@ -6791,9 +7275,8 @@ def resolved_area_chart_rows(
             )
             # Published detail is safe when it reconciles to the parent. If it
             # does not, only prefer it when its absolute coverage is greater
-            # than the parent (for example, an incomplete/zeroed parent).
-            # Never replace a larger authoritative parent with a smaller child
-            # frontier: that silently drops source energy.
+            # than the parent. Never replace a larger authoritative parent
+            # with a smaller child frontier.
             detail_contexts = coverage[
                 coverage["_parent_total"].isna()
                 | coverage["_detail_residual"].abs().le(tolerance)
@@ -6866,7 +7349,9 @@ def resolved_area_chart_rows(
                 notice_severity="warning",
                 diagnostic_context=diagnostic_context,
             )
-    chart_df = _non_overlapping_common_row_frontier(chart_df)
+    chart_df = _non_overlapping_common_row_frontier(
+        _eligible_extended_observations(chart_df)
+    )
     # Only a chart grouped by the raw common flow label still needs the
     # parent/child and same-name overlap pass.  Immediate-child and configured
     # flow groups have already collapsed their source rows onto an explicit,
@@ -7008,6 +7493,15 @@ def _build_section_aggregate_charts(
     Transfers) already breaks down into per-flow/product line charts, so these
     aggregates summarise everything non-subtotal within just that section.
     """
+    if not page_chart_layer_enabled(page_key, "section_aggregates", template):
+        return {}, [], []
+
+    page_df = _drop_synthetic_technology_diagnostic_rows(page_df)
+    if authoritative_total_df is not None:
+        authoritative_total_df = _drop_synthetic_technology_diagnostic_rows(
+            authoritative_total_df
+        )
+
     charts: dict[str, go.Figure] = {}
     chart_rows: list[dict] = []
     manifest_rows: list[dict] = []
@@ -7029,12 +7523,10 @@ def _build_section_aggregate_charts(
         if str(item.get("page_key", "")).strip() == page_key
     ]
     flow_nodes = get_existing_flow_nodes(page_df)
-    page_overview_config = (
-        template.get(f"{page_key}_page", {}).get("overview", {}) or {}
-    )
+    overview_config = page_overview_config(page_key, template)
     overview_owned_boundaries = [
         str(item.get("flow_boundary", "")).strip()
-        for item in page_overview_config.get("aggregates", [])
+        for item in overview_config.get("aggregates", [])
         if str(item.get("flow_boundary", "")).strip()
     ]
     overview_owned_boundaries.extend(
@@ -7251,13 +7743,42 @@ def _build_section_aggregate_charts(
                     overview_groupings.add("flow")
             else:
                 overview_groupings = {overview_group_by}
-        for group_col, group_noun, title_prefix, manifest_flow, manifest_product in (
-            ("common_product_label", "product", "Aggregate by product", section_label, "All products"),
-            ("common_flow_label", "flow", "Aggregate by flow", "All flows", section_label),
-        ):
+        road_aggregate = (
+            page_key == "transport"
+            and code_candidate_text(required_boundary) == "15.02"
+        )
+        if road_aggregate:
+            area_df["_transport_vehicle_type_label"] = area_df[
+                "common_flow_code"
+            ].map(_transport_road_vehicle_type)
+            area_df["_transport_drivetrain_label"] = area_df[
+                "common_flow_label"
+            ].map(_transport_road_drivetrain)
+            group_specs = [
+                (
+                    "_transport_vehicle_type_label",
+                    "vehicle",
+                    "Aggregate by vehicle type",
+                    "15.02 Road vehicle types",
+                    section_label,
+                ),
+                (
+                    "_transport_drivetrain_label",
+                    "drivetrain",
+                    "Aggregate by drivetrain",
+                    "15.02 Road drivetrain types",
+                    section_label,
+                ),
+            ]
+        else:
+            group_specs = [
+                ("common_product_label", "product", "Aggregate by product", section_label, "All products"),
+                ("common_flow_label", "flow", "Aggregate by flow", "All flows", section_label),
+            ]
+        for group_col, group_noun, title_prefix, manifest_flow, manifest_product in group_specs:
             if included_groupings and group_noun not in included_groupings:
                 continue
-            if section_overlay:
+            if section_overlay and not road_aggregate:
                 configured_group = str(
                     section_overlay.get("group_by", "flow")
                 ).strip().casefold()
@@ -7265,8 +7786,19 @@ def _build_section_aggregate_charts(
                     continue
             if overview_summary and group_noun not in overview_groupings:
                 continue
+            chart_area_df = area_df
+            if road_aggregate:
+                chart_area_df = area_df.loc[
+                    area_df[group_col].fillna("").astype(str).str.strip().ne("")
+                ].copy()
+                if group_noun == "drivetrain" and chart_area_df[
+                    group_col
+                ].nunique() < 2:
+                    continue
+                if chart_area_df.empty:
+                    continue
             chart_key = f"chart__area__section__{safe_slug(page_key)}__{safe_slug(section_label)}__{group_noun}"
-            metrics = compute_ranking_metrics(area_df, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
+            metrics = compute_ranking_metrics(chart_area_df, primary_source, primary_scenario, comparison_source, base_year=base_year, ninth_source=ninth_source)
             redundant_single_flow = group_noun == "flow" and effective_flow_count <= 1
             suppressed = (
                 metrics["total_abs_value"] < suppression_threshold
@@ -7284,16 +7816,16 @@ def _build_section_aggregate_charts(
                 "chart_key": chart_key,
                 "common_flow_label": manifest_flow,
                 "common_product_label": manifest_product,
-                "row_count": int(len(area_df)),
+                "row_count": int(len(chart_area_df)),
                 "source_flow_labels": "; ".join(flow_labels),
-                "sign_note": sign_note_for_chart(area_df),
+                "sign_note": sign_note_for_chart(chart_area_df),
                 "suppressed": suppressed,
                 **metrics,
             })
             if suppressed:
                 continue
             figure = build_area_chart(
-                area_df,
+                chart_area_df,
                 area_spec,
                 series_labels,
                 template,
@@ -7349,7 +7881,7 @@ def _build_section_aggregate_charts(
                 "flow_group_label": navigation_owner,
                 "content_kind": (
                     "technology_overview"
-                    if navigation_owner and group_noun == "flow"
+                    if navigation_owner and group_noun in {"flow", "vehicle"}
                     else ""
                 ),
                 "datasets": chart_dataset_tokens_from_figure(figure),
@@ -7379,6 +7911,9 @@ def _build_flow_group_aggregate_charts(
     flow's rows actually resolve to more than one distinct component flow
     (i.e. the common flow label is a rollup of several raw ESTO/LEAP flows).
     """
+    if not page_chart_layer_enabled(page_key, "flow_group_aggregates", template):
+        return {}, [], []
+
     page_df = drop_placeholder_only_demand_detail_rows(page_key, page_df, template)
     charts: dict[str, go.Figure] = {}
     chart_rows: list[dict] = []
@@ -7627,12 +8162,63 @@ def _build_flow_group_aggregate_charts(
             "aggregate_flow_label": parent_label,
             "source_flow_labels": source_flow_labels,
             "source_flow_labels_by_system": labels_by_source,
+            # The by-flow stack is resolved from immediate children, but its
+            # dashed total must remain the same published parent aggregate as
+            # the paired by-product overview.  Otherwise a source whose child
+            # frontier is suppressed or incomplete loses its comparable total
+            # line even when the parent is present in page_df.
+            "authoritative_total_flow_boundary": parent_prefix,
         }
         child_frontier = resolved_area_chart_rows(
             child_page_df,
             child_area_spec,
             group_col="_child_flow_label",
         )
+
+        # A source that publishes only the exact parent has no immediate-child
+        # rows to map above. Preserve that real parent category for that
+        # source/product/year context, while retaining child detail wherever
+        # the source actually supplies it.
+        exact_parent_rows = page_df.loc[
+            page_df["common_flow_code"].map(code_candidate_text).eq(parent_prefix)
+        ].copy()
+        if not exact_parent_rows.empty:
+            context_columns = [
+                column
+                for column in (
+                    "comparison_scope",
+                    "economy",
+                    "source_system",
+                    "scenario",
+                    "year",
+                    "common_product_code",
+                    "common_product_label",
+                )
+                if column in page_df.columns
+            ]
+            if context_columns:
+                child_contexts = child_page_df[context_columns].drop_duplicates()
+                parent_contexts = exact_parent_rows.merge(
+                    child_contexts.assign(_has_child_detail=True),
+                    on=context_columns,
+                    how="left",
+                )
+                exact_parent_rows = parent_contexts.loc[
+                    parent_contexts["_has_child_detail"].isna()
+                ].drop(columns="_has_child_detail")
+            if not exact_parent_rows.empty:
+                exact_parent_rows = _non_overlapping_common_row_frontier(
+                    exact_parent_rows
+                )
+                exact_parent_rows["_child_flow_code"] = parent_prefix
+                exact_parent_rows["_child_flow_label"] = (
+                    exact_parent_rows["common_flow_label"].astype(str).str.strip()
+                )
+                child_frontier = pd.concat(
+                    [child_frontier, exact_parent_rows],
+                    ignore_index=True,
+                    sort=False,
+                )
 
         flow_chart_key = (
             f"chart__area__flowgroup_parent__{safe_slug(page_key)}__"
@@ -7663,13 +8249,15 @@ def _build_flow_group_aggregate_charts(
         })
         if flow_suppressed:
             continue
+        child_area_spec["rows_are_resolved_area_frontier"] = True
         flow_figure = build_area_chart(
-            child_page_df,
+            child_frontier,
             child_area_spec,
             series_labels,
             template,
             group_col="_child_flow_label",
             title_prefix="Aggregate by flow",
+            authoritative_total_df=page_df,
         )
         if not flow_figure.data:
             manifest_rows[-1]["suppressed"] = True
@@ -7863,7 +8451,9 @@ def build_product_chart(
     base_year: int | None = None,
 ) -> go.Figure:
     """Build a line chart for one common flow/product row."""
-    chart_df = _non_overlapping_common_row_frontier(chart_df)
+    chart_df = _non_overlapping_common_row_frontier(
+        _eligible_extended_observations(chart_df)
+    )
     chart_unit = _chart_unit(chart_df)
     fig = go.Figure()
     trace_meta: list[dict] = []
@@ -7879,7 +8469,10 @@ def build_product_chart(
                 if str(source_system).casefold() == "ninth"
                 else base_year
             )
-            group = group[group["year"] >= source_base_year]
+            if (group["year"] > source_base_year).any():
+                group = group[group["year"] > source_base_year]
+            else:
+                group = group[group["year"] >= source_base_year]
         if group.empty:
             continue
         label = series_label(group.iloc[0], series_labels)
@@ -7909,13 +8502,17 @@ def build_product_chart(
                 "<br>Meaning: %{customdata[1]}"
                 "<extra>" + escape(label) + "</extra>"
             )
+        trace_x, trace_y, trace_customdata = discontinuous_trace_values(
+            group["year"], group["value"], customdata
+        )
         fig.add_trace(
             go.Scatter(
-                x=group["year"],
-                y=group["value"],
+                x=trace_x,
+                y=trace_y,
                 mode="lines+markers",
+                connectgaps=False,
                 name=label,
-                customdata=customdata,
+                customdata=trace_customdata,
                 hovertemplate=hovertemplate,
             )
         )
@@ -8560,7 +9157,11 @@ def write_chart_bundle(charts: dict[str, go.Figure], output_path: Path) -> None:
     assert_unique_line_trace_x(charts)
     serialized_charts: dict[str, dict[str, object]] = {}
     for key, figure in charts.items():
-        serialized = json.loads(json.dumps(figure, cls=PlotlyJSONEncoder))
+        # Keep the figure as a native Plotly mapping until the bundle is
+        # encoded below.  The previous dump/load per figure performed a full
+        # JSON round-trip for every chart before encoding the complete bundle,
+        # which became very expensive for large review dashboards.
+        serialized = figure.to_plotly_json()
         layout = serialized.setdefault("layout", {})
         # Every dashboard chart already has an accessible outer figcaption.
         # Suppress the duplicated Plotly title only in the published bundle so
@@ -8573,7 +9174,12 @@ def write_chart_bundle(charts: dict[str, go.Figure], output_path: Path) -> None:
     payload = {
         "charts": serialized_charts
     }
-    payload_json = json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
+    payload_json = json.dumps(
+        payload,
+        cls=PlotlyJSONEncoder,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
     output_path.write_text(payload_json, encoding="utf-8")
     output_path.with_suffix(".js").write_text(
         "window.COMMON_ESTO_CHART_BUNDLE_DATA=" + payload_json.replace("</", "<\\/") + ";\n",
@@ -8594,7 +9200,11 @@ def assert_unique_line_trace_x(charts: dict[str, go.Figure]) -> None:
             if x_values is None:
                 continue
             x_series = pd.Series(list(x_values), dtype=object)
-            duplicate_mask = x_series.duplicated(keep=False)
+            # ``None`` is a deliberate Plotly discontinuity sentinel, not a
+            # second observation at a real year. A sparse trace can have many
+            # breaks, while every non-null year must still be unique.
+            observed_x = x_series.loc[x_series.notna()]
+            duplicate_mask = observed_x.duplicated(keep=False)
             if not duplicate_mask.any():
                 continue
             failures.append(
@@ -8603,7 +9213,7 @@ def assert_unique_line_trace_x(charts: dict[str, go.Figure]) -> None:
                     "trace_index": trace_index,
                     "trace_name": str(getattr(trace, "name", "") or ""),
                     "duplicate_x_values": (
-                        x_series.loc[duplicate_mask]
+                        observed_x.loc[duplicate_mask]
                         .drop_duplicates()
                         .head(10)
                         .tolist()
@@ -9010,12 +9620,17 @@ def _jump_nav_html(
     if not section_tree:
         return ""
     visible_nodes: list[dict[str, object]] = []
+    seen_labels: set[str] = set()
     for section_label, subsection_nodes in section_tree:
         for node in subsection_nodes:
+            label = str(node["label"])
+            if label in seen_labels:
+                continue
+            seen_labels.add(label)
             target = str(node.get("target") or "") or _section_anchor(
                 page_label,
                 section_label,
-                str(node["label"]) if bool(node["use_subsection_anchor"]) else None,
+                label if bool(node["use_subsection_anchor"]) else None,
             )
             visible_nodes.append({**node, "target": target})
     if not visible_nodes:
@@ -9080,6 +9695,9 @@ def _area_charts_html(
             if str(row.get("overview_group", "Overview")) == group_label
         ]
         def pair_key(row: dict) -> str:
+            configured_pair_key = str(row.get("overview_pair_key") or "").strip()
+            if configured_pair_key:
+                return configured_pair_key
             title = str(row.get("title", "")).strip()
             title_owner = re.sub(
                 r"\s+—\s+by\s+(?:product|flow)$",
@@ -9357,35 +9975,6 @@ avigation_roots``. A page-defined overview aggregate can also parent a
         seen_sections[section_label].insert(0, root_label)
         existing_groups.add(root_label)
         root_targets[root_label] = str(root.get("target") or "").strip()
-
-    # A combined bunker placeholder can reach the navigation through both its
-    # by-product line owner (historically labelled ``04-05 International
-    # transport``) and its overview root (the canonical ``(bunkers)`` label).
-    # They are one representation boundary, not two Supply sections. Retain
-    # every card and anchor, but publish one canonical chip while placeholder
-    # coverage is active. Detailed 04 and 05 owners do not meet this condition.
-    bunker_groups = [
-        group
-        for groups in seen_sections.values()
-        for group in groups
-        if group in placeholder_groups
-        and code_candidate_text(group) == "04-05"
-        and "international transport" in group.casefold()
-    ]
-    canonical_bunker = next(
-        (group for group in bunker_groups if "(bunkers)" in group.casefold()),
-        "",
-    )
-    if canonical_bunker and len(set(bunker_groups)) > 1:
-        for groups in seen_sections.values():
-            retained: list[str] = []
-            for group in groups:
-                normalized = canonical_bunker if group in bunker_groups else group
-                if normalized not in retained:
-                    retained.append(normalized)
-            groups[:] = retained
-        placeholder_groups.difference_update(bunker_groups)
-        placeholder_groups.add(canonical_bunker)
 
     depth_overrides = {
         str(label).strip(): int(depth)
@@ -9949,8 +10538,60 @@ def write_dashboard_page(
     """Write a polished HTML dashboard page with sticky header, lazy loading, and sorting."""
     page_label = str(page_config.get("page_label", "Dashboard"))
     page_file = output_path.name
-    area_rows = [r for r in chart_rows if r.get("chart_type") == "stacked_area" and str(r.get("section_label")) == "Overview"]
-    line_rows = [r for r in chart_rows if not (r.get("chart_type") == "stacked_area" and str(r.get("section_label")) == "Overview")]
+    top_level_aggregate_prefixes = [
+        str(prefix).strip()
+        for prefix in page_config.get("top_level_aggregate_flow_prefixes", [])
+        if str(prefix).strip()
+    ]
+
+    def is_top_level_aggregate(row: dict) -> bool:
+        """Return whether a configured subsection aggregate belongs with page overview cards."""
+        return (
+            row.get("chart_type") == "stacked_area"
+            and str(row.get("section_label")) != "Overview"
+            and any(
+                code_expression_matches_prefix(
+                    code_candidate_text(row.get("flow_group_label")), prefix
+                )
+                for prefix in top_level_aggregate_prefixes
+            )
+        )
+
+    area_rows = [
+        row
+        for row in chart_rows
+        if (
+            row.get("chart_type") == "stacked_area"
+            and str(row.get("section_label")) == "Overview"
+        )
+    ]
+    # A page can explicitly place one coherent hierarchy of aggregate cards
+    # directly beneath its existing overview.  The rows retain their titles,
+    # figures, and relative order; only their page position changes.
+    area_rows.extend(
+        {
+            **row,
+            "overview_group": "Overview",
+            # Keep a promoted Road aggregate pair distinct from an existing
+            # overview pair with the same owner label.
+            "overview_pair_key": (
+                "promoted:" + str(row.get("flow_group_label") or "").strip()
+            ),
+        }
+        for row in chart_rows
+        if is_top_level_aggregate(row)
+    )
+    line_rows = [
+        row
+        for row in chart_rows
+        if not (
+            (
+                row.get("chart_type") == "stacked_area"
+                and str(row.get("section_label")) == "Overview"
+            )
+            or is_top_level_aggregate(row)
+        )
+    ]
     if bool(page_config.get("label_all_producers_with_plant_family", False)):
         line_rows = [
             {
@@ -10448,6 +11089,10 @@ def _build_td_sector_chart(
         for _, sector_row in sector_order.iterrows():
             page_key = str(sector_row["_page_key"])
             page_label = str(sector_row["_page_label"])
+            # Non-energy use is its own TFC stack component.  The Industry
+            # page label also names that routed section, but repeating it in
+            # this sector legend would imply the Industry area includes it.
+            display_label = "Industry" if page_key == "industry" else page_label
             sector_data = (
                 scenario_df[scenario_df["_page_key"] == page_key]
                 .groupby("year", as_index=False)["value"].sum()
@@ -10463,13 +11108,13 @@ def _build_td_sector_chart(
                 x_values=sector_data["year"],
                 y_values=sector_data["value"],
                 stackgroup_prefix=f"demand_{scenario_toggle_tag(stack_source_name, scenario_name)}",
-                trace_name=page_label,
+                trace_name=display_label,
                 visible=is_default,
                 hovertemplate=(
                     "%{x}<br>%{y:,.2f}"
                     + chart_unit
                     + "<extra>"
-                    + escape(page_label)
+                    + escape(display_label)
                     + "</extra>"
                 ),
                 line_color=color or "",
@@ -10491,9 +11136,12 @@ def _build_td_sector_chart(
         if not _has_nonzero_values(grp["value"]):
             continue
         lbl = series_label_from_values(src, scen, series_labels) + " (Domestic TFC)"
+        ordered = grp.sort_values("year")
+        trace_x, trace_y, _ = discontinuous_trace_values(ordered["year"], ordered["value"])
         fig.add_trace(go.Scatter(
-            x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
+            x=trace_x, y=trace_y,
             mode="lines+markers", name=lbl, line={"dash": "dash"},
+            connectgaps=False,
             hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
         ))
         trace_meta.append(trace_meta_entry(src, scen, True))
@@ -10682,9 +11330,12 @@ def _build_td_fuel_chart(
         if not _has_nonzero_values(grp["value"]):
             continue
         lbl = series_label_from_values(src, scen, series_labels) + " total (Domestic TFC)"
+        ordered = grp.sort_values("year")
+        trace_x, trace_y, _ = discontinuous_trace_values(ordered["year"], ordered["value"])
         fig.add_trace(go.Scatter(
-            x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
+            x=trace_x, y=trace_y,
             mode="lines+markers", name=lbl, line={"dash": "dash"},
+            connectgaps=False,
             hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
         ))
         trace_meta.append(trace_meta_entry(src, scen, True))
@@ -10850,9 +11501,12 @@ def _build_supply_stack_chart(
         if not _has_nonzero_values(grp["value"]):
             continue
         lbl = series_label_from_values(src, scen, series_labels) + f" {total_line_suffix}"
+        ordered = grp.sort_values("year")
+        trace_x, trace_y, _ = discontinuous_trace_values(ordered["year"], ordered["value"])
         fig.add_trace(go.Scatter(
-            x=grp.sort_values("year")["year"], y=grp.sort_values("year")["value"],
+            x=trace_x, y=trace_y,
             mode="lines+markers", name=lbl, line={"dash": "dash"},
+            connectgaps=False,
             hovertemplate="%{x}<br>%{y:,.2f}" + chart_unit + "<extra>" + escape(lbl) + "</extra>",
         ))
         trace_meta.append(trace_meta_entry(src, scen, True))
@@ -10988,10 +11642,12 @@ def _build_balance_flow_total_chart(
     for (source_system, scenario), group in totals.groupby(["source_system", "scenario"]):
         label = series_label_from_values(source_system, scenario, series_labels)
         ordered = group.sort_values("year")
+        trace_x, trace_y, _ = discontinuous_trace_values(ordered["year"], ordered["value"])
         fig.add_trace(go.Scatter(
-            x=ordered["year"],
-            y=ordered["value"],
+            x=trace_x,
+            y=trace_y,
             mode="lines+markers",
+            connectgaps=False,
             name=label,
             hovertemplate="%{x}<br>Signed value: %{y:,.2f}" + chart_unit + "<extra>" + escape(label) + "</extra>",
         ))
@@ -11981,6 +12637,7 @@ def render_dashboard(
     base_year = int(chart_config.get("base_year", 2023))
     excluded_flow_code_prefixes = template.get("excluded_flow_code_prefixes", [])
     excluded_flow_labels = template.get("excluded_flow_labels", [])
+    df = _drop_synthetic_technology_diagnostic_rows(df)
     df = _keep_one_measure_for_energy_balance_charts(df)
     df = drop_esto_post_base_year_rows(df, comparison_source, base_year)
     # Presentation exclusions hide duplicate/inclusive comparison rows from
@@ -11999,6 +12656,7 @@ def render_dashboard(
         and df["_other_nonenergy_estimation_method"].fillna("").astype(str).str.strip().ne("").any()
     )
     if scope_df is not None:
+        scope_df = _drop_synthetic_technology_diagnostic_rows(scope_df)
         scope_df = _keep_one_measure_for_energy_balance_charts(scope_df)
         scope_df = drop_esto_post_base_year_rows(scope_df, comparison_source, base_year)
         scope_df = drop_excluded_flow_rows(
@@ -12222,6 +12880,12 @@ def render_dashboard(
                 base_year=base_year,
                 parent_specs=automatic_parent_specs,
                 missing_basis_mode="keep_parent",
+                share_reference_year=(
+                    base_year + 1
+                    if page_key == "power"
+                    and comparison_source.casefold() == "esto_extended"
+                    else None
+                ),
                 audit_rows=historical_allocation_audit_rows,
             )
         for audit_row in historical_allocation_audit_rows[
@@ -12365,7 +13029,12 @@ def render_dashboard(
                 source_root_code = code_candidate_text(source_aggregate_label)
             if (
                 area_spec_is_placeholder_only_demand_child(page_key, area_spec, template)
-                or power_interim_flow_is_active(page_key, source_root_code, template)
+                or power_interim_overview_spec_is_hidden(
+                    page_key,
+                    source_root_code,
+                    group_col,
+                    template,
+                )
             ):
                 continue
             is_real_page_flow = source_aggregate_label in page_flow_labels
@@ -12398,7 +13067,10 @@ def render_dashboard(
             immediate_child_parent = str(
                 area_spec.get("immediate_child_flow_parent_prefix", "")
             ).strip()
-            if immediate_child_parent:
+            if immediate_child_parent and not (
+                group_col == "common_product_label"
+                and bool(area_spec.get("use_power_detail_frontier", False))
+            ):
                 if bool(
                     area_spec.get(
                         "reconcile_child_flow_to_product_frontier", False
@@ -12620,6 +13292,8 @@ def render_dashboard(
                     [product_overview_rows, area_product_rows],
                     ignore_index=True,
                 )
+                if bool(area_spec.get("skip_placeholder_product_cards", False)):
+                    continue
                 component_sections = [
                     section
                     for section in active_placeholder_product_sections(page_key, template)
@@ -12689,18 +13363,21 @@ def render_dashboard(
                             if str(label).strip()
                         )
                     ]
-                    product_charts, product_chart_rows, product_manifest_rows = (
-                        _build_ordinary_product_line_charts(
-                            aggregate_product_specs,
-                            page_key,
-                            page_label,
-                            template,
-                            series_labels,
+                    if page_chart_layer_enabled(
+                        page_key, "leaf_charts", template, default=True
+                    ):
+                        product_charts, product_chart_rows, product_manifest_rows = (
+                            _build_ordinary_product_line_charts(
+                                aggregate_product_specs,
+                                page_key,
+                                page_label,
+                                template,
+                                series_labels,
+                            )
                         )
-                    )
-                    charts.update(product_charts)
-                    chart_rows.extend(product_chart_rows)
-                    manifest_rows.extend(product_manifest_rows)
+                        charts.update(product_charts)
+                        chart_rows.extend(product_chart_rows)
+                        manifest_rows.extend(product_manifest_rows)
                     product_overview_rows = pd.concat(
                         [product_overview_rows, owner_rows],
                         ignore_index=True,
@@ -12738,18 +13415,21 @@ def render_dashboard(
                         if str(label).strip()
                     )
                 ]
-                owner_charts, owner_chart_rows, owner_manifest_rows = (
-                    _build_ordinary_product_line_charts(
-                        owner_specs,
-                        page_key,
-                        page_label,
-                        template,
-                        series_labels,
+                if page_chart_layer_enabled(
+                    page_key, "leaf_charts", template, default=True
+                ):
+                    owner_charts, owner_chart_rows, owner_manifest_rows = (
+                        _build_ordinary_product_line_charts(
+                            owner_specs,
+                            page_key,
+                            page_label,
+                            template,
+                            series_labels,
+                        )
                     )
-                )
-                charts.update(owner_charts)
-                chart_rows.extend(owner_chart_rows)
-                manifest_rows.extend(owner_manifest_rows)
+                    charts.update(owner_charts)
+                    chart_rows.extend(owner_chart_rows)
+                    manifest_rows.extend(owner_manifest_rows)
                 product_overview_rows = pd.concat(
                     [
                         product_overview_rows,
@@ -12846,7 +13526,24 @@ def render_dashboard(
         chart_rows.extend(flow_group_chart_rows)
         manifest_rows.extend(flow_group_manifest_rows)
 
-        pairs = detail_page_df[["common_flow_label", "common_product_label"]].drop_duplicates().sort_values(["common_flow_label", "common_product_label"])
+        pairs = detail_page_df[
+            ["common_flow_code", "common_flow_label", "common_product_label"]
+        ]
+        if page_chart_layer_enabled(
+            page_key, "leaf_charts", template, default=True
+        ):
+            pairs = pairs.drop_duplicates().sort_values(
+                ["common_flow_label", "common_product_label", "common_flow_code"]
+            )
+            pairs = pairs.loc[
+                pairs["common_flow_code"].map(
+                    lambda code: page_product_leaf_chart_enabled(
+                        page_key, code, template
+                    )
+                )
+            ]
+        else:
+            pairs = pairs.iloc[0:0]
         for _, pair in pairs.iterrows():
             flow_label = pair["common_flow_label"]
             product_label = pair["common_product_label"]
@@ -13064,6 +13761,12 @@ def render_dashboard(
             "product_code", "product_label", "parent_value",
             "preserved_native_child_value", "uncovered_parent_value",
             "leap_basis_value", "estimated_child_count",
+            "leap_share_reference_year", "leap_share_sign",
+            "leap_share_fallback_level", "leap_share_basis_scope",
+            "leap_share_positive_basis_value",
+            "leap_share_negative_basis_value",
+            "leap_share_basis_mismatch_value", "basis_parent_mismatch_ratio",
+            "mismatch_warning",
         ]
         pd.DataFrame(
             historical_allocation_audit_rows,
@@ -13078,6 +13781,15 @@ def render_dashboard(
         ).to_csv(
             layout["supporting"] / "chart_frontier_diagnostics.csv",
             index=False,
+        )
+        write_semantic_fingerprint(
+            layout,
+            identity={
+                "comparison_scope": active_scope,
+                "dashboard_key": str(template.get("_current_dashboard_key", ""))
+                or layout["root"].name,
+            },
+            base_year=base_year,
         )
     return manifest_df
 

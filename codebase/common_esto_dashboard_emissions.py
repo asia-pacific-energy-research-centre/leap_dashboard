@@ -1109,6 +1109,7 @@ def _power_frontier_with_reconciliation(
     context_keys = _transformation_context_keys(work)
     selected_groups: list[pd.DataFrame] = []
     qa_records: list[dict[str, object]] = []
+    renderer = _renderer()
 
     for _, group in work.groupby(
         context_keys, sort=False, dropna=False, observed=True
@@ -1129,9 +1130,10 @@ def _power_frontier_with_reconciliation(
         for _, branch_group in branches.groupby(
             "_power_branch", sort=False, observed=True
         ):
-            specificity = branch_group["common_flow_code"].map(
-                lambda value: len(re.findall(r"\d+(?:\.\d+)*", str(value)))
-            )
+            # Composite codes may name several parallel source paths. Their
+            # token count does not encode hierarchy level; use the deepest
+            # parsed component path, as the general transformation frontier does.
+            specificity = branch_group["common_flow_code"].map(renderer.code_depth)
             branch_frontier.append(branch_group[specificity.eq(specificity.max())])
         candidate = (
             pd.concat(branch_frontier, ignore_index=False)
@@ -1155,11 +1157,10 @@ def _power_frontier_with_reconciliation(
                 action = "children"
                 status = "passed"
             elif abs(candidate_value) > abs(parent_value):
-                # When detailed children have greater coverage than an incomplete
-                # or zeroed-out parent (e.g. DASH-037: broad 09.01-09.02 parent
-                # containing only Heat plants while Coal power is reported under
-                # process children), prefer the detailed children so combustion
-                # is not erased.
+                # A broad power parent can be incomplete: detailed child
+                # inputs may contain combustion omitted from the parent.
+                # Keep those children so the emissions frontier does not
+                # erase valid generation inputs.
                 chosen = candidate
                 action = "children"
                 status = "passed"
@@ -1735,6 +1736,9 @@ def build_emissions_page(
                     ].astype(str).unique()
                 ),
                 missing,
+                unrepresented_own_use_note=_unrepresented_own_use_note(
+                    assigned_df, factors, base_year, unit
+                ),
             ),
             dashboard_updated_label=dashboard_updated_label,
             **scope_ui_kwargs,
@@ -1816,17 +1820,202 @@ def _sector_color_map(template: dict, assigned_df: pd.DataFrame) -> dict[str, st
     }
 
 
+_MIXED_TRANSFORMATION_SECTORS_CACHE: dict[str, dict[str, str]] = {}
+
+_DEFAULT_MIXED_TRANSFORMATION_SECTORS: dict[str, str] = {
+    "10.01.02": "gas works",
+    "10.01.03": "liquefaction/regasification",
+    "10.01.04": "gas-to-liquids",
+    "10.01.05": "coke ovens",
+    "10.01.07": "blast furnaces",
+    "10.01.08": "patent fuel plants",
+    "10.01.09": "briquette plants",
+    "10.01.10": "coal liquefaction",
+    "10.01.11": "oil refining",
+    "10.01.15": "charcoal production",
+    "10.01.16": "biogasification",
+    "10.01.17": "non-specified transformation",
+    "10.01.19": "hydrogen production",
+}
+
+
+def load_mixed_transformation_own_use_sectors(
+    workbook_path: str | Path | None = None,
+) -> dict[str, str]:
+    """Discover transformation own-use flows combined by the active mappings."""
+    path = _resolve_mappings_path(
+        workbook_path or "config/outlook_mappings_single_axis.xlsx"
+    )
+    if not path.exists():
+        path = _resolve_mappings_path("config/outlook_mappings_master.xlsx")
+    cache_key = str(path)
+    if cache_key in _MIXED_TRANSFORMATION_SECTORS_CACHE:
+        return _MIXED_TRANSFORMATION_SECTORS_CACHE[cache_key].copy()
+    if not path.exists():
+        return _DEFAULT_MIXED_TRANSFORMATION_SECTORS.copy()
+    try:
+        rules_df = pd.read_excel(path, sheet_name="esto_rollup_rules")
+    except Exception:
+        return _DEFAULT_MIXED_TRANSFORMATION_SECTORS.copy()
+
+    mixed_sectors: dict[str, str] = {}
+    for rolled_flow, group in rules_df.groupby("rolled_esto_flow"):
+        input_flows = group["input_esto_flow"].dropna().astype(str).tolist()
+        child_flows = (
+            group["child_flow_labels"].dropna().astype(str).tolist()
+            if "child_flow_labels" in group.columns
+            else []
+        )
+        components = set(input_flows)
+        for value in child_flows:
+            components.update(item.strip() for item in value.split(";") if item.strip())
+        if not (
+            any(value.strip().startswith("09") for value in components)
+            or str(rolled_flow).strip().startswith("09")
+        ):
+            continue
+        own_use = [value.strip() for value in components if value.strip().startswith("10.01")]
+        if not own_use:
+            continue
+        name = str(rolled_flow).replace("(including own use)", "").strip()
+        parts = name.split(" ", 1)
+        if len(parts) > 1 and parts[0].replace(".", "").isdigit():
+            name = parts[1].strip()
+        display_name = name.lower()
+        for needle, replacement in (
+            ("oil refiner", "oil refining"),
+            ("gas work", "gas works"),
+            ("coke oven", "coke ovens"),
+            ("blast furnace", "blast furnaces"),
+            ("liquefaction", "liquefaction/regasification"),
+            ("gas process", "gas processing"),
+        ):
+            if needle in display_name:
+                display_name = replacement
+                break
+        for component in own_use:
+            code = component.split()[0] if component.split() else ""
+            if code.startswith("10.01"):
+                mixed_sectors[code] = display_name
+    if not mixed_sectors:
+        mixed_sectors = _DEFAULT_MIXED_TRANSFORMATION_SECTORS.copy()
+    _MIXED_TRANSFORMATION_SECTORS_CACHE[cache_key] = mixed_sectors
+    return mixed_sectors.copy()
+
+
+def _unrepresented_own_use_note(
+    assigned_df: pd.DataFrame,
+    factors: pd.DataFrame,
+    base_year: int = 2022,
+    unit: str = "Mt CO₂",
+    mixed_sectors: dict[str, str] | None = None,
+) -> str:
+    """Explain base-year own use absent as separate rows in LEAP scenarios."""
+    required = {"source_system", "scenario", "year", "common_flow_code", "value"}
+    if not required.issubset(assigned_df.columns) or assigned_df.empty:
+        return ""
+    df = assigned_df
+    if "comparison_scope" in df.columns:
+        scopes = df["comparison_scope"].dropna().unique()
+        if len(scopes):
+            df = df[df["comparison_scope"].eq(scopes[0])]
+    df = df.copy()
+    df["_note_year"] = pd.to_numeric(df["year"], errors="coerce")
+    df["_note_value"] = pd.to_numeric(df["value"], errors="coerce")
+    source = df["source_system"].astype(str).str.upper()
+    esto_sources = df.loc[source.str.contains("ESTO"), "source_system"].dropna().unique()
+    leap_scenarios = sorted(
+        df.loc[source.str.contains("LEAP") & df["_note_year"].gt(base_year), "scenario"]
+        .dropna().astype(str).unique(),
+        key=str.casefold,
+    )
+    if len(esto_sources) == 0 or len(leap_scenarios) == 0:
+        return ""
+
+    esto = df[
+        df["source_system"].isin(esto_sources)
+        & df["_note_value"].lt(0)
+    ]
+    effective_base_year = base_year
+    if not esto["_note_year"].eq(effective_base_year).any():
+        available_years = esto["_note_year"].dropna()
+        if available_years.empty:
+            return ""
+        effective_base_year = int(available_years.max())
+    esto_base = esto[esto["_note_year"].eq(effective_base_year)].copy()
+    if esto_base.empty:
+        return ""
+    esto_base_with_emissions = attach_emissions(esto_base, factors)
+    target_sectors = mixed_sectors or load_mixed_transformation_own_use_sectors()
+
+    scenario_missing: list[dict[str, float]] = []
+    for scenario in leap_scenarios:
+        leap_rows = df[
+            source.str.contains("LEAP")
+            & df["scenario"].astype(str).eq(scenario)
+            & df["_note_year"].gt(effective_base_year)
+            & df["_note_value"].lt(0)
+        ]
+        missing: dict[str, float] = {}
+        for prefix, label in sorted(target_sectors.items()):
+            sector_mask = esto_base_with_emissions["common_flow_code"].astype(str).str.startswith(prefix)
+            esto_emissions = esto_base_with_emissions.loc[sector_mask, EMISSIONS_COLUMN].abs().sum()
+            if esto_emissions < 0.5:
+                continue
+            leap_values = leap_rows.loc[
+                leap_rows["common_flow_code"].astype(str).str.startswith(prefix), "_note_value"
+            ].abs().sum()
+            if leap_values < 0.1:
+                missing[label] = float(esto_emissions)
+        scenario_missing.append(missing)
+    if not scenario_missing:
+        return ""
+
+    # The page note has no scenario label. Only state a missing own-use sector
+    # when every available LEAP scenario lacks it, and only use its amount when
+    # the independently calculated scenario values agree.
+    shared_labels = set(scenario_missing[0])
+    for scenario_values in scenario_missing[1:]:
+        shared_labels.intersection_update(scenario_values)
+    shared_missing = {
+        label: values[0]
+        for label in sorted(shared_labels)
+        if (values := [scenario_values[label] for scenario_values in scenario_missing])
+        and all(abs(value - values[0]) <= 1e-9 for value in values[1:])
+    }
+    missing_emissions = sum(shared_missing.values())
+    if not shared_missing or missing_emissions < 1.0:
+        return ""
+    labels = list(shared_missing)
+    if len(labels) == 1:
+        sector_text = labels[0]
+    elif len(labels) == 2:
+        sector_text = f"{labels[0]} and {labels[1]}"
+    else:
+        sector_text = f"{', '.join(labels[:-1])} and {labels[-1]}"
+    return (
+        f"Note: Own use for {sector_text} (~{round(missing_emissions):,.0f} "
+        f"{unit} in {effective_base_year}) is netted into transformation "
+        "rather than reported as separate fuel combustion in LEAP exports. "
+        "This means it cannot be reported as emissions, explaining a small gap "
+        "between ESTO/9th and LEAP totals."
+    )
+
+
 def _page_note(
     _factor_set: dict,
     _unit: str,
     _aggregate_sources: list[str],
     unmatched_rows: pd.DataFrame | None = None,
+    unrepresented_own_use_note: str = "",
 ) -> str:
     """Give the page a short explanation of what its emissions represent."""
     note = (
         "Emissions (Mt CO₂) are estimated from final demand, power generation and "
         "energy-sector own use, using energy-weighted 9th Edition CO₂e factors."
     )
+    if unrepresented_own_use_note:
+        note = f"{note} {unrepresented_own_use_note}"
     if unmatched_rows is None or unmatched_rows.empty:
         return note
     return f"{note} {_unmatched_factor_warning(unmatched_rows)}"

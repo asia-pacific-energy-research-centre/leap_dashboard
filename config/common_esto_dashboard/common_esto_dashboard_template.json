@@ -252,6 +252,7 @@
       "page_key": "transport",
       "page_label": "Transport",
       "reserve_unpaired_placeholder_overview_column": true,
+      "top_level_aggregate_flow_prefixes": ["15.02"],
       "priority": 70,
       "flow_code_prefixes": [
         "15"
@@ -264,6 +265,14 @@
         "Pipeline transport"
       ],
       "navigation_depth_overrides": {
+        "15.02 Road": 1,
+        "15.02.01 Freight road": 2,
+        "15.02.02 Passenger road": 2,
+        "15.02.01.01 LCVs": 3,
+        "15.02.01.02 Trucks": 3,
+        "15.02.02.01 Buses": 3,
+        "15.02.02.02 LPVs": 3,
+        "15.02.02.03 Motorcycles": 3,
         "15.01,15.03-15.06 Transport non-road": 1,
         "15.01 Domestic air transport": 2,
         "15.03 Rail": 2,
@@ -384,7 +393,7 @@
       "Industry": {"flow_code": "14", "label": "14 Industry sector"},
       "Road": {"flow_code": "15.02", "label": "15.02 Road"},
       "Transport non road": {"flow_code": "15.01,15.03-15.06", "label": "15.01,15.03-15.06 Transport non-road"},
-      "Buildings": {"flow_code": "16.01-16.02", "label": "16.01-16.02 Buildings"},
+      "Buildings": {"flow_code": "16.01-16.02", "label": "16.01-16.02 Buildings", "native_child_share_fallback": true},
       "Other sector": {"flow_code": "16.03-16.05", "label": "16.03-16.05 Other sector"},
       "Non Energy Use": {"flow_code": "17", "label": "17 Non-energy use"}
     },
@@ -441,33 +450,46 @@
     },
     "_note": "Both Other-demand Overview charts always use exact boundary 16.03-16.05; broad flow 16 is suppressed because it also contains sectors presented on the Buildings page. The by-flow source frontier first uses separate 16.03, 16.04 and 16.05 rows when they reconcile to the authoritative parent. A source that publishes only 16.03-16.04 retains that compound as the conservative fallback. Any remaining parent/detail difference is shown conservatively as unallocated rather than assigned to a specific child. A source/year with no child detail retains its published parent unless exactly one historical child reconciles to the compound; the active LEAP placeholder is otherwise retained. Source-specific comparison rollups 16.03-16.04 and 16.03-16.05 are already owned by the continuous Overview and are not repeated below as misleading historical-only or projection-only detail sections."
   },
-  "buildings_page": {
-    "page_key": "buildings",
-    "overview": {
-      "enabled": true,
-      "suppress_redundant_detail_flow_codes": ["16.01", "16.01-16.02"],
-      "aggregates": [
-        {
-          "flow_boundary": "16.01-16.02",
-          "label": "16.01-16.02 Buildings",
-          "preferred_detail_flow_boundaries": ["16.01", "16.02"],
-          "flow_groups": [
-            {"flow_boundary": "16.01", "label": "16.01 Commercial and public services"},
-            {"flow_boundary": "16.02", "label": "16.02 Residential"}
+  "page_chart_contracts": {
+    "_note": "Generic product-leaf line charts are disabled unless a page contract explicitly enables them. Aggregate section and flow-group cards remain active by default; Buildings explicitly keeps its genuine leaf charts.",
+    "buildings": {
+      "contract_version": 1,
+      "layers": {
+        "overview": {
+          "enabled": true,
+          "suppress_redundant_detail_flow_codes": ["16.01", "16.01-16.02"],
+          "aggregates": [
+            {
+              "flow_boundary": "16.01-16.02",
+              "label": "16.01-16.02 Buildings",
+              "preferred_detail_flow_boundaries": ["16.01", "16.02"],
+              "flow_groups": [
+                {"flow_boundary": "16.01", "label": "16.01 Commercial and public services"},
+                {"flow_boundary": "16.02", "label": "16.02 Residential"}
+              ],
+              "stacked_area_note": "Where the ESTO Buildings parent exceeds the published Services and Residential child total and LEAP has no non-zero split for that fuel, the uncovered historical remainder is estimated over those observed children in their same-year proportions. The allocation is recorded in historical_allocation_audit.csv."
+            },
+            {
+              "flow_boundary": "16.01",
+              "label": "16.01 Commercial and public services",
+              "preferred_detail_flow_boundaries": ["16.01.01", "16.01.99"],
+              "flow_groups": [
+                {"flow_boundary": "16.01.01", "label": "16.01.01 Datacentres"},
+                {"flow_boundary": "16.01.99", "label": "16.01.99 Commercial and public services unallocated"}
+              ]
+            }
           ]
         },
-        {
-          "flow_boundary": "16.01",
-          "label": "16.01 Commercial and public services",
-          "preferred_detail_flow_boundaries": ["16.01.01", "16.01.99"],
-          "flow_groups": [
-            {"flow_boundary": "16.01.01", "label": "16.01.01 Datacentres"},
-            {"flow_boundary": "16.01.99", "label": "16.01.99 Commercial and public services unallocated"}
-          ]
-        }
-      ]
-    },
-    "_note": "The detailed Buildings Overview is deliberately limited to the complete Buildings boundary and its Services branch. Each is shown by fuel and by immediate child flow. The full Buildings view uses Commercial/public services plus Residential; the Services view uses Datacentres plus the explicitly unallocated Commercial/public-services remainder. Broader flow 16 and duplicate detail summaries are not shown."
+        "section_aggregates": {"enabled": false},
+        "flow_group_aggregates": {"enabled": false},
+        "leaf_charts": {"enabled": true}
+      },
+      "_note": "Buildings Overview owns the configured aggregate pairs. Generic section and flow-group summaries are disabled; genuine Residential, Datacentre, and unallocated Commercial leaf charts remain enabled."
+    }
+  },
+  "buildings_page": {
+    "page_key": "buildings",
+    "_note": "Buildings routing identity. Chart ownership is declared in page_chart_contracts.buildings."
   },
   "power_page": {
     "page_key": "power",
@@ -481,7 +503,6 @@
           "child_flow_parent_prefix": "09.01",
           "label": "09.01-09.02 Power",
           "navigation_root": true,
-          "show_technology_coverage_trace": false,
           "comparison_total_uses_detail_stack": true,
           "child_flow_labels": {
             "09.01.01": "09.01.01,09.02.01 Electricity plants",
@@ -552,12 +573,14 @@
     "transport": {
       "Transport": {
         "required_flow_boundary": "15.02",
-        "include_groupings": ["flow"],
+        "hide_product_leaf_charts": true,
+        "include_groupings": ["vehicle", "drivetrain"],
         "grouping_titles": {
-          "flow": "15.02 Road — detailed model by technology"
+          "vehicle": "15.02 Road — energy by vehicle type",
+          "drivetrain": "15.02 Road — energy by drivetrain"
         },
         "navigation_owner": "15.02 Road",
-        "section_label": "15.02 Road — by product"
+        "section_label": "15.02 Road — by flow"
       }
     },
     "power": {
@@ -578,7 +601,7 @@
     "Electricity interim": ["09.01.01", "09.02.01"],
     "CHP interim": ["09.01.02", "09.02.02"],
     "Heat plant interim": ["09.01.03", "09.02.03"],
-    "_note": "When an interim branch is retained in the upstream fallback audit, hide its Power detail cards. The page-level Power aggregates remain until each interim branch is replaced by its completed LEAP source branch."
+    "_note": "When an interim branch is retained in the upstream fallback audit, keep its by-product overview because the placeholder is fuel-resolved, but hide its by-flow and detail cards because it does not justify a process split. The page-level Power aggregates remain until each interim branch is replaced by its completed LEAP source branch."
   },
   "scope_specific_pages": {
     "enabled": false,
