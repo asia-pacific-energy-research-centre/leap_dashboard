@@ -3577,9 +3577,9 @@ def resolve_supply_bunker_representation(
     """Select one additive bunker frontier per source/scenario/year surface.
 
     Explicit LEAP child rows are authoritative evidence that marine/aviation
-    detail exists, even when their values are zero. If any present child has a
-    non-zero value, only populated children are charted; an absent or zero
-    sibling is never manufactured. Resolving before page filtering prevents
+    detail exists, even when their values are zero. A combined parent remains
+    authoritative when only one child is present because that is not a
+    complete marine/aviation split. Resolving before page filtering prevents
     stale audit metadata from deleting genuine detail downstream.
     """
     supply_config = template.get("supply_page", {}) or {}
@@ -3648,7 +3648,12 @@ def resolve_supply_bunker_representation(
                 surface_codes.isin(detail_codes), "_bunker_frontier_row"
             ].astype(int)
         )
-        mode = "detail" if present_children else "combined"
+        complete_detail = set(detail_codes).issubset(present_children)
+        mode = (
+            "detail"
+            if complete_detail or (present_children and not has_combined)
+            else "combined"
+        )
         if mode == "detail":
             detail_frontier_rows_to_drop.update(
                 surface.loc[
@@ -3746,7 +3751,13 @@ def resolve_supply_bunker_representation(
         for source, mode in selected_modes
     )
     metadata_placeholder = uses_combined_international_transport_placeholder(template)
-    detail_active = bool(structural_detail_codes)
+    leap_combined_present = bool(
+        (leap_row_mask & codes.eq(boundary)).any()
+    )
+    detail_active = bool(structural_detail_codes) and (
+        not leap_combined_present
+        or set(detail_codes).issubset(structural_detail_codes)
+    )
     placeholder_active = (
         not detail_active
         and (
@@ -9346,6 +9357,35 @@ avigation_roots``. A page-defined overview aggregate can also parent a
         seen_sections[section_label].insert(0, root_label)
         existing_groups.add(root_label)
         root_targets[root_label] = str(root.get("target") or "").strip()
+
+    # A combined bunker placeholder can reach the navigation through both its
+    # by-product line owner (historically labelled ``04-05 International
+    # transport``) and its overview root (the canonical ``(bunkers)`` label).
+    # They are one representation boundary, not two Supply sections. Retain
+    # every card and anchor, but publish one canonical chip while placeholder
+    # coverage is active. Detailed 04 and 05 owners do not meet this condition.
+    bunker_groups = [
+        group
+        for groups in seen_sections.values()
+        for group in groups
+        if group in placeholder_groups
+        and code_candidate_text(group) == "04-05"
+        and "international transport" in group.casefold()
+    ]
+    canonical_bunker = next(
+        (group for group in bunker_groups if "(bunkers)" in group.casefold()),
+        "",
+    )
+    if canonical_bunker and len(set(bunker_groups)) > 1:
+        for groups in seen_sections.values():
+            retained: list[str] = []
+            for group in groups:
+                normalized = canonical_bunker if group in bunker_groups else group
+                if normalized not in retained:
+                    retained.append(normalized)
+            groups[:] = retained
+        placeholder_groups.difference_update(bunker_groups)
+        placeholder_groups.add(canonical_bunker)
 
     depth_overrides = {
         str(label).strip(): int(depth)
